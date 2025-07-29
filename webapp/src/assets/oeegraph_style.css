@@ -1,0 +1,24 @@
+@media screen {
+    /* Estilos para o card do gráfico na tela */
+     #oee-card-graph {
+        margin: 10px;
+        width: 98%;
+    }
+
+    /* Estilos para o gráfico em si na tela (Dashboard) */
+    #oee-graph {
+        height: 40vh !important; /* Altura que você deseja para a web (Dashboard) */
+        width: 99%; /* Ocupa 100% da largura do card pai na web (Dashboard) */
+    }
+}
+
+@media print {
+    /* Ajuste específico para o gráfico Plotly */
+    #oee-graph {
+        overflow: hidden !important;
+        height: 100%;
+        width: 100%;
+        /* Mantenha sem width/height aqui, pois o Python vai definir */
+    }
+    
+}

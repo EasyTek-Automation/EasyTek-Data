@@ -1,0 +1,67 @@
+@media screen {
+    #data-table {
+        width: 100%; /* Ocupa 100% da largura do card pai na web */
+        height: auto; /* Altura automática para a tela */
+        overflow-x: auto; /* Permite rolagem horizontal na tela */
+        font-size: 13px;
+        font-family: 'Arial', sans-serif;
+        text-align: center;
+    }
+
+    #data-table .dash-cell {
+        text-align: center;
+        font-size: 13px;
+        font-family: 'Arial', sans-serif;
+    }
+
+}
+
+@media print{
+    #break-before-msgtable {
+        page-break-before: always !important; /* Força uma nova página antes deste div */
+        height: 0 !important; /* Não deve ocupar espaço */
+        visibility: hidden !important; /* Não deve ser visível */
+        display: block !important; /* Precisa ser block para page-break-before funcionar */
+    }
+    /* Force uma quebra de página ANTES do card da tabela e adicione uma margem superior a ele */
+    #messagestable-cards-layout {
+        /* A margem superior da tabela será dada pelo padding-top do .subpage
+           e a quebra de página forçada pelo #break-before-msgtable */
+        margin-top: 0 !important; /* Garante que não haja margem extra aqui */
+    }
+    #data-table {
+        width: 100% !important;
+        height: auto !important;
+        overflow-x: hidden !important;
+        font-size: 11px !important;
+        font-family: 'Arial', sans-serif !important;
+        text-align: center !important;
+        
+    }
+    #data-table tr {
+        page-break-inside: avoid !important;
+        page-break-after: auto !important;
+    }
+    #data-table thead {
+        display: table-header-group !important;
+    }
+    #data-table .dash-cell {
+        text-align: center !important;
+        font-size: 11px !important;
+        white-space: normal !important;
+        word-wrap: break-word !important;
+        padding: 4px 6px !important;
+    }
+    #data-table .dash-cell-value {
+        background-color: white !important;
+        color: black !important;
+    }
+    #data-table tr:nth-child(odd) {
+        background-color: white !important;
+    }
+    #data-table tr:nth-child(even) {
+        background-color: lightgrey !important;
+    }
+
+
+}

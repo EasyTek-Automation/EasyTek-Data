@@ -1,0 +1,52 @@
+@import url('https://fonts.cdnfonts.com/css/dseg7-classic' );
+/* assets/supervisorio.css */
+
+/* Estilo para o nosso display digital customizado */
+.display-digital {
+    background-color: #b3b3b3; /* Fundo preto sólido */
+    color: #202020; /* Cor do texto vermelho vivo */
+    
+    /* Fonte que imita um display de 7 segmentos */
+    font-family: 'DSEG7 Classic', 'Courier New', monospace; 
+    
+    font-size: 3.5rem; /* Tamanho da fonte bem grande */
+    font-weight: bold; /* Negrito */
+    text-align: right; /* Alinha o número à direita, como em calculadoras */
+    
+    padding: 10px 15px; /* Espaçamento interno */
+    border: 2px solid #444444; /* Borda cinza escura sutil */
+    border-radius: 5px; /* Cantos levemente arredondados */
+    
+    height: auto; /* Altura automática para se ajustar ao tamanho da fonte */
+    width: 100%; /* Ocupa toda a largura do container pai */
+    box-sizing: border-box; /* Garante que padding e borda não aumentem a largura total */
+}
+
+/* Ajustes específicos para o componente dcc.Input */
+.display-digital.input-box {
+    /* Remove as setas de incremento/decremento no Chrome, Edge, etc. */
+    -webkit-appearance: none;
+    margin: 0;
+}
+.display-digital.input-box::-webkit-outer-spin-button,
+.display-digital.input-box::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Remove as setas no Firefox */
+.display-digital.input-box[type=number] {
+    -moz-appearance: textfield;
+}
+
+/* Estilo para o placeholder do Input */
+.display-digital.input-box::placeholder {
+    color: #6b6b6b; /* Cor do placeholder vermelho escuro */
+    font-size: 2rem; /* Tamanho da fonte do placeholder um pouco menor */
+    opacity: 0.8; /* Leve transparência */
+}
+
+/* Estilo para a Div que mostra o valor carregado */
+.display-digital.output-div {
+    line-height: 1.2; /* Ajusta a altura da linha para centralizar melhor o texto verticalmente */
+}

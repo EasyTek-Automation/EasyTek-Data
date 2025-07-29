@@ -1,0 +1,51 @@
+# pages/dashboard.py
+from dash import dcc, html
+import dash_bootstrap_components as dbc
+from datetime import datetime, timedelta
+
+# Importe seus componentes existentes
+from src.components.linegrapg01 import oeegraph_card_layout
+from src.components.kpicards01 import kpicards_cards_layout
+from src.components.msgtable01 import messagestable_cards_layout
+
+# ========= Layout da Página Dashboard =========== #
+layout = dbc.Container([
+    dbc.Col([ # Esta coluna agora representa o conteúdo principal da página
+    dbc.Row([
+        dbc.Card([
+            dbc.CardBody([
+                oeegraph_card_layout
+
+
+            ])
+
+        ],style={"margin": "10px", "width":"99%"})
+        
+    ]),
+    dbc.Row([ # Esta Row agrupa os cards de métricas (KPIs)
+        dbc.Card([
+            dbc.CardBody([
+                kpicards_cards_layout
+
+                
+            ])
+
+        ],style={"margin": "10px", "width":"99%"})
+        
+    ]),
+    dbc.Row([
+        dbc.Card([
+            dbc.CardBody([
+                messagestable_cards_layout
+
+                
+            ])
+
+        ],style={"margin": "10px", "width":"99%"})
+        
+    ])
+], 
+sm=12,
+
+)
+    ], fluid=True)

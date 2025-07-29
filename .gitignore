@@ -1,0 +1,77 @@
+
+# Ambiente virtual
+.venv/
+
+# Arquivo de variáveis de ambiente
+.env
+
+# Ferramentas locais
+tools/
+backups/
+
+# Arquivos temporários/excluídos
+*.py[cod]
+__pycache__/
+*.log
+*.tmp
+*~
+*.swp
+
+requirements copy
+ReunirProjeto
+docs/
+
+# ================================================= 
+# Arquivos de Ambiente e Credenciais (NÃO COMITAR) 
+# ================================================= 
+.env 
+*.env.*
+
+# ================================================= 
+# Dados de Serviços Docker (NÃO COMITAR)
+# ================================================= 
+# Contém certificados SSL e configurações do proxy 
+/nginx-proxy-manager/
+
+# ================================================= 
+# Dependências, Pacotes e Ambientes Virtuais 
+# ================================================= 
+# Python 
+.venv/ 
+*.egg-info/ 
+pip-wheel-metadata/
+
+# Node.js (para o Node-RED) 
+/node-red-config/node_modules/
+
+# ================================================= 
+# Arquivos de Cache, Logs e Temporários 
+# ================================================= 
+__pycache__/ 
+*.pyc 
+*.py[cod] 
+.DS_Store 
+Thumbs.db 
+*.log 
+*.log.* 
+*.tmp *~ 
+*.swp
+
+# ================================================= 
+# Arquivos e Pastas Específicas do Projeto a Ignorar 
+# ================================================= 
+/tools/ 
+/backups/ 
+/data/ 
+/cache/ 
+/docs/ 
+requirements copy 
+ReunirProjeto
+
+# ================================================= 
+# Arquivos de Configuração de IDEs 
+# ================================================= 
+.vscode/ 
+.idea/
+
+Unproject

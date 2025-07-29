@@ -1,0 +1,4 @@
+# Dependências para o serviço de gateway de eventos
+flask
+paho-mqtt
+gunicorn

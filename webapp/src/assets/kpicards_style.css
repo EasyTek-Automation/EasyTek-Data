@@ -1,0 +1,25 @@
+@media screen {
+
+
+}
+
+
+@media print {
+    /* Estilos para os cards de KPI */
+    #kpi-cards-row {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        justify-content: space-around !important;
+    }
+
+    #kpi-cards-row > .col-sm-3 {
+        flex: 0 0 48% !important; /* Ajuste para 2 colunas em retrato */
+        max-width: 48% !important;
+        padding: 5px !important;
+        margin-bottom: 10px !important;
+        box-sizing: border-box !important;
+    }
+
+
+
+}

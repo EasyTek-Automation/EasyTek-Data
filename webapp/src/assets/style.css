@@ -1,0 +1,167 @@
+@media screen {
+    
+    
+     #reports-print-page-wrapper {
+        /* Estilos para o "corpo" da página de relatório no navegador */
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+        min-height: 100vh;
+      
+        padding: 20px;
+    }
+
+    #main-print-container {
+        /* Estilos para o "papel" em si na visualização web (A4 Retrato) */
+        width: 210mm; /* Largura de A4 retrato */
+        min-height: 297mm; /* Altura de A4 retrato */
+        margin: 0;
+        border: 1px solid #d3d3d3;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+    
+        padding: 1cm;
+        box-sizing: border-box;
+    }
+
+    /* Estilos para os componentes dentro do "papel" na visualização web */
+ 
+
+    
+
+    
+
+    #main-print-container  {
+        /* Altura do gráfico na visualização web da página de relatório */
+        height: 300px; /* Ajuste conforme necessário para caber bem no "papel" */
+        width: 100%;
+    }
+
+    #main-print-container #data-table {
+        /* Estilos para a tabela na visualização web da página de relatório */
+        font-size: 12px;
+        overflow-x: auto; /* Permite rolagem horizontal na web */
+        width: 100%;
+    }
+
+
+    /* Adicione aqui quaisquer outros estilos específicos para a tela,
+       como para os KPIs, tabela, etc., se eles tiverem comportamentos diferentes
+       entre tela e impressão. */
+}
+
+
+@media print {
+    @page {
+        size: A4 portrait; /* Mude para retrato */
+        margin: 0; /* Essencial para controle total das margens pelo CSS */
+    }
+    html, body {
+        width: 210mm; /* Largura A4 retrato */
+        height: 297mm; /* Altura A4 retrato */
+        margin: 0;
+        padding: 0;
+        background-color: white !important;
+    }
+
+    /* Esconda elementos que NÃO devem ser impressos */
+    #sidebar-column,
+    #open-for-print-button,
+    .navbar,
+    .footer,
+    .dcc-link,
+    .d-inline-block,
+    .ms-auto,
+    .me-3,
+    .mt-2,
+    .mb-2,
+    .text-center.my-5.display-6.text-primary,
+    .lead.text-center.mb-4.text-muted,
+    .my-5 {
+        display: none !important;
+        visibility: hidden !important;
+    }
+
+    
+
+
+    /* Estilos para as "páginas" do relatório */
+     .page {
+        width: 210mm; /* Largura da página A4 retrato */
+        min-height: 297mm; /* Altura da página A4 retrato */
+        padding: 0mm;
+        margin: 0;
+        border: initial;
+        border-radius: initial;
+        background: white;
+        page-break-after: always;
+    }
+
+    .subpage {
+        padding: 1cm; /* Mantenha o padding */
+        height: auto;
+        min-height: 277mm; /* Ajuste para a altura útil de A4 retrato */
+    }
+
+    /* A última página não deve ter page-break-after */
+    .page:last-of-type {
+        page-break-after: avoid;
+    }
+   
+    
+    .report-section {
+        width: 100% !important;
+        margin-bottom: 10px !important; /* Espaçamento entre as seções */
+        /* Remova qualquer padding ou borda que o dbc.Card adicionava e que você não quer */
+        /* background-color: white; */ /* Se você quiser um fundo branco explícito */
+    }
+
+    /* Ou, uma abordagem mais simples se o .subpage sempre for o que quebra: */
+    /* Se o .subpage está quebrando, o padding-top dele deveria funcionar.
+       Se não funciona, pode ser que o navegador esteja ignorando-o em quebras.
+       Podemos tentar um pseudo-elemento. */
+
+    /* Tentar adicionar um espaço antes do conteúdo de cada nova página */
+
+
+    /* Para a primeira página, zere o espaço do pseudo-elemento */
+    
+
+    /* ==================================================================== */
+    /* FIM DA NOVA ESTRATÉGIA */
+    /* ==================================================================== */
+    
+
+    /* Torne visível apenas o container principal de impressão */
+   #main-print-container {
+        visibility: visible !important;
+        display: block !important;
+        width: 100% !important;
+        height: auto !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    
+
+    /* Ajustes para os cards dentro do relatório */
+    #oee-card-graph,
+    #kpi-main-card,
+    #messagestable-cards-layout {
+        width: 100% !important;
+        margin: 5px !important; /* Margem geral entre os cards */
+        padding: 5px !important;
+        box-sizing: border-box !important;
+        page-break-after: auto !important;
+        page-break-inside: avoid !important;
+        
+    }
+    #oee-card-graph,
+    #kpi-main-card {
+        margin-bottom: 1.5cm !important; /* Espaçamento entre os cards */
+    }
+    
+
+    
+    
+    
+}

@@ -1,0 +1,101 @@
+version: '3.8'
+
+services:
+  webapp:
+    build: ./webapp
+    ports:
+      - "8050:8050"
+    environment:
+      - MONGO_URI=${MONGO_URI}
+      - DB_NAME=${DB_NAME}
+      - GATEWAY_URL=${GATEWAY_URL}
+      - SECRET_KEY=${SECRET_KEY}
+      - COLLECTION_NAME=${COLLECTION_NAME}             
+      - OTHER_COLLECTION_NAME=${OTHER_COLLECTION_NAME} 
+      - ENERGY_COLLECTION=${ENERGY_COLLECTION}   
+    depends_on:
+      - event-gateway
+    networks:
+      - easytek-net
+
+  event-gateway:
+    build: ./event-gateway
+    ports:
+      - "5001:5001"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MQTT_BROKER_ADDRESS=${MQTT_BROKER_ADDRESS}
+      - MQTT_BROKER_PORT=${MQTT_BROKER_PORT}
+      - MQTT_USERNAME=${MQTT_USERNAME}
+      - MQTT_PASSWORD=${MQTT_PASSWORD}
+    networks:
+      - easytek-net
+
+  database:
+    # ... (sem alterações aqui)
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    networks:
+      - easytek-net
+    profiles:
+      - localdb
+
+  node-red:
+    container_name: node-red
+    build:
+      context: ./node-red
+    # A porta 1880 continua fechada para o exterior. Perfeito.
+    volumes:
+      - ./node-red-config:/data
+    restart: unless-stopped
+    networks:
+      - easytek-net
+
+  # === SERVIÇO NGINX PROXY MANAGER (SUBSTITUI O NGINX MANUAL) ===
+  nginx-proxy-manager:
+    image: 'jc21/nginx-proxy-manager:latest'
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    ports:
+      # Porta 80 para o tráfego HTTP (necessário para o desafio do Let's Encrypt)
+      - '80:80'
+      # Porta 443 para o tráfego HTTPS seguro
+      - '443:443'
+      # Porta 81 para a interface de administração
+      - '81:81'
+    volumes:
+      # Mapeia as pastas que criamos para persistir os dados
+      - ./nginx-proxy-manager/data:/data
+      - ./nginx-proxy-manager/letsencrypt:/etc/letsencrypt
+    networks:
+      - easytek-net
+  portainer:
+    image: portainer/portainer-ce:latest
+    container_name: portainer
+    command: -H unix:///var/run/docker.sock
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      # Mapeia o socket do Docker para que o Portainer possa gerenciar os contêineres
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Mapeia o volume nomeado para persistir os dados do Portainer
+      - portainer_data:/data
+    networks:
+      - easytek-net
+    
+      
+
+volumes:
+  mongo-data:
+  
+  # Declara o volume nomeado para o Portainer
+  portainer_data:
+  # O volume do NPM é gerenciado pelos bind mounts acima, não precisa de um volume nomeado aqui.
+
+networks:
+  easytek-net:
+    driver: bridge

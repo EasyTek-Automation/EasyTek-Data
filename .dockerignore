@@ -1,0 +1,28 @@
+# Ignorar ambiente virtual e caches do Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Ignorar arquivos de configuração de IDE e ferramentas
+.vscode/
+.idea/
+.DS_Store
+
+# Ignorar diretórios do Git
+.git/
+.gitignore
+
+# Ignorar pastas de suporte e dados não necessários na imagem final
+Backups/
+docs/
+tools/
+cache/
+data/
+
+# Ignorar arquivos de configuração local ou de build
+*.env
+Dockerfile
+docker-compose.yml
+README.md
