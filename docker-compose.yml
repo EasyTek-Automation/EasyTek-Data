@@ -45,14 +45,15 @@ services:
 
   node-red:
     container_name: node-red
-    build:
-      context: ./node-red
-    # A porta 1880 continua fechada para o exterior. Perfeito.
-    volumes:
-      - ./node-red-config:/data
+    image: nodered/node-red:latest  # Aponta para a imagem oficial
     restart: unless-stopped
+    volumes:
+      - ./node-red-config:/data # Mantém o mapeamento dos seus fluxos e configs
     networks:
       - easytek-net
+    # Comando que garante a instalação dos nós antes de iniciar
+    command: >
+      bash -c "cd /data && npm install --unsafe-perm --no-update-notifier --no-fund --only=production && npm start -- --userDir /data"
 
   # === SERVIÇO NGINX PROXY MANAGER (SUBSTITUI O NGINX MANUAL) ===
   nginx-proxy-manager:
