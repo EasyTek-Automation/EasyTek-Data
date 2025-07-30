@@ -55,24 +55,6 @@ services:
       - easytek-net
 
 
-  # === SERVIÇO NGINX PROXY MANAGER (SUBSTITUI O NGINX MANUAL) ===
-  nginx-proxy-manager:
-    image: 'jc21/nginx-proxy-manager:latest'
-    container_name: nginx-proxy-manager
-    restart: unless-stopped
-    ports:
-      # Porta 80 para o tráfego HTTP (necessário para o desafio do Let's Encrypt)
-      - '80:80'
-      # Porta 443 para o tráfego HTTPS seguro
-      - '443:443'
-      # Porta 81 para a interface de administração
-      - '81:81'
-    volumes:
-      # Mapeia as pastas que criamos para persistir os dados
-      - ./nginx-proxy-manager/data:/data
-      - ./nginx-proxy-manager/letsencrypt:/etc/letsencrypt
-    networks:
-      - easytek-net
   portainer:
     image: portainer/portainer-ce:latest
     container_name: portainer
@@ -98,4 +80,5 @@ volumes:
 
 networks:
   easytek-net:
-    driver: bridge
+    external: true
+
