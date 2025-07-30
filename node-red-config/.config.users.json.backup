@@ -28,14 +28,15 @@
                 "view-node-status": true,
                 "view-node-show-label": true,
                 "view-show-tips": true,
-                "view-show-welcome-tours": true
+                "view-show-welcome-tours": true,
+                "view-node-info-icon": true
             },
             "tours": {
-                "welcome": "4.0.9"
+                "welcome": "4.1.0"
             }
         },
         "debug": {
-            "filter": "filterCurrent"
+            "filter": "filterAll"
         }
     }
 }

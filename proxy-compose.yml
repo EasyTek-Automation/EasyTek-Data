@@ -1,7 +1,8 @@
+version: '3.8'
 services:
   nginx-proxy-manager:
     image: 'jc21/nginx-proxy-manager:latest'
-    container_name: nginx-proxy-manager
+    container_name: 'nginx-proxy-manager'
     restart: unless-stopped
     ports:
       - '80:80'
@@ -15,4 +16,5 @@ services:
 
 networks:
   easytek-net:
+    name: easytek-net
     driver: bridge
