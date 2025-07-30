@@ -17,6 +17,7 @@ from src.callbacks_registers.storetheme import register_storetheme_callbacks
 from src.callbacks_registers.states_switch_callback import register_states_switch_callback
 from src.callbacks_registers.sp_callback import register_sp_callback
 from src.callbacks_registers.tempgraph_callback import register_tempgraph_callbacks
+from src.callbacks_registers.main_layout_callbacks import register_main_layout_callbacks 
 
 # (Seu logger, se houver)
 
@@ -41,3 +42,4 @@ def register_callbacks(app):
     register_sp_callback(app)    
     register_energygraph_callbacks(app, collection_energia)
     register_tempgraph_callbacks(app, collection_temp)
+    register_main_layout_callbacks(app) 

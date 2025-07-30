@@ -165,3 +165,21 @@
     
     
 }
+
+/* Estilo para os ícones dentro dos links do menu dropdown */
+.dropdown-item .menu-icon svg {
+    /* Aumenta o tamanho do ícone. '1.2em' significa 1.2 vezes o tamanho da fonte do elemento pai. */
+    width: 1.6em;
+    height: 1.6em;
+
+    /* Adiciona uma margem à direita para separar o ícone do texto */
+    margin-right: 0.5rem; /* Equivalente à classe 'me-2' do Bootstrap */
+
+    /* Alinha o ícone verticalmente com o texto de forma mais precisa */
+    vertical-align: -0.2em; 
+}
+
+/* Remove o parágrafo (<p>) que o dcc.Markdown gera ao redor do SVG */
+.menu-icon p {
+    margin-bottom: 0;
+}
