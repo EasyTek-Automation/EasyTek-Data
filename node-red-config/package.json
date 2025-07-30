@@ -2,14 +2,5 @@
     "name": "node-red-project",
     "description": "A Node-RED Project",
     "version": "0.0.1",
-    "private": true,
-    "dependencies": {
-        "@flowfuse/node-red-dashboard": "~1.19.1",
-        "node-red-contrib-cip-st-ethernet-ip": "~2.0.3",
-        "node-red-contrib-modbus": "~5.43.0",
-        "node-red-contrib-mongodb4": "~3.1.1",
-        "node-red-contrib-pccc": "~1.0.2",
-        "node-red-contrib-siemens-sentron": "~0.0.41",
-        "node-red-node-mysql": "~2.0.0"
-    }
+    "private": true
 }
