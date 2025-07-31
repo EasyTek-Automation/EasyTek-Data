@@ -1,4 +1,3 @@
-version: '3.8'
 
 services:
   webapp:
@@ -45,34 +44,17 @@ services:
 
   node-red:
     container_name: node-red
-    image: nodered/node-red:latest  # Aponta para a imagem oficial
+    build: ./node-red
     restart: unless-stopped
     volumes:
-      - ./node-red-config:/data # Mantém o mapeamento dos seus fluxos e configs
+      # Volume para os nós, que será preenchido pelo conteúdo da imagem
+      - node_red_nodes:/data/node_modules
+      # Bind mount para seus arquivos de configuração, exceto os nós
+      - ./node-red-config:/data
     networks:
       - easytek-net
-    # Comando que garante a instalação dos nós antes de iniciar
-    command: >
-      bash -c "cd /data && npm install --unsafe-perm --no-update-notifier --no-fund --only=production && npm start -- --userDir /data"
 
-  # === SERVIÇO NGINX PROXY MANAGER (SUBSTITUI O NGINX MANUAL) ===
-  nginx-proxy-manager:
-    image: 'jc21/nginx-proxy-manager:latest'
-    container_name: nginx-proxy-manager
-    restart: unless-stopped
-    ports:
-      # Porta 80 para o tráfego HTTP (necessário para o desafio do Let's Encrypt)
-      - '80:80'
-      # Porta 443 para o tráfego HTTPS seguro
-      - '443:443'
-      # Porta 81 para a interface de administração
-      - '81:81'
-    volumes:
-      # Mapeia as pastas que criamos para persistir os dados
-      - ./nginx-proxy-manager/data:/data
-      - ./nginx-proxy-manager/letsencrypt:/etc/letsencrypt
-    networks:
-      - easytek-net
+
   portainer:
     image: portainer/portainer-ce:latest
     container_name: portainer
@@ -92,11 +74,10 @@ services:
 
 volumes:
   mongo-data:
-  
-  # Declara o volume nomeado para o Portainer
   portainer_data:
-  # O volume do NPM é gerenciado pelos bind mounts acima, não precisa de um volume nomeado aqui.
+  # Declara o novo volume nomeado
+  node_red_nodes:
 
 networks:
   easytek-net:
-    driver: bridge
+    external: true
