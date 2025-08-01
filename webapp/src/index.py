@@ -1,111 +1,103 @@
-# index.py 
+# webapp/src/index.py (VERSÃO FINAL COM SPINNER CUSTOMIZADO E TIMER)
 
-from dash import html, dcc, Input, Output
+from dash import html, dcc, Input, Output, State
+from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from flask_login import logout_user, current_user
-from dash.exceptions import PreventUpdate
 
 # --- Importações do Projeto ---
 from src.app import app
 from src.config import user_loader
-
-# 1. Importa os componentes de layout modulares
-from src.components import header
-from src.components import sidebar
-from src.components.stores import app_stores # <<< Importa a lista de Stores
-
-# 2. Importa as funções de registro de callbacks
-from src.callbacks import register_callbacks # Callbacks das páginas
-
-
-# 3. Importa os layouts das páginas
-from src.pages import (
-    dashboard as dashboard_page,
-    states as states_page,
-    login as login_page,
-    register as register_page,
-    superv as superv_page
-)
+from src.components import header, sidebar, stores
+from src.callbacks import register_callbacks
+from src.pages import dashboard, states, login, register, superv
 
 # --- Configurações Iniciais ---
-user_loader  # Garante que o loader do Flask-Login seja inicializado
+user_loader
 
 # --- Layout Principal do Aplicativo ---
-# O layout agora é apenas um esqueleto mínimo.
-# O conteúdo será preenchido dinamicamente pelo callback de roteamento.
 app.layout = html.Div([
     dcc.Location(id="url", refresh=False),
     dcc.Location(id='logout-url', refresh=True),
-    html.Div(id="app-container"),
+
+    # 1. NOSSO PRÓPRIO OVERLAY DE CARREGAMENTO. NOS DÁ CONTROLE TOTAL.
+    html.Div(
+        id='loading-overlay',
+        children=[dbc.Spinner(color="primary", size="lg")],
+        style={
+            'position': 'fixed',
+            'display': 'flex',
+            'justify-content': 'center',
+            'align-items': 'center',
+            'width': '100%',
+            'height': '100%',
+            'top': 0,
+            'left': 0,
+            'background-color': 'rgba(255, 255, 255, 0.8)', # Fundo branco semitransparente
+            'z-index': '1050', # z-index alto para ficar na frente de tudo
+            'visibility': 'visible' # Começa visível
+        }
+    ),
+
+    # 2. O container do app começa invisível e transparente para uma transição suave.
+    html.Div(id="app-container", style={'visibility': 'hidden', 'opacity': 0}),
+    
+    # 3. O timer para acionar a revelação do conteúdo.
+    dcc.Interval(id='reveal-timer', interval=1000, max_intervals=1, disabled=True)
 ])
 
-# --- Callback de Roteamento e Renderização de Conteúdo ---
+# --- Callback de Roteamento (Apenas monta o layout e ativa o timer) ---
 @app.callback(
     Output("app-container", "children"),
+    Output("reveal-timer", "disabled"),
     Input("url", "pathname")
 )
-def route_and_render_content(pathname):
-    """
-    Controla o roteamento da aplicação. Renderiza a página de login/registro
-    para usuários não autenticados ou o layout principal para usuários autenticados.
-    """
+def route_and_prepare_content(pathname):
     if not current_user.is_authenticated:
-        # Se o usuário NÃO estiver logado, mostra apenas as páginas de login/registro
-        if pathname == '/register':
-            return register_page.render_layout()
-        # Para qualquer outra URL, força o login
-        return login_page.render_layout()
+        if pathname == '/register': return register.render_layout(), False
+        return login.render_layout(), False
 
-    # --- Se o usuário ESTIVER logado, monta o layout principal ---
+    if pathname == "/": page_content = dashboard.layout
+    elif pathname == "/states": page_content = states.layout
+    elif pathname == "/superv" and hasattr(current_user, 'level') and (current_user.level in [2, 3]): page_content = superv.layout
+    else: page_content = html.Div([html.H2("404")])
 
-    # 1. Define o conteúdo da página (page_content) baseado na rota
-    if pathname == "/":
-        page_content = dashboard_page.layout
-    elif pathname == "/states":
-        page_content = states_page.layout
-    elif pathname == "/superv" and hasattr(current_user, 'level') and (current_user.level in [2, 3]):
-        page_content = superv_page.layout
-    else:
-        # Página padrão para rotas não encontradas ou sem permissão
-        page_content = html.Div([
-            html.H2("404: Página não encontrada ou Acesso Negado"),
-            html.P("Verifique a URL ou suas permissões de acesso."),
-            dcc.Link("Voltar ao Dashboard", href="/")
-        ], style={'textAlign': 'center', 'marginTop': '50px'})
-
-    # 2. Monta o layout completo da aplicação usando os módulos
     main_layout = html.Div([
-        # Insere todos os dcc.Store importados do módulo stores.py
-        *app_stores,
-
-        # Cria o header usando a função do módulo header.py
+        *stores.app_stores,
         header.create_header(pathname, current_user),
-
-        # Área Principal (Sidebar + Conteúdo da Página)
         html.Div([
-            # Coluna da Sidebar
-            html.Div(
-                [sidebar.create_sidebar_layout(app)],
-                id="sidebar-column",
-                style={"width": "25%", "height": "100%", "transition": "width 0.5s ease", "padding": "8px", "overflow": "hidden"}
-            ),
-            # Coluna do Conteúdo Principal, que recebe o page_content definido acima
-            html.Div(
-                [html.Div(page_content)],
-                id="content-column",
-                style={"width": "75%", "height": "100%", "transition": "width 0.5s ease", "overflowY": "auto"}
-            ),
-        ], id="main-container", style={
-            "position": "fixed", "top": "60px", "left": 0, "right": 0, "bottom": 0,
-            "display": "flex", "flexDirection": "row", "gap": "10px"
-        }),
-        
-        # Componentes globais como Toast e Interval
+            html.Div([sidebar.create_sidebar_layout(app)], id="sidebar-column", style={"width": "25%", "height": "100%", "transition": "width 0.5s ease", "padding": "8px", "overflow": "hidden"}),
+            html.Div([html.Div(page_content)], id="content-column", style={"width": "75%", "height": "100%", "transition": "width 0.5s ease", "overflowY": "auto"}),
+        ], id="main-container", style={"position": "fixed", "top": "60px", "left": 0, "right": 0, "bottom": 0, "display": "flex", "flexDirection": "row", "gap": "10px"}),
         dbc.Toast(id="toast-mqtt-status", header="Status da Publicação MQTT", is_open=False, dismissable=True, duration=4000, icon="info", style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999}),
         dcc.Interval(id='interval-component', interval=10 * 1000, n_intervals=0, disabled=False),
     ])
+    return main_layout, False
 
-    return main_layout
+# --- Callback para Revelar o Conteúdo (Acionado pelo Timer) ---
+@app.callback(
+    Output("app-container", "style"),
+    Output("loading-overlay", "style"),
+    Input("reveal-timer", "n_intervals")
+)
+def reveal_content_on_timer(n_intervals):
+    if n_intervals is None:
+        raise PreventUpdate
+
+    # Estilo para tornar o app visível com uma transição suave
+    app_style = {
+        'visibility': 'visible',
+        'opacity': 1,
+        'transition': 'opacity 0.5s ease-in'
+    }
+    # Estilo para esconder o overlay com uma transição suave
+    overlay_style = {
+        'visibility': 'hidden',
+        'opacity': 0,
+        'transition': 'visibility 0s 0.9s, opacity 0.9s ease'
+    }
+    
+    return app_style, overlay_style
 
 # --- Callback de Logout ---
 @app.callback(
@@ -120,8 +112,7 @@ def logout(n_clicks):
     return '/login'
 
 # --- Registro de Todos os Callbacks da Aplicação ---
-register_callbacks(app)             # Registra os callbacks específicos de cada página
-
+register_callbacks(app)
 
 # --- Ponto de Entrada da Aplicação ---
 if __name__ == '__main__':
