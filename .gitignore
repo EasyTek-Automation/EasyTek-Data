@@ -1,6 +1,7 @@
 
 # Ambiente virtual
 .venv/
+venv/
 
 # Arquivo de variáveis de ambiente
 .env
@@ -75,3 +76,5 @@ ReunirProjeto
 .idea/
 
 Unproject
+/node-red-config/
+
