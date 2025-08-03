@@ -8,14 +8,6 @@
         "env": []
     },
     {
-        "id": "e267ae6e6f7679c9",
-        "type": "tab",
-        "label": "Misturadores DB",
-        "disabled": false,
-        "info": "",
-        "env": []
-    },
-    {
         "id": "2d557e73cbc54abd",
         "type": "tab",
         "label": "Tratamento de Falhas",
@@ -76,90 +68,6 @@
         "y": 39,
         "w": 672,
         "h": 122
-    },
-    {
-        "id": "015611aa2a4f2790",
-        "type": "group",
-        "z": "e267ae6e6f7679c9",
-        "style": {
-            "fill": "#bfdbef",
-            "fill-opacity": "0.55",
-            "label": true,
-            "color": "#ff0000"
-        },
-        "nodes": [
-            "985297d396c0c0a5",
-            "1b312242d035b08f",
-            "65d5cc2cf3efeece",
-            "b9ae9be2f6320ca3",
-            "e65a3db2ec6caaf8",
-            "ce6d681fccbb6601",
-            "486cbf929029f717",
-            "348674a2a3df879a",
-            "0c643b6a01a9d50f",
-            "009e753369bace50",
-            "27b5b713bde95ee4",
-            "e6046b2c9ab7329a",
-            "60b7dedaafe53363",
-            "e26be427994b210f",
-            "68bcabeb2ca0604b",
-            "dcad07b51fd362ce",
-            "8f7660c885134022",
-            "812979136ebd5073",
-            "249f269f77700807",
-            "f3e03c1144373892",
-            "81be6047d2a69c83",
-            "9e1f971ef052a974",
-            "2ce11514d60d462e",
-            "f9db5f6599c17f82",
-            "8924b7f1ee2bc377",
-            "9b6847f2b0243b9e",
-            "a7dbd454985c6f88",
-            "a44b22e59404d4f4",
-            "516c0e32a5aa6434",
-            "116e5c88c05e56f9",
-            "cd1e0e5889a51057",
-            "267ec2732f501bc0",
-            "4d933062da152463",
-            "0dc65dd2a0ac279e",
-            "d164bdc7fa06474b",
-            "74aa99cbac64d3ae",
-            "fc31fef22ad9e119",
-            "67e3140a3fb8ee0b",
-            "59bc1ab666eda25e",
-            "5d7501c22ab91e1f",
-            "bd9b7968b034086d",
-            "2dedfda9b2e8e2d5",
-            "ee79b0f6312f470a",
-            "5010463cf135c7c6",
-            "254479a29d0d8f4a",
-            "f9068bfc2dd2064b",
-            "871a0ca5ef2c2817",
-            "f114a74684fede68",
-            "8074d9787d7d8429",
-            "35441a53fea084e7",
-            "c77d0088f3d4bd36"
-        ],
-        "x": 14,
-        "y": 19,
-        "w": 1212,
-        "h": 1462
-    },
-    {
-        "id": "6a91a74c073b51c4",
-        "type": "group",
-        "z": "e267ae6e6f7679c9",
-        "style": {
-            "fill": "#bfdbef",
-            "fill-opacity": "0.55",
-            "label": true,
-            "color": "#ff0000"
-        },
-        "nodes": [],
-        "x": 34,
-        "y": 1579,
-        "w": 40,
-        "h": 40
     },
     {
         "id": "5b5ca10ce118bd5f",
@@ -224,698 +132,6 @@
         "h": 40
     },
     {
-        "id": "1cdaecdf48901711",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "1",
-        "name": "",
-        "vartable": {
-            "": {
-                "InNR_TimeStamp": {
-                    "type": "REAL",
-                    "mapping": ""
-                },
-                "TempAmbiente_SimulatedSignal": {
-                    "type": "REAL",
-                    "mapping": ""
-                }
-            }
-        }
-    },
-    {
-        "id": "e34338f772f3d7da",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "1600",
-        "name": "PLC_Mist02",
-        "vartable": {
-            "": {
-                "SimOEE_Mist02.InDisp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InDisp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InDisp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InDisp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InDisp_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist02.InDisp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InDisp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist02.InDisp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist02.InDesemp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InDesemp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InDesemp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InDesemp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InDesempi_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist02.InDesemp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InDesemp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist02.InDesemp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist02.InQuali_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InQuali_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InQuali_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InQuali_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InQuali_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist02.InQuali_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.InQuali_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist02.InQuali_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist02.Out_OEE": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist02.Disp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist02.Desemp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist02.Quali_OutSignal": {
-                    "type": "REAL"
-                }
-            }
-        }
-    },
-    {
-        "id": "a90b1fafaf28ab5a",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "1500",
-        "name": "PLC_Mist01",
-        "vartable": {
-            "": {
-                "SimOEE_Mist01.InDisp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDisp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDisp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDisp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDisp_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.InDisp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDisp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist01.InDisp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.InDesemp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDesemp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDesemp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDesemp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDesempi_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.InDesemp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDesemp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist01.InDesemp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.InQuali_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InQuali_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InQuali_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InQuali_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InQuali_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.InQuali_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InQuali_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist01.InQuali_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.Out_OEE": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.Disp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.Desemp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.Quali_OutSignal": {
-                    "type": "REAL"
-                }
-            }
-        }
-    },
-    {
-        "id": "b21b2ee7870386a8",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "1700",
-        "name": "PLC_Mist03",
-        "vartable": {
-            "": {
-                "SimOEE_Mist03.InDisp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDisp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDisp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDisp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDisp_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.InDisp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDisp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist03.InDisp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.InDesemp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDesemp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDesemp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDesemp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDesempi_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.InDesemp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDesemp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist03.InDesemp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.InQuali_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InQuali_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InQuali_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InQuali_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InQuali_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.InQuali_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InQuali_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist03.InQuali_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.Out_OEE": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.Disp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.Desemp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.Quali_OutSignal": {
-                    "type": "REAL"
-                }
-            }
-        }
-    },
-    {
-        "id": "a070b994a7705195",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "1800",
-        "name": "PLC_Mist04",
-        "vartable": {
-            "": {
-                "SimOEE_Mist04.InDisp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDisp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDisp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDisp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDisp_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.InDisp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDisp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist04.InDisp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.InDesemp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDesemp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDesemp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDesemp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDesempi_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.InDesemp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDesemp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist04.InDesemp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.InQuali_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InQuali_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InQuali_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InQuali_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InQuali_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.InQuali_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InQuali_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist04.InQuali_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.Out_OEE": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.Disp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.Desemp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.Quali_OutSignal": {
-                    "type": "REAL"
-                }
-            }
-        }
-    },
-    {
-        "id": "0747325e74bc89c6",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "1900",
-        "name": "PLC_Mist05",
-        "vartable": {
-            "": {
-                "SimOEE_Mist05.InDisp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDisp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDisp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDisp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDisp_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.InDisp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDisp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist05.InDisp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.InDesemp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDesemp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDesemp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDesemp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDesempi_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.InDesemp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDesemp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist05.InDesemp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.InQuali_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InQuali_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InQuali_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InQuali_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InQuali_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.InQuali_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InQuali_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist05.InQuali_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.Out_OEE": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.Disp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.Desemp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.Quali_OutSignal": {
-                    "type": "REAL"
-                }
-            }
-        }
-    },
-    {
-        "id": "69cec9dd124da858",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "7500",
-        "name": "PLC_Mist06",
-        "vartable": {
-            "": {
-                "SimOEE_Mist06.InDisp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDisp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDisp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDisp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDisp_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.InDisp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDisp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist06.InDisp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.InDesemp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDesemp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDesemp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDesemp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDesempi_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.InDesemp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDesemp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist06.InDesemp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.InQuali_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InQuali_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InQuali_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InQuali_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InQuali_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.InQuali_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InQuali_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist06.InQuali_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.Out_OEE": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.Disp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.Desemp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.Quali_OutSignal": {
-                    "type": "REAL"
-                }
-            }
-        }
-    },
-    {
-        "id": "8b0fb837524aeb55",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "1500",
-        "name": "PLC_Mist01",
-        "vartable": {
-            "": {
-                "SimOEE_Mist01.InDisp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDisp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDisp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDisp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDisp_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.InDisp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDisp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist01.InDisp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.InDesemp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDesemp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDesemp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDesemp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDesempi_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.InDesemp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InDesemp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist01.InDesemp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.InQuali_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InQuali_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InQuali_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InQuali_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InQuali_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.InQuali_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist01.InQuali_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist01.InQuali_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.Out_OEE": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.Disp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.Desemp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist01.Quali_OutSignal": {
-                    "type": "REAL"
-                }
-            }
-        }
-    },
-    {
         "id": "3c6b59080ecf5485",
         "type": "mongodb4-client",
         "name": "",
@@ -938,441 +154,6 @@
         "uri": "mongodb+srv://rgustavo32s:Eletrica14@cluster-easytek.eljwyem.mongodb.net/?retryWrites=true&w=majority&appName=Cluster-EasyTek",
         "advanced": "{}",
         "uriTabActive": "tab-uri-advanced"
-    },
-    {
-        "id": "df678ea9d8fcf8e3",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "1700",
-        "name": "PLC_Mist03",
-        "vartable": {
-            "": {
-                "SimOEE_Mist03.InDisp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDisp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDisp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDisp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDisp_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.InDisp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDisp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist03.InDisp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.InDesemp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDesemp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDesemp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDesemp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDesempi_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.InDesemp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InDesemp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist03.InDesemp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.InQuali_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InQuali_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InQuali_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InQuali_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InQuali_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.InQuali_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist03.InQuali_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist03.InQuali_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.Out_OEE": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.Disp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.Desemp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist03.Quali_OutSignal": {
-                    "type": "REAL"
-                }
-            }
-        }
-    },
-    {
-        "id": "a035a321b76c51b1",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "1800",
-        "name": "PLC_Mist04",
-        "vartable": {
-            "": {
-                "SimOEE_Mist04.InDisp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDisp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDisp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDisp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDisp_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.InDisp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDisp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist04.InDisp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.InDesemp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDesemp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDesemp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDesemp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDesempi_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.InDesemp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InDesemp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist04.InDesemp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.InQuali_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InQuali_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InQuali_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InQuali_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InQuali_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.InQuali_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist04.InQuali_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist04.InQuali_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.Out_OEE": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.Disp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.Desemp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist04.Quali_OutSignal": {
-                    "type": "REAL"
-                }
-            }
-        }
-    },
-    {
-        "id": "7bce76502936086c",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "1900",
-        "name": "PLC_Mist05",
-        "vartable": {
-            "": {
-                "SimOEE_Mist05.InDisp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDisp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDisp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDisp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDisp_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.InDisp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDisp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist05.InDisp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.InDesemp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDesemp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDesemp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDesemp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDesempi_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.InDesemp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InDesemp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist05.InDesemp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.InQuali_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InQuali_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InQuali_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InQuali_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InQuali_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.InQuali_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist05.InQuali_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist05.InQuali_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.Out_OEE": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.Disp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.Desemp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist05.Quali_OutSignal": {
-                    "type": "REAL"
-                }
-            }
-        }
-    },
-    {
-        "id": "3b03147ca184ebf7",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "7500",
-        "name": "PLC_Mist06",
-        "vartable": {
-            "": {
-                "SimOEE_Mist06.InDisp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDisp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDisp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDisp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDisp_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.InDisp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDisp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist06.InDisp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.InDesemp_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDesemp_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDesemp_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDesemp_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDesempi_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.InDesemp_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InDesemp_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist06.InDesemp_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.InQuali_Precisao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InQuali_TPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InQuali_SPJanelaTend": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InQuali_Variacao": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InQuali_SPSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.InQuali_MinAceitavel": {
-                    "type": "DINT"
-                },
-                "SimOEE_Mist06.InQuali_EventExec": {
-                    "type": "BOOL"
-                },
-                "SimOEE_Mist06.InQuali_TimeStamp": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.Out_OEE": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.Disp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.Desemp_OutSignal": {
-                    "type": "REAL"
-                },
-                "SimOEE_Mist06.Quali_OutSignal": {
-                    "type": "REAL"
-                }
-            }
-        }
-    },
-    {
-        "id": "5e5ac4d7ada44fe6",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "500",
-        "name": "CPU_Falhas",
-        "vartable": {
-            "": {
-                "CodFalha_Mist01": {
-                    "type": "DINT"
-                },
-                "CodFalha_Mist02": {
-                    "type": "DINT"
-                },
-                "CodFalha_Mist03": {
-                    "type": "DINT"
-                },
-                "CodFalha_Mist04": {
-                    "type": "DINT"
-                },
-                "CodFalha_Mist05": {
-                    "type": "DINT"
-                },
-                "CodFalha_Mist06": {
-                    "type": "DINT"
-                },
-                "Trigger_Mist01": {
-                    "type": "DINT"
-                },
-                "Trigger_Mist02": {
-                    "type": "DINT"
-                },
-                "Trigger_Mist03": {
-                    "type": "DINT"
-                },
-                "Trigger_Mist04": {
-                    "type": "DINT"
-                },
-                "Trigger_Mist05": {
-                    "type": "DINT"
-                },
-                "Trigger_Mist06": {
-                    "type": "DINT"
-                },
-                "CodFalha_Decapado": {
-                    "type": "DINT"
-                }
-            }
-        }
     },
     {
         "id": "c681a42ffddbb03b",
@@ -1404,188 +185,902 @@
         "address": "192.168.50.190",
         "slot": "0",
         "cycletime": "1500",
-        "name": "PLC_Decapado",
+        "timeout": 10000,
+        "name": "PLC_SimFactory",
+        "connectedMess": false,
         "vartable": {
             "": {
                 "SimOEE_Decapado.InDisp_Precisao": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDisp_TPJanelaTend": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDisp_SPJanelaTend": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDisp_Variacao": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDisp_SPSignal": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDisp_MinAceitavel": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDisp_EventExec": {
-                    "type": "BOOL"
+                    "type": "BOOL",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDisp_TimeStamp": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDesemp_Precisao": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDesemp_TPJanelaTend": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDesemp_SPJanelaTend": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDesemp_Variacao": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDesempi_SPSignal": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDesemp_MinAceitavel": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDesemp_EventExec": {
-                    "type": "BOOL"
+                    "type": "BOOL",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InDesemp_TimeStamp": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InQuali_Precisao": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InQuali_TPJanelaTend": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InQuali_SPJanelaTend": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InQuali_Variacao": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InQuali_SPSignal": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InQuali_MinAceitavel": {
-                    "type": "DINT"
+                    "type": "DINT",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InQuali_EventExec": {
-                    "type": "BOOL"
+                    "type": "BOOL",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.InQuali_TimeStamp": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.Out_OEE": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.Disp_OutSignal": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.Desemp_OutSignal": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "SimOEE_Decapado.Quali_OutSignal": {
-                    "type": "REAL"
-                }
-            }
-        }
-    },
-    {
-        "id": "31d865d63bc2100f",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "2500",
-        "name": "DecapadoEnergia",
-        "vartable": {
-            "": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
                 "CorrenteFase_Decapado_SignalR": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "CorrenteFase_Decapado_SignalS": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "CorrenteFase_Decapado_SignalT": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "ConsumoEnergia_Decapado_Signal": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "Temp_Decapado_SignalR": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "Temp_Decapado_SignalS": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "Temp_Decapado_SignalT": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "Temp_Decapado_Signal": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "Temp_DecapadoR.SP_SimulatedSignal": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "Temp_DecapadoS.SP_SimulatedSignal": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "Temp_DecapadoT.SP_SimulatedSignal": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
                 "Temp_Decapado.SP_SimulatedSignal": {
-                    "type": "REAL"
-                }
-            }
-        }
-    },
-    {
-        "id": "65275923969c5f61",
-        "type": "eth-ip endpoint",
-        "address": "192.168.50.190",
-        "slot": "0",
-        "cycletime": "2500",
-        "name": "DecapadoEnergia",
-        "vartable": {
-            "": {
-                "CorrenteFase_Decapado_SignalR": {
-                    "type": "REAL"
+                    "type": "REAL",
+                    "mapping": ""
                 },
-                "CorrenteFase_Decapado_SignalS": {
-                    "type": "REAL"
+                "SimOEE_Mist01.InDisp_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
                 },
-                "CorrenteFase_Decapado_SignalT": {
-                    "type": "REAL"
+                "SimOEE_Mist01.InDisp_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
                 },
-                "ConsumoEnergia_Decapado_Signal": {
-                    "type": "REAL"
+                "SimOEE_Mist01.InDisp_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
                 },
-                "Temp_Decapado_SignalR": {
-                    "type": "REAL"
+                "SimOEE_Mist01.InDisp_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
                 },
-                "Temp_Decapado_SignalS": {
-                    "type": "REAL"
+                "SimOEE_Mist01.InDisp_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
                 },
-                "Temp_Decapado_SignalT": {
-                    "type": "REAL"
+                "SimOEE_Mist01.InDisp_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
                 },
-                "Temp_Decapado_Signal": {
-                    "type": "REAL"
+                "SimOEE_Mist01.InDisp_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
                 },
-                "Temp_DecapadoR.SP_SimulatedSignal": {
-                    "type": "REAL"
+                "SimOEE_Mist01.InDisp_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
                 },
-                "Temp_DecapadoS.SP_SimulatedSignal": {
-                    "type": "REAL"
+                "SimOEE_Mist01.InDesemp_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
                 },
-                "Temp_DecapadoT.SP_SimulatedSignal": {
-                    "type": "REAL"
+                "SimOEE_Mist01.InDesemp_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
                 },
-                "Temp_Decapado.SP_SimulatedSignal": {
-                    "type": "REAL"
+                "SimOEE_Mist01.InDesemp_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.InDesemp_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.InDesempi_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.InDesemp_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.InDesemp_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.InDesemp_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.InQuali_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.InQuali_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.InQuali_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.InQuali_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.InQuali_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.InQuali_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.InQuali_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.InQuali_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.Out_OEE": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.Disp_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.Desemp_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist01.Quali_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDisp_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDisp_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDisp_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDisp_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDisp_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDisp_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDisp_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDisp_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDesemp_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDesemp_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDesemp_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDesemp_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDesempi_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDesemp_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDesemp_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InDesemp_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InQuali_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InQuali_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InQuali_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InQuali_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InQuali_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InQuali_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InQuali_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.InQuali_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.Out_OEE": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.Disp_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.Desemp_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist02.Quali_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDisp_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDisp_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDisp_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDisp_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDisp_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDisp_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDisp_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDisp_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDesemp_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDesemp_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDesemp_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDesemp_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDesempi_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDesemp_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDesemp_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InDesemp_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InQuali_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InQuali_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InQuali_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InQuali_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InQuali_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InQuali_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InQuali_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.InQuali_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.Out_OEE": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.Disp_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.Desemp_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist03.Quali_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDisp_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDisp_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDisp_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDisp_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDisp_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDisp_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDisp_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDisp_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDesemp_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDesemp_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDesemp_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDesemp_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDesempi_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDesemp_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDesemp_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InDesemp_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InQuali_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InQuali_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InQuali_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InQuali_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InQuali_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InQuali_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InQuali_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.InQuali_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.Out_OEE": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.Disp_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.Desemp_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist04.Quali_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDisp_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDisp_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDisp_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDisp_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDisp_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDisp_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDisp_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDisp_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDesemp_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDesemp_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDesemp_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDesemp_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDesempi_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDesemp_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDesemp_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InDesemp_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InQuali_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InQuali_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InQuali_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InQuali_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InQuali_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InQuali_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InQuali_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.InQuali_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.Out_OEE": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.Disp_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.Desemp_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist05.Quali_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDisp_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDisp_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDisp_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDisp_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDisp_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDisp_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDisp_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDisp_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDesemp_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDesemp_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDesemp_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDesemp_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDesempi_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDesemp_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDesemp_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InDesemp_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InQuali_Precisao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InQuali_TPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InQuali_SPJanelaTend": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InQuali_Variacao": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InQuali_SPSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InQuali_MinAceitavel": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InQuali_EventExec": {
+                    "type": "BOOL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.InQuali_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.Out_OEE": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.Disp_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.Desemp_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "SimOEE_Mist06.Quali_OutSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "InNR_TimeStamp": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "TempAmbiente_SimulatedSignal": {
+                    "type": "REAL",
+                    "mapping": ""
+                },
+                "CodFalha_Mist01": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "CodFalha_Mist02": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "CodFalha_Mist03": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "CodFalha_Mist04": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "CodFalha_Mist05": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "CodFalha_Mist06": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "Trigger_Mist01": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "Trigger_Mist02": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "Trigger_Mist03": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "Trigger_Mist04": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "Trigger_Mist05": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "Trigger_Mist06": {
+                    "type": "DINT",
+                    "mapping": ""
+                },
+                "CodFalha_Decapado": {
+                    "type": "DINT",
+                    "mapping": ""
                 }
             }
         }
@@ -1706,12 +1201,12 @@
         "type": "eth-ip out",
         "z": "8e69476215f7ebaf",
         "g": "b836b91426a78051",
-        "endpoint": "1cdaecdf48901711",
+        "endpoint": "3b57fe1078701342",
         "variable": "InNR_TimeStamp",
         "program": "",
         "name": "",
         "x": 590,
-        "y": 120,
+        "y": 100,
         "wires": []
     },
     {
@@ -1734,1055 +1229,6 @@
                 "ec02628adfedf811"
             ]
         ]
-    },
-    {
-        "id": "985297d396c0c0a5",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "a90b1fafaf28ab5a",
-        "mode": "single",
-        "variable": "SimOEE_Mist01.Out_OEE",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 150,
-        "y": 60,
-        "wires": [
-            [
-                "a44b22e59404d4f4"
-            ]
-        ]
-    },
-    {
-        "id": "1b312242d035b08f",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "a90b1fafaf28ab5a",
-        "mode": "single",
-        "variable": "SimOEE_Mist01.Disp_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 170,
-        "y": 120,
-        "wires": [
-            [
-                "516c0e32a5aa6434"
-            ]
-        ]
-    },
-    {
-        "id": "65d5cc2cf3efeece",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "a90b1fafaf28ab5a",
-        "mode": "single",
-        "variable": "SimOEE_Mist01.Desemp_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 180,
-        "y": 180,
-        "wires": [
-            [
-                "116e5c88c05e56f9"
-            ]
-        ]
-    },
-    {
-        "id": "b9ae9be2f6320ca3",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "a90b1fafaf28ab5a",
-        "mode": "single",
-        "variable": "SimOEE_Mist01.Quali_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 170,
-        "y": 240,
-        "wires": [
-            [
-                "cd1e0e5889a51057"
-            ]
-        ]
-    },
-    {
-        "id": "e65a3db2ec6caaf8",
-        "type": "join",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "",
-        "mode": "custom",
-        "build": "object",
-        "property": "payload",
-        "propertyType": "msg",
-        "key": "topic",
-        "joiner": "\\n",
-        "joinerType": "str",
-        "useparts": false,
-        "accumulate": true,
-        "timeout": "",
-        "count": "24",
-        "reduceRight": false,
-        "reduceExp": "",
-        "reduceInit": "",
-        "reduceInitType": "",
-        "reduceFixup": "",
-        "x": 1140,
-        "y": 340,
-        "wires": [
-            [
-                "0f9b5975caeaa3ab",
-                "261e597b7e272e3b"
-            ]
-        ]
-    },
-    {
-        "id": "ce6d681fccbb6601",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "e34338f772f3d7da",
-        "mode": "single",
-        "variable": "SimOEE_Mist02.Out_OEE",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 150,
-        "y": 300,
-        "wires": [
-            [
-                "267ec2732f501bc0"
-            ]
-        ]
-    },
-    {
-        "id": "486cbf929029f717",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "e34338f772f3d7da",
-        "mode": "single",
-        "variable": "SimOEE_Mist02.Disp_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 170,
-        "y": 360,
-        "wires": [
-            [
-                "4d933062da152463"
-            ]
-        ]
-    },
-    {
-        "id": "348674a2a3df879a",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "e34338f772f3d7da",
-        "mode": "single",
-        "variable": "SimOEE_Mist02.Desemp_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 180,
-        "y": 420,
-        "wires": [
-            [
-                "0dc65dd2a0ac279e"
-            ]
-        ]
-    },
-    {
-        "id": "0c643b6a01a9d50f",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "e34338f772f3d7da",
-        "mode": "single",
-        "variable": "SimOEE_Mist02.Quali_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 170,
-        "y": 480,
-        "wires": [
-            [
-                "d164bdc7fa06474b"
-            ]
-        ]
-    },
-    {
-        "id": "009e753369bace50",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "b21b2ee7870386a8",
-        "mode": "single",
-        "variable": "SimOEE_Mist03.Out_OEE",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 150,
-        "y": 540,
-        "wires": [
-            [
-                "74aa99cbac64d3ae"
-            ]
-        ]
-    },
-    {
-        "id": "27b5b713bde95ee4",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "b21b2ee7870386a8",
-        "mode": "single",
-        "variable": "SimOEE_Mist03.Disp_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 170,
-        "y": 600,
-        "wires": [
-            [
-                "fc31fef22ad9e119"
-            ]
-        ]
-    },
-    {
-        "id": "e6046b2c9ab7329a",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "b21b2ee7870386a8",
-        "mode": "single",
-        "variable": "SimOEE_Mist03.Desemp_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 180,
-        "y": 660,
-        "wires": [
-            [
-                "67e3140a3fb8ee0b"
-            ]
-        ]
-    },
-    {
-        "id": "60b7dedaafe53363",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "b21b2ee7870386a8",
-        "mode": "single",
-        "variable": "SimOEE_Mist03.Quali_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 170,
-        "y": 720,
-        "wires": [
-            [
-                "59bc1ab666eda25e"
-            ]
-        ]
-    },
-    {
-        "id": "e26be427994b210f",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "a070b994a7705195",
-        "mode": "single",
-        "variable": "SimOEE_Mist04.Out_OEE",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 150,
-        "y": 780,
-        "wires": [
-            [
-                "5d7501c22ab91e1f"
-            ]
-        ]
-    },
-    {
-        "id": "68bcabeb2ca0604b",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "a070b994a7705195",
-        "mode": "single",
-        "variable": "SimOEE_Mist04.Disp_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 170,
-        "y": 840,
-        "wires": [
-            [
-                "bd9b7968b034086d"
-            ]
-        ]
-    },
-    {
-        "id": "dcad07b51fd362ce",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "a070b994a7705195",
-        "mode": "single",
-        "variable": "SimOEE_Mist04.Desemp_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 180,
-        "y": 900,
-        "wires": [
-            [
-                "2dedfda9b2e8e2d5"
-            ]
-        ]
-    },
-    {
-        "id": "8f7660c885134022",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "a070b994a7705195",
-        "mode": "single",
-        "variable": "SimOEE_Mist04.Quali_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 170,
-        "y": 960,
-        "wires": [
-            [
-                "ee79b0f6312f470a"
-            ]
-        ]
-    },
-    {
-        "id": "812979136ebd5073",
-        "type": "link out",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "AA01",
-        "mode": "link",
-        "links": [
-            "a7dbd454985c6f88"
-        ],
-        "x": 1095,
-        "y": 1080,
-        "wires": []
-    },
-    {
-        "id": "249f269f77700807",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "0747325e74bc89c6",
-        "mode": "single",
-        "variable": "SimOEE_Mist05.Out_OEE",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 150,
-        "y": 1020,
-        "wires": [
-            [
-                "5010463cf135c7c6"
-            ]
-        ]
-    },
-    {
-        "id": "f3e03c1144373892",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "0747325e74bc89c6",
-        "mode": "single",
-        "variable": "SimOEE_Mist05.Disp_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 170,
-        "y": 1080,
-        "wires": [
-            [
-                "254479a29d0d8f4a"
-            ]
-        ]
-    },
-    {
-        "id": "81be6047d2a69c83",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "0747325e74bc89c6",
-        "mode": "single",
-        "variable": "SimOEE_Mist05.Desemp_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 180,
-        "y": 1140,
-        "wires": [
-            [
-                "f9068bfc2dd2064b"
-            ]
-        ]
-    },
-    {
-        "id": "9e1f971ef052a974",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "0747325e74bc89c6",
-        "mode": "single",
-        "variable": "SimOEE_Mist05.Quali_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 170,
-        "y": 1200,
-        "wires": [
-            [
-                "871a0ca5ef2c2817"
-            ]
-        ]
-    },
-    {
-        "id": "2ce11514d60d462e",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "69cec9dd124da858",
-        "mode": "single",
-        "variable": "SimOEE_Mist06.Out_OEE",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 150,
-        "y": 1260,
-        "wires": [
-            [
-                "f114a74684fede68"
-            ]
-        ]
-    },
-    {
-        "id": "f9db5f6599c17f82",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "69cec9dd124da858",
-        "mode": "single",
-        "variable": "SimOEE_Mist06.Disp_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 170,
-        "y": 1320,
-        "wires": [
-            [
-                "8074d9787d7d8429"
-            ]
-        ]
-    },
-    {
-        "id": "8924b7f1ee2bc377",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "69cec9dd124da858",
-        "mode": "single",
-        "variable": "SimOEE_Mist06.Desemp_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 180,
-        "y": 1380,
-        "wires": [
-            [
-                "35441a53fea084e7"
-            ]
-        ]
-    },
-    {
-        "id": "9b6847f2b0243b9e",
-        "type": "eth-ip in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "endpoint": "69cec9dd124da858",
-        "mode": "single",
-        "variable": "SimOEE_Mist06.Quali_OutSignal",
-        "program": "",
-        "name": "",
-        "outputs": 1,
-        "x": 170,
-        "y": 1440,
-        "wires": [
-            [
-                "c77d0088f3d4bd36"
-            ]
-        ]
-    },
-    {
-        "id": "a7dbd454985c6f88",
-        "type": "link in",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "AO01",
-        "links": [
-            "812979136ebd5073"
-        ],
-        "x": 745,
-        "y": 120,
-        "wires": [
-            [
-                "e65a3db2ec6caaf8"
-            ]
-        ]
-    },
-    {
-        "id": "a44b22e59404d4f4",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 160,
-        "wires": [
-            [
-                "e65a3db2ec6caaf8"
-            ]
-        ]
-    },
-    {
-        "id": "516c0e32a5aa6434",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 200,
-        "wires": [
-            [
-                "e65a3db2ec6caaf8"
-            ]
-        ]
-    },
-    {
-        "id": "116e5c88c05e56f9",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 240,
-        "wires": [
-            [
-                "e65a3db2ec6caaf8"
-            ]
-        ]
-    },
-    {
-        "id": "cd1e0e5889a51057",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 280,
-        "wires": [
-            [
-                "e65a3db2ec6caaf8"
-            ]
-        ]
-    },
-    {
-        "id": "267ec2732f501bc0",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 320,
-        "wires": [
-            [
-                "e65a3db2ec6caaf8"
-            ]
-        ]
-    },
-    {
-        "id": "4d933062da152463",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 360,
-        "wires": [
-            [
-                "e65a3db2ec6caaf8"
-            ]
-        ]
-    },
-    {
-        "id": "0dc65dd2a0ac279e",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 400,
-        "wires": [
-            [
-                "e65a3db2ec6caaf8"
-            ]
-        ]
-    },
-    {
-        "id": "d164bdc7fa06474b",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 440,
-        "wires": [
-            [
-                "e65a3db2ec6caaf8"
-            ]
-        ]
-    },
-    {
-        "id": "74aa99cbac64d3ae",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 480,
-        "wires": [
-            [
-                "e65a3db2ec6caaf8"
-            ]
-        ]
-    },
-    {
-        "id": "fc31fef22ad9e119",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 520,
-        "wires": [
-            [
-                "e65a3db2ec6caaf8"
-            ]
-        ]
-    },
-    {
-        "id": "67e3140a3fb8ee0b",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 560,
-        "wires": [
-            [
-                "e65a3db2ec6caaf8"
-            ]
-        ]
-    },
-    {
-        "id": "59bc1ab666eda25e",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 600,
-        "wires": [
-            [
-                "e65a3db2ec6caaf8"
-            ]
-        ]
-    },
-    {
-        "id": "5d7501c22ab91e1f",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 880,
-        "wires": [
-            [
-                "812979136ebd5073"
-            ]
-        ]
-    },
-    {
-        "id": "bd9b7968b034086d",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 920,
-        "wires": [
-            [
-                "812979136ebd5073"
-            ]
-        ]
-    },
-    {
-        "id": "2dedfda9b2e8e2d5",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 960,
-        "wires": [
-            [
-                "812979136ebd5073"
-            ]
-        ]
-    },
-    {
-        "id": "ee79b0f6312f470a",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 1000,
-        "wires": [
-            [
-                "812979136ebd5073"
-            ]
-        ]
-    },
-    {
-        "id": "5010463cf135c7c6",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 1040,
-        "wires": [
-            [
-                "812979136ebd5073"
-            ]
-        ]
-    },
-    {
-        "id": "254479a29d0d8f4a",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 1080,
-        "wires": [
-            [
-                "812979136ebd5073"
-            ]
-        ]
-    },
-    {
-        "id": "f9068bfc2dd2064b",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 1120,
-        "wires": [
-            [
-                "812979136ebd5073"
-            ]
-        ]
-    },
-    {
-        "id": "871a0ca5ef2c2817",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 1160,
-        "wires": [
-            [
-                "812979136ebd5073"
-            ]
-        ]
-    },
-    {
-        "id": "f114a74684fede68",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 1200,
-        "wires": [
-            [
-                "812979136ebd5073"
-            ]
-        ]
-    },
-    {
-        "id": "8074d9787d7d8429",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 1240,
-        "wires": [
-            [
-                "812979136ebd5073"
-            ]
-        ]
-    },
-    {
-        "id": "35441a53fea084e7",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 1280,
-        "wires": [
-            [
-                "812979136ebd5073"
-            ]
-        ]
-    },
-    {
-        "id": "c77d0088f3d4bd36",
-        "type": "function",
-        "z": "e267ae6e6f7679c9",
-        "g": "015611aa2a4f2790",
-        "name": "Verifica se <1",
-        "func": "// Esta função será usada dentro de um nó de função no Node-RED\nif (typeof msg.payload === 'number' && msg.payload <= 1) {\n    // Retorna a mensagem com apenas o topic e o payload\n    return { topic: msg.topic, payload: msg.payload };\n} else {\n    // Retorna null para interromper o fluxo se a condição não for atendida\n    return null;\n}\n",
-        "outputs": 1,
-        "timeout": 0,
-        "noerr": 0,
-        "initialize": "",
-        "finalize": "",
-        "libs": [],
-        "x": 680,
-        "y": 1320,
-        "wires": [
-            [
-                "812979136ebd5073"
-            ]
-        ]
-    },
-    {
-        "id": "0f9b5975caeaa3ab",
-        "type": "link out",
-        "z": "e267ae6e6f7679c9",
-        "name": "link out 1",
-        "mode": "link",
-        "links": [],
-        "x": 1335,
-        "y": 340,
-        "wires": []
-    },
-    {
-        "id": "261e597b7e272e3b",
-        "type": "debug",
-        "z": "e267ae6e6f7679c9",
-        "name": "debug 6",
-        "active": false,
-        "tosidebar": true,
-        "console": false,
-        "tostatus": false,
-        "complete": "false",
-        "statusVal": "",
-        "statusType": "auto",
-        "x": 1300,
-        "y": 740,
-        "wires": []
     },
     {
         "id": "14f60c83feae1c69",
@@ -2988,11 +1434,14 @@
         "id": "6a2f0c77bba083d0",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "8b0fb837524aeb55",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist01.Out_OEE",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 130,
         "y": 140,
@@ -3006,11 +1455,14 @@
         "id": "9e08b4b111eaadfe",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "8b0fb837524aeb55",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist01.Disp_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 150,
         "y": 200,
@@ -3024,11 +1476,14 @@
         "id": "c4df3856ad6180c7",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "8b0fb837524aeb55",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist01.Desemp_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 160,
         "y": 260,
@@ -3042,11 +1497,14 @@
         "id": "40658b1c09eec1d4",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "8b0fb837524aeb55",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist01.Quali_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 150,
         "y": 320,
@@ -3080,11 +1538,14 @@
         "id": "d4d4b4fe468787e0",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "e34338f772f3d7da",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist02.Out_OEE",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 130,
         "y": 460,
@@ -3098,11 +1559,14 @@
         "id": "a7b402caa20fa8d2",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "e34338f772f3d7da",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist02.Disp_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 150,
         "y": 520,
@@ -3116,11 +1580,14 @@
         "id": "f3fd92630ff02106",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "e34338f772f3d7da",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist02.Desemp_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 160,
         "y": 580,
@@ -3134,11 +1601,14 @@
         "id": "477a6ce48a2a37e3",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "e34338f772f3d7da",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist02.Quali_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 150,
         "y": 640,
@@ -3256,11 +1726,14 @@
         "id": "a76cd0db23384278",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "df678ea9d8fcf8e3",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist03.Out_OEE",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 130,
         "y": 780,
@@ -3274,11 +1747,14 @@
         "id": "47bbc1a7520c9a8d",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "df678ea9d8fcf8e3",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist03.Disp_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 150,
         "y": 840,
@@ -3292,11 +1768,14 @@
         "id": "9bdb1a04a138fccf",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "df678ea9d8fcf8e3",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist03.Desemp_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 160,
         "y": 900,
@@ -3310,11 +1789,14 @@
         "id": "a4bd757e75e8635b",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "df678ea9d8fcf8e3",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist03.Quali_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 150,
         "y": 960,
@@ -3346,11 +1828,14 @@
         "id": "b7a7d54804a37119",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "a035a321b76c51b1",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist04.Out_OEE",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 130,
         "y": 1100,
@@ -3364,11 +1849,14 @@
         "id": "5e33dff122ac23e2",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "a035a321b76c51b1",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist04.Disp_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 150,
         "y": 1160,
@@ -3382,11 +1870,14 @@
         "id": "1a3ff9e4f0858185",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "a035a321b76c51b1",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist04.Desemp_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 160,
         "y": 1220,
@@ -3400,11 +1891,14 @@
         "id": "5a98527436da23fd",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "a035a321b76c51b1",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist04.Quali_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 150,
         "y": 1280,
@@ -3436,11 +1930,14 @@
         "id": "e8e50b619649dbf9",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "7bce76502936086c",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist05.Out_OEE",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 130,
         "y": 1420,
@@ -3454,11 +1951,14 @@
         "id": "f9e2bf79a7db05d3",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "7bce76502936086c",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist05.Disp_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 150,
         "y": 1480,
@@ -3472,11 +1972,14 @@
         "id": "1f3412b4ddf1b036",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "7bce76502936086c",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist05.Desemp_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 160,
         "y": 1540,
@@ -3490,11 +1993,14 @@
         "id": "6ec2468e39d54d32",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "7bce76502936086c",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist05.Quali_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 150,
         "y": 1600,
@@ -3508,11 +2014,14 @@
         "id": "b258f6087b80fd7b",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "3b03147ca184ebf7",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist06.Out_OEE",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 130,
         "y": 1720,
@@ -3526,11 +2035,14 @@
         "id": "fb351e084cd83f31",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "3b03147ca184ebf7",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist06.Disp_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 150,
         "y": 1780,
@@ -3544,11 +2056,14 @@
         "id": "75f8318967d2c0f2",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "3b03147ca184ebf7",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist06.Desemp_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 160,
         "y": 1840,
@@ -3562,11 +2077,14 @@
         "id": "2b557e8515f96a72",
         "type": "eth-ip in",
         "z": "1b6420b8adb5a5b7",
-        "endpoint": "3b03147ca184ebf7",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "SimOEE_Mist06.Quali_OutSignal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 150,
         "y": 1900,
@@ -4460,11 +2978,14 @@
         "id": "0b8e1d71d2332d50",
         "type": "eth-ip in",
         "z": "37e6316ce545a469",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "CodFalha_Mist01",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 120,
         "y": 40,
@@ -4478,11 +2999,14 @@
         "id": "4e62af48bbe8f39d",
         "type": "eth-ip in",
         "z": "37e6316ce545a469",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "CodFalha_Mist02",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 120,
         "y": 200,
@@ -4496,11 +3020,14 @@
         "id": "d5abee1091f8dae1",
         "type": "eth-ip in",
         "z": "37e6316ce545a469",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "CodFalha_Mist03",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 120,
         "y": 360,
@@ -4514,11 +3041,14 @@
         "id": "35813b25a20be761",
         "type": "eth-ip in",
         "z": "37e6316ce545a469",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "CodFalha_Mist04",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 120,
         "y": 520,
@@ -4532,11 +3062,14 @@
         "id": "0437624de1c83b72",
         "type": "eth-ip in",
         "z": "37e6316ce545a469",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "CodFalha_Mist05",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 120,
         "y": 680,
@@ -4550,11 +3083,14 @@
         "id": "f04a02324e9d2306",
         "type": "eth-ip in",
         "z": "37e6316ce545a469",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "CodFalha_Mist06",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 120,
         "y": 840,
@@ -4709,7 +3245,7 @@
         "id": "eb7091552ce7594e",
         "type": "eth-ip out",
         "z": "37e6316ce545a469",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "variable": "CodFalha_Mist01",
         "program": "",
         "name": "",
@@ -4960,7 +3496,7 @@
         "id": "c21d15185643f32a",
         "type": "eth-ip out",
         "z": "37e6316ce545a469",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "variable": "CodFalha_Mist02",
         "program": "",
         "name": "",
@@ -5162,7 +3698,7 @@
         "id": "e009598052602c52",
         "type": "eth-ip out",
         "z": "37e6316ce545a469",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "variable": "CodFalha_Mist03",
         "program": "",
         "name": "",
@@ -5364,7 +3900,7 @@
         "id": "ca28621c4b6d0fba",
         "type": "eth-ip out",
         "z": "37e6316ce545a469",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "variable": "CodFalha_Mist04",
         "program": "",
         "name": "",
@@ -5755,7 +4291,7 @@
         "id": "3a9b6c66e27c4d4f",
         "type": "eth-ip out",
         "z": "37e6316ce545a469",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "variable": "CodFalha_Mist05",
         "program": "",
         "name": "",
@@ -5767,7 +4303,7 @@
         "id": "3c289a119c9352ff",
         "type": "eth-ip out",
         "z": "37e6316ce545a469",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "variable": "CodFalha_Mist06",
         "program": "",
         "name": "",
@@ -5864,11 +4400,14 @@
         "id": "631ba67d45f072a8",
         "type": "eth-ip in",
         "z": "2b17cc635e977db5",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "CodFalha_Decapado",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 120,
         "y": 400,
@@ -6056,7 +4595,7 @@
         "id": "bf944cb3b41c98b2",
         "type": "eth-ip out",
         "z": "2b17cc635e977db5",
-        "endpoint": "5e5ac4d7ada44fe6",
+        "endpoint": "3b57fe1078701342",
         "variable": "CodFalha_Decapado",
         "program": "",
         "name": "",
@@ -6089,6 +4628,9 @@
         "variable": "SimOEE_Decapado.Out_OEE",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 140,
         "y": 40,
@@ -6206,7 +4748,7 @@
         "type": "debug",
         "z": "2b17cc635e977db5",
         "name": "debug 24",
-        "active": false,
+        "active": true,
         "tosidebar": true,
         "console": false,
         "tostatus": false,
@@ -6306,11 +4848,14 @@
         "id": "d19a89a86f40fe63",
         "type": "eth-ip in",
         "z": "2b17cc635e977db5",
-        "endpoint": "31d865d63bc2100f",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "CorrenteFase_Decapado_SignalR",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 160,
         "y": 560,
@@ -6324,11 +4869,14 @@
         "id": "8272b2abe3e30664",
         "type": "eth-ip in",
         "z": "2b17cc635e977db5",
-        "endpoint": "31d865d63bc2100f",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "CorrenteFase_Decapado_SignalT",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 160,
         "y": 680,
@@ -6342,11 +4890,14 @@
         "id": "ee66630f8aaed5e5",
         "type": "eth-ip in",
         "z": "2b17cc635e977db5",
-        "endpoint": "31d865d63bc2100f",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "ConsumoEnergia_Decapado_Signal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 160,
         "y": 740,
@@ -6360,11 +4911,14 @@
         "id": "736cddb48b5109ad",
         "type": "eth-ip in",
         "z": "2b17cc635e977db5",
-        "endpoint": "31d865d63bc2100f",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "CorrenteFase_Decapado_SignalS",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 160,
         "y": 620,
@@ -6527,11 +5081,14 @@
         "id": "c0a940d8e45a14c2",
         "type": "eth-ip in",
         "z": "2b17cc635e977db5",
-        "endpoint": "31d865d63bc2100f",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "Temp_Decapado_SignalR",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 130,
         "y": 860,
@@ -6545,11 +5102,14 @@
         "id": "b6b733f1e7d37048",
         "type": "eth-ip in",
         "z": "2b17cc635e977db5",
-        "endpoint": "31d865d63bc2100f",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "Temp_Decapado_SignalT",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 130,
         "y": 980,
@@ -6563,11 +5123,14 @@
         "id": "107aab8d6ac2b917",
         "type": "eth-ip in",
         "z": "2b17cc635e977db5",
-        "endpoint": "31d865d63bc2100f",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "Temp_Decapado_Signal",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 130,
         "y": 1040,
@@ -6581,11 +5144,14 @@
         "id": "86abc8d1500de2ae",
         "type": "eth-ip in",
         "z": "2b17cc635e977db5",
-        "endpoint": "31d865d63bc2100f",
+        "endpoint": "3b57fe1078701342",
         "mode": "single",
         "variable": "Temp_Decapado_SignalS",
         "program": "",
         "name": "",
+        "gatherMetrics": false,
+        "includeTimestamp": false,
+        "addErrorOutput": false,
         "outputs": 1,
         "x": 130,
         "y": 920,
@@ -7015,7 +5581,7 @@
         "id": "b8c6132405ab8d46",
         "type": "eth-ip out",
         "z": "539de8bfcd566b4e",
-        "endpoint": "65275923969c5f61",
+        "endpoint": "3b57fe1078701342",
         "variable": "Temp_DecapadoR.SP_SimulatedSignal",
         "program": "",
         "name": "",
@@ -7027,7 +5593,7 @@
         "id": "409c4753087b8ef9",
         "type": "eth-ip out",
         "z": "539de8bfcd566b4e",
-        "endpoint": "65275923969c5f61",
+        "endpoint": "3b57fe1078701342",
         "variable": "Temp_DecapadoS.SP_SimulatedSignal",
         "program": "",
         "name": "",
@@ -7039,7 +5605,7 @@
         "id": "3f413c167b44aea8",
         "type": "eth-ip out",
         "z": "539de8bfcd566b4e",
-        "endpoint": "65275923969c5f61",
+        "endpoint": "3b57fe1078701342",
         "variable": "Temp_DecapadoT.SP_SimulatedSignal",
         "program": "",
         "name": "",
@@ -7051,7 +5617,7 @@
         "id": "6def6d725d83d635",
         "type": "eth-ip out",
         "z": "539de8bfcd566b4e",
-        "endpoint": "65275923969c5f61",
+        "endpoint": "3b57fe1078701342",
         "variable": "Temp_Decapado.SP_SimulatedSignal",
         "program": "",
         "name": "",
