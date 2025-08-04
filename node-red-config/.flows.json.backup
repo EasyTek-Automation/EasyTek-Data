@@ -1231,6 +1231,16 @@
         ]
     },
     {
+        "id": "b5a93c116c9a2c3a",
+        "type": "comment",
+        "z": "8e69476215f7ebaf",
+        "name": "Teste Deploy NoderRed",
+        "info": "",
+        "x": 160,
+        "y": 260,
+        "wires": []
+    },
+    {
         "id": "14f60c83feae1c69",
         "type": "function",
         "z": "2d557e73cbc54abd",
