@@ -75,6 +75,12 @@ ReunirProjeto
 .vscode/ 
 .idea/
 
-Unproject
-/node-red-config/
+# Ignorar arquivos de cache e estado gerados pelo Node-RED e NPM
+/node-red-config/.npm/
+/node-red-config/_cacache/
+/node-red-config/.sessions.json
+/node-red-config/package-lock.json
 
+# Ignorar logs e arquivos temporários
+*.log
+*.tmp
