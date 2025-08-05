@@ -3,18 +3,9 @@ services:
     build: ./webapp
     ports:
       - "8050:8050"
+    # Apenas o env_file é necessário. Ele carrega TODAS as variáveis do arquivo.
     env_file:
       - .env.common
-    environment:
-      # Variáveis que o webapp precisa
-      - MONGO_URI=${MONGO_URI}
-      - DB_NAME=${DB_NAME}
-      - COLLECTION_NAME=${COLLECTION_NAME}
-      - OTHER_COLLECTION_NAME=${OTHER_COLLECTION_NAME}
-      - ENERGY_COLLECTION=${ENERGY_COLLECTION}
-      - TEMP_COLLECTION=${TEMP_COLLECTION}
-      - SECRET_KEY=${SECRET_KEY}
-      - GATEWAY_URL=${GATEWAY_URL}
     networks:
       - easytek-net
 
@@ -22,15 +13,9 @@ services:
     build: ./event-gateway
     ports:
       - "5001:5001"
+    # Apenas o env_file é necessário.
     env_file:
       - .env.common
-    environment:
-      # Variáveis que o event-gateway precisa
-      - PYTHONUNBUFFERED=1
-      - MQTT_BROKER_ADDRESS=${MQTT_BROKER_ADDRESS}
-      - MQTT_BROKER_PORT=${MQTT_BROKER_PORT}
-      - MQTT_USERNAME=${MQTT_USERNAME}
-      - MQTT_PASSWORD=${MQTT_PASSWORD}
     networks:
       - easytek-net
 
