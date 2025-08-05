@@ -1,19 +1,11 @@
-
 services:
   webapp:
     build: ./webapp
     ports:
       - "8050:8050"
-    environment:
-      - MONGO_URI=${MONGO_URI}
-      - DB_NAME=${DB_NAME}
-      - GATEWAY_URL=${GATEWAY_URL}
-      - SECRET_KEY=${SECRET_KEY}
-      - COLLECTION_NAME=${COLLECTION_NAME}             
-      - OTHER_COLLECTION_NAME=${OTHER_COLLECTION_NAME} 
-      - ENERGY_COLLECTION=${ENERGY_COLLECTION}   
-    depends_on:
-      - event-gateway
+    # Apenas o env_file é necessário. Ele carrega TODAS as variáveis do arquivo.
+    env_file:
+      - .env.common
     networks:
       - easytek-net
 
@@ -21,62 +13,33 @@ services:
     build: ./event-gateway
     ports:
       - "5001:5001"
-    environment:
-      - PYTHONUNBUFFERED=1
-      - MQTT_BROKER_ADDRESS=${MQTT_BROKER_ADDRESS}
-      - MQTT_BROKER_PORT=${MQTT_BROKER_PORT}
-      - MQTT_USERNAME=${MQTT_USERNAME}
-      - MQTT_PASSWORD=${MQTT_PASSWORD}
+    # Apenas o env_file é necessário.
+    env_file:
+      - .env.common
     networks:
       - easytek-net
-
-  database:
-    # ... (sem alterações aqui)
-    image: mongo:latest
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo-data:/data/db
-    networks:
-      - easytek-net
-    profiles:
-      - localdb
 
   node-red:
     container_name: node-red
     build: ./node-red
     restart: unless-stopped
     volumes:
-      # Volume para os nós, que será preenchido pelo conteúdo da imagem
-      - node_red_nodes:/data/node_modules
-      # Bind mount para seus arquivos de configuração, exceto os nós
+      # 1. Mapeia um volume nomeado APENAS para os node_modules.
+      #    Isso preserva os nós instalados pela imagem.
+      - node_red_modules:/data/node_modules
+
+      # 2. Mapeia sua configuração local para /data.
+      #    Isso sobrescreve tudo em /data, EXCETO a subpasta node_modules,
+      #    que já foi montada pelo volume nomeado acima.
       - ./node-red-config:/data
     networks:
       - easytek-net
 
-
-  portainer:
-    image: portainer/portainer-ce:latest
-    container_name: portainer
-    command: -H unix:///var/run/docker.sock
-    restart: unless-stopped
-    security_opt:
-      - no-new-privileges:true
-    volumes:
-      # Mapeia o socket do Docker para que o Portainer possa gerenciar os contêineres
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-      # Mapeia o volume nomeado para persistir os dados do Portainer
-      - portainer_data:/data
-    networks:
-      - easytek-net
-    
-      
-
 volumes:
   mongo-data:
   portainer_data:
-  # Declara o novo volume nomeado
-  node_red_nodes:
+  # Adicione o novo volume nomeado à lista de volumes
+  node_red_modules:
 
 networks:
   easytek-net:
