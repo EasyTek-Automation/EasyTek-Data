@@ -1,0 +1,5 @@
+# .gitattributes
+
+# Força o Git a usar finais de linha LF (Unix) para scripts shell,
+# independentemente do sistema operacional do desenvolvedor.
+*.sh text eol=lf
