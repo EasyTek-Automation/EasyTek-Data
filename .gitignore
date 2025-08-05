@@ -84,3 +84,5 @@ ReunirProjeto
 # Ignorar logs e arquivos temporários
 *.log
 *.tmp
+
+environments/
