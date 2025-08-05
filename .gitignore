@@ -85,4 +85,16 @@ ReunirProjeto
 *.log
 *.tmp
 
-environments/
+# Ignora todos os arquivos .env em qualquer subdiretório de environments
+environments/**/*.env
+# Ignora pastas de dados geradas pelo Nginx Proxy Manager e Portainer
+# em todos os ambientes.
+environments/**/nginx/
+environments/**/portainer/
+
+
+# Ignora todo o conteúdo da pasta de configuração do Node-RED, 
+# pois são dados de runtime. 
+/node-red-config/* 
+# Mas NÃO ignora o arquivo .gitkeep, para que a pasta vazia seja versionada. 
+!/node-red-config/.gitkeep
