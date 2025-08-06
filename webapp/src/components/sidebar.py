@@ -28,7 +28,7 @@ def create_sidebar_layout(app_instance):
                 html.Img(src="/assets/logo.png", style={"width": "50%", "max-height": "150px", "object-fit": "contain", "margin": "0 auto 20px", "display": "block"}),
                 html.Hr(),
                
-                html.Label("Selecione um Range de Datas", id="label-date-range"),
+                html.Label("Selecione um Intervalo", id="label-date-range"),
                 dcc.DatePickerRange(id='date-picker-range', start_date=initial_start_date, end_date=initial_end_date, display_format='DD/MM/YYYY', start_date_placeholder_text='Data início', end_date_placeholder_text='Data fim'),
             ], style={"width": "100%"}),
             html.Div([
