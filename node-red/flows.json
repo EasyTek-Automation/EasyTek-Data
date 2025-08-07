@@ -1251,6 +1251,16 @@
         "wires": []
     },
     {
+        "id": "d34e25e075fa3a74",
+        "type": "comment",
+        "z": "8e69476215f7ebaf",
+        "name": "Teste Deploy NodeRed 2",
+        "info": "",
+        "x": 170,
+        "y": 460,
+        "wires": []
+    },
+    {
         "id": "14f60c83feae1c69",
         "type": "function",
         "z": "2d557e73cbc54abd",
