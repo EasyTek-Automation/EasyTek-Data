@@ -1,7 +1,11 @@
 # Usar a imagem oficial do Node-RED como base
 FROM nodered/node-red:latest
 
-# Copiar o package.json para o diretório de dados do usuário DENTRO da imagem
+# Copiar os arquivos de configuração e fluxo para o diretório de dados da imagem
+# Esta é a etapa que estava faltando.
+COPY flows.json /data/
+COPY flows_cred.json /data/
+COPY settings.js /data/
 COPY package.json /data/
 
 # Mudar TEMPORARIAMENTE para o diretório de dados para executar a instalação
