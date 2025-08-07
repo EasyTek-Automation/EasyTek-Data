@@ -27,4 +27,8 @@ COPY . .
 EXPOSE 8050
 
 # 8. Comando para rodar a aplicação
+# ... (todo o resto do Dockerfile) ...
+
+# 8. Comando para rodar a aplicação
+# Adiciona --chdir para mudar para o diretório 'src' antes de iniciar.
 CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:8050", "src.run:server"]
