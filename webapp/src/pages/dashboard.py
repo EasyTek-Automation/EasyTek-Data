@@ -4,7 +4,7 @@ import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
 
 # Importe seus componentes existentes
-from src.components.linegrapg01 import oeegraph_card_layout
+from src.components.linegraph_energy import energygraph_card_layout
 from src.components.kpicards01 import kpicards_cards_layout
 from src.components.msgtable01 import messagestable_cards_layout
 
@@ -14,7 +14,7 @@ layout = dbc.Container([
     dbc.Row([
         dbc.Card([
             dbc.CardBody([
-                oeegraph_card_layout
+                energygraph_card_layout
 
 
             ])
