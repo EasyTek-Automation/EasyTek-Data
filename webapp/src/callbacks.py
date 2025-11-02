@@ -25,7 +25,7 @@ def register_callbacks(app):
     # Configurar conexões específicas para as coleções MongoDB
     collection_graph = get_mongo_connection(collection_name='DecapadoPerformance')
     collection_table = get_mongo_connection(collection_name='DecapadoFalhas')
-    collection_energia = get_mongo_connection(collection_name='DecapadoEnergia')
+    collection_energia = get_mongo_connection(collection_name='AMG_EnergyData')
     collection_temp = get_mongo_connection(collection_name='DecapadoTemp')
 
     # Registra os callbacks existentes (sem alterações aqui)

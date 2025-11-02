@@ -6,7 +6,7 @@ import dash_bootstrap_components as dbc
 energygraph_card_layout = html.Div([
     dbc.Row([
         dbc.Col(
-            html.H5("Monitoramento de Energia - Decapado Mecânico"),
+            html.H5("Monitoramento de Energia - SE03"),
             width="auto"
         ),
         dbc.Col(
