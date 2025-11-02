@@ -32,16 +32,12 @@ server.config.update(SECRET_KEY=SECRET_KEY)
 app = dash.Dash(
     __name__,
     server=server,
-    # 1. Mova o tema padrão (claro) para ser carregado externamente.
-    external_stylesheets=[external_stylesheets, FONT_AWESOME],
+        external_stylesheets=[external_stylesheets, FONT_AWESOME],
     suppress_callback_exceptions=True,
-    # 2. Adicione esta linha. É a correção mais importante.
-    #    Ela impede que os callbacks rodem até que a página esteja 100% carregada.
-    
-    title="EasyTek-Data",
+        title="EasyTek-Data",
     meta_tags=[
         {"name": "viewport", "content": "width=device-width, initial-scale=1"},
-        # A tag de preload para Font Awesome continua sendo uma boa prática.
+        
         {"rel": "preload", "href": "https://use.fontawesome.com/releases/v5.10.2/css/all.css", "as": "style"}
     ]
   )

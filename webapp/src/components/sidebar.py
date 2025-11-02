@@ -25,7 +25,7 @@ def create_sidebar_layout(app_instance):
             html.Div([
                 
 
-                html.Img(src="/assets/logo.png", style={"width": "50%", "max-height": "150px", "object-fit": "contain", "margin": "0 auto 20px", "display": "block"}),
+                html.Img(src="/assets/LogoAMG.png", style={"width": "50%", "max-height": "150px", "object-fit": "contain", "margin": "0 auto 20px", "display": "block"}),
                 html.Hr(),
                
                 html.Label("Insira a Data:", id="label-date-range"),

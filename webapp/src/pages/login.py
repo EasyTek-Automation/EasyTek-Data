@@ -34,7 +34,7 @@ def render_layout():
                 dbc.Card([
                     html.Div(
                         [
-                            html.Img(src="/assets/logo.png", style={"height": "40px"}),
+                            html.Img(src="/assets/LogoAMG.png", style={"height": "40px"}),
                             ThemeSwitchAIO(aio_id="theme", themes=[URL_THEME_MINTY, URL_THEME_DARKLY]),
                         ],
                         className="d-flex justify-content-between align-items-center"
@@ -59,7 +59,7 @@ def render_layout():
                     html.Div(
                         [
                             html.Span("Powered by:", style={'fontSize': '0.8rem', 'color': '#aaa', 'marginRight': '10px'}),
-                            html.Img(src="/assets/logo.png", style={"height": "25px"})
+                            html.Img(src="/assets/LogoAMG.png", style={"height": "25px"})
                         ],
                         className="d-flex justify-content-end align-items-center"
                     )

@@ -7,8 +7,6 @@ from pymongo.errors import ConnectionFailure, ConfigurationError
 from bson import ObjectId
 from werkzeug.security import generate_password_hash
 
-# Carrega as variáveis de ambiente do arquivo .env (importante para o desenvolvimento local)
-
 
 # Variáveis globais para cliente e banco de dados, para reutilizar a conexão
 client = None
@@ -26,10 +24,6 @@ def get_mongo_connection(collection_name=None):
             raise ConfigurationError("MONGO_URI e DB_NAME não foram encontradas no ambiente.")
 
         try:
-            # MUDANÇA PRINCIPAL AQUI:
-            # Deixe o pymongo gerenciar os parâmetros de conexão com base na URI.
-            # Ele é inteligente o suficiente para usar TLS para 'mongodb+srv://'
-            # e não usar para 'mongodb://'.
             print(f"Tentando conectar ao MongoDB (URI: {mongo_uri}, DB: {db_name})...")
             client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000) # Mantemos apenas um timeout generoso.
             

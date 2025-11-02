@@ -1,4 +1,4 @@
-# webapp/src/index.py (VERSÃO FINAL COM SPINNER CUSTOMIZADO E TIMER)
+# webapp/src/index.py 
 
 from dash import html, dcc, Input, Output, State
 from dash.exceptions import PreventUpdate
@@ -20,7 +20,7 @@ app.layout = html.Div([
     dcc.Location(id="url", refresh=False),
     dcc.Location(id='logout-url', refresh=True),
 
-    # 1. NOSSO PRÓPRIO OVERLAY DE CARREGAMENTO. NOS DÁ CONTROLE TOTAL.
+    
     html.Div(
         id='loading-overlay',
         children=[dbc.Spinner(color="primary", size="lg")],
@@ -33,9 +33,9 @@ app.layout = html.Div([
             'height': '100%',
             'top': 0,
             'left': 0,
-            'background-color': 'rgba(255, 255, 255, 0.8)', # Fundo branco semitransparente
-            'z-index': '1050', # z-index alto para ficar na frente de tudo
-            'visibility': 'visible' # Começa visível
+            'background-color': 'rgba(255, 255, 255, 0.8)',
+            'z-index': '1050', 
+            'visibility': 'visible' 
         }
     ),
 

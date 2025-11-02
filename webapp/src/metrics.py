@@ -25,7 +25,7 @@ def calcular_metricas(df: pd.DataFrame):
     if not all(col in df.columns for col in required_cols):
         logger.error(f"Colunas esperadas {required_cols} não encontradas no DataFrame. Colunas disponíveis: {df.columns.tolist()}")
         return {
-            "media_oee": float('nan'), # Not a Number
+            "media_oee": float('nan'), 
             "media_disp": float('nan'),
             "media_desemp": float('nan'),
             "media_quali": float('nan'),
