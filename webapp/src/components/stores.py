@@ -26,4 +26,7 @@ app_stores = [
     # Manter aqui centraliza tudo.
     dcc.Store(id='theme-store', storage_type='local'),
     dcc.Store(id="sidebar-state", storage_type="session", data="expanded"),
+
+    dcc.Store(id='stored-hourly-consumption-data', storage_type='session'),
+
 ]

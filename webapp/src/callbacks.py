@@ -11,6 +11,9 @@ from src.callbacks_registers.kpicards_callback import register_kpicards_callback
 from src.callbacks_registers.autoupdatetoggle_callback import register_autoupdatetoggle_callbacks
 from src.callbacks_registers.input_bridge_callbacks import register_input_bridge_callbacks
 from src.callbacks_registers.sidebar_filters_callback import register_sidebar_filter_callbacks
+from src.callbacks_registers.sidebar_default_dates_callback import (
+    register_sidebar_default_dates_callback,
+)
 from src.callbacks_registers.states_callbacks import register_states_callbacks
 from src.callbacks_registers.states_callbacks02 import register_states02_callbacks    
 from src.callbacks_registers.storetheme import register_storetheme_callbacks
@@ -18,6 +21,7 @@ from src.callbacks_registers.states_switch_callback import register_states_switc
 from src.callbacks_registers.sp_callback import register_sp_callback
 from src.callbacks_registers.tempgraph_callback import register_tempgraph_callbacks
 from src.callbacks_registers.main_layout_callbacks import register_main_layout_callbacks 
+from src.callbacks_registers.hourlyconsumption_callback import register_hourlyconsumption_callbacks
 
 # (Seu logger, se houver)
 
@@ -27,6 +31,7 @@ def register_callbacks(app):
     collection_table = get_mongo_connection(collection_name='DecapadoFalhas')
     collection_energia = get_mongo_connection(collection_name='AMG_EnergyData')
     collection_temp = get_mongo_connection(collection_name='DecapadoTemp')
+    collection_consumo = get_mongo_connection(collection_name="AMG_Consumo")
 
     # Registra os callbacks existentes (sem alterações aqui)
     register_input_bridge_callbacks(app)
@@ -35,11 +40,15 @@ def register_callbacks(app):
     register_kpicards_callbacks(app, collection_graph)
     register_autoupdatetoggle_callbacks(app)
     register_sidebar_filter_callbacks(app)
+    register_sidebar_default_dates_callback(app)
     register_states_callbacks(app, collection_graph)
     register_states02_callbacks(app, collection_graph)
     register_storetheme_callbacks(app)
     register_states_switch_callback(app)
     register_sp_callback(app)    
     register_energygraph_callbacks(app, collection_energia)
+
     register_tempgraph_callbacks(app, collection_temp)
     register_main_layout_callbacks(app) 
+    
+    register_hourlyconsumption_callbacks(app, collection_consumo)
