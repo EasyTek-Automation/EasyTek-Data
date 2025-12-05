@@ -6,16 +6,17 @@ from datetime import datetime, timedelta
 
 from flask_login import current_user # << IMPORTANTE
 
+# --- Definições de data (mantidas como estavam) ---
+today = datetime.now()
+initial_start_date = (today - timedelta(hours=24)).date()
+initial_end_date = today.date()
+now = datetime.now()
+minutes = (now.minute + 29) // 30 * 30
+rounded_now = (now + timedelta(minutes=minutes - now.minute)).replace(second=0, microsecond=0)
+last_24_hours = [(rounded_now - timedelta(minutes=30 * x)).strftime('%H:%M') for x in range(48)]
+
 
 def create_sidebar_layout(app_instance):
-        # Recalcula datas a cada chamada
-    now = datetime.now()
-    initial_end_date = now.date()
-    initial_start_date = (now - timedelta(hours=24)).date()
-    minutes = (now.minute + 29) // 30 * 30
-    rounded_now = (now + timedelta(minutes=minutes - now.minute)).replace(second=0, microsecond=0)
-    last_24_hours = [(rounded_now - timedelta(minutes=30 * x)).strftime('%H:%M') for x in range(48)]
-
    
 
     # --- Layout da Sidebar ---

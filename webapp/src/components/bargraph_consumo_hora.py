@@ -1,9 +1,9 @@
-# components/linegraph_energy.py
+# components/linegraph_consumption.py
 
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 
-energygraph_card_layout = html.Div([
+consumptiongraph_card_layout = html.Div([
     dbc.Row([
         dbc.Col(
             html.H5("Monitoramento de Energia - SE03!"),
@@ -12,7 +12,7 @@ energygraph_card_layout = html.Div([
         dbc.Col(
             dbc.Button(
                 "Exportar para Excel",
-                id="btn-export-energy",
+                id="btn-export-consumption",
                 className="ms-auto",
                 size="sm"
             ),
@@ -22,22 +22,22 @@ energygraph_card_layout = html.Div([
 
     # --- COMPONENTE DE DOWNLOAD (INVISÍVEL) ---
     # Ele vai receber os dados do callback para iniciar o download
-    dcc.Download(id="download-energy-excel"),
+    dcc.Download(id="download-consumption-excel"),
 
     # --- GRÁFICO ---
     dcc.Loading(
-        id="loading-energy-graph",
+        id="loading-consumption-graph",
         type="circle",
         children=[
             dcc.Graph(
-                id="energy-graph",
-                style={'visibility': 'hidden', 'height': '450px'},
-                config={"responsive": True, "displayModeBar": False, "showTips": False}
+                id="hourly-consumption-graph",
+                style={"visibility": "hidden", "height": "450px"},
+                config={"responsive": True, "displayModeBar": False, "showTips": False},
             )
         ]
     )
 ],
-id="energy-card-graph",
+id="consumption-card-graph",
 className="report-section",
 )
 

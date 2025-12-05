@@ -253,21 +253,11 @@ def register_energygraph_callbacks(app, collection_energia):
             )
             invalid_data_fig.update_layout(template=template)
             return invalid_data_fig, error_style
-        
-        df_tensao = df.dropna(subset=["TensaoL1", "TensaoL2", "TensaoL3"])
-
-        # Verifica se, após a filtragem, ainda existem dados para plotar.
-        if df_tensao.empty:
-            logger.warning("[GRAPH] Nenhum dado de TENSÃO encontrado após a filtragem.")
-            empty_fig = px.line(title="Sem dados de tensão para exibir no período.")
-            empty_fig.update_layout(template=template)
-            return empty_fig, error_style
-
 
         # Gráfico
         try:
             fig = px.line(
-                df_tensao,
+                df,
                 x="DateTime",
                 y=["TensaoL1", "TensaoL2", "TensaoL3"],
                 title="Monitoramento de Energia",
@@ -289,7 +279,7 @@ def register_energygraph_callbacks(app, collection_energia):
                 ),
             )
             logger.debug(
-                f"[GRAPH] Figura gerada ok (ms={_duration_ms(t0)}), rows={len(df_tensao)}"
+                f"[GRAPH] Figura gerada ok (ms={_duration_ms(t0)}), rows={len(df)}"
             )
             return fig, visible_style
         except Exception as e:
@@ -297,88 +287,6 @@ def register_energygraph_callbacks(app, collection_energia):
             invalid_data_fig = px.line(title="Erro ao renderizar gráfico.")
             invalid_data_fig.update_layout(template=template)
             return invalid_data_fig, error_style
-        
-    @app.callback(
-    [Output("current-graph", "figure"), Output("current-graph", "style")],
-    [Input("stored-energy-data", "data"), Input("url", "pathname")],
-    [Input(ThemeSwitchAIO.ids.switch("theme"), "value")],
-    )
-    def update_current_graph(stored_data, pathname, toggle):
-        t0 = time.perf_counter()
-        if toggle is None:
-            toggle = True
-        template = TEMPLATE_THEME_MINTY if toggle else TEMPLATE_THEME_DARKLY
-
-        visible_style = {"visibility": "visible", "height": "450px"}
-        error_style = {"visibility": "visible", "height": "450px"}
-
-        logger.debug(
-            f"[GRAPH_CURRENT] Update triggered. "
-            f"has_data={bool(stored_data and 'error' not in stored_data)}"
-        )
-
-        if not stored_data or "error" in stored_data:
-            msg = stored_data.get("error", "Sem dados para o período.")
-            logger.warning(f"[GRAPH_CURRENT] Sem dados ou erro no stored_data: {msg}")
-            error_fig = px.line(title=msg)
-            error_fig.update_layout(template=template)
-            return error_fig, error_style
-
-        try:
-            df = pd.DataFrame(stored_data)
-        except Exception as e:
-            logger.error(f"[GRAPH_CURRENT][EXC] Falha ao criar DataFrame: {e}")
-            error_fig = px.line(title="Erro: Dados inválidos.")
-            error_fig.update_layout(template=template)
-            return error_fig, error_style
-
-        # Verifica se as colunas de corrente existem
-        required_cols = ["DateTime", "CorrenteL1", "CorrenteL2", "CorrenteL3"]
-        missing = [c for c in required_cols if c not in df.columns]
-        if missing:
-            logger.error(f"[GRAPH_CURRENT] Colunas de corrente faltantes: {missing}")
-            error_fig = px.line(title=f"Erro: Faltam colunas de corrente: {missing}.")
-            error_fig.update_layout(template=template)
-            return error_fig, error_style
-
-        # Filtra o DataFrame para manter apenas linhas com dados de CORRENTE
-        df_corrente = df.dropna(subset=["CorrenteL1", "CorrenteL2", "CorrenteL3"])
-
-        if df_corrente.empty:
-            logger.warning("[GRAPH_CURRENT] Nenhum dado de CORRENTE encontrado após a filtragem.")
-            empty_fig = px.line(title="Sem dados de corrente para exibir no período.")
-            empty_fig.update_layout(template=template)
-            return empty_fig, error_style
-
-        # Cria o gráfico de corrente
-        try:
-            fig = px.line(
-                df_corrente,
-                x="DateTime",
-                y=["CorrenteL1", "CorrenteL2", "CorrenteL3"],
-                title="Monitoramento de Corrente",
-            )
-            fig.update_layout(
-                xaxis_title="Data e Hora",
-                yaxis_title="Corrente (A)", # Unidade de medida da corrente
-                template=template,
-                margin=dict(l=40, r=10, t=40, b=40),
-                xaxis=dict(tickfont=dict(size=20), nticks=20),
-                yaxis=dict(tickfont=dict(size=20)),
-                legend=dict(
-                    orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=9)
-                ),
-            )
-            logger.debug(
-                f"[GRAPH_CURRENT] Figura de corrente gerada ok (ms={_duration_ms(t0)}), rows={len(df_corrente)}"
-            )
-            return fig, visible_style
-        except Exception as e:
-            logger.error(f"[GRAPH_CURRENT][EXC] Falha ao renderizar gráfico de corrente: {e}")
-            error_fig = px.line(title="Erro ao renderizar gráfico de corrente.")
-            error_fig.update_layout(template=template)
-            return error_fig, error_style
-
 
     # 3) CALLBACK PARA EXPORTAR EXCEL
     @app.callback(
