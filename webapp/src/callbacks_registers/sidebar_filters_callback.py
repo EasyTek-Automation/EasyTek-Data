@@ -21,7 +21,7 @@ def register_sidebar_filter_callbacks(app):
             Output('end-hour', 'style'),
             Output('end-hour', 'className'),
 
-            # === NOVO: Dropdowns de máquinas ===
+            # Dropdowns de máquinas
             Output('machine-dropdown-group1', 'className'),
             Output('machine-dropdown-group2', 'className'),
 
@@ -33,10 +33,6 @@ def register_sidebar_filter_callbacks(app):
             # Labels dos grupos de máquinas
             Output('label-group1', 'style'),
             Output('label-group2', 'style'),
-
-            # dbc.Switch e seu tooltip
-            Output('auto-update-switch', 'label'),
-            Output('tooltip-target', 'className'),
         ],
         [Input(ThemeSwitchAIO.ids.switch("theme"), "value")]
     )
@@ -82,7 +78,6 @@ def register_sidebar_filter_callbacks(app):
 
         # Estilos para Dropdowns de hora
         dropdown_style = {
-            'width': '150px',
             'backgroundColor': bg_color,
             'color': text_color,
             'border': f'1px solid {border_color}',
@@ -91,8 +86,7 @@ def register_sidebar_filter_callbacks(app):
         }
         dropdown_class = "dropdown-light" if is_light_theme else "dropdown-dark"
 
-        # === NOVO: Classes para dropdowns de máquinas ===
-        # Mantém a classe original + adiciona classe de tema
+        # Classes para dropdowns de máquinas
         machine_dropdown_class_g1 = f"machine-dropdown-group1 {'dropdown-light' if is_light_theme else 'dropdown-dark'}"
         machine_dropdown_class_g2 = f"machine-dropdown-group2 {'dropdown-light' if is_light_theme else 'dropdown-dark'}"
 
@@ -111,13 +105,6 @@ def register_sidebar_filter_callbacks(app):
             'margin-bottom': '5px'
         }
 
-        # Estilos para Switch e Tooltip
-        switch_label_content = html.Span(
-            "Atualização Automática (a cada 10s)",
-            style={'color': text_color}
-        )
-        tooltip_icon_class = f"bi bi-info-circle {'text-dark' if is_light_theme else 'text-light'}"
-
         return (
             # DatePickerRange
             date_picker_style,
@@ -133,7 +120,7 @@ def register_sidebar_filter_callbacks(app):
             dropdown_style,
             dropdown_class,
 
-            # === NOVO: Dropdowns de máquinas ===
+            # Dropdowns de máquinas
             machine_dropdown_class_g1,
             machine_dropdown_class_g2,
 
@@ -145,8 +132,4 @@ def register_sidebar_filter_callbacks(app):
             # Labels dos grupos
             label_group1_style,
             label_group2_style,
-
-            # Switch e tooltip
-            switch_label_content,
-            tooltip_icon_class,
         )
