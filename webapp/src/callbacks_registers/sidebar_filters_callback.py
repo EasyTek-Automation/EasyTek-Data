@@ -1,7 +1,7 @@
 # callbacks/sidebar_filters_callbacks.py
 
 from dash.dependencies import Input, Output
-from dash import html # Ainda útil para o label do switch
+from dash import html
 from dash_bootstrap_templates import ThemeSwitchAIO
 
 def register_sidebar_filter_callbacks(app):
@@ -9,9 +9,9 @@ def register_sidebar_filter_callbacks(app):
         [
             # dcc.DatePickerRange
             Output('date-picker-range', 'style'),
-            Output('date-picker-range', 'className'), # Adicionado className
-            Output('date-picker-range', 'start_date_placeholder_text'), # Agora espera string
-            Output('date-picker-range', 'end_date_placeholder_text'),   # Agora espera string
+            Output('date-picker-range', 'className'),
+            Output('date-picker-range', 'start_date_placeholder_text'),
+            Output('date-picker-range', 'end_date_placeholder_text'),
 
             # dcc.Dropdown - start-hour
             Output('start-hour', 'style'),
@@ -35,60 +35,64 @@ def register_sidebar_filter_callbacks(app):
     def update_filter_styles(toggle):
         if toggle is None:
             toggle = True
-        # Cores para o tema escuro (Darkly)
-        dark_bg = "#303030"
-        dark_text = "white"
-        dark_border = "#495057"
-        dark_placeholder_text = "Data início" # String simples
-        dark_placeholder_end = "Data fim"     # String simples
-
-        # Cores para o tema claro (Minty)
+        
+        # ========== CORREÇÃO: INVERTIDO! ==========
+        # toggle = True  -> TEMA CLARO (Minty)
+        # toggle = False -> TEMA ESCURO (Darkly)
+        
+        # Cores para o tema CLARO (Minty) - quando toggle = True
         light_bg = "white"
         light_text = "black"
         light_border = "#ced4da"
-        light_placeholder_text = "Data início" # String simples
-        light_placeholder_end = "Data fim"     # String simples
+        
+        # Cores para o tema ESCURO (Darkly) - quando toggle = False
+        dark_bg = "#303030"
+        dark_text = "white"
+        dark_border = "#495057"
+        
+        # Placeholders
+        placeholder_start = "Data início"
+        placeholder_end = "Data fim"
 
         # Estilos para DatePickerRange
         date_picker_style = {
             'width': '100%',
-            'backgroundColor': light_bg if toggle else  dark_bg,
-            'color': light_text if toggle else  dark_text,
-            'border': f'1px solid {light_border if toggle else  dark_border}',
+            'backgroundColor': light_bg if toggle else dark_bg,
+            'color': light_text if toggle else dark_text,
+            'border': f'1px solid {light_border if toggle else dark_border}',
             'borderRadius': '5px',
             'font-size': '13px'
         }
-        date_picker_class = "date-picker-dark" if toggle else "date-picker-light"
-
+        # CORRIGIDO: Agora aplica a classe correta
+        date_picker_class = "date-picker-light" if toggle else "date-picker-dark"
 
         # Estilos para Dropdowns
         dropdown_style = {
             'width': '150px',
-            'backgroundColor': light_bg if toggle else  dark_bg,
-            'color': light_text if toggle else  dark_text,
-            'border': f'1px solid {light_border if toggle else  dark_border}',
+            'backgroundColor': light_bg if toggle else dark_bg,
+            'color': light_text if toggle else dark_text,
+            'border': f'1px solid {light_border if toggle else dark_border}',
             'borderRadius': '5px',
             'font-size': '13px'
         }
-        dropdown_class = "dropdown-dark" if toggle else "dropdown-light"
-
+        # CORRIGIDO: Agora aplica a classe correta
+        dropdown_class = "dropdown-light" if toggle else "dropdown-dark"
 
         # Estilos para Labels
-        label_style = {'color': light_text if toggle else  dark_text}
+        label_style = {'color': light_text if toggle else dark_text}
 
         # Estilos para Switch e Tooltip
         switch_label_content = html.Span(
             "Atualização Automática (a cada 10s)",
-            style={'color': light_text if toggle else  dark_text}
+            style={'color': light_text if toggle else dark_text}
         )
-        tooltip_icon_class = f"bi bi-info-circle {'text-light' if toggle else 'text-dark'}"
-
+        tooltip_icon_class = f"bi bi-info-circle {'text-dark' if toggle else 'text-light'}"
 
         return (
             date_picker_style,
-            date_picker_class, # Retorna a classe
-            dark_placeholder_text if toggle else light_placeholder_text, # Retorna string
-            dark_placeholder_end if toggle else light_placeholder_end,   # Retorna string
+            date_picker_class,
+            placeholder_start,
+            placeholder_end,
 
             dropdown_style,
             dropdown_class,
@@ -103,4 +107,3 @@ def register_sidebar_filter_callbacks(app):
             switch_label_content,
             tooltip_icon_class,
         )
-
