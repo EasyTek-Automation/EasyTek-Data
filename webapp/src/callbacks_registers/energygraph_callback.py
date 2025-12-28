@@ -14,6 +14,44 @@ import traceback
 import time
 from datetime import datetime
 
+from datetime import timezone
+from zoneinfo import ZoneInfo
+import pandas as pd
+from dateutil.parser import parse
+
+TZ_SP = ZoneInfo("America/Sao_Paulo")
+TZ_UTC = timezone.utc
+
+def sp_range_to_utc_naive(start_date, start_hour, end_date, end_hour):
+    """
+    Interpreta o que o usuário escolheu como horário de São Paulo (SP),
+    converte para UTC e devolve datetime *naive* em UTC (padrão mais compatível com Mongo/PyMongo).
+    """
+    start_sp = parse(f"{start_date} {start_hour}").replace(tzinfo=TZ_SP)
+    end_sp   = parse(f"{end_date} {end_hour}").replace(tzinfo=TZ_SP)
+
+    start_utc_naive = start_sp.astimezone(TZ_UTC).replace(tzinfo=None)
+    end_utc_naive   = end_sp.astimezone(TZ_UTC).replace(tzinfo=None)
+    return start_utc_naive, end_utc_naive
+
+def series_utc_to_sp_str(s: pd.Series, fmt="%Y-%m-%d %H:%M:%S"):
+    """
+    Pega uma Series com datetimes do Mongo (naive ou aware),
+    assume UTC, converte pra SP e devolve string pronta pro gráfico/store.
+    """
+    dt_utc = pd.to_datetime(s, utc=True)
+    dt_sp  = dt_utc.dt.tz_convert("America/Sao_Paulo")
+    return dt_sp.dt.strftime(fmt)
+
+def series_utc_to_sp_naive(s: pd.Series):
+    """
+    Igual acima, mas devolve datetime naive já em SP (ótimo pra floor('H') e groupby).
+    """
+    dt_utc = pd.to_datetime(s, utc=True)
+    dt_sp  = dt_utc.dt.tz_convert("America/Sao_Paulo").dt.tz_localize(None)
+    return dt_sp
+
+
 # --------------------------------------------------------------------------------
 # LOGGING CONFIG
 # Nível padrão DEBUG (ajustável via env LOG_LEVEL=INFO/DEBUG/WARNING/ERROR)
@@ -100,25 +138,39 @@ def register_energygraph_callbacks(app, collection_energia):
             Input("store-end-date", "data"),
             Input("store-start-hour", "data"),
             Input("store-end-hour", "data"),
+            Input("machine-dropdown", "value"),
         ],
     )
-    def fetch_energy_data(n_intervals, start_date, end_date, start_hour, end_hour):
+    def fetch_energy_data(n_intervals, start_date, end_date, start_hour, end_hour, selected_machine,):
         t0 = time.perf_counter()
         logger.debug(
             f"[FETCH] Trigger interval={n_intervals} "
             f"start_date={start_date} end_date={end_date} "
             f"start_hour={start_hour} end_hour={end_hour}"
+            f"machine={selected_machine}"
         )
 
         if not all([start_date, end_date, start_hour, end_hour]):
             logger.debug("[FETCH] Params incompletos -> PreventUpdate")
             raise dash.exceptions.PreventUpdate
 
+        if not selected_machine:
+            logger.warning("[FETCH] Nenhum equipamento selecionado.")
+            return {
+                "error": "Selecione um equipamento para carregar os dados."
+            }
+
         try:
             # Parse datas
             t_parse = time.perf_counter()
-            start_datetime = parse(f"{start_date} {start_hour}")
-            end_datetime = parse(f"{end_date} {end_hour}")
+            # 1) Range escolhido pelo usuário é São Paulo
+            start_sp = parse(f"{start_date} {start_hour}").replace(tzinfo=TZ_SP)
+            end_sp   = parse(f"{end_date} {end_hour}").replace(tzinfo=TZ_SP)
+
+            # 2) Mongo trabalha em UTC -> converte SP -> UTC e volta para "naive" (compatível com PyMongo padrão)
+            start_datetime = start_sp.astimezone(TZ_UTC).replace(tzinfo=None)
+            end_datetime   = end_sp.astimezone(TZ_UTC).replace(tzinfo=None)
+
             logger.debug(
                 f"[FETCH] Parsed datetime ok: start={start_datetime} end={end_datetime} "
                 f"(parse_ms={_duration_ms(t_parse)})"
@@ -134,7 +186,14 @@ def register_energygraph_callbacks(app, collection_energia):
                 }
 
             # Monta query
-            query = {"DateTime": {"$gte": start_datetime, "$lte": end_datetime}}
+            query = {
+                "DateTime": {"$gte": start_datetime, "$lte": end_datetime},
+            }
+
+            # Só filtra por IDMaq se veio algum equipamento selecionado
+            if selected_machine:
+                query["IDMaq"] = selected_machine
+
             logger.info(f"[FETCH] Query montada: {query}")
 
             # Contagem precisa (rápida para diagnóstico)
@@ -187,9 +246,16 @@ def register_energygraph_callbacks(app, collection_energia):
 
             # Conversão de campos
             if "DateTime" in df.columns:
-                df["DateTime"] = pd.to_datetime(df["DateTime"]).dt.strftime(
-                    "%Y-%m-%d %H:%M:%S"
+               # DateTime vindo do Mongo: trate como UTC e converta para São Paulo antes de virar string
+                dt_utc = pd.to_datetime(df["DateTime"], utc=True, errors="coerce")
+                df = df.loc[~dt_utc.isna()].copy()
+
+                df["DateTime"] = (
+                    dt_utc.loc[~dt_utc.isna()]
+                        .dt.tz_convert("America/Sao_Paulo")
+                        .dt.strftime("%Y-%m-%d %H:%M:%S")
                 )
+
             if "_id" in df.columns:
                 df["_id"] = df["_id"].astype(str)
 

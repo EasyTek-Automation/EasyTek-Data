@@ -28,5 +28,6 @@ app_stores = [
     dcc.Store(id="sidebar-state", storage_type="session", data="expanded"),
 
     dcc.Store(id='stored-hourly-consumption-data', storage_type='session'),
+    dcc.Store(id="store-selected-machine", storage_type='session'),
 
 ]

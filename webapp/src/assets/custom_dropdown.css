@@ -1,0 +1,107 @@
+/* Container do dropdown (input fechado e aberto) */
+.machine-dropdown .Select-control,
+.machine-dropdown .Select-menu-outer {
+    background-color: var(--bs-body-bg);
+    /* usa a cor de fundo do tema */
+    color: var(--bs-body-color);
+    /* usa a cor de texto do tema */
+    border-color: var(--bs-border-color, #6c757d);
+}
+
+/* Texto selecionado e placeholder */
+.machine-dropdown .Select-value-label,
+.machine-dropdown .Select-placeholder {
+    color: var(--bs-body-color);
+}
+
+/* Opções da lista */
+.machine-dropdown .Select-option {
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+}
+
+/* Opção quando passa o mouse */
+.machine-dropdown .Select-option.is-focused {
+    background-color: var(--bs-secondary-bg, #495057);
+    color: var(--bs-body-color);
+}
+
+/* Borda quando está focado */
+.machine-dropdown .is-focused:not(.is-open)>.Select-control {
+    border-color: var(--bs-primary, #0d6efd);
+    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+
+/* ====== AJUSTE DO DROPDOWN QUANDO ESTÁ FECHADO (VALOR SELECIONADO) ====== */
+/* Vai funcionar para qualquer tema cujo data-theme contenha "dark" 
+   (dark, darkly, etc)                                      */
+
+[data-theme*="dark"] .machine-dropdown .Select-control {
+    background-color: #343a40 !important;
+    /* fundo um pouco mais claro */
+    border-color: #6c757d !important;
+}
+
+/* Texto do valor selecionado */
+[data-theme*="dark"] .machine-dropdown .Select-value-label {
+    color: #f8f9fa !important;
+    /* texto bem claro */
+}
+
+/* Placeholder quando nada foi selecionado ainda */
+[data-theme*="dark"] .machine-dropdown .Select-placeholder {
+    color: #adb5bd !important;
+}
+
+/* Menu e opções, para manter o mesmo padrão */
+[data-theme*="dark"] .machine-dropdown .Select-menu-outer {
+    background-color: #343a40 !important;
+}
+
+[data-theme*="dark"] .machine-dropdown .Select-option {
+    background-color: #343a40;
+    color: #f8f9fa;
+}
+
+[data-theme*="dark"] .machine-dropdown .Select-option.is-focused {
+    background-color: #495057;
+}
+
+/* ============================
+   AJUSTES ESPECÍFICOS PARA DARKLY
+   ============================ */
+
+[data-theme="darkly"] .machine-dropdown .Select-control,
+[data-theme="darkly"] .machine-dropdown .Select-menu-outer {
+    background-color: #343a40 !important;
+    /* fundo mais claro que o body */
+    color: #f8f9fa !important;
+    /* texto bem claro */
+    border-color: #6c757d !important;
+}
+
+/* Valor selecionado (texto dentro do input fechado) */
+[data-theme="darkly"] .machine-dropdown .Select-value-label {
+    color: #f8f9fa !important;
+}
+
+/* Placeholder quando nada foi selecionado */
+[data-theme="darkly"] .machine-dropdown .Select-placeholder {
+    color: #adb5bd !important;
+}
+
+/* Menu e opções */
+[data-theme="darkly"] .machine-dropdown .Select-option {
+    background-color: #343a40 !important;
+    color: #f8f9fa !important;
+}
+
+[data-theme="darkly"] .machine-dropdown .Select-option.is-focused {
+    background-color: #495057 !important;
+}
+
+[data-theme="darkly"] .machine-dropdown .Select-option.is-selected {
+    background-color: #0d6efd !important;
+    color: #ffffff !important;
+}
