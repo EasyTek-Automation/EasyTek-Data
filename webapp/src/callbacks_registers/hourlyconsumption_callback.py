@@ -1,4 +1,4 @@
-# callbacks_registers/energygraph_callback.py
+# callbacks_registers/consumptiongraph_callback.py
 
 from dash.dependencies import Input, Output, State
 from dateutil.parser import parse
@@ -14,6 +14,43 @@ import traceback
 import time
 from datetime import datetime
 
+from datetime import timezone
+from zoneinfo import ZoneInfo
+import pandas as pd
+from dateutil.parser import parse
+
+TZ_SP = ZoneInfo("America/Sao_Paulo")
+TZ_UTC = timezone.utc
+
+def sp_range_to_utc_naive(start_date, start_hour, end_date, end_hour):
+    """
+    Interpreta o que o usuário escolheu como horário de São Paulo (SP),
+    converte para UTC e devolve datetime *naive* em UTC (padrão mais compatível com Mongo/PyMongo).
+    """
+    start_sp = parse(f"{start_date} {start_hour}").replace(tzinfo=TZ_SP)
+    end_sp   = parse(f"{end_date} {end_hour}").replace(tzinfo=TZ_SP)
+
+    start_utc_naive = start_sp.astimezone(TZ_UTC).replace(tzinfo=None)
+    end_utc_naive   = end_sp.astimezone(TZ_UTC).replace(tzinfo=None)
+    return start_utc_naive, end_utc_naive
+
+def series_utc_to_sp_str(s: pd.Series, fmt="%Y-%m-%d %H:%M:%S"):
+    """
+    Pega uma Series com datetimes do Mongo (naive ou aware),
+    assume UTC, converte pra SP e devolve string pronta pro gráfico/store.
+    """
+    dt_utc = pd.to_datetime(s, utc=True)
+    dt_sp  = dt_utc.dt.tz_convert("America/Sao_Paulo")
+    return dt_sp.dt.strftime(fmt)
+
+def series_utc_to_sp_naive(s: pd.Series):
+    """
+    Igual acima, mas devolve datetime naive já em SP (ótimo pra floor('H') e groupby).
+    """
+    dt_utc = pd.to_datetime(s, utc=True)
+    dt_sp  = dt_utc.dt.tz_convert("America/Sao_Paulo").dt.tz_localize(None)
+    return dt_sp
+
 # --------------------------------------------------------------------------------
 # LOGGING CONFIG
 # Nível padrão DEBUG (ajustável via env LOG_LEVEL=INFO/DEBUG/WARNING/ERROR)
@@ -26,7 +63,7 @@ logging.basicConfig(
     datefmt="%d/%m/%Y %H:%M:%S",
     force=True,  # força reconfigurar se já houver config do gunicorn
 )
-logger = logging.getLogger("energygraph")
+logger = logging.getLogger("consumptiongraph")
 
 def _mongo_meta_info(collection):
     """Coleta metadados do Mongo com robustez (não quebra se algo não existir)."""
@@ -82,7 +119,7 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
     # Loga metadados da coleção no registro do callback
     meta = _mongo_meta_info(collection_consumo)
     logger.info(
-        f"[INIT] EnergyGraph ligado em Mongo: "
+        f"[INIT] consumptionGraph ligado em Mongo: "
         f"db={meta.get('db_name')} col={meta.get('collection_name')} "
         f"nodes={meta.get('nodes')} ping={meta.get('ping')}"
     )
@@ -100,25 +137,44 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
             Input("store-end-date", "data"),
             Input("store-start-hour", "data"),
             Input("store-end-hour", "data"),
+            Input("machine-dropdown", "value"),
         ],
     )
-    def fetch_energy_data(n_intervals, start_date, end_date, start_hour, end_hour):
+    def fetch_consumption_data(n_intervals, 
+                               start_date, 
+                               end_date, 
+                               start_hour, 
+                               end_hour, 
+                               selected_machine,):
         t0 = time.perf_counter()
         logger.debug(
             f"[FETCH] Trigger interval={n_intervals} "
             f"start_date={start_date} end_date={end_date} "
             f"start_hour={start_hour} end_hour={end_hour}"
+            f"machine={selected_machine}"
         )
 
         if not all([start_date, end_date, start_hour, end_hour]):
             logger.debug("[FETCH] Params incompletos -> PreventUpdate")
             raise dash.exceptions.PreventUpdate
 
+        if not selected_machine:
+            logger.warning("[FETCH] Nenhum equipamento selecionado.")
+            return {
+                "error": "Selecione um equipamento para carregar os dados."
+            }
+
         try:
             # Parse datas
             t_parse = time.perf_counter()
-            start_datetime = parse(f"{start_date} {start_hour}")
-            end_datetime = parse(f"{end_date} {end_hour}")
+            # 1) Range escolhido pelo usuário é São Paulo
+            start_sp = parse(f"{start_date} {start_hour}").replace(tzinfo=TZ_SP)
+            end_sp   = parse(f"{end_date} {end_hour}").replace(tzinfo=TZ_SP)
+
+            # 2) Converte para UTC (naive) para consultar no Mongo
+            start_datetime = start_sp.astimezone(TZ_UTC).replace(tzinfo=None)
+            end_datetime   = end_sp.astimezone(TZ_UTC).replace(tzinfo=None)
+
             logger.debug(
                 f"[FETCH] Parsed datetime ok: start={start_datetime} end={end_datetime} "
                 f"(parse_ms={_duration_ms(t_parse)})"
@@ -135,6 +191,11 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
 
             # Monta query
             query = {"DateTime": {"$gte": start_datetime, "$lte": end_datetime}}
+
+            # Só filtra por IDMaq se veio algum equipamento selecionado
+            if selected_machine:
+                query["IDMaq"] = selected_machine
+
             logger.info(f"[FETCH] Query montada: {query}")
 
             # Contagem precisa (rápida para diagnóstico)
@@ -191,7 +252,10 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
                 return {"error": "Dados inválidos: coluna DateTime ausente em AMG_Consumo."}
 
             # Converte DateTime para datetime (sem formatar para string ainda)
-            df["DateTime"] = pd.to_datetime(df["DateTime"])
+            # DateTime vindo do Mongo: trate como UTC e converta para São Paulo (antes de floor/groupby)
+            df["DateTime"] = pd.to_datetime(df["DateTime"], utc=True, errors="coerce").dt.tz_convert("America/Sao_Paulo")
+            df = df.dropna(subset=["DateTime"])
+
 
             # --- 2) Garantir que a coluna de CONSUMO exista e seja numérica ---
             # TROQUE "kwh_intervalo" PELO NOME EXATO DA SUA COLUNA DE DELTA
@@ -337,3 +401,29 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
             error_fig = px.bar(title="Erro ao renderizar gráfico de consumo por hora.")
             error_fig.update_layout(template=template)
             return error_fig, error_style
+        
+    @app.callback(
+        Output("download-consumption-excel", "data"),
+        Input("btn-export-consumption", "n_clicks"),
+        State("stored-hourly-consumption-data", "data"),
+        prevent_initial_call=True,
+    )
+    def export_consumption_data_to_excel(n_clicks, stored_data):
+        logger.debug(
+            f"[EXPORT] n_clicks={n_clicks} has_data={bool(stored_data and 'error' not in stored_data)}"
+        )
+        if not stored_data or "error" in stored_data:
+            logger.warning("[EXPORT] Sem dados para exportação -> PreventUpdate")
+            raise dash.exceptions.PreventUpdate
+
+        try:
+            df_to_export = pd.DataFrame(stored_data)
+            if "_id" in df_to_export.columns:
+                df_to_export = df_to_export.drop(columns=["_id"])
+            logger.info(f"[EXPORT] Exportando {len(df_to_export)} linhas para Excel")
+            return dcc.send_data_frame(
+                df_to_export.to_excel, "dados_energia.xlsx", sheet_name="Dados", index=False
+            )
+        except Exception as e:
+            logger.error(f"[EXPORT][EXC] Falha ao exportar Excel: {e}")
+            raise dash.exceptions.PreventUpdate

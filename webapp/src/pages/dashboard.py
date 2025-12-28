@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from src.components.linegrapg01 import oeegraph_card_layout
 from src.components.linegraph_energy import energygraph_card_layout
 from src.components.linegraph_energy02 import energygraph_card_layout02
+from src.components.bargraph_consumo_hora import consumptiongraph_card_layout
 from src.components.kpicards01 import kpicards_cards_layout
 from src.components.msgtable01 import messagestable_cards_layout
 
@@ -16,24 +17,24 @@ layout = dbc.Container([
     dbc.Row(
             [
                 dbc.Col(
-                    dbc.Card(
+                    dbc.Card([
                         dbc.CardBody(
                             [
                                 energygraph_card_layout
                             ]
                         )
-                    ),
+            ],style={"margin-top": "10px"}),
                     xs=12,  # ocupa 12 colunas no mobile
                     md=6,   # ocupa metade da tela a partir de md (>= 768px)
                 ),
                 dbc.Col(
-                    dbc.Card(
+                    dbc.Card([
                         dbc.CardBody(
                             [
                                 energygraph_card_layout02
                             ]
                         )
-                    ),
+            ],style={"margin-top": "10px"}),
                     xs=12,
                     md=6,
                 ),
@@ -48,7 +49,7 @@ layout = dbc.Container([
     dbc.Row([
         dbc.Card([
             dbc.CardBody([
-                
+                consumptiongraph_card_layout
 
               
 
