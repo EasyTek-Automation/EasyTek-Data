@@ -56,7 +56,12 @@ def create_dashboard_filters():
         dbc.Row([
             # Coluna 1: Grupo 1 (Esquerda)
             dbc.Col([
-                html.H6("Grupo 1", className="fw-bold mb-3", style={"color": "#1f77b4", "borderBottom": "2px solid #1f77b4", "paddingBottom": "8px"}),
+                html.H6(
+                    "Grupo 1",
+                    id="label-group1",  # ID NECESSÁRIO PARA O CALLBACK
+                    className="fw-bold mb-3",
+                    style={"color": "#1f77b4", "borderBottom": "2px solid #1f77b4", "paddingBottom": "8px"}
+                ),
                 dcc.Dropdown(
                     id="machine-dropdown-group1",
                     options=mm_options,
@@ -80,7 +85,11 @@ def create_dashboard_filters():
 
             # Coluna 2: Período (Centro)
             dbc.Col([
-                html.H6("Período", className="fw-bold mb-3 text-center", style={"color": "var(--bs-primary)", "borderBottom": "2px solid var(--bs-primary)", "paddingBottom": "8px"}),
+                html.H6(
+                    "Período",
+                    className="fw-bold mb-3 text-center",
+                    style={"color": "var(--bs-primary)", "borderBottom": "2px solid var(--bs-primary)", "paddingBottom": "8px"}
+                ),
                 
                 # Data
                 html.Div([
@@ -123,7 +132,12 @@ def create_dashboard_filters():
 
             # Coluna 3: Grupo 2 (Direita)
             dbc.Col([
-                html.H6("Grupo 2", className="fw-bold mb-3", style={"color": "#ff7f0e", "borderBottom": "2px solid #ff7f0e", "paddingBottom": "8px"}),
+                html.H6(
+                    "Grupo 2",
+                    id="label-group2",  # ID NECESSÁRIO PARA O CALLBACK
+                    className="fw-bold mb-3",
+                    style={"color": "#ff7f0e", "borderBottom": "2px solid #ff7f0e", "paddingBottom": "8px"}
+                ),
                 dcc.Dropdown(
                     id="machine-dropdown-group2",
                     options=mm_options,

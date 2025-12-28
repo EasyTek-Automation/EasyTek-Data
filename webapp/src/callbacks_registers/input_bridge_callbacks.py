@@ -13,9 +13,8 @@ logger = logging.getLogger(__name__)
 
 def register_input_bridge_callbacks(app):
     """
-    Este callback serve como uma ponte, pegando os inputs da sidebar
+    Este callback serve como uma ponte, pegando os inputs dos filtros
     e armazenando-os em dcc.Store componentes, que estão sempre presentes.
-    Isso previne ReferenceError quando a sidebar não está visível.
     """
     @app.callback(
         [
@@ -30,11 +29,10 @@ def register_input_bridge_callbacks(app):
             Input('date-picker-range', 'end_date'),
             Input('start-hour', 'value'),
             Input('end-hour', 'value'),
-            Input('auto-update-switch', 'value'),
             Input('url', 'pathname')  # Para saber qual página está ativa
         ]
     )
-    def update_global_stores(start_date, end_date, start_hour, end_hour, auto_update_enabled, pathname):
+    def update_global_stores(start_date, end_date, start_hour, end_hour, pathname):
         
         # Inicializar valores padrões, caso os inputs estejam vazios
         end_datetime = datetime.now()
@@ -43,6 +41,8 @@ def register_input_bridge_callbacks(app):
         default_end_date = end_datetime.strftime("%Y-%m-%d")
         default_start_hour = "00:00"
         default_end_hour = "23:59"
+        
+        # Auto-update desabilitado por padrão (removido o switch)
         default_auto_update = False
 
         # Verifica a página ativa
@@ -52,16 +52,16 @@ def register_input_bridge_callbacks(app):
             # Se os valores atuais dos storages globais já existem, preserva-os
             if start_date and end_date and start_hour and end_hour:
                 logger.info(f"Preservando valores existentes para impressão.")
-                return start_date, end_date, start_hour, end_hour, auto_update_enabled
+                return start_date, end_date, start_hour, end_hour, default_auto_update
 
             # Caso contrário, inicializa com valores padrão
             logger.info(f"Usando valores padrões para impressão.")
             return default_start_date, default_end_date, default_start_hour, default_end_hour, default_auto_update
 
-        # Se não é a página de impressão, usa os valores da sidebar normalmente
+        # Se não é a página de impressão, usa os valores dos filtros normalmente
         if start_date is None or end_date is None or start_hour is None or end_hour is None:
             # Evita erro causado por valores ausentes
             raise dash.exceptions.PreventUpdate
 
-        logger.info(f"Atualizando valores globais oriundos da sidebar para a página: {pathname}.")
-        return start_date, end_date, start_hour, end_hour, auto_update_enabled
+        logger.info(f"Atualizando valores globais oriundos dos filtros para a página: {pathname}.")
+        return start_date, end_date, start_hour, end_hour, default_auto_update
