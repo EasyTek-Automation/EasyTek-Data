@@ -1,313 +1,419 @@
 /* ========================================
-   CORREÇÃO DROPDOWN - SOLUÇÃO ROBUSTA
-   Sobrescreve TODOS os estilos problemáticos
+   CORREÇÃO COMPLETA - DROPDOWNS + DATEPICKER
+   Funciona com ThemeSwitchAIO
    ======================================== */
 
-/* ========== TEMA ESCURO - FORÇA TUDO ========== */
+/* ==========================================
+   DROPDOWNS - TEMA ESCURO
+   ========================================== */
 
-/* Container do dropdown fechado - TEMA ESCURO */
-body[data-bs-theme="dark"] .Select-control,
-body[data-bs-theme="dark"] .machine-dropdown .Select-control,
-body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-control,
-body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-control,
+/* Menu dropdown aberto */
+.dropdown-dark .Select-menu-outer {
+    background-color: #2b3035 !important;
+    border: 1px solid #495057 !important;
+    border-radius: 0 0 4px 4px !important;
+}
+
+.dropdown-dark .Select-menu {
+    background-color: #2b3035 !important;
+}
+
+/* Opções do dropdown - classe real usada pelo Dash */
+.dropdown-dark .VirtualizedSelectOption {
+    background-color: #2b3035 !important;
+    color: #f8f9fa !important;
+    cursor: pointer !important;
+}
+
+/* Opção com foco/hover */
+.dropdown-dark .VirtualizedSelectFocusedOption,
+.dropdown-dark .VirtualizedSelectOption:hover {
+    background-color: #495057 !important;
+    color: #ffffff !important;
+}
+
+/* Container do dropdown fechado */
 .dropdown-dark .Select-control {
     background-color: #343a40 !important;
     border-color: #6c757d !important;
     color: #f8f9fa !important;
 }
 
-/* Texto dos valores selecionados - TEMA ESCURO */
-body[data-bs-theme="dark"] .Select-value-label,
-body[data-bs-theme="dark"] .machine-dropdown .Select-value-label,
-body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-value-label,
-body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-value-label,
-.dropdown-dark .Select-value-label {
-    color: #f8f9fa !important;
-    background-color: transparent !important;
-}
-
-/* Placeholder - TEMA ESCURO */
-body[data-bs-theme="dark"] .Select-placeholder,
-body[data-bs-theme="dark"] .machine-dropdown .Select-placeholder,
-body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-placeholder,
-body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-placeholder,
-.dropdown-dark .Select-placeholder {
-    color: #adb5bd !important;
-}
-
-/* MENU DROPDOWN (lista de opções) - TEMA ESCURO */
-body[data-bs-theme="dark"] .Select-menu-outer,
-body[data-bs-theme="dark"] .machine-dropdown .Select-menu-outer,
-body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-menu-outer,
-body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-menu-outer,
-.dropdown-dark .Select-menu-outer {
-    background-color: #2b3035 !important;
-    border-color: #495057 !important;
-}
-
-/* CADA OPÇÃO na lista - TEMA ESCURO */
-body[data-bs-theme="dark"] .Select-option,
-body[data-bs-theme="dark"] .machine-dropdown .Select-option,
-body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-option,
-body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-option,
-.dropdown-dark .Select-option {
-    background-color: #2b3035 !important;
-    color: #f8f9fa !important;
-}
-
-/* Opção quando passa o mouse (hover/focused) - TEMA ESCURO */
-body[data-bs-theme="dark"] .Select-option:hover,
-body[data-bs-theme="dark"] .Select-option.is-focused,
-body[data-bs-theme="dark"] .machine-dropdown .Select-option:hover,
-body[data-bs-theme="dark"] .machine-dropdown .Select-option.is-focused,
-body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-option:hover,
-body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-option.is-focused,
-body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-option:hover,
-body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-option.is-focused,
-.dropdown-dark .Select-option:hover,
-.dropdown-dark .Select-option.is-focused {
-    background-color: #495057 !important;
-    color: #ffffff !important;
-}
-
-/* Opção selecionada (com checkmark) - TEMA ESCURO */
-body[data-bs-theme="dark"] .Select-option.is-selected,
-body[data-bs-theme="dark"] .machine-dropdown .Select-option.is-selected,
-body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-option.is-selected,
-body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-option.is-selected,
-.dropdown-dark .Select-option.is-selected {
-    background-color: #0d6efd !important;
-    color: #ffffff !important;
-}
-
-/* Tags dos itens selecionados (multi-select) - TEMA ESCURO */
-body[data-bs-theme="dark"] .Select-value,
-body[data-bs-theme="dark"] .machine-dropdown .Select-value,
-body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-value,
-body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-value,
+/* Valores selecionados (tags) */
 .dropdown-dark .Select-value {
     background-color: #495057 !important;
     border-color: #6c757d !important;
     color: #f8f9fa !important;
 }
 
-/* Botão X das tags - TEMA ESCURO */
-body[data-bs-theme="dark"] .Select-value-icon,
-body[data-bs-theme="dark"] .machine-dropdown .Select-value-icon,
-body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-value-icon,
-body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-value-icon,
-.dropdown-dark .Select-value-icon {
-    border-color: #6c757d !important;
+.dropdown-dark .Select-value-label {
+    color: #f8f9fa !important;
 }
 
-body[data-bs-theme="dark"] .Select-value-icon:hover,
-body[data-bs-theme="dark"] .machine-dropdown .Select-value-icon:hover,
-body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-value-icon:hover,
-body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-value-icon:hover,
+/* Botão X para remover tag */
+.dropdown-dark .Select-value-icon {
+    border-right-color: #6c757d !important;
+    color: #f8f9fa !important;
+}
+
 .dropdown-dark .Select-value-icon:hover {
     background-color: #dc3545 !important;
     color: #ffffff !important;
 }
 
-/* Seta do dropdown - TEMA ESCURO */
-body[data-bs-theme="dark"] .Select-arrow,
-body[data-bs-theme="dark"] .machine-dropdown .Select-arrow,
-body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-arrow,
-body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-arrow,
+/* Placeholder */
+.dropdown-dark .Select-placeholder {
+    color: #adb5bd !important;
+}
+
+/* Seta do dropdown */
 .dropdown-dark .Select-arrow {
     border-color: #adb5bd transparent transparent !important;
 }
 
-/* Input de busca - TEMA ESCURO */
-body[data-bs-theme="dark"] .Select-input>input,
-body[data-bs-theme="dark"] .machine-dropdown .Select-input>input,
-body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-input>input,
-body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-input>input,
+/* Input de busca */
 .dropdown-dark .Select-input>input {
     color: #f8f9fa !important;
 }
 
-/* ========== TEMA CLARO - FORÇA TUDO ========== */
+/* Clear button */
+.dropdown-dark .Select-clear {
+    color: #adb5bd !important;
+}
 
-/* Container - TEMA CLARO */
-body[data-bs-theme="light"] .Select-control,
-body:not([data-bs-theme]) .Select-control,
-body[data-bs-theme="light"] .machine-dropdown .Select-control,
-body[data-bs-theme="light"] .machine-dropdown-group1 .Select-control,
-body[data-bs-theme="light"] .machine-dropdown-group2 .Select-control,
-body:not([data-bs-theme]) .machine-dropdown .Select-control,
-body:not([data-bs-theme]) .machine-dropdown-group1 .Select-control,
-body:not([data-bs-theme]) .machine-dropdown-group2 .Select-control,
+.dropdown-dark .Select-clear:hover {
+    color: #dc3545 !important;
+}
+
+/* ReactVirtualized Grid */
+.dropdown-dark .ReactVirtualized__Grid,
+.dropdown-dark .ReactVirtualized__Grid__innerScrollContainer {
+    background-color: #2b3035 !important;
+}
+
+/* ==========================================
+   DROPDOWNS - TEMA CLARO
+   ========================================== */
+
+/* Menu dropdown aberto */
+.dropdown-light .Select-menu-outer {
+    background-color: #ffffff !important;
+    border: 1px solid #ced4da !important;
+    border-radius: 0 0 4px 4px !important;
+}
+
+.dropdown-light .Select-menu {
+    background-color: #ffffff !important;
+}
+
+/* Opções do dropdown */
+.dropdown-light .VirtualizedSelectOption {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+    cursor: pointer !important;
+}
+
+/* Opção com foco/hover */
+.dropdown-light .VirtualizedSelectFocusedOption,
+.dropdown-light .VirtualizedSelectOption:hover {
+    background-color: #e9ecef !important;
+    color: #212529 !important;
+}
+
+/* Container do dropdown fechado */
 .dropdown-light .Select-control {
     background-color: #ffffff !important;
     border-color: #ced4da !important;
     color: #212529 !important;
 }
 
-/* Valores e placeholder - TEMA CLARO */
-body[data-bs-theme="light"] .Select-value-label,
-body:not([data-bs-theme]) .Select-value-label,
-body[data-bs-theme="light"] .machine-dropdown .Select-value-label,
-body[data-bs-theme="light"] .machine-dropdown-group1 .Select-value-label,
-body[data-bs-theme="light"] .machine-dropdown-group2 .Select-value-label,
-body:not([data-bs-theme]) .machine-dropdown .Select-value-label,
-body:not([data-bs-theme]) .machine-dropdown-group1 .Select-value-label,
-body:not([data-bs-theme]) .machine-dropdown-group2 .Select-value-label,
-.dropdown-light .Select-value-label {
-    color: #212529 !important;
-}
-
-body[data-bs-theme="light"] .Select-placeholder,
-body:not([data-bs-theme]) .Select-placeholder,
-body[data-bs-theme="light"] .machine-dropdown .Select-placeholder,
-body[data-bs-theme="light"] .machine-dropdown-group1 .Select-placeholder,
-body[data-bs-theme="light"] .machine-dropdown-group2 .Select-placeholder,
-body:not([data-bs-theme]) .machine-dropdown .Select-placeholder,
-body:not([data-bs-theme]) .machine-dropdown-group1 .Select-placeholder,
-body:not([data-bs-theme]) .machine-dropdown-group2 .Select-placeholder,
-.dropdown-light .Select-placeholder {
-    color: #6c757d !important;
-}
-
-/* Menu - TEMA CLARO */
-body[data-bs-theme="light"] .Select-menu-outer,
-body:not([data-bs-theme]) .Select-menu-outer,
-body[data-bs-theme="light"] .machine-dropdown .Select-menu-outer,
-body[data-bs-theme="light"] .machine-dropdown-group1 .Select-menu-outer,
-body[data-bs-theme="light"] .machine-dropdown-group2 .Select-menu-outer,
-body:not([data-bs-theme]) .machine-dropdown .Select-menu-outer,
-body:not([data-bs-theme]) .machine-dropdown-group1 .Select-menu-outer,
-body:not([data-bs-theme]) .machine-dropdown-group2 .Select-menu-outer,
-.dropdown-light .Select-menu-outer {
-    background-color: #ffffff !important;
-    border-color: #ced4da !important;
-}
-
-/* Opções - TEMA CLARO */
-body[data-bs-theme="light"] .Select-option,
-body:not([data-bs-theme]) .Select-option,
-body[data-bs-theme="light"] .machine-dropdown .Select-option,
-body[data-bs-theme="light"] .machine-dropdown-group1 .Select-option,
-body[data-bs-theme="light"] .machine-dropdown-group2 .Select-option,
-body:not([data-bs-theme]) .machine-dropdown .Select-option,
-body:not([data-bs-theme]) .machine-dropdown-group1 .Select-option,
-body:not([data-bs-theme]) .machine-dropdown-group2 .Select-option,
-.dropdown-light .Select-option {
-    background-color: #ffffff !important;
-    color: #212529 !important;
-}
-
-/* Hover - TEMA CLARO */
-body[data-bs-theme="light"] .Select-option:hover,
-body[data-bs-theme="light"] .Select-option.is-focused,
-body:not([data-bs-theme]) .Select-option:hover,
-body:not([data-bs-theme]) .Select-option.is-focused,
-body[data-bs-theme="light"] .machine-dropdown .Select-option:hover,
-body[data-bs-theme="light"] .machine-dropdown .Select-option.is-focused,
-body[data-bs-theme="light"] .machine-dropdown-group1 .Select-option:hover,
-body[data-bs-theme="light"] .machine-dropdown-group1 .Select-option.is-focused,
-body[data-bs-theme="light"] .machine-dropdown-group2 .Select-option:hover,
-body[data-bs-theme="light"] .machine-dropdown-group2 .Select-option.is-focused,
-body:not([data-bs-theme]) .machine-dropdown .Select-option:hover,
-body:not([data-bs-theme]) .machine-dropdown .Select-option.is-focused,
-body:not([data-bs-theme]) .machine-dropdown-group1 .Select-option:hover,
-body:not([data-bs-theme]) .machine-dropdown-group1 .Select-option.is-focused,
-body:not([data-bs-theme]) .machine-dropdown-group2 .Select-option:hover,
-body:not([data-bs-theme]) .machine-dropdown-group2 .Select-option.is-focused,
-.dropdown-light .Select-option:hover,
-.dropdown-light .Select-option.is-focused {
-    background-color: #e9ecef !important;
-}
-
-/* Selecionado - TEMA CLARO */
-body[data-bs-theme="light"] .Select-option.is-selected,
-body:not([data-bs-theme]) .Select-option.is-selected,
-body[data-bs-theme="light"] .machine-dropdown .Select-option.is-selected,
-body[data-bs-theme="light"] .machine-dropdown-group1 .Select-option.is-selected,
-body[data-bs-theme="light"] .machine-dropdown-group2 .Select-option.is-selected,
-body:not([data-bs-theme]) .machine-dropdown .Select-option.is-selected,
-body:not([data-bs-theme]) .machine-dropdown-group1 .Select-option.is-selected,
-body:not([data-bs-theme]) .machine-dropdown-group2 .Select-option.is-selected,
-.dropdown-light .Select-option.is-selected {
-    background-color: #0d6efd !important;
-    color: #ffffff !important;
-}
-
-/* Tags - TEMA CLARO */
-body[data-bs-theme="light"] .Select-value,
-body:not([data-bs-theme]) .Select-value,
-body[data-bs-theme="light"] .machine-dropdown .Select-value,
-body[data-bs-theme="light"] .machine-dropdown-group1 .Select-value,
-body[data-bs-theme="light"] .machine-dropdown-group2 .Select-value,
-body:not([data-bs-theme]) .machine-dropdown .Select-value,
-body:not([data-bs-theme]) .machine-dropdown-group1 .Select-value,
-body:not([data-bs-theme]) .machine-dropdown-group2 .Select-value,
+/* Valores selecionados (tags) */
 .dropdown-light .Select-value {
     background-color: #e9ecef !important;
     border-color: #ced4da !important;
     color: #212529 !important;
 }
 
-/* ========== LABELS DOS GRUPOS ========== */
-
-#label-group1,
-#label-group2 {
-    transition: color 0.2s ease;
-    display: block;
-    margin-bottom: 5px;
+.dropdown-light .Select-value-label {
+    color: #212529 !important;
 }
 
-/* Labels mais claros quando focado - TEMA ESCURO */
-body[data-bs-theme="dark"] #container-group1:focus-within #label-group1,
-.dropdown-dark.Select--is-focused~div #label-group1 {
-    color: #5ba3f5 !important;
+/* Botão X para remover tag */
+.dropdown-light .Select-value-icon {
+    border-right-color: #ced4da !important;
+    color: #212529 !important;
 }
 
-body[data-bs-theme="dark"] #container-group2:focus-within #label-group2,
-.dropdown-dark.Select--is-focused~div #label-group2 {
-    color: #ffb366 !important;
+.dropdown-light .Select-value-icon:hover {
+    background-color: #dc3545 !important;
+    color: #ffffff !important;
 }
 
-/* Labels mais escuros quando focado - TEMA CLARO */
-body[data-bs-theme="light"] #container-group1:focus-within #label-group1,
-body:not([data-bs-theme]) #container-group1:focus-within #label-group1,
-.dropdown-light.Select--is-focused~div #label-group1 {
-    color: #0d5a9e !important;
+/* Placeholder */
+.dropdown-light .Select-placeholder {
+    color: #6c757d !important;
 }
 
-body[data-bs-theme="light"] #container-group2:focus-within #label-group2,
-body:not([data-bs-theme]) #container-group2:focus-within #label-group2,
-.dropdown-light.Select--is-focused~div #label-group2 {
-    color: #cc6600 !important;
+/* Seta do dropdown */
+.dropdown-light .Select-arrow {
+    border-color: #6c757d transparent transparent !important;
 }
 
-/* ========== AJUSTES GERAIS ========== */
+/* Input de busca */
+.dropdown-light .Select-input>input {
+    color: #212529 !important;
+}
 
-.Select-control:focus {
+/* Clear button */
+.dropdown-light .Select-clear {
+    color: #6c757d !important;
+}
+
+.dropdown-light .Select-clear:hover {
+    color: #dc3545 !important;
+}
+
+/* ReactVirtualized Grid */
+.dropdown-light .ReactVirtualized__Grid,
+.dropdown-light .ReactVirtualized__Grid__innerScrollContainer {
+    background-color: #ffffff !important;
+}
+
+/* ==========================================
+   DATEPICKER - TEMA ESCURO
+   ========================================== */
+
+/* Input do DatePicker */
+.date-picker-dark .DateInput_input {
+    background-color: #303030 !important;
+    color: white !important;
+    border-color: #495057 !important;
+}
+
+.date-picker-dark .DateInput_input::placeholder {
+    color: #adb5bd !important;
+}
+
+/* Calendário */
+.date-picker-dark .DayPicker,
+.date-picker-dark .DayPicker_transitionContainer {
+    background-color: #303030 !important;
+}
+
+.date-picker-dark .CalendarMonth {
+    background-color: #303030 !important;
+}
+
+.date-picker-dark .CalendarMonth_caption {
+    color: white !important;
+}
+
+/* Dias do calendário */
+.date-picker-dark .CalendarDay__default {
+    background-color: #303030 !important;
+    color: white !important;
+    border-color: #495057 !important;
+}
+
+.date-picker-dark .CalendarDay__default:hover {
+    background-color: #495057 !important;
+    color: white !important;
+}
+
+/* Dia selecionado */
+.date-picker-dark .CalendarDay__selected,
+.date-picker-dark .CalendarDay__selected:hover {
+    background-color: #007bff !important;
+    color: white !important;
+    border-color: #007bff !important;
+}
+
+/* Range selecionado */
+.date-picker-dark .CalendarDay__selected_span,
+.date-picker-dark .CalendarDay__hovered_span {
+    background-color: #495057 !important;
+    color: white !important;
+    border-color: #6c757d !important;
+}
+
+/* Dias fora do mês */
+.date-picker-dark .CalendarDay__outside {
+    color: #6c757d !important;
+}
+
+/* Header da semana */
+.date-picker-dark .DayPicker_weekHeader {
+    color: white !important;
+}
+
+.date-picker-dark .DayPicker_weekHeader_ul {
+    color: white !important;
+}
+
+.date-picker-dark .DayPicker_weekHeader small {
+    color: #adb5bd !important;
+}
+
+/* Navegação */
+.date-picker-dark .DayPickerNavigation_button {
+    background-color: #495057 !important;
+    border-color: #6c757d !important;
+}
+
+.date-picker-dark .DayPickerNavigation_svg__horizontal {
+    fill: white !important;
+}
+
+/* Input focus */
+.date-picker-dark .DateInput_input:focus {
     outline: none !important;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
 }
 
-.Select--multi .Select-value {
-    margin: 2px 5px 2px 0 !important;
-    padding: 2px 8px !important;
-    border-radius: 4px !important;
+/* Seta entre datas */
+.date-picker-dark .DateRangePickerInput_arrow_svg {
+    fill: white !important;
 }
 
+/* Container do DateRangePicker */
+.date-picker-dark .DateRangePickerInput {
+    background-color: #303030 !important;
+    border-color: #495057 !important;
+}
+
+.date-picker-dark .DateInput {
+    background-color: #303030 !important;
+}
+
+/* ==========================================
+   DATEPICKER - TEMA CLARO
+   ========================================== */
+
+/* Input do DatePicker */
+.date-picker-light .DateInput_input {
+    background-color: white !important;
+    color: black !important;
+    border-color: #ced4da !important;
+}
+
+.date-picker-light .DateInput_input::placeholder {
+    color: #6c757d !important;
+}
+
+/* Calendário */
+.date-picker-light .DayPicker,
+.date-picker-light .DayPicker_transitionContainer {
+    background-color: white !important;
+}
+
+.date-picker-light .CalendarMonth {
+    background-color: white !important;
+}
+
+.date-picker-light .CalendarMonth_caption {
+    color: black !important;
+}
+
+/* Dias do calendário */
+.date-picker-light .CalendarDay__default {
+    background-color: white !important;
+    color: black !important;
+    border-color: #e4e7e7 !important;
+}
+
+.date-picker-light .CalendarDay__default:hover {
+    background-color: #e9ecef !important;
+    color: black !important;
+}
+
+/* Dia selecionado */
+.date-picker-light .CalendarDay__selected,
+.date-picker-light .CalendarDay__selected:hover {
+    background-color: #28a745 !important;
+    color: white !important;
+    border-color: #28a745 !important;
+}
+
+/* Range selecionado */
+.date-picker-light .CalendarDay__selected_span,
+.date-picker-light .CalendarDay__hovered_span {
+    background-color: #e2f0d9 !important;
+    color: black !important;
+    border-color: #c8e6c9 !important;
+}
+
+/* Dias fora do mês */
+.date-picker-light .CalendarDay__outside {
+    color: #adb5bd !important;
+}
+
+/* Header da semana */
+.date-picker-light .DayPicker_weekHeader {
+    color: black !important;
+}
+
+.date-picker-light .DayPicker_weekHeader_ul {
+    color: black !important;
+}
+
+.date-picker-light .DayPicker_weekHeader small {
+    color: #6c757d !important;
+}
+
+/* Navegação */
+.date-picker-light .DayPickerNavigation_button {
+    background-color: #f8f9fa !important;
+    border-color: #ced4da !important;
+}
+
+.date-picker-light .DayPickerNavigation_svg__horizontal {
+    fill: #212529 !important;
+}
+
+/* Input focus */
+.date-picker-light .DateInput_input:focus {
+    outline: none !important;
+    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25) !important;
+}
+
+/* Seta entre datas */
+.date-picker-light .DateRangePickerInput_arrow_svg {
+    fill: #212529 !important;
+}
+
+/* Container do DateRangePicker */
+.date-picker-light .DateRangePickerInput {
+    background-color: white !important;
+    border-color: #ced4da !important;
+}
+
+.date-picker-light .DateInput {
+    background-color: white !important;
+}
+
+/* ==========================================
+   GERAIS
+   ========================================== */
+
+/* Z-INDEX */
+.Select-menu-outer {
+    z-index: 1000 !important;
+}
+
+/* TRANSIÇÕES */
 .Select-control,
-.Select-option,
-.Select-value {
-    transition: all 0.2s ease !important;
+.Select-value,
+.VirtualizedSelectOption,
+.DateInput_input {
+    transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease !important;
 }
 
-/* ========== RESPONSIVIDADE ========== */
-
+/* RESPONSIVIDADE */
 @media (max-width: 768px) {
-    .Select-control {
-        min-height: 42px !important;
-    }
-
-    .Select-option {
-        padding: 12px !important;
-        font-size: 14px !important;
+    .VirtualizedSelectOption {
+        min-height: 40px !important;
+        display: flex !important;
+        align-items: center !important;
+        padding: 0 12px !important;
     }
 }

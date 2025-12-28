@@ -21,10 +21,18 @@ def register_sidebar_filter_callbacks(app):
             Output('end-hour', 'style'),
             Output('end-hour', 'className'),
 
+            # === NOVO: Dropdowns de máquinas ===
+            Output('machine-dropdown-group1', 'className'),
+            Output('machine-dropdown-group2', 'className'),
+
             # html.Label
             Output('label-date-range', 'style'),
             Output('label-start-hour', 'style'),
             Output('label-end-hour', 'style'),
+
+            # Labels dos grupos de máquinas
+            Output('label-group1', 'style'),
+            Output('label-group2', 'style'),
 
             # dbc.Switch e seu tooltip
             Output('auto-update-switch', 'label'),
@@ -36,19 +44,26 @@ def register_sidebar_filter_callbacks(app):
         if toggle is None:
             toggle = True
         
-        # ========== CORREÇÃO: INVERTIDO! ==========
+        # ========== LÓGICA DE TEMA ==========
         # toggle = True  -> TEMA CLARO (Minty)
         # toggle = False -> TEMA ESCURO (Darkly)
         
-        # Cores para o tema CLARO (Minty) - quando toggle = True
+        is_light_theme = toggle
+        
+        # Cores para o tema CLARO (Minty)
         light_bg = "white"
         light_text = "black"
         light_border = "#ced4da"
         
-        # Cores para o tema ESCURO (Darkly) - quando toggle = False
+        # Cores para o tema ESCURO (Darkly)
         dark_bg = "#303030"
         dark_text = "white"
         dark_border = "#495057"
+        
+        # Seleciona cores baseado no tema
+        bg_color = light_bg if is_light_theme else dark_bg
+        text_color = light_text if is_light_theme else dark_text
+        border_color = light_border if is_light_theme else dark_border
         
         # Placeholders
         placeholder_start = "Data início"
@@ -57,53 +72,81 @@ def register_sidebar_filter_callbacks(app):
         # Estilos para DatePickerRange
         date_picker_style = {
             'width': '100%',
-            'backgroundColor': light_bg if toggle else dark_bg,
-            'color': light_text if toggle else dark_text,
-            'border': f'1px solid {light_border if toggle else dark_border}',
+            'backgroundColor': bg_color,
+            'color': text_color,
+            'border': f'1px solid {border_color}',
             'borderRadius': '5px',
             'font-size': '13px'
         }
-        # CORRIGIDO: Agora aplica a classe correta
-        date_picker_class = "date-picker-light" if toggle else "date-picker-dark"
+        date_picker_class = "date-picker-light" if is_light_theme else "date-picker-dark"
 
-        # Estilos para Dropdowns
+        # Estilos para Dropdowns de hora
         dropdown_style = {
             'width': '150px',
-            'backgroundColor': light_bg if toggle else dark_bg,
-            'color': light_text if toggle else dark_text,
-            'border': f'1px solid {light_border if toggle else dark_border}',
+            'backgroundColor': bg_color,
+            'color': text_color,
+            'border': f'1px solid {border_color}',
             'borderRadius': '5px',
             'font-size': '13px'
         }
-        # CORRIGIDO: Agora aplica a classe correta
-        dropdown_class = "dropdown-light" if toggle else "dropdown-dark"
+        dropdown_class = "dropdown-light" if is_light_theme else "dropdown-dark"
+
+        # === NOVO: Classes para dropdowns de máquinas ===
+        # Mantém a classe original + adiciona classe de tema
+        machine_dropdown_class_g1 = f"machine-dropdown-group1 {'dropdown-light' if is_light_theme else 'dropdown-dark'}"
+        machine_dropdown_class_g2 = f"machine-dropdown-group2 {'dropdown-light' if is_light_theme else 'dropdown-dark'}"
 
         # Estilos para Labels
-        label_style = {'color': light_text if toggle else dark_text}
+        label_style = {'color': text_color}
+
+        # Estilos para Labels dos grupos (mantém cores originais)
+        label_group1_style = {
+            'color': '#1f77b4',  # Azul do Grupo 1
+            'font-weight': 'bold',
+            'margin-bottom': '5px'
+        }
+        label_group2_style = {
+            'color': '#ff7f0e',  # Laranja do Grupo 2
+            'font-weight': 'bold',
+            'margin-bottom': '5px'
+        }
 
         # Estilos para Switch e Tooltip
         switch_label_content = html.Span(
             "Atualização Automática (a cada 10s)",
-            style={'color': light_text if toggle else dark_text}
+            style={'color': text_color}
         )
-        tooltip_icon_class = f"bi bi-info-circle {'text-dark' if toggle else 'text-light'}"
+        tooltip_icon_class = f"bi bi-info-circle {'text-dark' if is_light_theme else 'text-light'}"
 
         return (
+            # DatePickerRange
             date_picker_style,
             date_picker_class,
             placeholder_start,
             placeholder_end,
 
+            # Dropdown start-hour
             dropdown_style,
             dropdown_class,
 
+            # Dropdown end-hour
             dropdown_style,
             dropdown_class,
 
+            # === NOVO: Dropdowns de máquinas ===
+            machine_dropdown_class_g1,
+            machine_dropdown_class_g2,
+
+            # Labels
             label_style,
             label_style,
             label_style,
 
+            # Labels dos grupos
+            label_group1_style,
+            label_group2_style,
+
+            # Switch e tooltip
             switch_label_content,
             tooltip_icon_class,
         )

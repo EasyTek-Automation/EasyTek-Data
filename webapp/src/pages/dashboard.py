@@ -59,28 +59,7 @@ layout = dbc.Container([
         ],style={"margin": "10px", "width":"99%"})
         
     ]),
-    dbc.Row([ # Esta Row agrupa os cards de métricas (KPIs)
-        dbc.Card([
-            dbc.CardBody([
-                kpicards_cards_layout
-
-                
-            ])
-
-        ],style={"margin": "10px", "width":"99%"})
-        
-    ]),
-    dbc.Row([
-        dbc.Card([
-            dbc.CardBody([
-                messagestable_cards_layout
-
-                
-            ])
-
-        ],style={"margin": "10px", "width":"99%"})
-        
-    ])
+  
 ], 
 sm=12,
 
