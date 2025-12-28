@@ -9,7 +9,6 @@ import dash
 from dash_bootstrap_templates import ThemeSwitchAIO
 from src.config.theme_config import TEMPLATE_THEME_MINTY, TEMPLATE_THEME_DARKLY
 from dash import dcc
-from src.utils.empty_state import create_empty_state_figure, create_error_state_figure
 import os
 import traceback
 import time
@@ -251,23 +250,11 @@ def register_energygraph_callbacks(app, collection_energia):
 
         # Verifica erro
         if not stored_data or (isinstance(stored_data, dict) and "error" in stored_data):
-            if isinstance(stored_data, dict) and stored_data.get("error"):
-                error_msg = stored_data.get("error", "")
-                if "Selecione pelo menos um equipamento" in error_msg:
-                    # Empty state
-                    logger.info("[GRAPH] Empty state: nenhum equipamento selecionado")
-                    empty_fig = create_empty_state_figure('voltage', template)
-                    return empty_fig, visible_style
-                else:
-                    # Erro real
-                    logger.warning(f"[GRAPH] Erro: {error_msg}")
-                    error_fig = create_error_state_figure(error_msg, template)
-                    return error_fig, error_style
-            
-            # Fallback
-            logger.warning("[GRAPH] Sem dados")
-            empty_fig = create_empty_state_figure('voltage', template)
-            return empty_fig, visible_style
+            msg = stored_data.get("error", "Sem dados para o período.") if isinstance(stored_data, dict) else "Sem dados"
+            logger.warning(f"[GRAPH] Erro: {msg}")
+            error_fig = px.line(title=msg)
+            error_fig.update_layout(template=template)
+            return error_fig, error_style
 
         # Extrai dados
         data_records = stored_data.get("data", []) if isinstance(stored_data, dict) else stored_data
@@ -277,7 +264,8 @@ def register_energygraph_callbacks(app, collection_energia):
             df = pd.DataFrame(data_records)
         except Exception as e:
             logger.error(f"[GRAPH][EXC] Falha ao criar DataFrame: {e}")
-            error_fig = create_error_state_figure("Dados inválidos", template)
+            error_fig = px.line(title="Erro: Dados inválidos.")
+            error_fig.update_layout(template=template)
             return error_fig, error_style
 
         # Verifica colunas
@@ -285,15 +273,17 @@ def register_energygraph_callbacks(app, collection_energia):
         missing = [c for c in required_cols if c not in df.columns]
         if missing:
             logger.error(f"[GRAPH] Colunas faltantes: {missing}")
-            error_fig = create_error_state_figure(f"Faltam colunas: {', '.join(missing)}", template)
+            error_fig = px.line(title=f"Erro: Faltam colunas: {missing}.")
+            error_fig.update_layout(template=template)
             return error_fig, error_style
         
         df_tensao = df.dropna(subset=["TensaoL1", "TensaoL2", "TensaoL3"])
 
         if df_tensao.empty:
             logger.warning("[GRAPH] Nenhum dado de tensão após filtragem.")
-            empty_fig = create_empty_state_figure('voltage', template)
-            return empty_fig, visible_style
+            error_fig = px.line(title="Sem dados de tensão para exibir.")
+            error_fig.update_layout(template=template)
+            return error_fig, error_style
 
         # Cria gráfico
         try:
@@ -347,7 +337,8 @@ def register_energygraph_callbacks(app, collection_energia):
 
         except Exception as e:
             logger.error(f"[GRAPH][EXC] Falha ao renderizar: {e}")
-            error_fig = create_error_state_figure("Erro ao renderizar gráfico de tensão", template)
+            error_fig = px.line(title="Erro ao renderizar gráfico.")
+            error_fig.update_layout(template=template)
             return error_fig, error_style
 
     # ========== CALLBACK PARA ATUALIZAR GRÁFICO DE CORRENTE ========== #
@@ -369,23 +360,11 @@ def register_energygraph_callbacks(app, collection_energia):
 
         # Verifica erro
         if not stored_data or (isinstance(stored_data, dict) and "error" in stored_data):
-            if isinstance(stored_data, dict) and stored_data.get("error"):
-                error_msg = stored_data.get("error", "")
-                if "Selecione pelo menos um equipamento" in error_msg:
-                    # Empty state
-                    logger.info("[GRAPH_CURRENT] Empty state: nenhum equipamento selecionado")
-                    empty_fig = create_empty_state_figure('current', template)
-                    return empty_fig, visible_style
-                else:
-                    # Erro real
-                    logger.warning(f"[GRAPH_CURRENT] Erro: {error_msg}")
-                    error_fig = create_error_state_figure(error_msg, template)
-                    return error_fig, error_style
-            
-            # Fallback
-            logger.warning("[GRAPH_CURRENT] Sem dados")
-            empty_fig = create_empty_state_figure('current', template)
-            return empty_fig, visible_style
+            msg = stored_data.get("error", "Sem dados para o período.") if isinstance(stored_data, dict) else "Sem dados"
+            logger.warning(f"[GRAPH_CURRENT] Erro: {msg}")
+            error_fig = px.line(title=msg)
+            error_fig.update_layout(template=template)
+            return error_fig, error_style
 
         # Extrai dados
         data_records = stored_data.get("data", []) if isinstance(stored_data, dict) else stored_data
@@ -395,7 +374,8 @@ def register_energygraph_callbacks(app, collection_energia):
             df = pd.DataFrame(data_records)
         except Exception as e:
             logger.error(f"[GRAPH_CURRENT][EXC] Falha ao criar DataFrame: {e}")
-            error_fig = create_error_state_figure("Dados inválidos", template)
+            error_fig = px.line(title="Erro: Dados inválidos.")
+            error_fig.update_layout(template=template)
             return error_fig, error_style
 
         # Verifica colunas
@@ -403,15 +383,17 @@ def register_energygraph_callbacks(app, collection_energia):
         missing = [c for c in required_cols if c not in df.columns]
         if missing:
             logger.error(f"[GRAPH_CURRENT] Colunas faltantes: {missing}")
-            error_fig = create_error_state_figure(f"Faltam colunas: {', '.join(missing)}", template)
+            error_fig = px.line(title=f"Erro: Faltam colunas: {missing}.")
+            error_fig.update_layout(template=template)
             return error_fig, error_style
 
         df_corrente = df.dropna(subset=["CorrenteL1", "CorrenteL2", "CorrenteL3"])
 
         if df_corrente.empty:
             logger.warning("[GRAPH_CURRENT] Nenhum dado de corrente após filtragem.")
-            empty_fig = create_empty_state_figure('current', template)
-            return empty_fig, visible_style
+            error_fig = px.line(title="Sem dados de corrente para exibir.")
+            error_fig.update_layout(template=template)
+            return error_fig, error_style
 
         # Cria gráfico
         try:
@@ -464,7 +446,8 @@ def register_energygraph_callbacks(app, collection_energia):
 
         except Exception as e:
             logger.error(f"[GRAPH_CURRENT][EXC] Falha ao renderizar: {e}")
-            error_fig = create_error_state_figure("Erro ao renderizar gráfico de corrente", template)
+            error_fig = px.line(title="Erro ao renderizar gráfico.")
+            error_fig.update_layout(template=template)
             return error_fig, error_style
 
     # ========== CALLBACK PARA EXPORTAR EXCEL ========== #

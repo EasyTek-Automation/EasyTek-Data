@@ -3,8 +3,7 @@
 from dash import dcc, html
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
-
-from flask_login import current_user # << IMPORTANTE
+from flask_login import current_user
 from zoneinfo import ZoneInfo
 
 
@@ -16,53 +15,93 @@ def create_sidebar_layout(app_instance):
         return dt.replace(minute=minute, second=0, microsecond=0)
 
     now = datetime.now(TZ_SP)
-
-    # Fecha o "fim" sempre no último bloco de 30min (NUNCA no futuro)
     end_dt = floor_to_30(now)
-
-    # Início exatamente 24h antes do fim (fica redondinho)
     start_dt = end_dt - timedelta(hours=24)
 
     initial_start_date = start_dt.date()
     initial_end_date = end_dt.date()
 
-    # Opções fixas do dia (00:00..23:30) — não depende de "agora"
     hours_30 = [f"{h:02d}:{m:02d}" for h in range(24) for m in (0, 30)]
 
     default_start_hour = start_dt.strftime("%H:%M")
     default_end_hour = end_dt.strftime("%H:%M")
 
+    # Opções dos multimedidores
+    mm_options = [
+        {"label": "SE03_MM01_Geral", "value": "SE03_MM01"},
+        {"label": "SE03_MM02_PR01/05", "value": "SE03_MM02"},
+        {"label": "SE03_MM03_PR02/08", "value": "SE03_MM03"},
+        {"label": "SE03_MM04_LCT16", "value": "SE03_MM04"},
+        {"label": "SE03_MM05_LCL08", "value": "SE03_MM05"},
+        {"label": "SE03_MM06_LCT08", "value": "SE03_MM06"},
+        {"label": "SE03_MM07_LCL4,5", "value": "SE03_MM07"},
+    ]
 
-    # --- Layout da Sidebar ---
     return dbc.Card([
         dbc.CardBody([
             html.Div([
-                
-
-                html.Img(src="/assets/LogoAMG.png", style={"width": "50%", "max-height": "150px", "object-fit": "contain", "margin": "0 auto 20px", "display": "block"}),
+                html.Img(
+                    src="/assets/LogoAMG.png",
+                    style={
+                        "width": "50%",
+                        "max-height": "150px",
+                        "object-fit": "contain",
+                        "margin": "0 auto 20px",
+                        "display": "block"
+                    }
+                ),
                 html.Hr(),
                
                 html.Label("Insira a Data:", id="label-date-range"),
-                dcc.DatePickerRange(id='date-picker-range', start_date=initial_start_date, end_date=initial_end_date, display_format='DD/MM/YYYY', start_date_placeholder_text='Data início', end_date_placeholder_text='Data fim'),
+                dcc.DatePickerRange(
+                    id='date-picker-range',
+                    start_date=initial_start_date,
+                    end_date=initial_end_date,
+                    display_format='DD/MM/YYYY',
+                    start_date_placeholder_text='Data início',
+                    end_date_placeholder_text='Data fim'
+                ),
             ], style={"width": "100%"}),
-                dbc.Label("Equipamento"),
-                    dcc.Dropdown(
-                        id="machine-dropdown",
-                        options=[
-                            {"label": "SE03_MM01_Geral", "value": "SE03_MM01"},
-                            # depois você adiciona outros aqui
-                            {"label": "SE03_MM02_PR01/05", "value": "SE03_MM02"},
-                            {"label": "SE03_MM03_PR02/08", "value": "SE03_MM03"},
-                            {"label": "SE03_MM04_LCT16", "value": "SE03_MM04"},
-                            {"label": "SE03_MM05_LCL08", "value": "SE03_MM05"},
-                            {"label": "SE03_MM06_LCT08", "value": "SE03_MM06"},
-                            {"label": "SE03_MM07_LCL4,5", "value": "SE03_MM07"},
-                        ],
-                        value="SE03_MM01",          # valor padrão
-                        clearable=False,
-                        placeholder="Selecione o equipamento",
-                        className="machine-dropdown",
-                    ),
+
+            # === GRUPO 1 ===
+            html.Div([
+                dbc.Label("Grupo 1 - Equipamentos", style={"font-weight": "bold", "color": "#1f77b4"}),
+                dcc.Dropdown(
+                    id="machine-dropdown-group1",
+                    options=mm_options,
+                    value=["SE03_MM01"],  # Valor padrão
+                    multi=True,
+                    placeholder="Selecione equipamentos do Grupo 1",
+                    className="machine-dropdown",
+                ),
+            ], style={"margin-top": "15px"}),
+
+            # === GRUPO 2 ===
+            html.Div([
+                dbc.Label("Grupo 2 - Equipamentos", style={"font-weight": "bold", "color": "#ff7f0e"}),
+                dcc.Dropdown(
+                    id="machine-dropdown-group2",
+                    options=mm_options,
+                    value=[],  # Vazio por padrão
+                    multi=True,
+                    placeholder="Selecione equipamentos do Grupo 2",
+                    className="machine-dropdown",
+                ),
+            ], style={"margin-top": "15px"}),
+
+            # === MENSAGEM DE VALIDAÇÃO ===
+            html.Div(
+                id="validation-message",
+                style={
+                    "margin-top": "10px",
+                    "padding": "8px",
+                    "border-radius": "4px",
+                    "font-size": "0.85rem",
+                    "display": "none"
+                }
+            ),
+
+            # === HORAS ===
             html.Div([
                 html.Div([
                     html.Label("Hora de início:", id="label-start-hour"),
@@ -81,17 +120,27 @@ def create_sidebar_layout(app_instance):
                         value=default_end_hour,
                         clearable=False
                     )
-
                 ], style={'display': 'inline-block'})
             ], style={'margin-top': '20px'}),
+
+            # === AUTO-UPDATE ===
             html.Div([
-                dbc.Switch(id="auto-update-switch", label="Atualização Automática (a cada 10s)", value=False, className="d-inline-block me-2"),
+                dbc.Switch(
+                    id="auto-update-switch",
+                    label="Atualização Automática (a cada 10s)",
+                    value=False,
+                    className="d-inline-block me-2"
+                ),
                 html.I(className="bi bi-info-circle", id="tooltip-target"),
-                dbc.Tooltip("Quando desativado, os dados só serão atualizados ao alterar o intervalo de datas/horas.", target="tooltip-target", placement="right")
+                dbc.Tooltip(
+                    "Quando desativado, os dados só serão atualizados ao alterar o intervalo de datas/horas.",
+                    target="tooltip-target",
+                    placement="right"
+                )
             ], style={'margin-top': '20px', 'display': 'flex', 'align-items': 'center'})
         ], style={"height": "calc(100% - 2rem)", "margin": "0"})
     ], id="sidebar-content", style={
-        "flex": "1", # <<< ADICIONE ESTA LINHA DE VOLTA
+        "flex": "1",
         "height": "100%",
         "visibility": "visible",
         "opacity": 1,

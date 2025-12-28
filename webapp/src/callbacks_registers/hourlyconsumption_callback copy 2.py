@@ -10,7 +10,6 @@ import dash
 from dash_bootstrap_templates import ThemeSwitchAIO
 from src.config.theme_config import TEMPLATE_THEME_MINTY, TEMPLATE_THEME_DARKLY
 from dash import dcc
-from src.utils.empty_state import create_empty_state_figure, create_error_state_figure
 import os
 import traceback
 import time
@@ -318,26 +317,13 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
 
         logger.debug(f"[GRAPH_HOURLY] Update pathname={pathname} toggle={toggle}")
 
-        # --- 1) Sem dados ou erro ---
-        if (not stored_data) or (isinstance(stored_data, dict) and "error" in stored_data):
-            # Verifica se é erro de "nenhum equipamento selecionado"
-            if isinstance(stored_data, dict) and stored_data.get("error"):
-                error_msg = stored_data.get("error", "")
-                if "Selecione pelo menos um equipamento" in error_msg:
-                    # Empty state (nenhum equipamento selecionado)
-                    logger.info("[GRAPH_HOURLY] Empty state: nenhum equipamento selecionado")
-                    empty_fig = create_empty_state_figure('consumption', template)
-                    return empty_fig, visible_style
-                else:
-                    # Erro real
-                    logger.warning(f"[GRAPH_HOURLY] Erro: {error_msg}")
-                    error_fig = create_error_state_figure(error_msg, template)
-                    return error_fig, error_style
-            
-            # Fallback para sem dados
-            logger.warning("[GRAPH_HOURLY] Sem dados")
-            empty_fig = create_empty_state_figure('consumption', template)
-            return empty_fig, visible_style
+        # Verifica erro
+        if not stored_data or (isinstance(stored_data, dict) and "error" in stored_data):
+            msg = stored_data.get("error", "Sem dados") if isinstance(stored_data, dict) else "Sem dados"
+            logger.warning(f"[GRAPH_HOURLY] Erro: {msg}")
+            error_fig = px.bar(title=msg)
+            error_fig.update_layout(template=template)
+            return error_fig, error_style
 
         # Extrai metadados
         has_group1 = stored_data.get("has_group1", False)
@@ -346,34 +332,25 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
 
         if not data_records:
             logger.warning("[GRAPH_HOURLY] data_records vazio")
-            empty_fig = create_empty_state_figure('consumption', template)
-            return empty_fig, visible_style
+            error_fig = px.bar(title="Sem dados para exibir")
+            error_fig.update_layout(template=template)
+            return error_fig, error_style
 
-        # --- 2) Converter para DataFrame ---
         try:
             df = pd.DataFrame(data_records)
         except Exception as e:
             logger.error(f"[GRAPH_HOURLY][EXC] Falha ao criar DataFrame: {e}")
-            error_fig = create_error_state_figure("Dados inválidos para gráfico de consumo", template)
+            error_fig = px.bar(title="Dados inválidos")
+            error_fig.update_layout(template=template)
             return error_fig, error_style
 
-        # --- 3) Conferir colunas obrigatórias ---
-        required_cols = ["HoraStr", "Grupo1_kWh", "Grupo2_kWh"]
-        missing = [c for c in required_cols if c not in df.columns]
-        if missing:
-            logger.error(f"[GRAPH_HOURLY] Colunas faltantes: {missing} | cols={list(df.columns)}")
-            error_fig = create_error_state_figure(
-                f"Dados inválidos (faltam colunas: {', '.join(missing)})",
-                template
-            )
+        if df.empty or "HoraStr" not in df.columns:
+            logger.warning("[GRAPH_HOURLY] DataFrame vazio ou sem HoraStr")
+            error_fig = px.bar(title="Sem dados para exibir")
+            error_fig.update_layout(template=template)
             return error_fig, error_style
 
-        if df.empty:
-            logger.warning("[GRAPH_HOURLY] DataFrame vazio.")
-            empty_fig = create_empty_state_figure('consumption', template)
-            return empty_fig, visible_style
-
-        # --- 4) Criar o gráfico de barras ---
+        # ========== CRIAR GRÁFICO COM BARRAS AGRUPADAS ========== #
         try:
             fig = go.Figure()
 
@@ -419,7 +396,8 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
 
         except Exception as e:
             logger.error(f"[GRAPH_HOURLY][EXC] Falha ao renderizar: {e}")
-            error_fig = create_error_state_figure("Erro ao renderizar gráfico de consumo", template)
+            error_fig = px.bar(title="Erro ao renderizar gráfico")
+            error_fig.update_layout(template=template)
             return error_fig, error_style
 
     # ========== CALLBACK PARA EXPORTAR EXCEL ========== #
