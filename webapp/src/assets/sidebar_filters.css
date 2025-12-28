@@ -1,158 +1,128 @@
+/*
 /* assets/sidebar_filters.css */
 
 /* Estilos para DatePickerRange - Tema Escuro */
 /* assets/sidebar_filters.css */
 
 /* Estilos para DatePickerRange - TEMA CLARO (antes era dark) */
-.date-picker-light .DateInput_input { /* AGORA É LIGHT */
-    background-color: #303030 !important; /* ESTE ERA O FUNDO ESCURO */
+.date-picker-light .DateInput_input {
+    /* AGORA É LIGHT */
+    background-color: #303030 !important;
+    /* ESTE ERA O FUNDO ESCURO */
     color: white !important;
     border-color: #495057 !important;
 }
-.date-picker-light .DateInput_input::placeholder { /* AGORA É LIGHT */
+
+.date-picker-light .DateInput_input::placeholder {
+    /* AGORA É LIGHT */
     color: #ced4da !important;
 }
-.date-picker-light .CalendarDay__default { /* AGORA É LIGHT */
+
+.date-picker-light .CalendarDay__default {
+    /* AGORA É LIGHT */
     background-color: #303030 !important;
     color: white !important;
 }
-.date-picker-light .CalendarDay__selected, /* AGORA É LIGHT */
+
+.date-picker-light .CalendarDay__selected,
+/* AGORA É LIGHT */
 .date-picker-light .CalendarDay__selected:hover {
     background-color: #007bff !important;
     color: white !important;
 }
-.date-picker-light .CalendarDay__hovered_span, /* AGORA É LIGHT */
+
+.date-picker-light .CalendarDay__hovered_span,
+/* AGORA É LIGHT */
 .date-picker-light .CalendarDay__hovered_span:hover {
     background-color: #495057 !important;
     color: white !important;
 }
-.date-picker-light .DayPicker_weekHeader_ul { /* AGORA É LIGHT */
+
+.date-picker-light .DayPicker_weekHeader_ul {
+    /* AGORA É LIGHT */
     color: white !important;
 }
-.date-picker-light .DayPicker_transitionContainer { /* AGORA É LIGHT */
+
+.date-picker-light .DayPicker_transitionContainer {
+    /* AGORA É LIGHT */
     background-color: #303030 !important;
 }
-.date-picker-light .DayPicker_nav--prev, /* AGORA É LIGHT */
+
+.date-picker-light .DayPicker_nav--prev,
+/* AGORA É LIGHT */
 .date-picker-light .DayPicker_nav--next {
     color: white !important;
 }
-.date-picker-light .DayPicker_caption { /* AGORA É LIGHT */
+
+.date-picker-light .DayPicker_caption {
+    /* AGORA É LIGHT */
     color: white !important;
 }
-.date-picker-light .DateInput_input:focus { /* AGORA É LIGHT */
+
+.date-picker-light .DateInput_input:focus {
+    /* AGORA É LIGHT */
     outline: none !important;
     box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
 }
 
 
 /* Estilos para DatePickerRange - TEMA ESCURO (antes era light) */
-.date-picker-dark .DateInput_input { /* AGORA É DARK */
-    background-color: white !important; /* ESTE ERA O FUNDO CLARO */
+.date-picker-dark .DateInput_input {
+    /* AGORA É DARK */
+    background-color: white !important;
+    /* ESTE ERA O FUNDO CLARO */
     color: black !important;
     border-color: #ced4da !important;
 }
-.date-picker-dark .DateInput_input::placeholder { /* AGORA É DARK */
+
+.date-picker-dark .DateInput_input::placeholder {
+    /* AGORA É DARK */
     color: #6c757d !important;
 }
-.date-picker-dark .CalendarDay__default { /* AGORA É DARK */
+
+.date-picker-dark .CalendarDay__default {
+    /* AGORA É DARK */
     background-color: white !important;
     color: black !important;
 }
-.date-picker-dark .CalendarDay__selected, /* AGORA É DARK */
+
+.date-picker-dark .CalendarDay__selected,
+/* AGORA É DARK */
 .date-picker-dark .CalendarDay__selected:hover {
     background-color: #28a745 !important;
     color: white !important;
 }
-.date-picker-dark .CalendarDay__hovered_span, /* AGORA É DARK */
+
+.date-picker-dark .CalendarDay__hovered_span,
+/* AGORA É DARK */
 .date-picker-dark .CalendarDay__hovered_span:hover {
     background-color: #e2f0d9 !important;
     color: black !important;
 }
-.date-picker-dark .DayPicker_weekHeader_ul { /* AGORA É DARK */
+
+.date-picker-dark .DayPicker_weekHeader_ul {
+    /* AGORA É DARK */
     color: black !important;
 }
-.date-picker-dark .DayPicker_transitionContainer { /* AGORA É DARK */
+
+.date-picker-dark .DayPicker_transitionContainer {
+    /* AGORA É DARK */
     background-color: white !important;
 }
-.date-picker-dark .DayPicker_nav--prev, /* AGORA É DARK */
+
+.date-picker-dark .DayPicker_nav--prev,
+/* AGORA É DARK */
 .date-picker-dark .DayPicker_nav--next {
     color: black !important;
 }
-.date-picker-dark .DayPicker_caption { /* AGORA É DARK */
+
+.date-picker-dark .DayPicker_caption {
+    /* AGORA É DARK */
     color: black !important;
 }
-.date-picker-dark .DateInput_input:focus { /* AGORA É DARK */
-    outline: none !important;
-    box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25) !important;
-}
 
-
-
-/* Estilos para Dropdown - TEMA CLARO (antes era dark) */
-.dropdown-light .Select-control { /* AGORA É LIGHT */
-    background-color: #303030 !important; /* ESTE ERA O FUNDO ESCURO */
-    border-color: #495057 !important;
-    color: white !important;
-}
-.dropdown-light .Select-value-label { /* AGORA É LIGHT */
-    color: white !important;
-}
-.dropdown-light .Select-arrow { /* AGORA É LIGHT */
-    border-color: white transparent transparent !important;
-}
-.dropdown-light .Select-menu-outer { /* AGORA É LIGHT */
-    background-color: #303030 !important;
-    border-color: #495057 !important;
-}
-.dropdown-light .Select-option { /* AGORA É LIGHT */
-    background-color: #303030 !important;
-    color: white !important;
-}
-.dropdown-light .Select-option.is-focused { /* AGORA É LIGHT */
-    background-color: #007bff !important;
-}
-.dropdown-light .Select-option.is-selected { /* AGORA É LIGHT */
-    background-color: #0056b3 !important;
-}
-.dropdown-light .Select-placeholder { /* AGORA É LIGHT */
-    color: #ced4da !important;
-}
-.dropdown-light .Select-control:focus { /* AGORA É LIGHT */
-    outline: none !important;
-    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25) !important;
-}
-
-
-/* Estilos para Dropdown - TEMA ESCURO (antes era light) */
-.dropdown-dark .Select-control { /* AGORA É DARK */
-    background-color: white !important; /* ESTE ERA O FUNDO CLARO */
-    border-color: #ced4da !important;
-    color: black !important;
-}
-.dropdown-dark .Select-value-label { /* AGORA É DARK */
-    color: black !important;
-}
-.dropdown-dark .Select-arrow { /* AGORA É DARK */
-    border-color: black transparent transparent !important;
-}
-.dropdown-dark .Select-menu-outer { /* AGORA É DARK */
-    background-color: white !important;
-    border-color: #ced4da !important;
-}
-.dropdown-dark .Select-option { /* AGORA É DARK */
-    background-color: white !important;
-    color: black !important;
-}
-.dropdown-dark .Select-option.is-focused { /* AGORA É DARK */
-    background-color: #e2f0d9 !important;
-}
-.dropdown-dark .Select-option.is-selected { /* AGORA É DARK */
-    background-color: #28a745 !important;
-}
-.dropdown-dark .Select-placeholder { /* AGORA É DARK */
-    color: #6c757d !important;
-}
-.dropdown-dark .Select-control:focus { /* AGORA É DARK */
+.date-picker-dark .DateInput_input:focus {
+    /* AGORA É DARK */
     outline: none !important;
     box-shadow: 0 0 0 0.2rem rgba(40, 167, 69, 0.25) !important;
 }

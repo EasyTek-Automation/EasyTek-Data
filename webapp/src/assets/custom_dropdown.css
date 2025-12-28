@@ -1,107 +1,313 @@
-/* Container do dropdown (input fechado e aberto) */
-.machine-dropdown .Select-control,
-.machine-dropdown .Select-menu-outer {
-    background-color: var(--bs-body-bg);
-    /* usa a cor de fundo do tema */
-    color: var(--bs-body-color);
-    /* usa a cor de texto do tema */
-    border-color: var(--bs-border-color, #6c757d);
-}
+/* ========================================
+   CORREÇÃO DROPDOWN - SOLUÇÃO ROBUSTA
+   Sobrescreve TODOS os estilos problemáticos
+   ======================================== */
 
-/* Texto selecionado e placeholder */
-.machine-dropdown .Select-value-label,
-.machine-dropdown .Select-placeholder {
-    color: var(--bs-body-color);
-}
+/* ========== TEMA ESCURO - FORÇA TUDO ========== */
 
-/* Opções da lista */
-.machine-dropdown .Select-option {
-    background-color: var(--bs-body-bg);
-    color: var(--bs-body-color);
-}
-
-/* Opção quando passa o mouse */
-.machine-dropdown .Select-option.is-focused {
-    background-color: var(--bs-secondary-bg, #495057);
-    color: var(--bs-body-color);
-}
-
-/* Borda quando está focado */
-.machine-dropdown .is-focused:not(.is-open)>.Select-control {
-    border-color: var(--bs-primary, #0d6efd);
-    box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
-}
-
-
-/* ====== AJUSTE DO DROPDOWN QUANDO ESTÁ FECHADO (VALOR SELECIONADO) ====== */
-/* Vai funcionar para qualquer tema cujo data-theme contenha "dark" 
-   (dark, darkly, etc)                                      */
-
-[data-theme*="dark"] .machine-dropdown .Select-control {
+/* Container do dropdown fechado - TEMA ESCURO */
+body[data-bs-theme="dark"] .Select-control,
+body[data-bs-theme="dark"] .machine-dropdown .Select-control,
+body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-control,
+body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-control,
+.dropdown-dark .Select-control {
     background-color: #343a40 !important;
-    /* fundo um pouco mais claro */
     border-color: #6c757d !important;
-}
-
-/* Texto do valor selecionado */
-[data-theme*="dark"] .machine-dropdown .Select-value-label {
     color: #f8f9fa !important;
-    /* texto bem claro */
 }
 
-/* Placeholder quando nada foi selecionado ainda */
-[data-theme*="dark"] .machine-dropdown .Select-placeholder {
+/* Texto dos valores selecionados - TEMA ESCURO */
+body[data-bs-theme="dark"] .Select-value-label,
+body[data-bs-theme="dark"] .machine-dropdown .Select-value-label,
+body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-value-label,
+body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-value-label,
+.dropdown-dark .Select-value-label {
+    color: #f8f9fa !important;
+    background-color: transparent !important;
+}
+
+/* Placeholder - TEMA ESCURO */
+body[data-bs-theme="dark"] .Select-placeholder,
+body[data-bs-theme="dark"] .machine-dropdown .Select-placeholder,
+body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-placeholder,
+body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-placeholder,
+.dropdown-dark .Select-placeholder {
     color: #adb5bd !important;
 }
 
-/* Menu e opções, para manter o mesmo padrão */
-[data-theme*="dark"] .machine-dropdown .Select-menu-outer {
-    background-color: #343a40 !important;
+/* MENU DROPDOWN (lista de opções) - TEMA ESCURO */
+body[data-bs-theme="dark"] .Select-menu-outer,
+body[data-bs-theme="dark"] .machine-dropdown .Select-menu-outer,
+body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-menu-outer,
+body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-menu-outer,
+.dropdown-dark .Select-menu-outer {
+    background-color: #2b3035 !important;
+    border-color: #495057 !important;
 }
 
-[data-theme*="dark"] .machine-dropdown .Select-option {
-    background-color: #343a40;
-    color: #f8f9fa;
-}
-
-[data-theme*="dark"] .machine-dropdown .Select-option.is-focused {
-    background-color: #495057;
-}
-
-/* ============================
-   AJUSTES ESPECÍFICOS PARA DARKLY
-   ============================ */
-
-[data-theme="darkly"] .machine-dropdown .Select-control,
-[data-theme="darkly"] .machine-dropdown .Select-menu-outer {
-    background-color: #343a40 !important;
-    /* fundo mais claro que o body */
-    color: #f8f9fa !important;
-    /* texto bem claro */
-    border-color: #6c757d !important;
-}
-
-/* Valor selecionado (texto dentro do input fechado) */
-[data-theme="darkly"] .machine-dropdown .Select-value-label {
+/* CADA OPÇÃO na lista - TEMA ESCURO */
+body[data-bs-theme="dark"] .Select-option,
+body[data-bs-theme="dark"] .machine-dropdown .Select-option,
+body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-option,
+body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-option,
+.dropdown-dark .Select-option {
+    background-color: #2b3035 !important;
     color: #f8f9fa !important;
 }
 
-/* Placeholder quando nada foi selecionado */
-[data-theme="darkly"] .machine-dropdown .Select-placeholder {
-    color: #adb5bd !important;
-}
-
-/* Menu e opções */
-[data-theme="darkly"] .machine-dropdown .Select-option {
-    background-color: #343a40 !important;
-    color: #f8f9fa !important;
-}
-
-[data-theme="darkly"] .machine-dropdown .Select-option.is-focused {
+/* Opção quando passa o mouse (hover/focused) - TEMA ESCURO */
+body[data-bs-theme="dark"] .Select-option:hover,
+body[data-bs-theme="dark"] .Select-option.is-focused,
+body[data-bs-theme="dark"] .machine-dropdown .Select-option:hover,
+body[data-bs-theme="dark"] .machine-dropdown .Select-option.is-focused,
+body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-option:hover,
+body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-option.is-focused,
+body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-option:hover,
+body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-option.is-focused,
+.dropdown-dark .Select-option:hover,
+.dropdown-dark .Select-option.is-focused {
     background-color: #495057 !important;
+    color: #ffffff !important;
 }
 
-[data-theme="darkly"] .machine-dropdown .Select-option.is-selected {
+/* Opção selecionada (com checkmark) - TEMA ESCURO */
+body[data-bs-theme="dark"] .Select-option.is-selected,
+body[data-bs-theme="dark"] .machine-dropdown .Select-option.is-selected,
+body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-option.is-selected,
+body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-option.is-selected,
+.dropdown-dark .Select-option.is-selected {
     background-color: #0d6efd !important;
     color: #ffffff !important;
+}
+
+/* Tags dos itens selecionados (multi-select) - TEMA ESCURO */
+body[data-bs-theme="dark"] .Select-value,
+body[data-bs-theme="dark"] .machine-dropdown .Select-value,
+body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-value,
+body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-value,
+.dropdown-dark .Select-value {
+    background-color: #495057 !important;
+    border-color: #6c757d !important;
+    color: #f8f9fa !important;
+}
+
+/* Botão X das tags - TEMA ESCURO */
+body[data-bs-theme="dark"] .Select-value-icon,
+body[data-bs-theme="dark"] .machine-dropdown .Select-value-icon,
+body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-value-icon,
+body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-value-icon,
+.dropdown-dark .Select-value-icon {
+    border-color: #6c757d !important;
+}
+
+body[data-bs-theme="dark"] .Select-value-icon:hover,
+body[data-bs-theme="dark"] .machine-dropdown .Select-value-icon:hover,
+body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-value-icon:hover,
+body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-value-icon:hover,
+.dropdown-dark .Select-value-icon:hover {
+    background-color: #dc3545 !important;
+    color: #ffffff !important;
+}
+
+/* Seta do dropdown - TEMA ESCURO */
+body[data-bs-theme="dark"] .Select-arrow,
+body[data-bs-theme="dark"] .machine-dropdown .Select-arrow,
+body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-arrow,
+body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-arrow,
+.dropdown-dark .Select-arrow {
+    border-color: #adb5bd transparent transparent !important;
+}
+
+/* Input de busca - TEMA ESCURO */
+body[data-bs-theme="dark"] .Select-input>input,
+body[data-bs-theme="dark"] .machine-dropdown .Select-input>input,
+body[data-bs-theme="dark"] .machine-dropdown-group1 .Select-input>input,
+body[data-bs-theme="dark"] .machine-dropdown-group2 .Select-input>input,
+.dropdown-dark .Select-input>input {
+    color: #f8f9fa !important;
+}
+
+/* ========== TEMA CLARO - FORÇA TUDO ========== */
+
+/* Container - TEMA CLARO */
+body[data-bs-theme="light"] .Select-control,
+body:not([data-bs-theme]) .Select-control,
+body[data-bs-theme="light"] .machine-dropdown .Select-control,
+body[data-bs-theme="light"] .machine-dropdown-group1 .Select-control,
+body[data-bs-theme="light"] .machine-dropdown-group2 .Select-control,
+body:not([data-bs-theme]) .machine-dropdown .Select-control,
+body:not([data-bs-theme]) .machine-dropdown-group1 .Select-control,
+body:not([data-bs-theme]) .machine-dropdown-group2 .Select-control,
+.dropdown-light .Select-control {
+    background-color: #ffffff !important;
+    border-color: #ced4da !important;
+    color: #212529 !important;
+}
+
+/* Valores e placeholder - TEMA CLARO */
+body[data-bs-theme="light"] .Select-value-label,
+body:not([data-bs-theme]) .Select-value-label,
+body[data-bs-theme="light"] .machine-dropdown .Select-value-label,
+body[data-bs-theme="light"] .machine-dropdown-group1 .Select-value-label,
+body[data-bs-theme="light"] .machine-dropdown-group2 .Select-value-label,
+body:not([data-bs-theme]) .machine-dropdown .Select-value-label,
+body:not([data-bs-theme]) .machine-dropdown-group1 .Select-value-label,
+body:not([data-bs-theme]) .machine-dropdown-group2 .Select-value-label,
+.dropdown-light .Select-value-label {
+    color: #212529 !important;
+}
+
+body[data-bs-theme="light"] .Select-placeholder,
+body:not([data-bs-theme]) .Select-placeholder,
+body[data-bs-theme="light"] .machine-dropdown .Select-placeholder,
+body[data-bs-theme="light"] .machine-dropdown-group1 .Select-placeholder,
+body[data-bs-theme="light"] .machine-dropdown-group2 .Select-placeholder,
+body:not([data-bs-theme]) .machine-dropdown .Select-placeholder,
+body:not([data-bs-theme]) .machine-dropdown-group1 .Select-placeholder,
+body:not([data-bs-theme]) .machine-dropdown-group2 .Select-placeholder,
+.dropdown-light .Select-placeholder {
+    color: #6c757d !important;
+}
+
+/* Menu - TEMA CLARO */
+body[data-bs-theme="light"] .Select-menu-outer,
+body:not([data-bs-theme]) .Select-menu-outer,
+body[data-bs-theme="light"] .machine-dropdown .Select-menu-outer,
+body[data-bs-theme="light"] .machine-dropdown-group1 .Select-menu-outer,
+body[data-bs-theme="light"] .machine-dropdown-group2 .Select-menu-outer,
+body:not([data-bs-theme]) .machine-dropdown .Select-menu-outer,
+body:not([data-bs-theme]) .machine-dropdown-group1 .Select-menu-outer,
+body:not([data-bs-theme]) .machine-dropdown-group2 .Select-menu-outer,
+.dropdown-light .Select-menu-outer {
+    background-color: #ffffff !important;
+    border-color: #ced4da !important;
+}
+
+/* Opções - TEMA CLARO */
+body[data-bs-theme="light"] .Select-option,
+body:not([data-bs-theme]) .Select-option,
+body[data-bs-theme="light"] .machine-dropdown .Select-option,
+body[data-bs-theme="light"] .machine-dropdown-group1 .Select-option,
+body[data-bs-theme="light"] .machine-dropdown-group2 .Select-option,
+body:not([data-bs-theme]) .machine-dropdown .Select-option,
+body:not([data-bs-theme]) .machine-dropdown-group1 .Select-option,
+body:not([data-bs-theme]) .machine-dropdown-group2 .Select-option,
+.dropdown-light .Select-option {
+    background-color: #ffffff !important;
+    color: #212529 !important;
+}
+
+/* Hover - TEMA CLARO */
+body[data-bs-theme="light"] .Select-option:hover,
+body[data-bs-theme="light"] .Select-option.is-focused,
+body:not([data-bs-theme]) .Select-option:hover,
+body:not([data-bs-theme]) .Select-option.is-focused,
+body[data-bs-theme="light"] .machine-dropdown .Select-option:hover,
+body[data-bs-theme="light"] .machine-dropdown .Select-option.is-focused,
+body[data-bs-theme="light"] .machine-dropdown-group1 .Select-option:hover,
+body[data-bs-theme="light"] .machine-dropdown-group1 .Select-option.is-focused,
+body[data-bs-theme="light"] .machine-dropdown-group2 .Select-option:hover,
+body[data-bs-theme="light"] .machine-dropdown-group2 .Select-option.is-focused,
+body:not([data-bs-theme]) .machine-dropdown .Select-option:hover,
+body:not([data-bs-theme]) .machine-dropdown .Select-option.is-focused,
+body:not([data-bs-theme]) .machine-dropdown-group1 .Select-option:hover,
+body:not([data-bs-theme]) .machine-dropdown-group1 .Select-option.is-focused,
+body:not([data-bs-theme]) .machine-dropdown-group2 .Select-option:hover,
+body:not([data-bs-theme]) .machine-dropdown-group2 .Select-option.is-focused,
+.dropdown-light .Select-option:hover,
+.dropdown-light .Select-option.is-focused {
+    background-color: #e9ecef !important;
+}
+
+/* Selecionado - TEMA CLARO */
+body[data-bs-theme="light"] .Select-option.is-selected,
+body:not([data-bs-theme]) .Select-option.is-selected,
+body[data-bs-theme="light"] .machine-dropdown .Select-option.is-selected,
+body[data-bs-theme="light"] .machine-dropdown-group1 .Select-option.is-selected,
+body[data-bs-theme="light"] .machine-dropdown-group2 .Select-option.is-selected,
+body:not([data-bs-theme]) .machine-dropdown .Select-option.is-selected,
+body:not([data-bs-theme]) .machine-dropdown-group1 .Select-option.is-selected,
+body:not([data-bs-theme]) .machine-dropdown-group2 .Select-option.is-selected,
+.dropdown-light .Select-option.is-selected {
+    background-color: #0d6efd !important;
+    color: #ffffff !important;
+}
+
+/* Tags - TEMA CLARO */
+body[data-bs-theme="light"] .Select-value,
+body:not([data-bs-theme]) .Select-value,
+body[data-bs-theme="light"] .machine-dropdown .Select-value,
+body[data-bs-theme="light"] .machine-dropdown-group1 .Select-value,
+body[data-bs-theme="light"] .machine-dropdown-group2 .Select-value,
+body:not([data-bs-theme]) .machine-dropdown .Select-value,
+body:not([data-bs-theme]) .machine-dropdown-group1 .Select-value,
+body:not([data-bs-theme]) .machine-dropdown-group2 .Select-value,
+.dropdown-light .Select-value {
+    background-color: #e9ecef !important;
+    border-color: #ced4da !important;
+    color: #212529 !important;
+}
+
+/* ========== LABELS DOS GRUPOS ========== */
+
+#label-group1,
+#label-group2 {
+    transition: color 0.2s ease;
+    display: block;
+    margin-bottom: 5px;
+}
+
+/* Labels mais claros quando focado - TEMA ESCURO */
+body[data-bs-theme="dark"] #container-group1:focus-within #label-group1,
+.dropdown-dark.Select--is-focused~div #label-group1 {
+    color: #5ba3f5 !important;
+}
+
+body[data-bs-theme="dark"] #container-group2:focus-within #label-group2,
+.dropdown-dark.Select--is-focused~div #label-group2 {
+    color: #ffb366 !important;
+}
+
+/* Labels mais escuros quando focado - TEMA CLARO */
+body[data-bs-theme="light"] #container-group1:focus-within #label-group1,
+body:not([data-bs-theme]) #container-group1:focus-within #label-group1,
+.dropdown-light.Select--is-focused~div #label-group1 {
+    color: #0d5a9e !important;
+}
+
+body[data-bs-theme="light"] #container-group2:focus-within #label-group2,
+body:not([data-bs-theme]) #container-group2:focus-within #label-group2,
+.dropdown-light.Select--is-focused~div #label-group2 {
+    color: #cc6600 !important;
+}
+
+/* ========== AJUSTES GERAIS ========== */
+
+.Select-control:focus {
+    outline: none !important;
+}
+
+.Select--multi .Select-value {
+    margin: 2px 5px 2px 0 !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+}
+
+.Select-control,
+.Select-option,
+.Select-value {
+    transition: all 0.2s ease !important;
+}
+
+/* ========== RESPONSIVIDADE ========== */
+
+@media (max-width: 768px) {
+    .Select-control {
+        min-height: 42px !important;
+    }
+
+    .Select-option {
+        padding: 12px !important;
+        font-size: 14px !important;
+    }
 }

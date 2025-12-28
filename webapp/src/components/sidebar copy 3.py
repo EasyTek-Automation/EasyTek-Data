@@ -65,41 +65,29 @@ def create_sidebar_layout(app_instance):
 
             # === GRUPO 1 ===
             html.Div([
-                html.Div([
-                    dbc.Label(
-                        "Grupo 1 - Equipamentos",
-                        id="label-group1",
-                        style={"font-weight": "bold", "color": "#1f77b4", "margin-bottom": "5px"}
-                    ),
-                ]),
+                dbc.Label("Grupo 1 - Equipamentos", style={"font-weight": "bold", "color": "#1f77b4"}),
                 dcc.Dropdown(
                     id="machine-dropdown-group1",
                     options=mm_options,
                     value=["SE03_MM01"],  # Valor padrão
                     multi=True,
                     placeholder="Selecione equipamentos do Grupo 1",
-                    className="machine-dropdown-group1",
+                    className="machine-dropdown",
                 ),
-            ], style={"margin-top": "15px"}, id="container-group1"),
+            ], style={"margin-top": "15px"}),
 
             # === GRUPO 2 ===
             html.Div([
-                html.Div([
-                    dbc.Label(
-                        "Grupo 2 - Equipamentos",
-                        id="label-group2",
-                        style={"font-weight": "bold", "color": "#ff7f0e", "margin-bottom": "5px"}
-                    ),
-                ]),
+                dbc.Label("Grupo 2 - Equipamentos", style={"font-weight": "bold", "color": "#ff7f0e"}),
                 dcc.Dropdown(
                     id="machine-dropdown-group2",
                     options=mm_options,
                     value=[],  # Vazio por padrão
                     multi=True,
                     placeholder="Selecione equipamentos do Grupo 2",
-                    className="machine-dropdown-group2",
+                    className="machine-dropdown",
                 ),
-            ], style={"margin-top": "15px"}, id="container-group2"),
+            ], style={"margin-top": "15px"}),
 
             # === MENSAGEM DE VALIDAÇÃO ===
             html.Div(
