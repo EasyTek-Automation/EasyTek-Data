@@ -1,0 +1,123 @@
+/* ========================================
+   FILTROS NO HEADER - DROPDOWN MEGA MENU
+   ======================================== */
+
+/* Container do dropdown de filtros */
+#filters-dropdown-menu .dropdown-menu {
+    padding: 0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2) !important;
+    border: 1px solid var(--bs-border-color) !important;
+    overflow: visible !important;
+
+    /* LARGURA DO MEGA MENU */
+    min-width: 95vw !important;
+    max-width: 1400px !important;
+
+    /* Centraliza na tela */
+    position: fixed !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    top: 55px !important;
+    right: auto !important;
+}
+
+/* ALTURA DO MEGA MENU - Conteúdo interno dos filtros */
+#dashboard-filters-content {
+    width: 100% !important;
+    min-width: auto !important;
+    min-height: 450px !important;
+    /* ALTURA AUMENTADA - perto dos gráficos */
+    padding: 25px 35px !important;
+}
+
+/* Estilo do botão de filtros */
+#filters-dropdown-menu>.nav-link {
+    display: flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 8px 12px !important;
+    border-radius: 6px !important;
+    transition: background-color 0.2s ease !important;
+}
+
+#filters-dropdown-menu>.nav-link:hover {
+    background-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Ícone de filtro dentro do botão */
+#filters-dropdown-menu .menu-icon {
+    margin-right: 4px !important;
+}
+
+/* Labels dos filtros */
+#filters-dropdown-menu label,
+#dashboard-filters-content label {
+    font-size: 0.85rem !important;
+    font-weight: 500 !important;
+    color: var(--bs-body-color) !important;
+}
+
+/* Z-index para o menu de filtros */
+#filters-dropdown-menu .dropdown-menu {
+    z-index: 1050 !important;
+}
+
+/* Colunas dos filtros - espaçamento */
+#dashboard-filters-content .filter-column {
+    padding: 0 25px !important;
+}
+
+/* Títulos das colunas */
+#dashboard-filters-content h6 {
+    margin-bottom: 20px !important;
+}
+
+/* Responsividade */
+@media (max-width: 992px) {
+    #filters-dropdown-menu .dropdown-menu {
+        min-width: 98vw !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+    }
+
+    #dashboard-filters-content {
+        padding: 15px !important;
+        min-height: auto !important;
+    }
+
+    #dashboard-filters-content .row {
+        flex-direction: column !important;
+    }
+
+    #dashboard-filters-content .col-md-4 {
+        width: 100% !important;
+        max-width: 100% !important;
+        border-right: none !important;
+        border-bottom: 1px solid var(--bs-border-color) !important;
+        padding: 15px 0 !important;
+        margin-bottom: 10px !important;
+    }
+
+    #dashboard-filters-content .col-md-4:last-child {
+        border-bottom: none !important;
+        margin-bottom: 0 !important;
+    }
+}
+
+/* Animação suave ao abrir */
+#filters-dropdown-menu .dropdown-menu.show {
+    animation: fadeIn 0.15s ease-out;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(-5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
