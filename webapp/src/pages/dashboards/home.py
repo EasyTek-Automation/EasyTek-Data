@@ -181,7 +181,7 @@ def layout():
                                 dcc.Graph(
                                     id="graph-home-oee",
                                     config={"displayModeBar": False},
-                                    style={"height": "250px"}
+                                    style={"visibility": "hidden", "height": "250px"}  # ← CORRIGIDO: Inicia invisível
                                 )
                             ]
                         )
@@ -204,7 +204,7 @@ def layout():
                                 dcc.Graph(
                                     id="graph-home-energy",
                                     config={"displayModeBar": False},
-                                    style={"height": "250px"}
+                                    style={"visibility": "hidden", "height": "250px"}  # ← CORRIGIDO: Inicia invisível
                                 )
                             ]
                         )
