@@ -44,7 +44,7 @@ ROUTES = {
     "/register": register.render_layout,
     
     # Dashboards
-    "/": home.layout,                    # ← TEMPORÁRIO: Home atual (mudar no Bife 3)
+    "/": home.layout,                    
     "/production/oee": production_oee.layout,      # ← NOVO: Rota específica
     
     # Energia
