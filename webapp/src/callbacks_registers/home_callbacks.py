@@ -112,7 +112,7 @@ def register_home_callbacks(app):
     
     # =======================================
     # CALLBACK: Gráfico Energia
-    # =======================================
+    # ======================================= 
     @app.callback(
         [
             Output("graph-home-energy", "figure"),
