@@ -19,7 +19,7 @@ from src.callbacks import register_callbacks
 from src.pages.auth import login, register
 
 # Dashboards
-from src.pages.dashboards import production_oee
+from src.pages.dashboards import home, production_oee
 # from src.pages.dashboards import home  # ← Criar no Bife 3
 
 # Energia
@@ -44,7 +44,7 @@ ROUTES = {
     "/register": register.render_layout,
     
     # Dashboards
-    "/": production_oee.layout,                    # ← TEMPORÁRIO: Home atual (mudar no Bife 3)
+    "/": home.layout,                    # ← TEMPORÁRIO: Home atual (mudar no Bife 3)
     "/production/oee": production_oee.layout,      # ← NOVO: Rota específica
     
     # Energia
