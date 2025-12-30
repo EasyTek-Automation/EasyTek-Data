@@ -95,8 +95,8 @@ def layout():
                             size="sm",
                             color="warning",
                             outline=True,
-                            className="w-100",
-                            disabled=True  # ← Habilitar no Bife 4
+                            className="w-100"
+                            
                         )
                     ])
                 ], className="h-100 shadow-sm")

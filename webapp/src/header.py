@@ -251,7 +251,7 @@ def create_header(pathname, user):
                 ),
                 href="/energy",
                 active=(pathname == "/energy"),
-                disabled=True,
+                
                 style={"opacity": "0.5"}
             ),
             dbc.DropdownMenuItem(divider=True),

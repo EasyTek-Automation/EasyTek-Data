@@ -23,7 +23,7 @@ from src.pages.dashboards import home, production_oee
 # from src.pages.dashboards import home  # ← Criar no Bife 3
 
 # Energia
-# from src.pages.energy import overview as energy_overview  # ← Criar no Bife 4
+from src.pages.energy import overview as energy_overview
 
 # Produção
 from src.pages.production import states
@@ -35,6 +35,8 @@ from src.pages.supervision import control as supervision_control
 # Relatórios
 from src.pages.reports import reports
 
+from src.pages.energy import overview as energy_overview
+
 # ========================================
 # MAPEAMENTO DE ROTAS (NOVA ESTRUTURA)
 # ========================================
@@ -44,18 +46,18 @@ ROUTES = {
     "/register": register.render_layout,
     
     # Dashboards
-    "/": home.layout,                    
-    "/production/oee": production_oee.layout,      # ← NOVO: Rota específica
+    "/": home.layout,                       
+    "/production/oee": production_oee.layout,    
     
     # Energia
-    # "/energy": energy_overview.layout,           # ← Criar no Bife 4
+    "/energy": energy_overview.layout,
     
     # Produção
-    "/production/states": states.layout,           # ← NOVO: Rota específica
+    "/production/states": states.layout,           
     # "/production/alarms": alarms.layout,         # ← Criar no Bife 5
     
     # Supervisório
-    "/supervision": supervision_control.layout,    # ← NOVO: Rota específica
+    "/supervision": supervision_control.layout,    
     
     # Relatórios
     "/reports": reports.layout,
