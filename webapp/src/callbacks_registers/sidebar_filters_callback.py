@@ -95,12 +95,12 @@ def register_sidebar_filter_callbacks(app):
 
         # Estilos para Labels dos grupos (mantém cores originais)
         label_group1_style = {
-            'color': '#1f77b4',  # Azul do Grupo 1
+            'color': '#1f77b4',  # Azul do Transversais
             'font-weight': 'bold',
             'margin-bottom': '5px'
         }
         label_group2_style = {
-            'color': '#ff7f0e',  # Laranja do Grupo 2
+            'color': '#ff7f0e',  # Laranja do Longitudinais
             'font-weight': 'bold',
             'margin-bottom': '5px'
         }

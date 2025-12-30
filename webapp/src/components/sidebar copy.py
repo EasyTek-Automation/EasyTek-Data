@@ -63,11 +63,11 @@ def create_sidebar_layout(app_instance):
                 ),
             ], style={"width": "100%"}),
 
-            # === GRUPO 1 ===
+            # === Transversais ===
             html.Div([
                 html.Div([
                     dbc.Label(
-                        "Grupo 1 - Equipamentos",
+                        "Transversais - Equipamentos",
                         id="label-group1",
                         style={"font-weight": "bold", "color": "#1f77b4", "margin-bottom": "5px"}
                     ),
@@ -77,16 +77,16 @@ def create_sidebar_layout(app_instance):
                     options=mm_options,
                     value=["SE03_MM01"],  # Valor padrão
                     multi=True,
-                    placeholder="Selecione equipamentos do Grupo 1",
+                    placeholder="Selecione equipamentos do Transversais",
                     className="machine-dropdown-group1",
                 ),
             ], style={"margin-top": "15px"}, id="container-group1"),
 
-            # === GRUPO 2 ===
+            # === Longitudinais ===
             html.Div([
                 html.Div([
                     dbc.Label(
-                        "Grupo 2 - Equipamentos",
+                        "Longitudinais - Equipamentos",
                         id="label-group2",
                         style={"font-weight": "bold", "color": "#ff7f0e", "margin-bottom": "5px"}
                     ),
@@ -96,7 +96,7 @@ def create_sidebar_layout(app_instance):
                     options=mm_options,
                     value=[],  # Vazio por padrão
                     multi=True,
-                    placeholder="Selecione equipamentos do Grupo 2",
+                    placeholder="Selecione equipamentos do Longitudinais",
                     className="machine-dropdown-group2",
                 ),
             ], style={"margin-top": "15px"}, id="container-group2"),

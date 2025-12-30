@@ -21,7 +21,7 @@ from src.config.theme_config import URL_THEME_MINTY, URL_THEME_DARKLY
 def create_dashboard_filters():
     """
     Filtros específicos para a página Dashboard.
-    Layout: Grupo 1 | Período | Grupo 2
+    Layout: Transversais | Período | Longitudinais
     """
     TZ_SP = ZoneInfo("America/Sao_Paulo")
 
@@ -54,10 +54,10 @@ def create_dashboard_filters():
 
     return html.Div([
         dbc.Row([
-            # Coluna 1: Grupo 1 (Esquerda)
+            # Coluna 1: Transversais (Esquerda)
             dbc.Col([
                 html.H6(
-                    "Grupo 1",
+                    "Transversais",
                     id="label-group1",  # ID NECESSÁRIO PARA O CALLBACK
                     className="fw-bold mb-3",
                     style={"color": "#1f77b4", "borderBottom": "2px solid #1f77b4", "paddingBottom": "8px"}
@@ -130,10 +130,10 @@ def create_dashboard_filters():
                 
             ], md=4, className="filter-column", style={"borderRight": "1px solid var(--bs-border-color)", "paddingLeft": "20px", "paddingRight": "20px"}),
 
-            # Coluna 3: Grupo 2 (Direita)
+            # Coluna 3: Longitudinais (Direita)
             dbc.Col([
                 html.H6(
-                    "Grupo 2",
+                    "Longitudinais",
                     id="label-group2",  # ID NECESSÁRIO PARA O CALLBACK
                     className="fw-bold mb-3",
                     style={"color": "#ff7f0e", "borderBottom": "2px solid #ff7f0e", "paddingBottom": "8px"}

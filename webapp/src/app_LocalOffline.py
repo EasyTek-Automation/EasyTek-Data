@@ -1,4 +1,4 @@
-# src/app.py
+# src/app.py (VERSÃO FINAL OFFLINE)
 import dash
 import dash_bootstrap_components as dbc
 from flask import Flask
@@ -7,14 +7,11 @@ import os
 from dash_bootstrap_templates import load_figure_template
 
 # --- Constantes ---
-FONT_AWESOME = ["https://use.fontawesome.com/releases/v5.10.2/css/all.css"]
-external_stylesheets = [dbc.themes.MINTY]
 load_figure_template("minty")
 
 # --- Inicialização do Servidor Flask ---
 server = Flask(__name__)
 
-# Validação da SECRET_KEY
 SECRET_KEY = os.getenv('SECRET_KEY')
 if not SECRET_KEY:
     raise ValueError(
@@ -24,16 +21,24 @@ if not SECRET_KEY:
 
 server.config.update(SECRET_KEY=SECRET_KEY)
 
+# ========== MODO OFFLINE ==========
+# Usa arquivos CSS locais ao invés de CDN
+external_stylesheets = [
+    '/assets/bootstrap.min.css',  # Bootstrap local
+    '/assets/fontawesome.min.css'  # Font Awesome local
+]
+
 # --- Inicialização do App Dash ---
 app = dash.Dash(
     __name__,
     server=server,
-    external_stylesheets=[external_stylesheets, FONT_AWESOME],
+    external_stylesheets=external_stylesheets,
     suppress_callback_exceptions=True,
     title="EasyTek-Data",
+    serve_locally=True,  # CRÍTICO: Serve todos os assets localmente
+    assets_folder='assets',
     meta_tags=[
         {"name": "viewport", "content": "width=device-width, initial-scale=1"},
-        {"rel": "preload", "href": FONT_AWESOME[0], "as": "style"}
     ]
 )
 

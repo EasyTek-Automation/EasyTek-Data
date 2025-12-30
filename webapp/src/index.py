@@ -8,7 +8,9 @@ from flask_login import logout_user, current_user
 # --- Importações do Projeto ---
 from src.app import app
 from src.config import user_loader
-from src.components import header, sidebar, stores
+from src import header
+from src import sidebar
+from src.components import stores
 from src.callbacks import register_callbacks
 from src.pages import dashboard, states, login, register, superv
 
