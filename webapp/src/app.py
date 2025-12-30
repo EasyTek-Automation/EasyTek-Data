@@ -1,4 +1,5 @@
-# src/app.py
+# src/app.py (Versão Corrigida e Segura)
+
 import dash
 import dash_bootstrap_components as dbc
 from flask import Flask
@@ -8,34 +9,38 @@ from dash_bootstrap_templates import load_figure_template
 
 # --- Constantes ---
 FONT_AWESOME = ["https://use.fontawesome.com/releases/v5.10.2/css/all.css"]
+
+# Define a folha de estilos que você já usa
 external_stylesheets = [dbc.themes.MINTY]
+
+# ADICIONE ESTA LINHA PARA CARREGAR OS TEMAS PARA OS GRÁFICOS
 load_figure_template("minty")
 
 # --- Inicialização do Servidor Flask ---
-server = Flask(__name__)
+server = Flask(__name__ )
 
-# Validação da SECRET_KEY
 SECRET_KEY = os.getenv('SECRET_KEY')
 if not SECRET_KEY:
-    raise ValueError(
-        "❌ ERRO: A variável de ambiente SECRET_KEY não foi definida!\n"
-        "   Crie um arquivo .env com: SECRET_KEY=sua_chave_secreta_aqui"
-    )
+   
+    raise ValueError("A variável de ambiente SECRET_KEY é obrigatória e não foi definida.")
 
 server.config.update(SECRET_KEY=SECRET_KEY)
+
+
 
 # --- Inicialização do App Dash ---
 app = dash.Dash(
     __name__,
     server=server,
-    external_stylesheets=[external_stylesheets, FONT_AWESOME],
+        external_stylesheets=[external_stylesheets, FONT_AWESOME],
     suppress_callback_exceptions=True,
-    title="EasyTek-Data",
+        title="EasyTek-Data",
     meta_tags=[
         {"name": "viewport", "content": "width=device-width, initial-scale=1"},
-        {"rel": "preload", "href": FONT_AWESOME[0], "as": "style"}
+        
+        {"rel": "preload", "href": "https://use.fontawesome.com/releases/v5.10.2/css/all.css", "as": "style"}
     ]
-)
+  )
 
 # --- Configuração do Flask-Login ---
 login_manager = LoginManager()
