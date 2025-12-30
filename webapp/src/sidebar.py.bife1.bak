@@ -21,32 +21,18 @@ def get_sidebar_content_for_page(pathname):
     """
     Retorna o conteúdo da sidebar baseado na página atual.
     
-    IMPORTANTE: Esta função recebe o pathname JÁ RESOLVIDO após os aliases.
-    Por exemplo, se o usuário acessa /dashboard, esta função recebe /production/oee
-    
     Args:
-        pathname (str): O caminho da URL atual (já resolvido após aliases)
+        pathname (str): O caminho da URL atual
         
     Returns:
         html.Div: Componente com o conteúdo apropriado para a página
     """
-    # ========================================
-    # CORRIGIDO: Reconhece rotas NOVAS (após resolução de aliases)
-    # ========================================
-    
-    # Dashboard / Production OEE
-    if pathname in ["/", "/production/oee"]:
+    if pathname == "/" or pathname == "/dashboard":
         return create_dashboard_sidebar_content()
-    
-    # Production States
-    elif pathname == "/production/states":
+    elif pathname == "/states":
         return create_states_sidebar_content()
-    
-    # Supervision
-    elif pathname == "/supervision":
+    elif pathname == "/superv":
         return create_superv_sidebar_content()
-    
-    # Fallback para qualquer outra rota (reports, energy, alarms, etc)
     else:
         return create_default_sidebar_content()
 
