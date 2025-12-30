@@ -12,7 +12,63 @@ from src import header
 from src import sidebar
 from src.components import stores
 from src.callbacks import register_callbacks
-from src.pages import dashboard, states, login, register, superv
+# ========================================
+# IMPORTAÇÕES DE PÁGINAS - NOVA ESTRUTURA
+# ========================================
+# Autenticação
+from src.pages.auth import login, register
+
+# Dashboards
+from src.pages.dashboards import production_oee
+# from src.pages.dashboards import home  # ← Criar no Bife 3
+
+# Energia
+# from src.pages.energy import overview as energy_overview  # ← Criar no Bife 4
+
+# Produção
+from src.pages.production import states
+# from src.pages.production import alarms  # ← Criar no Bife 5
+
+# Supervisório
+from src.pages.supervision import control as supervision_control
+
+# Relatórios
+from src.pages.reports import reports
+
+# ========================================
+# MAPEAMENTO DE ROTAS (NOVA ESTRUTURA)
+# ========================================
+ROUTES = {
+    # Auth
+    "/login": login.render_layout,
+    "/register": register.render_layout,
+    
+    # Dashboards
+    "/": production_oee.layout,                    # ← TEMPORÁRIO: Home atual (mudar no Bife 3)
+    "/production/oee": production_oee.layout,      # ← NOVO: Rota específica
+    
+    # Energia
+    # "/energy": energy_overview.layout,           # ← Criar no Bife 4
+    
+    # Produção
+    "/production/states": states.layout,           # ← NOVO: Rota específica
+    # "/production/alarms": alarms.layout,         # ← Criar no Bife 5
+    
+    # Supervisório
+    "/supervision": supervision_control.layout,    # ← NOVO: Rota específica
+    
+    # Relatórios
+    "/reports": reports.layout,
+}
+
+# ========================================
+# ALIASES PARA RETROCOMPATIBILIDADE
+# ========================================
+ROUTE_ALIASES = {
+    "/dashboard": "/production/oee",  # Redireciona rota antiga
+    "/states": "/production/states",
+    "/superv": "/supervision",
+}
 
 # --- Configurações Iniciais ---
 user_loader
@@ -56,22 +112,57 @@ app.layout = html.Div([
 )
 def route_and_prepare_content(pathname):
     if not current_user.is_authenticated:
-        if pathname == '/register': return register.render_layout(), False
+        if pathname == '/register': 
+            return register.render_layout(), False
         return login.render_layout(), False
 
-    if pathname == "/": page_content = dashboard.layout
-    elif pathname == "/states": page_content = states.layout
-    elif pathname == "/superv" and hasattr(current_user, 'level') and (current_user.level in [2, 3]): page_content = superv.layout
-    else: page_content = html.Div([html.H2("404")])
+    # ========================================
+    # RESOLVER ALIASES (RETROCOMPATIBILIDADE)
+    # ========================================
+    if pathname in ROUTE_ALIASES:
+        pathname = ROUTE_ALIASES[pathname]
+    
+    # ========================================
+    # RESOLVER ROTA
+    # ========================================
+    page_content = ROUTES.get(pathname)
+    
+    if page_content is None:
+        page_content = html.Div([
+            html.H2("404 - Página não encontrada"),
+            html.P(f"Rota: {pathname}")
+        ])
+    elif callable(page_content):
+        page_content = page_content()
+
+    # Verificar permissões para supervisório
+    if pathname == "/supervision":
+        if not (hasattr(current_user, 'level') and (current_user.level in [2, 3])):
+            page_content = html.Div([
+                dbc.Alert([
+                    html.H4("⛔ Acesso Negado"),
+                    html.P("Você não tem permissão para acessar o supervisório.")
+                ], color="danger")
+            ])
 
     main_layout = html.Div([
         *stores.app_stores,
         header.create_header(pathname, current_user),
         html.Div([
-            html.Div([sidebar.create_sidebar_layout(app)], id="sidebar-column", style={"width": "25%", "height": "100%", "transition": "width 0.5s ease", "padding": "8px", "overflow": "hidden"}),
-            html.Div([html.Div(page_content)], id="content-column", style={"width": "75%", "height": "100%", "transition": "width 0.5s ease", "overflowY": "auto"}),
-        ], id="main-container", style={"position": "fixed", "top": "60px", "left": 0, "right": 0, "bottom": 0, "display": "flex", "flexDirection": "row", "gap": "10px"}),
-        dbc.Toast(id="toast-mqtt-status", header="Status da Publicação MQTT", is_open=False, dismissable=True, duration=4000, icon="info", style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999}),
+            html.Div([sidebar.create_sidebar_layout(app)], 
+                     id="sidebar-column", 
+                     style={"width": "25%", "height": "100%", "transition": "width 0.5s ease", 
+                            "padding": "8px", "overflow": "hidden"}),
+            html.Div([html.Div(page_content)], 
+                     id="content-column", 
+                     style={"width": "75%", "height": "100%", "transition": "width 0.5s ease", 
+                            "overflowY": "auto"}),
+        ], id="main-container", style={"position": "fixed", "top": "60px", "left": 0, "right": 0, 
+                                       "bottom": 0, "display": "flex", "flexDirection": "row", 
+                                       "gap": "10px"}),
+        dbc.Toast(id="toast-mqtt-status", header="Status da Publicação MQTT", 
+                  is_open=False, dismissable=True, duration=4000, icon="info", 
+                  style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999}),
         dcc.Interval(id='interval-component', interval=10 * 1000, n_intervals=0, disabled=False),
     ])
     return main_layout, False
