@@ -22,6 +22,7 @@ from src.callbacks_registers.sp_callback import register_sp_callback
 from src.callbacks_registers.tempgraph_callback import register_tempgraph_callbacks
 from src.callbacks_registers.main_layout_callbacks import register_main_layout_callbacks 
 from src.callbacks_registers.hourlyconsumption_callback import register_hourlyconsumption_callbacks
+from src.callbacks_registers.sidebar_content_callback import register_sidebar_content_callback
 
 # (Seu logger, se houver)
 
@@ -52,3 +53,4 @@ def register_callbacks(app):
     register_main_layout_callbacks(app) 
     
     register_hourlyconsumption_callbacks(app, collection_consumo)
+    register_sidebar_content_callback(app)

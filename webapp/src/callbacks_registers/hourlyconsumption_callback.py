@@ -200,22 +200,22 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
             # Query base (range de tempo)
             base_query = {"DateTime": {"$gte": start_datetime, "$lte": end_datetime}}
 
-            # ========== PROCESSAR GRUPO 1 ========== #
+            # ========== PROCESSAR Transversais ========== #
             df_grupo1 = None
             if group1:
                 query1 = {**base_query, "IDMaq": {"$in": group1}}
-                logger.info(f"[FETCH] Query Grupo 1: {query1}")
+                logger.info(f"[FETCH] Query Transversais: {query1}")
                 
                 t_find1 = time.perf_counter()
                 cursor1 = collection_consumo.find(query1).sort("DateTime", 1)
                 data1 = list(cursor1)
-                logger.info(f"[FETCH] Grupo 1: {len(data1)} docs (find_ms={_duration_ms(t_find1)})")
+                logger.info(f"[FETCH] Transversais: {len(data1)} docs (find_ms={_duration_ms(t_find1)})")
 
                 if data1:
                     df1 = pd.DataFrame(data1)
                     
                     if "DateTime" not in df1.columns or "kwh_intervalo" not in df1.columns:
-                        logger.error("[FETCH] Colunas necessárias ausentes no Grupo 1")
+                        logger.error("[FETCH] Colunas necessárias ausentes no Transversais")
                         return {"error": "Dados inválidos: colunas ausentes"}
 
                     df1["DateTime"] = pd.to_datetime(df1["DateTime"], utc=True, errors="coerce").dt.tz_convert("America/Sao_Paulo")
@@ -230,22 +230,22 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
                                .rename(columns={"kwh_intervalo": "Grupo1_kWh"})
                         )
 
-            # ========== PROCESSAR GRUPO 2 ========== #
+            # ========== PROCESSAR Longitudinais ========== #
             df_grupo2 = None
             if group2:
                 query2 = {**base_query, "IDMaq": {"$in": group2}}
-                logger.info(f"[FETCH] Query Grupo 2: {query2}")
+                logger.info(f"[FETCH] Query Longitudinais: {query2}")
                 
                 t_find2 = time.perf_counter()
                 cursor2 = collection_consumo.find(query2).sort("DateTime", 1)
                 data2 = list(cursor2)
-                logger.info(f"[FETCH] Grupo 2: {len(data2)} docs (find_ms={_duration_ms(t_find2)})")
+                logger.info(f"[FETCH] Longitudinais: {len(data2)} docs (find_ms={_duration_ms(t_find2)})")
 
                 if data2:
                     df2 = pd.DataFrame(data2)
                     
                     if "DateTime" not in df2.columns or "kwh_intervalo" not in df2.columns:
-                        logger.error("[FETCH] Colunas necessárias ausentes no Grupo 2")
+                        logger.error("[FETCH] Colunas necessárias ausentes no Longitudinais")
                         return {"error": "Dados inválidos: colunas ausentes"}
 
                     df2["DateTime"] = pd.to_datetime(df2["DateTime"], utc=True, errors="coerce").dt.tz_convert("America/Sao_Paulo")
@@ -377,21 +377,21 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
         try:
             fig = go.Figure()
 
-            # Adiciona barra Grupo 1 (se existir)
+            # Adiciona barra Transversais (se existir)
             if has_group1 and "Grupo1_kWh" in df.columns:
                 fig.add_trace(go.Bar(
                     x=df["HoraStr"],
                     y=df["Grupo1_kWh"],
-                    name="Grupo 1",
+                    name="Transversais",
                     marker_color="#1f77b4",  # Azul
                 ))
 
-            # Adiciona barra Grupo 2 (se existir)
+            # Adiciona barra Longitudinais (se existir)
             if has_group2 and "Grupo2_kWh" in df.columns:
                 fig.add_trace(go.Bar(
                     x=df["HoraStr"],
                     y=df["Grupo2_kWh"],
-                    name="Grupo 2",
+                    name="Longitudinais",
                     marker_color="#ff7f0e",  # Laranja
                 ))
 
