@@ -18,11 +18,10 @@ from src.components.icons import (
     external_link_icon,
     filter_icon,
     home_icon,
-    maintenance_icon,    # ← NOVO
+    maintenance_icon,
     production_icon,
     energy_icon,
     alarm_icon,
-    report_icon
 )
 from src.config.theme_config import URL_THEME_MINTY, URL_THEME_DARKLY
 
@@ -39,7 +38,6 @@ def get_filters_for_page(pathname):
     Retorna o conteúdo de filtros baseado na página atual.
     
     IMPORTANTE: Esta função recebe o pathname JÁ RESOLVIDO após os aliases.
-    Por exemplo, se o usuário acessa /dashboard, esta função recebe /production/oee
     
     Args:
         pathname (str): O caminho da URL atual (já resolvido após aliases)
@@ -47,10 +45,6 @@ def get_filters_for_page(pathname):
     Returns:
         html.Div: Componente com os filtros apropriados para a página
     """
-    # ========================================
-    # CORRIGIDO: Reconhece rotas NOVAS (após resolução de aliases)
-    # ========================================
-    
     # Dashboard / Production OEE
     if pathname in ["/", "/production/oee"]:
         return create_dashboard_filters()
@@ -59,11 +53,11 @@ def get_filters_for_page(pathname):
     elif pathname == "/production/states":
         return create_states_filters()
     
-    # Outras páginas (supervision, reports, energy, alarms)
-    elif pathname in ["/supervision", "/reports", "/energy", "/production/alarms"]:
+    # Outras páginas
+    elif pathname in ["/supervision", "/utilities", "/energy", "/production/alarms"]:
         return create_default_filters()
     
-    # Fallback para qualquer outra rota
+    # Fallback
     else:
         return create_default_filters()
 
@@ -72,19 +66,35 @@ def create_header(pathname, user):
     """
     Cria e retorna o componente de cabeçalho (header) da aplicação.
     
-    Esta função é responsável por construir dinamicamente o header,
-    incluindo o menu de navegação organizado por módulos que dependem 
-    da rota atual (pathname) e do nível de permissão do usuário (user).
-
     Args:
-        pathname (str): O caminho da URL atual APÓS resolução de aliases 
-                       (ex: "/production/oee", "/production/states", "/supervision").
+        pathname (str): O caminho da URL atual APÓS resolução de aliases
         user: O objeto current_user do Flask-Login.
 
     Returns:
         html.Div: O componente Dash que representa o cabeçalho completo.
     """
     
+    # ========================================
+    # ÍCONES AUXILIARES (inline)
+    # ========================================
+    def water_icon():
+        return html.I(className="bi bi-droplet")
+    
+    def gas_icon():
+        return html.I(className="bi bi-fire")
+    
+    def compressed_air_icon():
+        return html.I(className="bi bi-wind")
+    
+    def settings_icon():
+        return html.I(className="bi bi-gear")
+    
+    def users_icon():
+        return html.I(className="bi bi-people")
+    
+    def register_icon():
+        return html.I(className="bi bi-clipboard-check")
+
     # ========================================
     # MENU DE NAVEGAÇÃO - ORGANIZADO POR MÓDULOS
     # ========================================
@@ -104,7 +114,7 @@ def create_header(pathname, user):
         )
     )
     
-    # 🔧 MANUTENÇÃO - Dropdown
+    # 🔧 MANUTENÇÃO - Dropdown (AGORA COM ALARMES)
     maintenance_dropdown = dbc.DropdownMenu(
         label=html.Div(
             [
@@ -136,6 +146,21 @@ def create_header(pathname, user):
                 ),
                 href="/maintenance/schedule",
                 disabled=True,
+                style={"opacity": "0.5"}
+            ),
+            dbc.DropdownMenuItem(divider=True),
+            # ← ALARMES MOVIDOS PARA CÁ
+            dbc.DropdownMenuItem(
+                html.Div(
+                    [
+                        html.Span(alarm_icon(), style={"marginRight": "8px"}),
+                        "Alarmes"
+                    ],
+                    className="d-flex align-items-center"
+                ),
+                href="/maintenance/alarms",
+                active=(pathname == "/maintenance/alarms"),
+                disabled=True,  # ← Habilitar no Bife 5
                 style={"opacity": "0.5"}
             ),
             dbc.DropdownMenuItem(divider=True),
@@ -174,7 +199,7 @@ def create_header(pathname, user):
         }
     )
     
-    # 🏭 PRODUÇÃO - Dropdown
+    # 🏭 PRODUÇÃO - Dropdown (SEM ALARMES)
     production_dropdown = dbc.DropdownMenu(
         label=html.Div(
             [
@@ -206,20 +231,6 @@ def create_header(pathname, user):
                 href="/production/states",
                 active=(pathname == "/production/states")
             ),
-            dbc.DropdownMenuItem(divider=True),
-            dbc.DropdownMenuItem(
-                html.Div(
-                    [
-                        html.Span(alarm_icon(), style={"marginRight": "8px"}),
-                        "Alarmes"
-                    ],
-                    className="d-flex align-items-center"
-                ),
-                href="/production/alarms",
-                active=(pathname == "/production/alarms"),
-               
-                style={"opacity": "1"}
-            ),
         ],
         nav=True,
         in_navbar=True,
@@ -231,54 +242,107 @@ def create_header(pathname, user):
         }
     )
     
-    # ⚡ ENERGIA - Dropdown
-    energy_dropdown = dbc.DropdownMenu(
+    # 💧 UTILIDADES - Dropdown com SUB-MENUS
+    utilities_dropdown = dbc.DropdownMenu(
         label=html.Div(
             [
-                html.Span(energy_icon(), style={"marginRight": "8px"}),
-                html.Span("Energia", style={"fontWeight": "600"})
+                html.I(className="bi bi-droplet-half me-2"),
+                html.Span("Utilidades", style={"fontWeight": "600"})
             ],
             className="d-flex align-items-center"
         ),
         children=[
+            # ⚡ ENERGIA ELÉTRICA - com sub-items
             dbc.DropdownMenuItem(
-                html.Div(
-                    [
-                        html.Span(energy_icon(), style={"marginRight": "8px"}),
-                        "Visão Geral"
-                    ],
-                    className="d-flex align-items-center"
-                ),
-                href="/energy",
-                active=(pathname == "/energy"),
-                
-                style={"opacity": "1"}
+                html.Div([
+                    html.Span(energy_icon(), style={"marginRight": "8px"}),
+                    html.Span("Energia Elétrica", style={"fontWeight": "500"})
+                ], className="d-flex align-items-center"),
+                header=True,
+                style={"backgroundColor": "var(--bs-light)", "cursor": "default"}
             ),
+            dbc.DropdownMenuItem(
+                "       📊 Visão Geral",
+                href="/utilities/energy",
+                active=(pathname == "/utilities/energy"),
+                style={"paddingLeft": "2.5rem", "fontSize": "0.9rem"}
+            ),
+            dbc.DropdownMenuItem(
+                "       🏭 Subestações",
+                header=True,
+                style={"paddingLeft": "2.5rem", "fontSize": "0.85rem", "opacity": "0.7"}
+            ),
+            dbc.DropdownMenuItem(
+                "           • SE01 - Principal",
+                href="/utilities/energy/se01",
+                disabled=True,
+                style={"paddingLeft": "3.5rem", "fontSize": "0.85rem", "opacity": "0.5"}
+            ),
+            dbc.DropdownMenuItem(
+                "           • SE02 - Produção",
+                href="/utilities/energy/se02",
+                disabled=True,
+                style={"paddingLeft": "3.5rem", "fontSize": "0.85rem", "opacity": "0.5"}
+            ),
+            dbc.DropdownMenuItem(
+                "           • SE03 - AMG",
+                href="/utilities/energy/se03",
+                active=(pathname == "/utilities/energy/se03"),
+                style={"paddingLeft": "3.5rem", "fontSize": "0.85rem"}
+            ),
+            dbc.DropdownMenuItem(
+                "           • SE04 - Auxiliar",
+                href="/utilities/energy/se04",
+                disabled=True,
+                style={"paddingLeft": "3.5rem", "fontSize": "0.85rem", "opacity": "0.5"}
+            ),
+            
             dbc.DropdownMenuItem(divider=True),
-            dbc.DropdownMenuItem("Subestações", header=True, style={"opacity": "0.6"}),
+            
+            # 💧 ÁGUA
             dbc.DropdownMenuItem(
-                "SE01 - Principal",
-                href="/energy/se01",
+                html.Div([
+                    html.Span(water_icon(), style={"marginRight": "8px"}),
+                    "Água"
+                ], className="d-flex align-items-center"),
+                href="/utilities/water",
                 disabled=True,
-                style={"opacity": "0.4", "fontSize": "0.9rem"}
+                style={"opacity": "0.5"}
             ),
+            
+            # 🔥 GÁS NATURAL
             dbc.DropdownMenuItem(
-                "SE02 - Produção",
-                href="/energy/se02",
+                html.Div([
+                    html.Span(gas_icon(), style={"marginRight": "8px"}),
+                    "Gás Natural"
+                ], className="d-flex align-items-center"),
+                href="/utilities/gas",
                 disabled=True,
-                style={"opacity": "0.4", "fontSize": "0.9rem"}
+                style={"opacity": "0.5"}
             ),
+            
+            # 💨 AR COMPRIMIDO
             dbc.DropdownMenuItem(
-                "SE03 - AMG",
-                href="/energy/se03",
+                html.Div([
+                    html.Span(compressed_air_icon(), style={"marginRight": "8px"}),
+                    "Ar Comprimido"
+                ], className="d-flex align-items-center"),
+                href="/utilities/compressed-air",
                 disabled=True,
-                style={"opacity": "0.4", "fontSize": "0.9rem"}
+                style={"opacity": "0.5"}
             ),
+            
+            dbc.DropdownMenuItem(divider=True),
+            
+            # DASHBOARD INTEGRADO
             dbc.DropdownMenuItem(
-                "SE04 - Auxiliar",
-                href="/energy/se04",
+                html.Div([
+                    html.I(className="bi bi-grid-3x3-gap me-2"),
+                    "Dashboard Integrado"
+                ], className="d-flex align-items-center"),
+                href="/utilities/dashboard",
                 disabled=True,
-                style={"opacity": "0.4", "fontSize": "0.9rem"}
+                style={"opacity": "0.5", "fontWeight": "500"}
             ),
         ],
         nav=True,
@@ -324,26 +388,52 @@ def create_header(pathname, user):
         }
     )
     
-    # 📄 RELATÓRIOS - Dropdown
-    reports_dropdown = dbc.DropdownMenu(
+    # 📋 REGISTROS - Dropdown (NOVO)
+    registros_dropdown = dbc.DropdownMenu(
         label=html.Div(
             [
-                html.Span(report_icon(), style={"marginRight": "8px"}),
-                html.Span("Relatórios", style={"fontWeight": "600"})
+                html.Span(register_icon(), style={"marginRight": "8px"}),
+                html.Span("Registros", style={"fontWeight": "600"})
             ],
             className="d-flex align-items-center"
         ),
         children=[
+            dbc.DropdownMenuItem("Departamentos:", header=True, style={"fontSize": "0.75rem", "opacity": "0.6"}),
             dbc.DropdownMenuItem(
-                html.Div(
-                    [
-                        html.Span(report_icon(), style={"marginRight": "8px"}),
-                        "Gerar Relatório"
-                    ],
-                    className="d-flex align-items-center"
-                ),
-                href="/reports",
-                active=(pathname == "/reports")
+                html.Div([html.I(className="bi bi-gear-wide me-2"), "Produção"], className="d-flex align-items-center"),
+                href="/registros/producao",
+                disabled=True,
+                style={"opacity": "0.5"}
+            ),
+            dbc.DropdownMenuItem(
+                html.Div([html.I(className="bi bi-wrench me-2"), "Manutenção"], className="d-flex align-items-center"),
+                href="/registros/manutencao",
+                disabled=True,
+                style={"opacity": "0.5"}
+            ),
+            dbc.DropdownMenuItem(
+                html.Div([html.I(className="bi bi-check-circle me-2"), "Qualidade"], className="d-flex align-items-center"),
+                href="/registros/qualidade",
+                disabled=True,
+                style={"opacity": "0.5"}
+            ),
+            dbc.DropdownMenuItem(
+                html.Div([html.I(className="bi bi-leaf me-2"), "Meio Ambiente"], className="d-flex align-items-center"),
+                href="/registros/meio-ambiente",
+                disabled=True,
+                style={"opacity": "0.5"}
+            ),
+            dbc.DropdownMenuItem(
+                html.Div([html.I(className="bi bi-shield-check me-2"), "Segurança"], className="d-flex align-items-center"),
+                href="/registros/seguranca",
+                disabled=True,
+                style={"opacity": "0.5"}
+            ),
+            dbc.DropdownMenuItem(
+                html.Div([html.I(className="bi bi-tools me-2"), "Engenharias"], className="d-flex align-items-center"),
+                href="/registros/engenharias",
+                disabled=True,
+                style={"opacity": "0.5"}
             ),
         ],
         nav=True,
@@ -356,18 +446,69 @@ def create_header(pathname, user):
         }
     )
     
+    # ⚙️ CONFIGURAÇÕES - Dropdown (NÍVEL 3 APENAS)
+    # Só aparece se user.level == 3
+    config_dropdown = None
+    if hasattr(user, 'level') and user.level == 3:
+        config_dropdown = dbc.DropdownMenu(
+            label=html.Div(
+                [
+                    html.Span(settings_icon(), style={"marginRight": "8px"}),
+                    html.Span("Configurações", style={"fontWeight": "600"})
+                ],
+                className="d-flex align-items-center"
+            ),
+            children=[
+                dbc.DropdownMenuItem(
+                    html.Div([
+                        html.Span(users_icon(), style={"marginRight": "8px"}),
+                        "Gerenciar Usuários"
+                    ], className="d-flex align-items-center"),
+                    href="/config/users",
+                    active=(pathname == "/config/users")
+                ),
+                dbc.DropdownMenuItem(divider=True),
+                dbc.DropdownMenuItem(
+                    html.Div([html.I(className="bi bi-sliders me-2"), "Preferências"], className="d-flex align-items-center"),
+                    href="/config/preferences",
+                    disabled=True,
+                    style={"opacity": "0.5"}
+                ),
+                dbc.DropdownMenuItem(
+                    html.Div([html.I(className="bi bi-file-text me-2"), "Logs do Sistema"], className="d-flex align-items-center"),
+                    href="/config/logs",
+                    disabled=True,
+                    style={"opacity": "0.5"}
+                ),
+            ],
+            nav=True,
+            in_navbar=True,
+            toggle_style={
+                "display": "inline-flex",
+                "alignItems": "center",
+                "gap": "4px",
+                "fontWeight": "600"
+            }
+        )
+    
     # ========================================
     # NAVBAR COMPLETO
     # ========================================
+    nav_items = [
+        home_link,
+        maintenance_dropdown,
+        production_dropdown,
+        utilities_dropdown,
+        supervision_dropdown,
+        registros_dropdown,
+    ]
+    
+    # Adiciona Configurações apenas se user nível 3
+    if config_dropdown:
+        nav_items.append(config_dropdown)
+    
     navigation_menu = dbc.Nav(
-        [
-            home_link,
-            maintenance_dropdown,    # ← NOVO
-            production_dropdown,
-            energy_dropdown,
-            supervision_dropdown,
-            reports_dropdown,
-        ],
+        nav_items,
         navbar=True,
         className="ms-3",
     )
@@ -397,11 +538,11 @@ def create_header(pathname, user):
     )
 
     # ========================================
-    # LAYOUT FINAL DO HEADER
+    # LAYOUT FINAL DO HEADER (SEM LOGO)
     # ========================================
     header_layout = html.Div(
         [
-            # Seção Esquerda: Hamburger + Logo + Título + Menu
+            # Seção Esquerda: Hamburger + Menu (SEM LOGO!)
             html.Div(
                 [
                     dbc.Button(
@@ -411,31 +552,24 @@ def create_header(pathname, user):
                         size="sm",
                         className="me-2"
                     ),
-                    html.Img(
-                        src="/assets/LogoAMG.png",
-                        style={"height": "35px", "marginRight": "10px"}
-                    ),
-                    html.Span(
-                        "EasyTek-Data",
-                        className="navbar-brand mb-0 me-3",
-                        style={"fontSize": "1.2rem", "fontWeight": "500"}
-                    ),
                     navigation_menu,
                 ],
                 className="d-flex align-items-center",
             ),
 
-            # Seção Direita: Filtros + Tema + Usuário + Logout
+            # Seção Direita: Filtros + ESPAÇO + Tema + Usuário + Logout
             html.Div(
                 [
                     filters_dropdown,
-                    html.Div(style={"width": "20px"}),  # Espaçador
+                    html.Div(style={"width": "40px"}),  # ← ESPAÇADOR MAIOR (era 20px)
                     ThemeSwitchAIO(aio_id="theme", themes=[URL_THEME_MINTY, URL_THEME_DARKLY]),
+                    html.Div(style={"width": "20px"}),  # ← ESPAÇADOR EXTRA entre tema e usuário
                     html.Span(
                         ["Bem-vindo, ", html.Strong(f"{user.username}", style={'color': '#0d6efd'})],
-                        className="me-3 align-middle",
+                        className="align-middle",
                         style={'fontSize': '0.9rem'}
                     ),
+                    html.Div(style={"width": "15px"}),  # ← ESPAÇADOR antes do logout
                     dbc.Button("Logout", id="logout_button", color="danger", size="sm"),
                 ],
                 className="d-flex align-items-center",
