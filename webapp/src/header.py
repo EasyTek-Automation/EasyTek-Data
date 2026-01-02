@@ -237,7 +237,7 @@ def create_header(pathname, user):
         }
     )
     
-    # 💧 UTILIDADES - MEGA MENU COM 4 COLUNAS
+    # 💧 UTILIDADES - MEGA MENU COM 4 COLUNAS (CORRIGIDO - USA DropdownMenuItem)
     utilities_dropdown = dbc.DropdownMenu(
         label=html.Div(
             [
@@ -247,6 +247,7 @@ def create_header(pathname, user):
             className="d-flex align-items-center"
         ),
         children=[
+            # Wrapper com Grid Layout
             html.Div([
                 dbc.Row([
                     # ========================================
@@ -254,122 +255,173 @@ def create_header(pathname, user):
                     # ========================================
                     dbc.Col([
                         html.Div([
+                            # Cabeçalho da coluna
                             html.Div([
                                 html.Span(energy_icon(), style={"marginRight": "6px"}),
                                 html.Span("Energia Elétrica", style={"fontWeight": "600", "fontSize": "0.9rem"})
-                            ], className="d-flex align-items-center mb-2", style={"color": "var(--bs-primary)"}),
+                            ], className="d-flex align-items-center mb-2 px-2", style={"color": "var(--bs-primary)"}),
                             
-                            html.Div([
-                                dbc.NavLink("📊 Visão Geral", href="/utilities/energy", 
-                                           active=(pathname == "/utilities/energy"),
-                                           className="py-1 px-2", style={"fontSize": "0.85rem"}),
-                                
-                                html.Div("Subestações:", className="mt-2 mb-1", 
-                                        style={"fontSize": "0.75rem", "opacity": "0.7", "fontWeight": "600"}),
-                                
-                                dbc.NavLink("• SE00 - Entrada", href="/utilities/energy/se00", 
-                                           disabled=True, className="py-1 px-2 ms-2", 
-                                           style={"fontSize": "0.8rem", "opacity": "0.5"}),
-                                dbc.NavLink("• SE01 - Decapado", href="/utilities/energy/se01", 
-                                           disabled=True, className="py-1 px-2 ms-2", 
-                                           style={"fontSize": "0.8rem", "opacity": "0.5"}),
-                                dbc.NavLink("• SE02 - Prensas / Utilidades", href="/utilities/energy/se02", 
-                                           disabled=True, className="py-1 px-2 ms-2", 
-                                           style={"fontSize": "0.8rem", "opacity": "0.5"}),
-                                dbc.NavLink("• SE03 - Cortadeiras Transversais/Longitudinais", href="/utilities/energy/se03", 
-                                           active=(pathname == "/utilities/energy/se03"),
-                                           className="py-1 px-2 ms-2", style={"fontSize": "0.8rem"}),
-                                dbc.NavLink("• SE04 - LWB", href="/utilities/energy/se04", 
-                                           disabled=True, className="py-1 px-2 ms-2", 
-                                           style={"fontSize": "0.8rem", "opacity": "0.5"}),
-                                
-                                dbc.NavLink("📈 Histórico", href="/utilities/energy/history", 
-                                           disabled=True, className="py-1 px-2 mt-2", 
-                                           style={"fontSize": "0.85rem", "opacity": "0.5"}),
-                                dbc.NavLink("💰 Custos", href="/utilities/energy/costs", 
-                                           disabled=True, className="py-1 px-2", 
-                                           style={"fontSize": "0.85rem", "opacity": "0.5"}),
-                            ])
+                            # Itens (usando DropdownMenuItem)
+                            dbc.DropdownMenuItem(
+                                "📊 Visão Geral",
+                                href="/utilities/energy",
+                                active=(pathname == "/utilities/energy"),
+                                style={"fontSize": "0.85rem", "paddingLeft": "0.5rem"}
+                            ),
+                            
+                            html.Div("Subestações:", className="mt-2 mb-1 px-2", 
+                                    style={"fontSize": "0.75rem", "opacity": "0.7", "fontWeight": "600"}),
+                            
+                            dbc.DropdownMenuItem(
+                                "• SE01 - Principal",
+                                href="/utilities/energy/se01",
+                                disabled=True,
+                                style={"fontSize": "0.8rem", "opacity": "0.5", "paddingLeft": "1rem"}
+                            ),
+                            dbc.DropdownMenuItem(
+                                "• SE02 - Produção",
+                                href="/utilities/energy/se02",
+                                disabled=True,
+                                style={"fontSize": "0.8rem", "opacity": "0.5", "paddingLeft": "1rem"}
+                            ),
+                            dbc.DropdownMenuItem(
+                                "• SE03 - AMG",
+                                href="/utilities/energy/se03",
+                                active=(pathname == "/utilities/energy/se03"),
+                                style={"fontSize": "0.8rem", "paddingLeft": "1rem"}
+                            ),
+                            dbc.DropdownMenuItem(
+                                "• SE04 - Auxiliar",
+                                href="/utilities/energy/se04",
+                                disabled=True,
+                                style={"fontSize": "0.8rem", "opacity": "0.5", "paddingLeft": "1rem"}
+                            ),
+                            
+                            dbc.DropdownMenuItem(
+                                "📈 Histórico",
+                                href="/utilities/energy/history",
+                                disabled=True,
+                                style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
+                            ),
+                            dbc.DropdownMenuItem(
+                                "💰 Custos",
+                                href="/utilities/energy/costs",
+                                disabled=True,
+                                style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
+                            ),
                         ], style={"minHeight": "200px"})
-                    ], width=3, className="border-end px-3"),
+                    ], width=3, className="border-end"),
                     
                     # ========================================
                     # COLUNA 2: ÁGUA
                     # ========================================
                     dbc.Col([
                         html.Div([
+                            # Cabeçalho
                             html.Div([
                                 html.Span(water_icon(), style={"marginRight": "6px"}),
                                 html.Span("Água", style={"fontWeight": "600", "fontSize": "0.9rem"})
-                            ], className="d-flex align-items-center mb-2", style={"color": "#0dcaf0"}),
+                            ], className="d-flex align-items-center mb-2 px-2", style={"color": "#0dcaf0"}),
                             
-                            html.Div([
-                                dbc.NavLink("📊 Visão Geral", href="/utilities/water", 
-                                           disabled=True, className="py-1 px-2", 
-                                           style={"fontSize": "0.85rem", "opacity": "0.5"}),
-                                dbc.NavLink("🚰 Pontos de Consumo", href="/utilities/water/points", 
-                                           disabled=True, className="py-1 px-2", 
-                                           style={"fontSize": "0.85rem", "opacity": "0.5"}),
-                                dbc.NavLink("📈 Histórico", href="/utilities/water/history", 
-                                           disabled=True, className="py-1 px-2", 
-                                           style={"fontSize": "0.85rem", "opacity": "0.5"}),
-                                dbc.NavLink("💰 Custos", href="/utilities/water/costs", 
-                                           disabled=True, className="py-1 px-2", 
-                                           style={"fontSize": "0.85rem", "opacity": "0.5"}),
-                            ])
+                            # Itens
+                            dbc.DropdownMenuItem(
+                                "📊 Visão Geral",
+                                href="/utilities/water",
+                                disabled=True,
+                                style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
+                            ),
+                            dbc.DropdownMenuItem(
+                                "🚰 Pontos de Consumo",
+                                href="/utilities/water/points",
+                                disabled=True,
+                                style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
+                            ),
+                            dbc.DropdownMenuItem(
+                                "📈 Histórico",
+                                href="/utilities/water/history",
+                                disabled=True,
+                                style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
+                            ),
+                            dbc.DropdownMenuItem(
+                                "💰 Custos",
+                                href="/utilities/water/costs",
+                                disabled=True,
+                                style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
+                            ),
                         ], style={"minHeight": "200px"})
-                    ], width=3, className="border-end px-3"),
+                    ], width=3, className="border-end"),
                     
                     # ========================================
                     # COLUNA 3: GÁS NATURAL
                     # ========================================
                     dbc.Col([
                         html.Div([
+                            # Cabeçalho
                             html.Div([
                                 html.Span(gas_icon(), style={"marginRight": "6px"}),
                                 html.Span("Gás Natural", style={"fontWeight": "600", "fontSize": "0.9rem"})
-                            ], className="d-flex align-items-center mb-2", style={"color": "#fd7e14"}),
+                            ], className="d-flex align-items-center mb-2 px-2", style={"color": "#fd7e14"}),
                             
-                            html.Div([
-                                dbc.NavLink("📊 Visão Geral", href="/utilities/gas", 
-                                           disabled=True, className="py-1 px-2", 
-                                           style={"fontSize": "0.85rem", "opacity": "0.5"}),
-                                dbc.NavLink("📍 Pontos de Medição", href="/utilities/gas/points", 
-                                           disabled=True, className="py-1 px-2", 
-                                           style={"fontSize": "0.85rem", "opacity": "0.5"}),
-                                dbc.NavLink("📈 Histórico", href="/utilities/gas/history", 
-                                           disabled=True, className="py-1 px-2", 
-                                           style={"fontSize": "0.85rem", "opacity": "0.5"}),
-                                dbc.NavLink("💰 Custos", href="/utilities/gas/costs", 
-                                           disabled=True, className="py-1 px-2", 
-                                           style={"fontSize": "0.85rem", "opacity": "0.5"}),
-                            ])
+                            # Itens
+                            dbc.DropdownMenuItem(
+                                "📊 Visão Geral",
+                                href="/utilities/gas",
+                                disabled=True,
+                                style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
+                            ),
+                            dbc.DropdownMenuItem(
+                                "📍 Pontos de Medição",
+                                href="/utilities/gas/points",
+                                disabled=True,
+                                style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
+                            ),
+                            dbc.DropdownMenuItem(
+                                "📈 Histórico",
+                                href="/utilities/gas/history",
+                                disabled=True,
+                                style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
+                            ),
+                            dbc.DropdownMenuItem(
+                                "💰 Custos",
+                                href="/utilities/gas/costs",
+                                disabled=True,
+                                style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
+                            ),
                         ], style={"minHeight": "200px"})
-                    ], width=3, className="border-end px-3"),
+                    ], width=3, className="border-end"),
                     
                     # ========================================
                     # COLUNA 4: AR COMPRIMIDO
                     # ========================================
                     dbc.Col([
                         html.Div([
+                            # Cabeçalho
                             html.Div([
                                 html.Span(compressed_air_icon(), style={"marginRight": "6px"}),
                                 html.Span("Ar Comprimido", style={"fontWeight": "600", "fontSize": "0.9rem"})
-                            ], className="d-flex align-items-center mb-2", style={"color": "#6c757d"}),
+                            ], className="d-flex align-items-center mb-2 px-2", style={"color": "#6c757d"}),
                             
-                            html.Div([
-                                dbc.NavLink("📊 Visão Geral", href="/utilities/compressed-air", 
-                                           disabled=True, className="py-1 px-2", 
-                                           style={"fontSize": "0.85rem", "opacity": "0.5"}),
-                                dbc.NavLink("🔧 Compressores", href="/utilities/compressed-air/compressors", 
-                                           disabled=True, className="py-1 px-2", 
-                                           style={"fontSize": "0.85rem", "opacity": "0.5"}),
-                                dbc.NavLink("📈 Eficiência", href="/utilities/compressed-air/efficiency", 
-                                           disabled=True, className="py-1 px-2", 
-                                           style={"fontSize": "0.85rem", "opacity": "0.5"}),
-                            ])
+                            # Itens
+                            dbc.DropdownMenuItem(
+                                "📊 Visão Geral",
+                                href="/utilities/compressed-air",
+                                disabled=True,
+                                style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
+                            ),
+                            dbc.DropdownMenuItem(
+                                "🔧 Compressores",
+                                href="/utilities/compressed-air/compressors",
+                                disabled=True,
+                                style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
+                            ),
+                            dbc.DropdownMenuItem(
+                                "📈 Eficiência",
+                                href="/utilities/compressed-air/efficiency",
+                                disabled=True,
+                                style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
+                            ),
                         ], style={"minHeight": "200px"})
-                    ], width=3, className="px-3"),
+                    ], width=3),
                     
                 ], className="g-0"),
                 
@@ -377,14 +429,16 @@ def create_header(pathname, user):
                 # DASHBOARD INTEGRADO (rodapé)
                 # ========================================
                 html.Hr(className="my-2"),
-                html.Div([
-                    dbc.NavLink([
+                dbc.DropdownMenuItem(
+                    [
                         html.I(className="bi bi-speedometer2 me-2"),
                         "Dashboard Integrado de Utilidades"
-                    ], href="/utilities/dashboard", disabled=True, 
-                       className="py-2 px-3 text-center", 
-                       style={"fontSize": "0.9rem", "opacity": "0.5", "fontWeight": "500"})
-                ])
+                    ],
+                    href="/utilities/dashboard",
+                    disabled=True,
+                    className="text-center",
+                    style={"fontSize": "0.9rem", "opacity": "0.5", "fontWeight": "500"}
+                )
                 
             ], style={"padding": "15px", "minWidth": "750px"})
         ],
