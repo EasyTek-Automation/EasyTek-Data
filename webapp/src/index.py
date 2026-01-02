@@ -26,8 +26,7 @@ from src.pages.dashboards import home, production_oee
 from src.pages.energy import overview as energy_overview
 
 # Produção
-from src.pages.production import states
-# from src.pages.production import alarms  # ← Criar no Bife 5
+from src.pages.production import states, alarms
 
 # Supervisório
 from src.pages.supervision import control as supervision_control
@@ -54,7 +53,7 @@ ROUTES = {
     
     # Produção
     "/production/states": states.layout,           
-    # "/production/alarms": alarms.layout,         # ← Criar no Bife 5
+    "/production/alarms": alarms.layout,
     
     # Supervisório
     "/supervision": supervision_control.layout,    

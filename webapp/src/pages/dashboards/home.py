@@ -125,8 +125,7 @@ def layout():
                             size="sm",
                             color="danger",
                             outline=True,
-                            className="w-100",
-                            disabled=True  # ← Habilitar no Bife 5
+                            className="w-100"
                         )
                     ])
                 ], className="h-100 shadow-sm")
