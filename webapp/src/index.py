@@ -29,13 +29,16 @@ from src.pages.energy import overview as energy_overview
 from src.pages.production import states
 
 # Manutenção
-from src.pages.maintenance import alarms  # ← MOVIDO DE PRODUCTION PARA MAINTENANCE
+from src.pages.maintenance import alarms
 
 # Supervisório
 from src.pages.supervision import control as supervision_control
 
 # Relatórios
 from src.pages.reports import reports
+
+# Comum - Páginas de utilidade
+from src.pages.common import under_development
 
 # ========================================
 # MAPEAMENTO DE ROTAS (NOVA ESTRUTURA)
@@ -50,30 +53,81 @@ ROUTES = {
     "/production/oee": production_oee.layout,    
     
     # Energia
-    "/utilities/energy": energy_overview.layout,
+    "/energy": energy_overview.layout,
+    "/utilities/energy": energy_overview.layout,  # Alias
     
     # Produção
-    "/production/states": states.layout,
     
     # Manutenção
-    "/maintenance/alarms": alarms.layout,  # ← NOVA ROTA
+    "/maintenance/alarms": alarms.layout,
     
     # Supervisório
     "/supervision": supervision_control.layout,    
     
     # Relatórios
     "/reports": reports.layout,
+    
+    # ========================================
+    # ROTAS EM DESENVOLVIMENTO
+    # ========================================
+
+    # Produção - Estados
+    "/production/states": lambda: under_development.layout("Status de Ativos - Em Desenvolvimento"),
+    
+
+
+    # Energia - Subestações
+    "/utilities/energy/se01": lambda: under_development.layout("Subestação SE01 - Em Desenvolvimento"),
+    "/utilities/energy/se02": lambda: under_development.layout("Subestação SE02 - Em Desenvolvimento"),
+    "/utilities/energy/se03": lambda: under_development.layout("Subestação SE03 - Em Desenvolvimento"),
+    "/utilities/energy/se04": lambda: under_development.layout("Subestação SE04 - Em Desenvolvimento"),
+    "/utilities/energy/history": lambda: under_development.layout("Histórico de Consumo - Em Desenvolvimento"),
+    "/utilities/energy/costs": lambda: under_development.layout("Análise de Custos - Em Desenvolvimento"),
+    
+    # Água
+    "/utilities/water": lambda: under_development.utilities_development(),
+    "/utilities/water/points": lambda: under_development.utilities_development(),
+    "/utilities/water/history": lambda: under_development.utilities_development(),
+    "/utilities/water/costs": lambda: under_development.utilities_development(),
+    
+    # Gás Natural
+    "/utilities/gas": lambda: under_development.utilities_development(),
+    "/utilities/gas/points": lambda: under_development.utilities_development(),
+    "/utilities/gas/history": lambda: under_development.utilities_development(),
+    "/utilities/gas/costs": lambda: under_development.utilities_development(),
+    
+    # Ar Comprimido
+    "/utilities/compressed-air": lambda: under_development.utilities_development(),
+    "/utilities/compressed-air/compressors": lambda: under_development.utilities_development(),
+    "/utilities/compressed-air/efficiency": lambda: under_development.utilities_development(),
+    
+    # Dashboard Integrado de Utilidades
+    "/utilities/dashboard": lambda: under_development.layout(
+        "Dashboard Integrado de Utilidades - Em Desenvolvimento",
+        "O dashboard consolidado de todas as utilidades (energia, água, gás e ar comprimido) está sendo desenvolvido."
+    ),
+    
+    # Manutenção
+    "/maintenance/work-orders": lambda: under_development.maintenance_development(),
+    "/maintenance/schedule": lambda: under_development.maintenance_development(),
+    "/maintenance/history": lambda: under_development.maintenance_development(),
+    "/maintenance/indicators": lambda: under_development.maintenance_development(),
+    
+    # Configurações
+    "/config/users": lambda: under_development.config_development(),
+    "/config/preferences": lambda: under_development.config_development(),
+    "/config/logs": lambda: under_development.config_development(),
 }
 
 # ========================================
 # ALIASES PARA RETROCOMPATIBILIDADE
 # ========================================
 ROUTE_ALIASES = {
-    "/dashboard": "/production/oee",       # Redireciona rota antiga
+    "/dashboard": "/production/oee",
     "/states": "/production/states",
     "/superv": "/supervision",
-    "/production/alarms": "/maintenance/alarms",  # ← NOVO: Redireciona rota antiga de alarmes
-    "/alarms": "/maintenance/alarms",      # ← NOVO: Alias curto
+    "/production/alarms": "/maintenance/alarms",
+    "/alarms": "/maintenance/alarms",
 }
 
 # --- Configurações Iniciais ---
@@ -103,14 +157,12 @@ app.layout = html.Div([
         }
     ),
 
-    # 2. O container do app começa invisível e transparente para uma transição suave.
     html.Div(id="app-container", style={'visibility': 'hidden', 'opacity': 0}),
     
-    # 3. O timer para acionar a revelação do conteúdo.
     dcc.Interval(id='reveal-timer', interval=1000, max_intervals=1, disabled=True)
 ])
 
-# --- Callback de Roteamento (Apenas monta o layout e ativa o timer) ---
+# --- Callback de Roteamento ---
 @app.callback(
     Output("app-container", "children"),
     Output("reveal-timer", "disabled"),
@@ -134,10 +186,32 @@ def route_and_prepare_content(pathname):
     page_content = ROUTES.get(pathname)
     
     if page_content is None:
-        page_content = html.Div([
-            html.H2("404 - Página não encontrada"),
-            html.P(f"Rota: {pathname}")
-        ])
+        # 404 - Página não encontrada
+        page_content = dbc.Container([
+            dbc.Row([
+                dbc.Col([
+                    dbc.Card([
+                        dbc.CardBody([
+                            html.Div([
+                                html.I(className="bi bi-exclamation-triangle-fill text-danger", 
+                                      style={"fontSize": "5rem"})
+                            ], className="text-center mb-4"),
+                            
+                            html.H2("404 - Página Não Encontrada", className="text-center mb-3"),
+                            html.P(f"A rota '{pathname}' não existe.", 
+                                  className="text-center text-muted mb-4"),
+                            
+                            html.Div([
+                                dbc.Button([
+                                    html.I(className="bi bi-house-door me-2"),
+                                    "Voltar ao Início"
+                                ], href="/", color="primary", size="lg")
+                            ], className="text-center")
+                        ], className="p-5")
+                    ], className="shadow")
+                ], width={"size": 6, "offset": 3})
+            ], className="mt-5")
+        ], fluid=True, style={"minHeight": "70vh", "display": "flex", "alignItems": "center"})
     elif callable(page_content):
         page_content = page_content()
 
@@ -173,7 +247,7 @@ def route_and_prepare_content(pathname):
     ])
     return main_layout, False
 
-# --- Callback para Revelar o Conteúdo (Acionado pelo Timer) ---
+# --- Callback para Revelar o Conteúdo ---
 @app.callback(
     Output("app-container", "style"),
     Output("loading-overlay", "style"),
@@ -183,13 +257,11 @@ def reveal_content_on_timer(n_intervals):
     if n_intervals is None:
         raise PreventUpdate
 
-    # Estilo para tornar o app visível com uma transição suave
     app_style = {
         'visibility': 'visible',
         'opacity': 1,
         'transition': 'opacity 0.5s ease-in'
     }
-    # Estilo para esconder o overlay com uma transição suave
     overlay_style = {
         'visibility': 'hidden',
         'opacity': 0,
