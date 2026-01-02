@@ -50,7 +50,7 @@ ROUTES = {
     "/production/oee": production_oee.layout,    
     
     # Energia
-    "/energy": energy_overview.layout,
+    "/utilities/energy": energy_overview.layout,
     
     # Produção
     "/production/states": states.layout,
