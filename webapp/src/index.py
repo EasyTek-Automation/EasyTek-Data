@@ -12,6 +12,7 @@ from src import header
 from src import sidebar
 from src.components import stores
 from src.callbacks import register_callbacks
+
 # ========================================
 # IMPORTAÇÕES DE PÁGINAS - NOVA ESTRUTURA
 # ========================================
@@ -20,21 +21,21 @@ from src.pages.auth import login, register
 
 # Dashboards
 from src.pages.dashboards import home, production_oee
-# from src.pages.dashboards import home  # ← Criar no Bife 3
 
 # Energia
 from src.pages.energy import overview as energy_overview
 
 # Produção
-from src.pages.production import states, alarms
+from src.pages.production import states
+
+# Manutenção
+from src.pages.maintenance import alarms  # ← MOVIDO DE PRODUCTION PARA MAINTENANCE
 
 # Supervisório
 from src.pages.supervision import control as supervision_control
 
 # Relatórios
 from src.pages.reports import reports
-
-from src.pages.energy import overview as energy_overview
 
 # ========================================
 # MAPEAMENTO DE ROTAS (NOVA ESTRUTURA)
@@ -52,8 +53,10 @@ ROUTES = {
     "/energy": energy_overview.layout,
     
     # Produção
-    "/production/states": states.layout,           
-    "/production/alarms": alarms.layout,
+    "/production/states": states.layout,
+    
+    # Manutenção
+    "/maintenance/alarms": alarms.layout,  # ← NOVA ROTA
     
     # Supervisório
     "/supervision": supervision_control.layout,    
@@ -66,9 +69,11 @@ ROUTES = {
 # ALIASES PARA RETROCOMPATIBILIDADE
 # ========================================
 ROUTE_ALIASES = {
-    "/dashboard": "/production/oee",  # Redireciona rota antiga
+    "/dashboard": "/production/oee",       # Redireciona rota antiga
     "/states": "/production/states",
     "/superv": "/supervision",
+    "/production/alarms": "/maintenance/alarms",  # ← NOVO: Redireciona rota antiga de alarmes
+    "/alarms": "/maintenance/alarms",      # ← NOVO: Alias curto
 }
 
 # --- Configurações Iniciais ---
