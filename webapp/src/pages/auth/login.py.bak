@@ -50,7 +50,10 @@ def render_layout():
                     
                     html.Div(id="login-error-message", className="text-danger text-center mt-3"),
                     
-                    
+                    html.Div([
+                        # CORREÇÃO: Trocada 'text-white-50' por 'text-muted'
+                        dcc.Link("Criar uma conta", href="/register", className="text-muted"),
+                    ], className="text-center mt-3"),
 
                     html.Hr(className="mt-4"),
                     html.Div(
