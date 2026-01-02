@@ -41,7 +41,7 @@ if __name__ == '__main__':
     
     # MUDANÇA AQUI: run() ao invés de run_server()
     app.run(
-        debug=True,
+        debug=False,
         host='0.0.0.0',
         port=port,
         dev_tools_hot_reload=True
