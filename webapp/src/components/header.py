@@ -18,7 +18,7 @@ from src.components.icons import (
 from src.config.theme_config import URL_THEME_MINTY, URL_THEME_DARKLY
 
 
-def create_dashboard_filters():
+def create_energy_filters():
     """
     Filtros específicos para a página Dashboard.
     Layout: Transversais | Período | Longitudinais
@@ -182,7 +182,7 @@ def get_filters_for_page(pathname):
     Retorna o conteúdo de filtros baseado na página atual.
     """
     if pathname == "/" or pathname == "/dashboard":
-        return create_dashboard_filters()
+        return create_energy_filters()
     elif pathname == "/states":
         return create_states_filters()
     else:

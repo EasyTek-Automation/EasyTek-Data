@@ -28,7 +28,7 @@ from src.config.theme_config import URL_THEME_MINTY, URL_THEME_DARKLY
 
 # Importações dos filtros específicos de cada página
 from src.components.headers import (
-    create_dashboard_filters,
+    create_energy_filters,
     create_states_filters,
     create_default_filters
 )
@@ -47,12 +47,17 @@ def get_filters_for_page(pathname):
         html.Div: Componente com os filtros apropriados para a página
     """
     # Dashboard / Production OEE
-    if pathname in ["/", "/production/oee"]:
-        return create_dashboard_filters()
+    if pathname in ["/"]:
+        
+        return create_default_filters()
     
     # Production States
     elif pathname == "/production/states":
         return create_states_filters()
+    
+    # Production Energy
+    elif pathname in ["/energy", "/utilities/energy"]:
+        return create_energy_filters()
     
     # Outras páginas
     elif pathname in ["/supervision", "/utilities", "/energy", "/maintenance/alarms"]:
@@ -597,7 +602,8 @@ def create_header(pathname, user):
                 [
                     filters_dropdown,
                     html.Div(style={"width": "40px"}),
-                    ThemeSwitchAIO(aio_id="theme", themes=[URL_THEME_MINTY, URL_THEME_DARKLY]),
+                    html.Div(    
+                    ThemeSwitchAIO(aio_id="theme", themes=[URL_THEME_MINTY, URL_THEME_DARKLY]),style={"width": "100px"}),
                     html.Div(style={"width": "20px"}),
                     html.Span(
                         ["Bem-vindo, ", html.Strong(f"{user.username}", style={'color': '#0d6efd'})],

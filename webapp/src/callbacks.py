@@ -25,6 +25,7 @@ from src.callbacks_registers.hourlyconsumption_callback import register_hourlyco
 from src.callbacks_registers.sidebar_content_callback import register_sidebar_content_callback
 from src.callbacks_registers.home_callbacks import register_home_callbacks
 from src.callbacks_registers.alarms_callbacks import register_alarms_callbacks
+
 from src.pages.energy import callbacks as energy_callbacks
 
 # (Seu logger, se houver)
@@ -51,12 +52,10 @@ def register_callbacks(app):
     register_states_switch_callback(app)
     register_sp_callback(app)    
     register_energygraph_callbacks(app, collection_energia)
-
     register_tempgraph_callbacks(app, collection_temp)
-    register_main_layout_callbacks(app) 
-    
+    register_main_layout_callbacks(app)     
     register_hourlyconsumption_callbacks(app, collection_consumo)
     register_sidebar_content_callback(app)
     register_home_callbacks(app)
     register_alarms_callbacks(app)
-
+ 

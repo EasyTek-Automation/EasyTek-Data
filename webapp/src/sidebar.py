@@ -51,19 +51,30 @@ def get_sidebar_content_for_page(pathname):
         return create_default_sidebar_content()
 
 
-def create_sidebar_layout(app_instance, pathname="/"):
+def create_sidebar_layout(app_instance, pathname="/", sidebar_content_style=None):
     """
     Cria o layout da sidebar com logo e container para conteúdo dinâmico.
     
     Args:
         app_instance: Instância da aplicação Dash
         pathname (str): O caminho da URL atual para determinar o conteúdo inicial
+        sidebar_content_style (dict): Estilo para o Card da sidebar. Se None, usa padrão (hidden).
         
     Returns:
         dbc.Card: Componente Card contendo a sidebar completa
     """
     # Obtém o conteúdo inicial para a página atual
     initial_content = get_sidebar_content_for_page(pathname)
+    
+    # Define estilo padrão se não fornecido (collapsed/hidden)
+    if sidebar_content_style is None:
+        sidebar_content_style = {
+            "height": "100%",
+            "visibility": "hidden",
+            "opacity": 0,
+            "overflow": "hidden",
+            "transition": "opacity 0.2s ease, visibility 0s linear 0.2s"
+        }
     
     return dbc.Card([
         dbc.CardBody([
@@ -89,11 +100,4 @@ def create_sidebar_layout(app_instance, pathname="/"):
             ),
 
         ], style={"height": "calc(100% - 2rem)", "margin": "0"})
-    ], id="sidebar-content", style={
-        "flex": "1",
-        "height": "100%",
-        "visibility": "visible",
-        "opacity": 1,
-        "overflowY": "auto",
-        "transition": "opacity 0.3s ease, visibility 0s linear 0.5s"
-    })
+    ], id="sidebar-content", style=sidebar_content_style)

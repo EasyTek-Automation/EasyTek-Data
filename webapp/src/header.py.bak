@@ -28,7 +28,7 @@ from src.config.theme_config import URL_THEME_MINTY, URL_THEME_DARKLY
 
 # Importações dos filtros específicos de cada página
 from src.components.headers import (
-    create_dashboard_filters,
+    create_energy_filters,
     create_states_filters,
     create_default_filters
 )
