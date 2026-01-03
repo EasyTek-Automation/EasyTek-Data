@@ -137,7 +137,9 @@ user_loader
 app.layout = html.Div([
     dcc.Location(id="url", refresh=False),
     dcc.Location(id='logout-url', refresh=True),
-
+    
+    # Store para estado da sidebar (precisa estar aqui para o callback funcionar)
+    dcc.Store(id="sidebar-state", storage_type="session", data="collapsed"),
     
     html.Div(
         id='loading-overlay',
@@ -166,9 +168,10 @@ app.layout = html.Div([
 @app.callback(
     Output("app-container", "children"),
     Output("reveal-timer", "disabled"),
-    Input("url", "pathname")
+    Input("url", "pathname"),
+    State("sidebar-state", "data")
 )
-def route_and_prepare_content(pathname):
+def route_and_prepare_content(pathname, sidebar_state):
     if not current_user.is_authenticated:
         if pathname == '/register': 
             return register.render_layout(), False
@@ -225,18 +228,36 @@ def route_and_prepare_content(pathname):
                 ], color="danger")
             ])
 
+    # Definir estilos baseado no estado da sidebar
+    if sidebar_state == "expanded":
+        sidebar_col_style = {"width": "25%", "height": "100%", "transition": "width 0.5s ease", 
+                            "padding": "8px", "overflow": "hidden"}
+        content_col_style = {"width": "75%", "height": "100%", "transition": "width 0.5s ease", 
+                            "overflowY": "auto"}
+        sidebar_content_style = {
+            "height": "100%", "visibility": "visible", "opacity": 1, 
+            "overflowY": "auto", "transition": "opacity 0.3s ease, visibility 0s linear 0.5s"
+        }
+    else:  # collapsed ou None
+        sidebar_col_style = {"width": "0%", "height": "100%", "transition": "width 0.5s ease", 
+                            "padding": "8px", "overflow": "hidden"}
+        content_col_style = {"width": "100%", "height": "100%", "transition": "width 0.5s ease", 
+                            "overflowY": "auto"}
+        sidebar_content_style = {
+            "height": "100%", "visibility": "hidden", "opacity": 0, 
+            "overflow": "hidden", "transition": "opacity 0.2s ease, visibility 0s linear 0.2s"
+        }
+
     main_layout = html.Div([
         *stores.app_stores,
         header.create_header(pathname, current_user),
         html.Div([
-            html.Div([sidebar.create_sidebar_layout(app)], 
+            html.Div([sidebar.create_sidebar_layout(app, pathname, sidebar_content_style)], 
                      id="sidebar-column", 
-                     style={"width": "25%", "height": "100%", "transition": "width 0.5s ease", 
-                            "padding": "8px", "overflow": "hidden"}),
+                     style=sidebar_col_style),
             html.Div([html.Div(page_content)], 
                      id="content-column", 
-                     style={"width": "75%", "height": "100%", "transition": "width 0.5s ease", 
-                            "overflowY": "auto"}),
+                     style=content_col_style),
         ], id="main-container", style={"position": "fixed", "top": "60px", "left": 0, "right": 0, 
                                        "bottom": 0, "display": "flex", "flexDirection": "row", 
                                        "gap": "10px"}),

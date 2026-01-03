@@ -25,7 +25,7 @@ app_stores = [
     # Stores globais que poderiam estar aqui também (ou no index.py)
     # Manter aqui centraliza tudo.
     dcc.Store(id='theme-store', storage_type='local'),
-    dcc.Store(id="sidebar-state", storage_type="session", data="expanded"),
+    # NOTA: sidebar-state foi movido para app.layout no index.py
 
     dcc.Store(id='stored-hourly-consumption-data', storage_type='session'),
     dcc.Store(id="store-selected-machine", storage_type='session'),

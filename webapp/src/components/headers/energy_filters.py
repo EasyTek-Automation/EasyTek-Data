@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 
-def create_dashboard_filters():
+def create_energy_filters():
     """
     Cria os filtros específicos para a página Dashboard.
     Inclui seleção de equipamentos em 2 grupos e período de datas.
