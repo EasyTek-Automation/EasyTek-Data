@@ -13,6 +13,10 @@ from src import sidebar
 from src.components import stores
 from src.callbacks import register_callbacks
 
+# --- Importação do Sistema de Permissões ---
+from src.utils.permissions import can_access_route, check_access
+from src.pages.common import access_denied
+
 # ========================================
 # IMPORTAÇÕES DE PÁGINAS - NOVA ESTRUTURA
 # ========================================
@@ -74,8 +78,6 @@ ROUTES = {
     # Produção - Estados
     "/production/states": lambda: under_development.layout("Status de Ativos - Em Desenvolvimento"),
     
-
-
     # Energia - Subestações
     "/utilities/energy/se01": lambda: under_development.layout("Subestação SE01 - Em Desenvolvimento"),
     "/utilities/energy/se02": lambda: under_development.layout("Subestação SE02 - Em Desenvolvimento"),
@@ -172,6 +174,9 @@ app.layout = html.Div([
     State("sidebar-state", "data")
 )
 def route_and_prepare_content(pathname, sidebar_state):
+    # ========================================
+    # VERIFICAÇÃO DE AUTENTICAÇÃO
+    # ========================================
     if not current_user.is_authenticated:
         if pathname == '/register': 
             return register.render_layout(), False
@@ -184,89 +189,161 @@ def route_and_prepare_content(pathname, sidebar_state):
         pathname = ROUTE_ALIASES[pathname]
     
     # ========================================
+    # VERIFICAÇÃO DE PERMISSÃO (NOVO!)
+    # ========================================
+    has_access, denial_reason = check_access(current_user, pathname)
+    
+    if not has_access:
+        # Log de acesso negado
+        print(f"[ACCESS DENIED] User: {current_user.username}, Path: {pathname}, Reason: {denial_reason}")
+        
+        # Mostrar página de acesso negado
+        page_content = access_denied.layout(
+            pathname=pathname, 
+            reason=denial_reason, 
+            user=current_user
+        )
+        
+        # Montar layout com header (para permitir navegação)
+        main_layout = _build_main_layout(pathname, page_content, sidebar_state)
+        return main_layout, False
+    
+    # ========================================
     # RESOLVER ROTA
     # ========================================
     page_content = ROUTES.get(pathname)
     
     if page_content is None:
         # 404 - Página não encontrada
-        page_content = dbc.Container([
-            dbc.Row([
-                dbc.Col([
-                    dbc.Card([
-                        dbc.CardBody([
-                            html.Div([
-                                html.I(className="bi bi-exclamation-triangle-fill text-danger", 
-                                      style={"fontSize": "5rem"})
-                            ], className="text-center mb-4"),
-                            
-                            html.H2("404 - Página Não Encontrada", className="text-center mb-3"),
-                            html.P(f"A rota '{pathname}' não existe.", 
-                                  className="text-center text-muted mb-4"),
-                            
-                            html.Div([
-                                dbc.Button([
-                                    html.I(className="bi bi-house-door me-2"),
-                                    "Voltar ao Início"
-                                ], href="/", color="primary", size="lg")
-                            ], className="text-center")
-                        ], className="p-5")
-                    ], className="shadow")
-                ], width={"size": 6, "offset": 3})
-            ], className="mt-5")
-        ], fluid=True, style={"minHeight": "70vh", "display": "flex", "alignItems": "center"})
+        page_content = _build_404_page(pathname)
     elif callable(page_content):
         page_content = page_content()
 
-    # Verificar permissões para supervisório
-    if pathname == "/supervision":
-        if not (hasattr(current_user, 'level') and (current_user.level in [2, 3])):
-            page_content = html.Div([
-                dbc.Alert([
-                    html.H4("⛔ Acesso Negado"),
-                    html.P("Você não tem permissão para acessar o supervisório.")
-                ], color="danger")
-            ])
+    # ========================================
+    # MONTAR LAYOUT PRINCIPAL
+    # ========================================
+    main_layout = _build_main_layout(pathname, page_content, sidebar_state)
+    return main_layout, False
 
+
+def _build_main_layout(pathname, page_content, sidebar_state):
+    """
+    Constrói o layout principal com header, sidebar e conteúdo.
+    
+    Args:
+        pathname (str): Rota atual
+        page_content: Conteúdo da página
+        sidebar_state (str): Estado da sidebar ("expanded" ou "collapsed")
+        
+    Returns:
+        html.Div: Layout completo
+    """
     # Definir estilos baseado no estado da sidebar
     if sidebar_state == "expanded":
-        sidebar_col_style = {"width": "25%", "height": "100%", "transition": "width 0.5s ease", 
-                            "padding": "8px", "overflow": "hidden"}
-        content_col_style = {"width": "75%", "height": "100%", "transition": "width 0.5s ease", 
-                            "overflowY": "auto"}
+        sidebar_col_style = {
+            "width": "25%", "height": "100%", 
+            "transition": "width 0.5s ease", 
+            "padding": "8px", "overflow": "hidden"
+        }
+        content_col_style = {
+            "width": "75%", "height": "100%", 
+            "transition": "width 0.5s ease", 
+            "overflowY": "auto"
+        }
         sidebar_content_style = {
             "height": "100%", "visibility": "visible", "opacity": 1, 
-            "overflowY": "auto", "transition": "opacity 0.3s ease, visibility 0s linear 0.5s"
+            "overflowY": "auto", 
+            "transition": "opacity 0.3s ease, visibility 0s linear 0.5s"
         }
     else:  # collapsed ou None
-        sidebar_col_style = {"width": "0%", "height": "100%", "transition": "width 0.5s ease", 
-                            "padding": "8px", "overflow": "hidden"}
-        content_col_style = {"width": "100%", "height": "100%", "transition": "width 0.5s ease", 
-                            "overflowY": "auto"}
+        sidebar_col_style = {
+            "width": "0%", "height": "100%", 
+            "transition": "width 0.5s ease", 
+            "padding": "8px", "overflow": "hidden"
+        }
+        content_col_style = {
+            "width": "100%", "height": "100%", 
+            "transition": "width 0.5s ease", 
+            "overflowY": "auto"
+        }
         sidebar_content_style = {
             "height": "100%", "visibility": "hidden", "opacity": 0, 
-            "overflow": "hidden", "transition": "opacity 0.2s ease, visibility 0s linear 0.2s"
+            "overflow": "hidden", 
+            "transition": "opacity 0.2s ease, visibility 0s linear 0.2s"
         }
 
-    main_layout = html.Div([
+    return html.Div([
         *stores.app_stores,
         header.create_header(pathname, current_user),
         html.Div([
-            html.Div([sidebar.create_sidebar_layout(app, pathname, sidebar_content_style)], 
-                     id="sidebar-column", 
-                     style=sidebar_col_style),
-            html.Div([html.Div(page_content)], 
-                     id="content-column", 
-                     style=content_col_style),
-        ], id="main-container", style={"position": "fixed", "top": "60px", "left": 0, "right": 0, 
-                                       "bottom": 0, "display": "flex", "flexDirection": "row", 
-                                       "gap": "10px"}),
-        dbc.Toast(id="toast-mqtt-status", header="Status da Publicação MQTT", 
-                  is_open=False, dismissable=True, duration=4000, icon="info", 
-                  style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999}),
+            html.Div(
+                [sidebar.create_sidebar_layout(app, pathname, sidebar_content_style)], 
+                id="sidebar-column", 
+                style=sidebar_col_style
+            ),
+            html.Div(
+                [html.Div(page_content)], 
+                id="content-column", 
+                style=content_col_style
+            ),
+        ], id="main-container", style={
+            "position": "fixed", "top": "60px", "left": 0, "right": 0, 
+            "bottom": 0, "display": "flex", "flexDirection": "row", 
+            "gap": "10px"
+        }),
+        dbc.Toast(
+            id="toast-mqtt-status", 
+            header="Status da Publicação MQTT", 
+            is_open=False, 
+            dismissable=True, 
+            duration=4000, 
+            icon="info", 
+            style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999}
+        ),
         dcc.Interval(id='interval-component', interval=10 * 1000, n_intervals=0, disabled=False),
     ])
-    return main_layout, False
+
+
+def _build_404_page(pathname):
+    """
+    Constrói a página de erro 404.
+    
+    Args:
+        pathname (str): Rota não encontrada
+        
+    Returns:
+        dbc.Container: Layout da página 404
+    """
+    return dbc.Container([
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardBody([
+                        html.Div([
+                            html.I(
+                                className="bi bi-exclamation-triangle-fill text-danger", 
+                                style={"fontSize": "5rem"}
+                            )
+                        ], className="text-center mb-4"),
+                        
+                        html.H2("404 - Página Não Encontrada", className="text-center mb-3"),
+                        html.P(
+                            f"A rota '{pathname}' não existe.", 
+                            className="text-center text-muted mb-4"
+                        ),
+                        
+                        html.Div([
+                            dbc.Button([
+                                html.I(className="bi bi-house-door me-2"),
+                                "Voltar ao Início"
+                            ], href="/", color="primary", size="lg")
+                        ], className="text-center")
+                    ], className="p-5")
+                ], className="shadow")
+            ], width={"size": 6, "offset": 3})
+        ], className="mt-5")
+    ], fluid=True, style={"minHeight": "70vh", "display": "flex", "alignItems": "center"})
+
 
 # --- Callback para Revelar o Conteúdo ---
 @app.callback(
@@ -291,6 +368,7 @@ def reveal_content_on_timer(n_intervals):
     
     return app_style, overlay_style
 
+
 # --- Callback de Logout ---
 @app.callback(
     Output('logout-url', 'pathname'),
@@ -303,8 +381,10 @@ def logout(n_clicks):
     logout_user()
     return '/login'
 
+
 # --- Registro de Todos os Callbacks da Aplicação ---
 register_callbacks(app)
+
 
 # --- Ponto de Entrada da Aplicação ---
 if __name__ == '__main__':

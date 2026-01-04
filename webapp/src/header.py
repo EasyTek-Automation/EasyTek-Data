@@ -3,6 +3,8 @@
 """
 Componente de cabeçalho (header) principal da aplicação.
 Responsável por montar o header com menu de navegação, filtros e controles de usuário.
+
+ATUALIZADO: Agora filtra menus baseado no perfil do usuário (controle de acesso matricial)
 """
 
 from dash import html, dcc
@@ -33,6 +35,9 @@ from src.components.headers import (
     create_default_filters
 )
 
+# --- Importação do Sistema de Permissões ---
+from src.utils.permissions import can_see_menu
+
 
 def get_filters_for_page(pathname):
     """
@@ -48,7 +53,6 @@ def get_filters_for_page(pathname):
     """
     # Dashboard / Production OEE
     if pathname in ["/"]:
-        
         return create_default_filters()
     
     # Production States
@@ -71,6 +75,8 @@ def get_filters_for_page(pathname):
 def create_header(pathname, user):
     """
     Cria e retorna o componente de cabeçalho (header) da aplicação.
+    
+    ATUALIZADO: Agora filtra menus baseado no perfil do usuário.
     
     Args:
         pathname (str): O caminho da URL atual APÓS resolução de aliases
@@ -102,7 +108,7 @@ def create_header(pathname, user):
     # MENU DE NAVEGAÇÃO - ORGANIZADO POR MÓDULOS
     # ========================================
     
-    # 🏠 HOME - Link direto
+    # 🏠 HOME - Link direto (SHARED - todos veem)
     home_link = dbc.NavItem(
         dbc.NavLink(
             html.Div(
@@ -117,7 +123,7 @@ def create_header(pathname, user):
         )
     )
     
-    # 🔧 MANUTENÇÃO - Dropdown (COM ALARMES HABILITADO)
+    # 🔧 MANUTENÇÃO - Dropdown
     maintenance_dropdown = dbc.DropdownMenu(
         label=html.Div(
             [
@@ -242,7 +248,7 @@ def create_header(pathname, user):
         }
     )
     
-    # 💧 UTILIDADES - MEGA MENU COM 4 COLUNAS (CORRIGIDO - USA DropdownMenuItem)
+    # 💧 UTILIDADES - MEGA MENU COM 4 COLUNAS
     utilities_dropdown = dbc.DropdownMenu(
         label=html.Div(
             [
@@ -478,7 +484,6 @@ def create_header(pathname, user):
                 ),
                 href="/supervision",
                 active=(pathname == "/supervision"),
-                disabled=not (hasattr(user, 'level') and user.level in [2, 3])
             ),
         ],
         nav=True,
@@ -491,62 +496,75 @@ def create_header(pathname, user):
         }
     )
     
-    # ⚙️ CONFIGURAÇÕES - Dropdown (NÍVEL 3 APENAS)
-    config_dropdown = None
-    if hasattr(user, 'level') and user.level == 3:
-        config_dropdown = dbc.DropdownMenu(
-            label=html.Div(
-                [
-                    html.Span(settings_icon(), style={"marginRight": "8px"}),
-                    html.Span("Configurações", style={"fontWeight": "600"})
-                ],
-                className="d-flex align-items-center"
-            ),
-            children=[
-                dbc.DropdownMenuItem(
-                    html.Div([
-                        html.Span(users_icon(), style={"marginRight": "8px"}),
-                        "Gerenciar Usuários"
-                    ], className="d-flex align-items-center"),
-                    href="/config/users",
-                    active=(pathname == "/config/users")
-                ),
-                dbc.DropdownMenuItem(divider=True),
-                dbc.DropdownMenuItem(
-                    html.Div([html.I(className="bi bi-sliders me-2"), "Preferências"], className="d-flex align-items-center"),
-                    href="/config/preferences",
-                    disabled=True,
-                    style={"opacity": "0.5"}
-                ),
-                dbc.DropdownMenuItem(
-                    html.Div([html.I(className="bi bi-file-text me-2"), "Logs do Sistema"], className="d-flex align-items-center"),
-                    href="/config/logs",
-                    disabled=True,
-                    style={"opacity": "0.5"}
-                ),
+    # ⚙️ CONFIGURAÇÕES - Dropdown
+    config_dropdown = dbc.DropdownMenu(
+        label=html.Div(
+            [
+                html.Span(settings_icon(), style={"marginRight": "8px"}),
+                html.Span("Configurações", style={"fontWeight": "600"})
             ],
-            nav=True,
-            in_navbar=True,
-            toggle_style={
-                "display": "inline-flex",
-                "alignItems": "center",
-                "gap": "4px",
-                "fontWeight": "600"
-            }
-        )
+            className="d-flex align-items-center"
+        ),
+        children=[
+            dbc.DropdownMenuItem(
+                html.Div([
+                    html.Span(users_icon(), style={"marginRight": "8px"}),
+                    "Gerenciar Usuários"
+                ], className="d-flex align-items-center"),
+                href="/config/users",
+                active=(pathname == "/config/users")
+            ),
+            dbc.DropdownMenuItem(divider=True),
+            dbc.DropdownMenuItem(
+                html.Div([html.I(className="bi bi-sliders me-2"), "Preferências"], className="d-flex align-items-center"),
+                href="/config/preferences",
+                disabled=True,
+                style={"opacity": "0.5"}
+            ),
+            dbc.DropdownMenuItem(
+                html.Div([html.I(className="bi bi-file-text me-2"), "Logs do Sistema"], className="d-flex align-items-center"),
+                href="/config/logs",
+                disabled=True,
+                style={"opacity": "0.5"}
+            ),
+        ],
+        nav=True,
+        in_navbar=True,
+        toggle_style={
+            "display": "inline-flex",
+            "alignItems": "center",
+            "gap": "4px",
+            "fontWeight": "600"
+        }
+    )
     
     # ========================================
-    # NAVBAR COMPLETO
+    # NAVBAR COMPLETO - FILTRADO POR PERMISSÕES
     # ========================================
-    nav_items = [
-        home_link,
-        maintenance_dropdown,
-        production_dropdown,
-        utilities_dropdown,
-        supervision_dropdown,
-    ]
+    nav_items = []
     
-    if config_dropdown:
+    # Home - SHARED (sempre visível para todos os perfis)
+    if can_see_menu(user, "home"):
+        nav_items.append(home_link)
+    
+    # Manutenção - filtrado por perfil
+    if can_see_menu(user, "manutencao"):
+        nav_items.append(maintenance_dropdown)
+    
+    # Produção - filtrado por perfil
+    if can_see_menu(user, "producao"):
+        nav_items.append(production_dropdown)
+    
+    # Utilidades - filtrado por perfil
+    if can_see_menu(user, "utilidades"):
+        nav_items.append(utilities_dropdown)
+    
+    # Supervisório - filtrado por perfil E nível
+    if can_see_menu(user, "supervisorio"):
+        nav_items.append(supervision_dropdown)
+    
+    # Configurações - filtrado por perfil E nível
+    if can_see_menu(user, "configuracoes"):
         nav_items.append(config_dropdown)
     
     navigation_menu = dbc.Nav(
@@ -580,7 +598,23 @@ def create_header(pathname, user):
     )
 
     # ========================================
-    # LAYOUT FINAL DO HEADER (SEM LOGO)
+    # INFORMAÇÃO DO PERFIL DO USUÁRIO
+    # ========================================
+    user_perfil = getattr(user, 'perfil', 'N/A') if user else 'N/A'
+    user_level = getattr(user, 'level', 0) if user else 0
+    
+    # Badge de perfil com cor baseada no perfil
+    perfil_colors = {
+        "manutencao": "primary",
+        "qualidade": "success",
+        "producao": "warning",
+        "utilidades": "info",
+        "admin": "danger"
+    }
+    perfil_color = perfil_colors.get(user_perfil, "secondary")
+
+    # ========================================
+    # LAYOUT FINAL DO HEADER
     # ========================================
     header_layout = html.Div(
         [
@@ -603,13 +637,29 @@ def create_header(pathname, user):
                     filters_dropdown,
                     html.Div(style={"width": "40px"}),
                     html.Div(    
-                    ThemeSwitchAIO(aio_id="theme", themes=[URL_THEME_MINTY, URL_THEME_DARKLY]),style={"width": "100px"}),
-                    html.Div(style={"width": "20px"}),
-                    html.Span(
-                        ["Bem-vindo, ", html.Strong(f"{user.username}", style={'color': '#0d6efd'})],
-                        className="align-middle",
-                        style={'fontSize': '0.9rem'}
+                        ThemeSwitchAIO(aio_id="theme", themes=[URL_THEME_MINTY, URL_THEME_DARKLY]),
+                        style={"width": "100px"}
                     ),
+                    html.Div(style={"width": "20px"}),
+                    # Informação do usuário com perfil
+                    html.Div([
+                        html.Span(
+                            ["Bem-vindo, ", html.Strong(f"{user.username}", style={'color': '#0d6efd'})],
+                            className="align-middle me-2",
+                            style={'fontSize': '0.9rem'}
+                        ),
+                        dbc.Badge(
+                            user_perfil.upper() if user_perfil else "N/A",
+                            color=perfil_color,
+                            className="me-1",
+                            style={"fontSize": "0.7rem"}
+                        ),
+                        dbc.Badge(
+                            f"Nv.{user_level}",
+                            color="secondary",
+                            style={"fontSize": "0.7rem"}
+                        ),
+                    ], className="d-flex align-items-center"),
                     html.Div(style={"width": "15px"}),
                     dbc.Button("Logout", id="logout_button", color="danger", size="sm"),
                 ],
