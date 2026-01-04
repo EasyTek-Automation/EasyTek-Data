@@ -25,7 +25,7 @@ def get_mongo_connection(collection_name=None):
 
         try:
             print(f"Tentando conectar ao MongoDB (URI: {mongo_uri}, DB: {db_name})...")
-            client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000)
+            client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000) # Mantemos apenas um timeout generoso.
             
             client.admin.command('ping')
             db = client[db_name]
@@ -47,46 +47,22 @@ def get_mongo_connection(collection_name=None):
     
     raise ConnectionError("A conexão com o MongoDB não está disponível.")
 
-
 # --- Lógica de Usuários para Flask-Login ---
+# O restante do arquivo permanece o mesmo, mas agora depende da função acima.
 
 class User:
-    """
-    Classe de usuário para Flask-Login.
-    
-    Atributos:
-        id (str): ID único do usuário no MongoDB
-        username (str): Nome de usuário
-        email (str): E-mail do usuário
-        password (str): Senha hasheada
-        level (int): Nível de acesso vertical (1=básico, 2=avançado, 3=admin)
-        perfil (str): Perfil de acesso horizontal (manutencao, qualidade, producao, etc.)
-    """
-    
     def __init__(self, user_data):
         self.id = str(user_data["_id"])
         self.username = user_data["username"]
         self.email = user_data.get("email")
         self.password = user_data["password"]
         self.level = int(user_data.get("level", 1))
-        # NOVO: Campo perfil para controle de acesso horizontal
-        self.perfil = user_data.get("perfil", "manutencao")  # Default: manutencao
+        self.perfil = user_data.get("perfil", "manutencao")
 
-    def is_authenticated(self): 
-        return True
-    
-    def is_active(self): 
-        return True
-    
-    def is_anonymous(self): 
-        return False
-    
-    def get_id(self): 
-        return self.id
-    
-    def __repr__(self):
-        return f"<User {self.username} (level={self.level}, perfil={self.perfil})>"
-
+    def is_authenticated(self): return True
+    def is_active(self): return True
+    def is_anonymous(self): return False
+    def get_id(self): return self.id
 
 def get_user_by_id(user_id):
     if not ObjectId.is_valid(user_id):
@@ -98,7 +74,6 @@ def get_user_by_id(user_id):
     except ConnectionError:
         return None
 
-
 def get_user_by_username(username):
     try:
         user_collection = get_mongo_connection(collection_name="usuarios")
@@ -106,7 +81,6 @@ def get_user_by_username(username):
         return User(user_data) if user_data else None
     except ConnectionError:
         return None
-
 
 def get_user_by_email(email):
     try:
@@ -116,21 +90,7 @@ def get_user_by_email(email):
     except ConnectionError:
         return None
 
-
-def save_user(username, email, password, level, perfil="manutencao"):
-    """
-    Salva um novo usuário no banco de dados.
-    
-    Args:
-        username (str): Nome de usuário
-        email (str): E-mail
-        password (str): Senha (será hasheada)
-        level (int): Nível de acesso (1, 2 ou 3)
-        perfil (str): Perfil de acesso horizontal (default: manutencao)
-    
-    Returns:
-        bool: True se salvou com sucesso, False caso contrário
-    """
+def save_user(username, email, password, level):
     try:
         user_collection = get_mongo_connection(collection_name="usuarios")
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
@@ -138,9 +98,9 @@ def save_user(username, email, password, level, perfil="manutencao"):
             "username": username,
             "email": email,
             "password": hashed_password,
-            "level": int(level),
-            "perfil": perfil  # NOVO: Campo perfil
+            "level": int(level)
         })
         return True
     except ConnectionError:
         return False
+
