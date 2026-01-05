@@ -326,6 +326,14 @@ def create_header(pathname, user):
                 html.Div([html.Span(users_icon(), style={"marginRight": "8px"}), "Gerenciar Usuários"], className="d-flex align-items-center"),
                 href="/config/users", active=(pathname == "/config/users")
             ),
+            dbc.DropdownMenuItem(
+                html.Div([
+                    html.I(className="bi bi-person-plus", style={"marginRight": "8px"}),
+                    "Criar Novo Usuário"
+                ], className="d-flex align-items-center"),
+                href="/config/users/create",
+                active=(pathname == "/config/users/create")
+            ),
             dbc.DropdownMenuItem(divider=True),
             dbc.DropdownMenuItem(
                 html.Div([html.Span(sliders_icon(), style={"marginRight": "8px"}), "Preferências"], className="d-flex align-items-center"),

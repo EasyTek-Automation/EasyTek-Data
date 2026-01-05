@@ -31,7 +31,11 @@ PERFIS = [
     "qualidade",     # Equipe de qualidade
     "producao",      # Equipe de produção
     "utilidades",    # Equipe de utilidades (energia, água, etc.)
-    "admin",         # Administradores do sistema
+    "admin",         # Administradores do sistema (legacy)
+    "ti",            # Tecnologia da Informação (privilégios especiais)
+    "meio_ambiente", # Meio Ambiente
+    "seguranca",     # Segurança do Trabalho
+    "engenharias",   # Engenharias
 ]
 
 # ========================================
@@ -304,6 +308,11 @@ ROUTE_ACCESS = {
         "min_level": 3,
         "description": "Logs do Sistema"
     },
+    "/config/users/create": {
+        "shared": True,  # Todos os perfis de nível 3 podem criar usuários
+        "min_level": 3,
+        "description": "Criar Novo Usuário"
+    },
 }
 
 
@@ -356,8 +365,7 @@ MENU_ACCESS = {
     
     # Menu Configurações
     "configuracoes": {
-        "shared": False,
-        "perfis": ["manutencao", "admin"],
+        "shared": True,  # Todos os perfis de nível 3 podem acessar
         "min_level": 3,
         "description": "Menu Configurações"
     },
