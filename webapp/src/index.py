@@ -21,7 +21,7 @@ from src.pages.common import access_denied
 # IMPORTAÇÕES DE PÁGINAS - NOVA ESTRUTURA
 # ========================================
 # Autenticação
-from src.pages.auth import login, register
+from src.pages.auth import login, register, change_password
 
 # Dashboards
 from src.pages.dashboards import home, production_oee
@@ -54,6 +54,7 @@ ROUTES = {
     # Auth
     "/login": login.render_layout,
     "/register": register.render_layout,
+    "/change-password": change_password.layout_wrapper,
     
     # Dashboards
     "/": home.layout,                       

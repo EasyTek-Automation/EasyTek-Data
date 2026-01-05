@@ -81,11 +81,24 @@ def render_layout():
     prevent_initial_call=True
 )
 def successful_login(n_clicks, email, password):
-    if not email or not password:
+    # Only require email (password can be blank for first-time users)
+    if not email:
         raise PreventUpdate
+
+    # Allow password to be None or empty string
+    if password is None:
+        password = ""
+
     user = get_user_by_email(email)
     if user and check_password_hash(user.password, password):
         login_user(user)
-        return "/", ""
+
+        # Check if user has blank password (first-time setup)
+        if check_password_hash(user.password, ""):
+            # Redirect to password change page for first-time setup
+            return "/change-password", ""
+        else:
+            # Normal login - redirect to home
+            return "/", ""
     else:
         return dash.no_update, "E-mail ou senha inválidos."
