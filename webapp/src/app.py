@@ -37,10 +37,31 @@ app = dash.Dash(
         title="EasyTek-Data",
     meta_tags=[
         {"name": "viewport", "content": "width=device-width, initial-scale=1"},
-        
+
         {"rel": "preload", "href": "https://use.fontawesome.com/releases/v5.10.2/css/all.css", "as": "style"}
     ]
   )
+
+# --- Configuração do Favicon Customizado ---
+app.index_string = '''
+<!DOCTYPE html>
+<html>
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
+        {%css%}
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>
+'''
 
 # --- Configuração do Flask-Login ---
 login_manager = LoginManager()
