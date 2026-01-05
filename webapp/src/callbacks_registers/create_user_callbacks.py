@@ -41,10 +41,10 @@ def register_create_user_callbacks(app):
         Returns:
             dbc.Alert: Info card showing what the admin can do
         """
-        if admin_perfil == "ti":
+        if admin_perfil == "admin":
             return dbc.Alert([
                 html.I(className="bi bi-shield-check me-2"),
-                "Você tem privilégios completos de TI: pode criar usuários de qualquer departamento e nível."
+                "Você tem privilégios completos de Administrador: pode criar usuários de qualquer departamento e nível."
             ], color="info")
         else:
             # Map perfil codes to display names
@@ -101,12 +101,11 @@ def register_create_user_callbacks(app):
             "seguranca": "🛡️ Segurança",
             "engenharias": "🛠️ Engenharias",
             "utilidades": "💧 Utilidades",
-            "admin": "👑 Administrador",
-            "ti": "💻 TI"
+            "admin": "👑 Administrador"
         }
 
-        if admin_perfil == "ti":
-            # TI users: show all departments, enable dropdown
+        if admin_perfil == "admin":
+            # Admin users: show all departments, enable dropdown
             options = [
                 {"label": perfil_labels.get(p, p), "value": p}
                 for p in PERFIS
@@ -142,7 +141,7 @@ def register_create_user_callbacks(app):
         Populate level dropdown based on admin's perfil.
 
         RBAC Rules:
-        - TI: Can assign any level (1, 2, 3)
+        - Admin: Can assign any level (1, 2, 3)
         - Others: Can only assign levels 1-2 (cannot create level 3 admins)
 
         Args:
@@ -151,8 +150,8 @@ def register_create_user_callbacks(app):
         Returns:
             tuple: (options, value, help_text)
         """
-        if admin_perfil == "ti":
-            # TI users can create any level
+        if admin_perfil == "admin":
+            # Admin users can create any level
             options = [
                 {"label": "Nível 1 - Visualizador", "value": 1},
                 {"label": "Nível 2 - Operador", "value": 2},
@@ -264,19 +263,19 @@ def register_create_user_callbacks(app):
         # Critical: Re-validate all permission rules on server side
         # to prevent bypass via browser DevTools
 
-        # Rule 1: Only TI can create level 3 users
-        if target_level == 3 and admin_perfil != "ti":
+        # Rule 1: Only Admin can create level 3 users
+        if target_level == 3 and admin_perfil != "admin":
             logger.warning(
                 f"[PERMISSION_DENIED] Admin '{admin_perfil}' (level {admin_level}) "
                 f"attempted to create level 3 user '{username}'"
             )
             return dbc.Alert([
                 html.I(className="bi bi-shield-x me-2"),
-                "PERMISSÃO NEGADA: Apenas usuários de TI podem criar administradores (nível 3)."
+                "PERMISSÃO NEGADA: Apenas Administradores podem criar usuários nível 3."
             ], color="danger")
 
-        # Rule 2: Only TI can create users in other departments
-        if target_department != admin_perfil and admin_perfil != "ti":
+        # Rule 2: Only Admin can create users in other departments
+        if target_department != admin_perfil and admin_perfil != "admin":
             logger.warning(
                 f"[PERMISSION_DENIED] Admin '{admin_perfil}' (level {admin_level}) "
                 f"attempted to create user in department '{target_department}'"
