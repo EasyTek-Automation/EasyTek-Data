@@ -44,6 +44,9 @@ from src.pages.reports import reports
 # Comum - Páginas de utilidade
 from src.pages.common import under_development
 
+# Admin
+from src.pages.admin import create_user
+
 # ========================================
 # MAPEAMENTO DE ROTAS (NOVA ESTRUTURA)
 # ========================================
@@ -117,6 +120,7 @@ ROUTES = {
     
     # Configurações
     "/config/users": lambda: under_development.config_development(),
+    "/config/users/create": create_user.layout_wrapper,
     "/config/preferences": lambda: under_development.config_development(),
     "/config/logs": lambda: under_development.config_development(),
 }
