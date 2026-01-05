@@ -57,7 +57,6 @@ class User:
         self.email = user_data.get("email")
         self.password = user_data["password"]
         self.level = int(user_data.get("level", 1))
-        self.perfil = user_data.get("perfil", "manutencao")
 
     def is_authenticated(self): return True
     def is_active(self): return True

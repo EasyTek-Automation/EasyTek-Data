@@ -83,7 +83,7 @@ def create_sidebar_layout(app_instance, pathname="/", sidebar_content_style=None
                 html.Img(
                     src="/assets/LogoAMG.png",
                     style={
-                        "width": "80%",
+                        "width": "100%",
                         "max-height": "120px",
                         "object-fit": "contain",
                         "margin": "0 auto 20px",

@@ -34,14 +34,14 @@ def render_layout():
                 dbc.Card([
                     html.Div(
                         [
-                            html.Img(src="/assets/LogoAMG.png", style={"height": "40px"}),
+                            html.Img(src="/assets/LogoAMG.png", style={"height": "100px"}),
                             ThemeSwitchAIO(aio_id="theme", themes=[URL_THEME_MINTY, URL_THEME_DARKLY]),
                         ],
                         className="d-flex justify-content-between align-items-center"
                     ),
                     html.Hr(className="my-4"),
                     
-                    # CORREÇÃO: Removida a classe 'text-white'
+                    
                     html.H2("EasyTek-Data", className="text-center mb-4"),
                     
                     dbc.Input(id="email_login", placeholder="E-mail", type="email", className="mb-3"),
@@ -56,7 +56,7 @@ def render_layout():
                     html.Div(
                         [
                             html.Span("Powered by:", style={'fontSize': '0.8rem', 'color': '#aaa', 'marginRight': '10px'}),
-                            html.Img(src="/assets/LogoAMG.png", style={"height": "25px"})
+                            html.Img(src="/assets/Logo.png", style={"height": "50px"})
                         ],
                         className="d-flex justify-content-end align-items-center"
                     )
