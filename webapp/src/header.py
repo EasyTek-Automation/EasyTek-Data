@@ -428,6 +428,10 @@ def create_header(pathname, user):
                 html.Div([html.I(className="bi bi-bell me-2"), "Notificações"], className="d-flex align-items-center"),
                 href="/notifications", disabled=True, style={"opacity": "0.5"}
             ),
+            dbc.DropdownMenuItem(
+                html.Div([html.I(className="bi bi-shield-lock me-2"), "Alterar Senha"], className="d-flex align-items-center"),
+                href="/change-password"
+            ),
             dbc.DropdownMenuItem(divider=True),
             
             # Logout

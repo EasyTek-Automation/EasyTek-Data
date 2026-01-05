@@ -215,19 +215,23 @@ def register_create_user_callbacks(app):
         # INPUT VALIDATION
         # ========================================
 
-        # Check all required fields are provided
-        if not all([username, email, password, target_department, target_level]):
+        # Check required fields (password can be blank for first-time setup)
+        if not all([username, email, target_department, target_level]):
             return dbc.Alert([
                 html.I(className="bi bi-exclamation-triangle me-2"),
-                "Todos os campos são obrigatórios."
+                "Todos os campos são obrigatórios (senha pode ficar em branco)."
             ], color="danger")
 
-        # Password strength validation
-        if len(password) < 8:
+        # Password strength validation (only if password is provided)
+        if password and len(password) < 8:
             return dbc.Alert([
                 html.I(className="bi bi-exclamation-triangle me-2"),
-                "A senha deve ter no mínimo 8 caracteres."
+                "A senha deve ter no mínimo 8 caracteres (ou deixe em branco para senha temporária)."
             ], color="danger")
+
+        # If password is empty, use empty string (will be hashed)
+        if not password:
+            password = ""  # Blank password for first-time login
 
         # Basic email format validation
         if "@" not in email or "." not in email:

@@ -67,6 +67,11 @@ ROUTE_ACCESS = {
         "min_level": 0,
         "description": "Página de Registro"
     },
+    "/change-password": {
+        "shared": True,
+        "min_level": 1,
+        "description": "Alterar Senha"
+    },
     
     # ========================================
     # PÁGINAS COMPARTILHADAS (todos os perfis)

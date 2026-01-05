@@ -104,11 +104,14 @@ def layout(user):
                         html.Label("Senha:", className="fw-bold mb-1"),
                         dbc.Input(
                             id="create-user-password",
-                            placeholder="Senha (mínimo 8 caracteres)",
+                            placeholder="Senha (deixe em branco para senha temporária)",
                             type="password",
                             className="mb-3",
-                            required=True,
-                            minLength=8
+                            required=False
+                        ),
+                        html.Small(
+                            "Deixe em branco para forçar o usuário a criar senha no primeiro login",
+                            className="text-muted d-block mb-3"
                         ),
 
                         # ========================================
