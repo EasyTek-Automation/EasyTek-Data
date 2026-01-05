@@ -45,7 +45,7 @@ from src.pages.reports import reports
 from src.pages.common import under_development
 
 # Admin
-from src.pages.admin import create_user
+from src.pages.admin import create_user, manage_users
 
 # ========================================
 # MAPEAMENTO DE ROTAS (NOVA ESTRUTURA)
@@ -120,7 +120,7 @@ ROUTES = {
     "/maintenance/indicators": lambda: under_development.maintenance_development(),
     
     # Configurações
-    "/config/users": lambda: under_development.config_development(),
+    "/config/users": manage_users.layout_wrapper,
     "/config/users/create": create_user.layout_wrapper,
     "/config/preferences": lambda: under_development.config_development(),
     "/config/logs": lambda: under_development.config_development(),

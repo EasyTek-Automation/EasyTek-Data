@@ -316,3 +316,16 @@ def report_icon():
 </svg>
 '''
     return dcc.Markdown(svg_string, dangerously_allow_html=True, className="menu-icon")
+
+from dash import dcc
+
+def user_create_icon():
+    """Ícone de 'Criar Novo Usuário' (person-plus) no padrão SVG inline."""
+    svg_string = '''
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-person-plus" viewBox="0 0 16 16">
+  <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z"/>
+  <path d="M8 9a5 5 0 0 0-4.546 2.916.5.5 0 1 0 .892.448A4 4 0 0 1 8 10a4 4 0 0 1 3.654 2.364.5.5 0 1 0 .892-.448A5 5 0 0 0 8 9z"/>
+  <path fill-rule="evenodd" d="M13.5 5a.5.5 0 0 1 .5.5V7h1.5a.5.5 0 0 1 0 1H14v1.5a.5.5 0 0 1-1 0V8h-1.5a.5.5 0 0 1 0-1H13V5.5a.5.5 0 0 1 .5-.5z"/>
+</svg>
+'''
+    return dcc.Markdown(svg_string, dangerously_allow_html=True, className="menu-icon")

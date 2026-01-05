@@ -41,6 +41,7 @@ from src.components.icons import (
     logs_icon,
     logout_icon,
     speedometer_icon,
+    user_create_icon,
 )
 from src.config.theme_config import URL_THEME_MINTY, URL_THEME_DARKLY
 
@@ -328,7 +329,7 @@ def create_header(pathname, user):
             ),
             dbc.DropdownMenuItem(
                 html.Div([
-                    html.I(className="bi bi-person-plus", style={"marginRight": "8px"}),
+                    html.Span(user_create_icon(), style={"marginRight": "8px"}),
                     "Criar Novo Usuário"
                 ], className="d-flex align-items-center"),
                 href="/config/users/create",

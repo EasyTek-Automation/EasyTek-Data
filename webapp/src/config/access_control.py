@@ -31,8 +31,7 @@ PERFIS = [
     "qualidade",     # Equipe de qualidade
     "producao",      # Equipe de produção
     "utilidades",    # Equipe de utilidades (energia, água, etc.)
-    "admin",         # Administradores do sistema (legacy)
-    "ti",            # Tecnologia da Informação (privilégios especiais)
+    "admin",         # Administradores do sistema (privilégios especiais)
     "meio_ambiente", # Meio Ambiente
     "seguranca",     # Segurança do Trabalho
     "engenharias",   # Engenharias
@@ -297,7 +296,7 @@ ROUTE_ACCESS = {
     # ========================================
     "/config/users": {
         "shared": False,
-        "perfis": ["manutencao", "admin"],
+        "perfis": ["manutencao", "admin", "qualidade", "producao", "utilidades"],
         "min_level": 3,
         "description": "Gerenciar Usuários"
     },

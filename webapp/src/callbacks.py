@@ -27,6 +27,7 @@ from src.callbacks_registers.home_callbacks import register_home_callbacks
 from src.callbacks_registers.alarms_callbacks import register_alarms_callbacks
 from src.callbacks_registers.create_user_callbacks import register_create_user_callbacks
 from src.callbacks_registers.change_password_callbacks import register_change_password_callbacks
+from src.callbacks_registers.manage_users_callbacks import register_manage_users_callbacks
 
 from src.pages.energy import callbacks as energy_callbacks
 
@@ -62,3 +63,4 @@ def register_callbacks(app):
     register_alarms_callbacks(app)
     register_create_user_callbacks(app)
     register_change_password_callbacks(app)
+    register_manage_users_callbacks(app)
