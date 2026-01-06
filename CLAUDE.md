@@ -81,14 +81,19 @@ PORT=8050
 
 ```
 webapp/src/
-├── app.py              # Flask server & Dash app initialization
+├── app.py              # Flask server & Dash app initialization (includes favicon config)
 ├── run.py              # Application entry point
 ├── index.py            # Main routing and layout orchestration
 ├── callbacks.py        # Central callback registration
-├── header.py           # Top navigation bar
-├── sidebar.py          # Dynamic sidebar with filters
 ├── callbacks_registers/  # Callback modules (one per feature)
 ├── components/         # Reusable UI components (graphs, cards, tables)
+│   ├── header.py       # Top navigation bar
+│   ├── sidebar.py      # Sidebar with logo
+│   ├── headers/        # Page-specific header filter modules
+│   │   ├── energy_filters.py
+│   │   ├── states_filters.py
+│   │   └── default_filters.py
+│   └── icons.py        # SVG icon components
 ├── config/             # Configuration modules
 │   ├── access_control.py   # Route & menu permissions matrix
 │   ├── theme_config.py     # Dash Bootstrap theme configuration
@@ -103,7 +108,7 @@ webapp/src/
 │   ├── maintenance/    # Alarms and work orders
 │   ├── supervision/    # Supervisory control (SCADA-like)
 │   ├── reports/        # Reporting pages
-│   └── common/         # Shared pages (404, access denied, under development)
+│   └── common/         # Shared pages (404, access denied, under_development.py)
 └── utils/
     ├── permissions.py  # Access control logic
     └── helpers.py      # Utility functions
@@ -156,14 +161,23 @@ def register_callbacks(app):
 
 Each callback module in `callbacks_registers/` exports a `register_*_callbacks(app, ...)` function.
 
-#### 5. Dynamic Sidebar System
+#### 5. Header and Sidebar System
 
-Sidebar content changes based on:
-- Current route (different filters per page type)
-- User permissions (only show accessible menu items)
+**Header**: Top navigation bar (`components/header.py`) with:
+- Page-specific filters loaded dynamically from `components/headers/` directory
+- Theme switcher using `ThemeSwitchAIO`
+- Hamburger menu for sidebar toggle
+- Profile icon and user menu
+
+**Sidebar**: Collapsible sidebar (`components/sidebar.py`) with:
+- Company logo display
 - Sidebar state (expanded/collapsed) stored in `dcc.Store`
+- Currently minimal - awaiting future menu items
 
-Filter bridges: Callbacks sync date pickers and dropdowns between sidebar and page-specific stores.
+**Page-Specific Filters**: Located in `components/headers/`:
+- `energy_filters.py`: Equipment dropdowns and date/time pickers for energy pages
+- `states_filters.py`: Filters for production state monitoring
+- `default_filters.py`: Generic filter layout for other pages
 
 #### 6. MongoDB Collections
 
@@ -217,7 +231,23 @@ When user navigates:
 
 - Bootstrap theme configured in `app.py`: `MINTY` and `darkly` templates loaded
 - Dash Bootstrap Components (dbc) used throughout
-- Custom theme toggle functionality via `storetheme_callback`
+- Custom theme toggle functionality via `ThemeSwitchAIO`
+- Custom CSS files in `assets/` directory for component-specific styling
+- Favicon configured via `app.index_string` to use `/assets/favicon.ico`
+
+### UI Components and Layouts
+
+**Under Development Pages** (`pages/common/under_development.py`):
+- Centralized layout function for pages not yet implemented
+- Uses responsive Bootstrap grid with offset columns for centering
+- Pre-configured variants: `states_development()`, `alarms_development()`, `maintenance_development()`, etc.
+- Layout adapts correctly to sidebar collapse/expand states
+
+**Multi-Tab Pattern** (e.g., `pages/energy/overview.py`):
+- Uses `dbc.Tabs` for organizing content by category
+- Tab content loaded dynamically via callbacks
+- Under-development tabs use `get_under_development_content()` helper
+- Fully developed tabs (like SE03) include multiple graphs and KPI cards
 
 ### MQTT Command Publishing
 

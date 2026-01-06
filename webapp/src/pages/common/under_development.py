@@ -42,21 +42,21 @@ def layout(page_title="Funcionalidade em Desenvolvimento", custom_message=None):
                                 }
                             )
                         ], className="text-center mb-4"),
-                        
+
                         # Título
                         html.H2(
                             page_title,
                             className="text-center mb-3",
                             style={"fontWeight": "600"}
                         ),
-                        
+
                         # Mensagem
                         html.P(
                             message,
                             className="text-center text-muted mb-4",
                             style={"fontSize": "1.1rem"}
                         ),
-                        
+
                         # Badge de status
                         html.Div([
                             dbc.Badge(
@@ -69,35 +69,35 @@ def layout(page_title="Funcionalidade em Desenvolvimento", custom_message=None):
                                 style={"fontSize": "0.9rem"}
                             )
                         ], className="text-center mb-4"),
-                        
+
                         # Linha separadora
                         html.Hr(),
-                        
+
                         # Informações adicionais
                         dbc.Row([
                             dbc.Col([
                                 html.Div([
-                                    html.I(className="bi bi-clock-history text-primary", 
+                                    html.I(className="bi bi-clock-history text-primary",
                                           style={"fontSize": "1.5rem"}),
                                     html.P("Em breve", className="mt-2 mb-0 small text-muted")
                                 ], className="text-center")
                             ], width=4),
                             dbc.Col([
                                 html.Div([
-                                    html.I(className="bi bi-code-slash text-success", 
+                                    html.I(className="bi bi-code-slash text-success",
                                           style={"fontSize": "1.5rem"}),
                                     html.P("Em construção", className="mt-2 mb-0 small text-muted")
                                 ], className="text-center")
                             ], width=4),
                             dbc.Col([
                                 html.Div([
-                                    html.I(className="bi bi-rocket-takeoff text-info", 
+                                    html.I(className="bi bi-rocket-takeoff text-info",
                                           style={"fontSize": "1.5rem"}),
                                     html.P("Novidades chegando", className="mt-2 mb-0 small text-muted")
                                 ], className="text-center")
                             ], width=4),
                         ], className="mt-4"),
-                        
+
                         # Botão voltar
                         html.Div([
                             dbc.Button(
@@ -111,14 +111,14 @@ def layout(page_title="Funcionalidade em Desenvolvimento", custom_message=None):
                                 className="mt-4"
                             )
                         ], className="text-center")
-                        
+
                     ], className="p-5")
                 ], className="shadow-lg", style={"borderRadius": "15px"})
-                
-            ], width={"size": 8, "offset": 2}, lg={"size": 6, "offset": 3})
+
+            ], width={"size": 10, "offset": 1}, lg={"size": 8, "offset": 2})
         ], className="mt-5")
-        
-    ], fluid=True, className="p-4", style={"minHeight": "80vh", "display": "flex", "alignItems": "center"})
+
+    ], fluid=True, className="p-4")
 
 
 # ========================================
