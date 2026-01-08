@@ -27,7 +27,7 @@ from src.pages.auth import login, register, change_password
 from src.pages.dashboards import home, production_oee
 
 # Energia
-from src.pages.energy import overview as energy_overview
+from src.pages.energy import overview as energy_overview, config as energy_config
 
 # Produção
 from src.pages.production import states
@@ -63,6 +63,7 @@ ROUTES = {
     # Energia
     "/energy": energy_overview.layout,
     "/utilities/energy": energy_overview.layout,  # Alias
+    "/utilities/energy/config": energy_config.layout,  # Configuração de tarifas
     
     # Produção
     

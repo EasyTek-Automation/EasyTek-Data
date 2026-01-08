@@ -175,6 +175,12 @@ def create_header(pathname, user):
                                 style={"fontSize": "0.85rem", "opacity": "0.5", "paddingLeft": "0.5rem"}
                             ),
                             dbc.DropdownMenuItem(
+                                "⚙️ Configurações",
+                                href="/utilities/energy/config",
+                                disabled=False,
+                                style={"fontSize": "0.85rem", "paddingLeft": "0.5rem"}
+                            ),
+                            dbc.DropdownMenuItem(
                                 "💰 Custos",
                                 href="/utilities/energy/costs",
                                 disabled=True,

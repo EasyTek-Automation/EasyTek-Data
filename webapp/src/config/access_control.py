@@ -182,6 +182,12 @@ ROUTE_ACCESS = {
         "min_level": 1,
         "description": "Análise de Custos"
     },
+    "/utilities/energy/config": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 3,  # Apenas administradores
+        "description": "Configuração de Tarifas de Energia"
+    },
     
     # ========================================
     # UTILIDADES - ÁGUA

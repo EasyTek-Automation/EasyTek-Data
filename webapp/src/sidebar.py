@@ -13,7 +13,8 @@ from src.components.sidebars import (
     create_dashboard_sidebar_content,
     create_states_sidebar_content,
     create_superv_sidebar_content,
-    create_default_sidebar_content
+    create_default_sidebar_content,
+    create_default_energy_sidebar_content
 )
 
 
@@ -45,8 +46,12 @@ def get_sidebar_content_for_page(pathname):
     # Supervision
     elif pathname == "/supervision":
         return create_superv_sidebar_content()
-    
-    # Fallback para qualquer outra rota (reports, energy, alarms, etc)
+
+    # Energy pages - placeholder (will be updated by tab-aware callback)
+    elif pathname in ["/utilities/energy", "/energy"]:
+        return create_default_energy_sidebar_content()
+
+    # Fallback para qualquer outra rota (reports, alarms, etc)
     else:
         return create_default_sidebar_content()
 
