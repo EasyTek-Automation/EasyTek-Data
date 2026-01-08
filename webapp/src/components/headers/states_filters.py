@@ -7,6 +7,7 @@ Pode ser customizado conforme necessário.
 
 from dash import html
 import dash_bootstrap_components as dbc
+from src.components.dropdown_footer import create_dropdown_footer
 
 
 def create_states_filters():
@@ -22,5 +23,8 @@ def create_states_filters():
             html.I(className="fas fa-cog fa-2x text-muted mb-3"),
             html.P("Filtros da página States", className="fw-bold mb-1"),
             html.P("Em desenvolvimento...", className="text-muted small"),
-        ], className="text-center py-4")
+        ], className="text-center py-4"),
+
+        # Footer "Powered By"
+        create_dropdown_footer()
     ], style={"padding": "1rem", "minWidth": "300px"}, id="states-filters-content")

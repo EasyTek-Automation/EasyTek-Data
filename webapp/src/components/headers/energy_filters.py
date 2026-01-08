@@ -9,6 +9,7 @@ from dash import html, dcc
 import dash_bootstrap_components as dbc
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
+from src.components.dropdown_footer import create_dropdown_footer
 
 
 def create_energy_filters():
@@ -144,4 +145,7 @@ def create_energy_filters():
                 ),
             ], md=4, className="filter-column", style={"paddingLeft": "20px"}),
         ], className="g-0"),
+
+        # Footer "Powered By"
+        create_dropdown_footer()
     ], style={"padding": "20px 25px", "minWidth": "900px"}, id="dashboard-filters-content")
