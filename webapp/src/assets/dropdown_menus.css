@@ -1,0 +1,170 @@
+/* ========================================
+   DROPDOWN MENUS - CONSISTENT STYLING
+   Enhanced dropdown menus with min-width and branding footer
+   ======================================== */
+
+/* ==========================================
+   MIN-WIDTH CLASSES
+   ========================================== */
+
+/* Simple menus (Manutenção, Produção, Supervisório, Configurações) */
+.simple-dropdown-menu {
+    min-width: 300px !important;
+    padding: 0.5rem 0;
+}
+
+/* Helper class for menus with footer positioning */
+.dropdown-menu-with-footer {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ==========================================
+   DROPDOWN FOOTER COMPONENT
+   ========================================== */
+
+.dropdown-footer {
+    width: 100%;
+    margin-top: 0.5rem;
+    padding-top: 0;
+}
+
+.dropdown-footer-separator {
+    margin: 0.5rem 0;
+    border: 0;
+    border-top: 1px solid var(--bs-border-color, #dee2e6);
+    opacity: 1;
+    height: 0;
+    background: transparent;
+}
+
+.dropdown-footer-content {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    padding: 8px 12px;
+    justify-content: flex-end;
+    /* Bottom-right alignment - text aligns with bottom of logo */
+}
+
+.dropdown-footer-logo {
+    height: 33px;
+    /* Optimal size for 1142x471 aspect ratio = ~53px width */
+    width: auto;
+    object-fit: contain;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.dropdown-footer-logo:hover {
+    opacity: 1;
+    cursor: default;
+    /* Not clickable */
+}
+
+.dropdown-footer-text {
+    font-size: 0.75rem;
+    /* 12px if base is 16px */
+    color: var(--bs-secondary, #6c757d);
+    font-weight: 400;
+    opacity: 0.7;
+    line-height: 1;
+
+}
+
+/* ==========================================
+   THEME SUPPORT - DARK MODE
+   ========================================== */
+
+/* Dark theme adjustments */
+[data-bs-theme="dark"] .dropdown-footer-text {
+    color: var(--bs-light, #f8f9fa);
+}
+
+[data-bs-theme="dark"] .dropdown-footer-logo {
+    filter: brightness(0.9);
+}
+
+[data-bs-theme="dark"] .dropdown-footer-separator {
+    border-color: rgba(5, 5, 5, 0.8);
+}
+
+/* ==========================================
+   RESPONSIVE DESIGN
+   ========================================== */
+
+@media (max-width: 768px) {
+
+    /* Reduce min-width for mobile */
+    .simple-dropdown-menu {
+        min-width: 250px !important;
+    }
+
+    /* Smaller footer on mobile */
+    .dropdown-footer-content {
+        padding: 6px 10px;
+        gap: 6px;
+    }
+
+    .dropdown-footer-logo {
+        height: 18px;
+        /* Scales width to ~43px */
+    }
+
+    .dropdown-footer-text {
+        font-size: 0.7rem;
+        /* 11.2px */
+    }
+}
+
+/* Extra small devices */
+@media (max-width: 480px) {
+    .simple-dropdown-menu {
+        min-width: 200px !important;
+    }
+
+    .dropdown-footer-content {
+        padding: 4px 8px;
+        gap: 4px;
+    }
+
+    .dropdown-footer-logo {
+        height: 16px;
+    }
+
+    .dropdown-footer-text {
+        font-size: 0.65rem;
+        /* 10.4px */
+    }
+}
+
+/* ==========================================
+   ACCESSIBILITY
+   ========================================== */
+
+.dropdown-footer-logo:focus {
+    outline: 2px solid var(--bs-primary, #0d6efd);
+    outline-offset: 2px;
+}
+
+/* Ensure footer doesn't interfere with menu item interactions */
+.dropdown-footer {
+    pointer-events: none;
+    /* Allow clicks to pass through container */
+}
+
+.dropdown-footer * {
+    pointer-events: auto;
+    /* Re-enable for children if needed */
+}
+
+/* ==========================================
+   PRINT STYLES
+   ========================================== */
+
+@media print {
+    .dropdown-footer {
+        display: none;
+        /* Hide footer in print */
+    }
+}

@@ -52,6 +52,9 @@ from src.components.headers import (
     create_default_filters
 )
 
+# Footer reutilizável para dropdowns
+from src.components.dropdown_footer import create_dropdown_footer
+
 # Sistema de Permissões
 from src.utils.permissions import can_see_menu
 
@@ -94,28 +97,33 @@ def create_header(pathname, user):
             html.Span("Manutenção", style={"fontWeight": "600"})
         ], className="d-flex align-items-center"),
         children=[
-            dbc.DropdownMenuItem(
-                html.Div([html.Span(clipboard_icon(), style={"marginRight": "8px"}), "Ordens de Serviço"], className="d-flex align-items-center"),
-                href="/maintenance/work-orders", disabled=True, style={"opacity": "0.5"}
-            ),
-            dbc.DropdownMenuItem(
-                html.Div([html.Span(calendar_icon(), style={"marginRight": "8px"}), "Plano de Manutenção"], className="d-flex align-items-center"),
-                href="/maintenance/schedule", disabled=True, style={"opacity": "0.5"}
-            ),
-            dbc.DropdownMenuItem(divider=True),
-            dbc.DropdownMenuItem(
-                html.Div([html.Span(alarm_icon(), style={"marginRight": "8px"}), "Alarmes"], className="d-flex align-items-center"),
-                href="/maintenance/alarms", active=(pathname == "/maintenance/alarms"),
-            ),
-            dbc.DropdownMenuItem(divider=True),
-            dbc.DropdownMenuItem(
-                html.Div([html.Span(history_icon(), style={"marginRight": "8px"}), "Histórico de Intervenções"], className="d-flex align-items-center"),
-                href="/maintenance/history", disabled=True, style={"opacity": "0.5"}
-            ),
-            dbc.DropdownMenuItem(
-                html.Div([html.Span(graph_icon(), style={"marginRight": "8px"}), "Indicadores de Manutenção"], className="d-flex align-items-center"),
-                href="/maintenance/indicators", disabled=True, style={"opacity": "0.5"}
-            ),
+            html.Div([
+                dbc.DropdownMenuItem(
+                    html.Div([html.Span(clipboard_icon(), style={"marginRight": "8px"}), "Ordens de Serviço"], className="d-flex align-items-center"),
+                    href="/maintenance/work-orders", disabled=True, style={"opacity": "0.5"}
+                ),
+                dbc.DropdownMenuItem(
+                    html.Div([html.Span(calendar_icon(), style={"marginRight": "8px"}), "Plano de Manutenção"], className="d-flex align-items-center"),
+                    href="/maintenance/schedule", disabled=True, style={"opacity": "0.5"}
+                ),
+                dbc.DropdownMenuItem(divider=True),
+                dbc.DropdownMenuItem(
+                    html.Div([html.Span(alarm_icon(), style={"marginRight": "8px"}), "Alarmes"], className="d-flex align-items-center"),
+                    href="/maintenance/alarms", active=(pathname == "/maintenance/alarms"),
+                ),
+                dbc.DropdownMenuItem(divider=True),
+                dbc.DropdownMenuItem(
+                    html.Div([html.Span(history_icon(), style={"marginRight": "8px"}), "Histórico de Intervenções"], className="d-flex align-items-center"),
+                    href="/maintenance/history", disabled=True, style={"opacity": "0.5"}
+                ),
+                dbc.DropdownMenuItem(
+                    html.Div([html.Span(graph_icon(), style={"marginRight": "8px"}), "Indicadores de Manutenção"], className="d-flex align-items-center"),
+                    href="/maintenance/indicators", disabled=True, style={"opacity": "0.5"}
+                ),
+
+                # Footer "Powered By"
+                create_dropdown_footer()
+            ], className="simple-dropdown-menu dropdown-menu-with-footer")
         ],
         nav=True, in_navbar=True,
         toggle_style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "fontWeight": "600"}
@@ -128,14 +136,19 @@ def create_header(pathname, user):
             html.Span("Produção", style={"fontWeight": "600"})
         ], className="d-flex align-items-center"),
         children=[
-            dbc.DropdownMenuItem(
-                html.Div([html.Span(dashboard_icon(), style={"marginRight": "8px"}), "Dashboard OEE"], className="d-flex align-items-center"),
-                href="/production/oee", active=(pathname == "/production/oee")
-            ),
-            dbc.DropdownMenuItem(
-                html.Div([html.Span(states_icon(), style={"marginRight": "8px"}), "Estados da Linha"], className="d-flex align-items-center"),
-                href="/production/states", active=(pathname == "/production/states")
-            ),
+            html.Div([
+                dbc.DropdownMenuItem(
+                    html.Div([html.Span(dashboard_icon(), style={"marginRight": "8px"}), "Dashboard OEE"], className="d-flex align-items-center"),
+                    href="/production/oee", active=(pathname == "/production/oee")
+                ),
+                dbc.DropdownMenuItem(
+                    html.Div([html.Span(states_icon(), style={"marginRight": "8px"}), "Estados da Linha"], className="d-flex align-items-center"),
+                    href="/production/states", active=(pathname == "/production/states")
+                ),
+
+                # Footer "Powered By"
+                create_dropdown_footer()
+            ], className="simple-dropdown-menu dropdown-menu-with-footer")
         ],
         nav=True, in_navbar=True,
         toggle_style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "fontWeight": "600"}
@@ -295,7 +308,10 @@ def create_header(pathname, user):
                 dbc.DropdownMenuItem(
                     html.Div([html.Span(speedometer_icon(), style={"marginRight": "8px"}), "Dashboard Integrado de Utilidades"], className="d-flex align-items-center justify-content-center"),
                     href="/utilities/dashboard", disabled=True, className="text-center", style={"fontSize": "0.9rem", "opacity": "0.5", "fontWeight": "500"}
-                )
+                ),
+
+                # Footer "Powered By"
+                create_dropdown_footer()
             ], style={"padding": "15px", "minWidth": "750px"})
         ],
         nav=True, in_navbar=True,
@@ -310,13 +326,18 @@ def create_header(pathname, user):
             html.Span("Supervisório", style={"fontWeight": "600"})
         ], className="d-flex align-items-center"),
         children=[
-            dbc.DropdownMenuItem(
-                html.Div(
-                    [html.Span(temperature_control_icon(), style={"marginRight": "8px"}), "Controle de Temperatura"],
-                    className="d-flex align-items-center"), href="/supervision", active=(pathname == "/supervision")
-                
+            html.Div([
+                dbc.DropdownMenuItem(
+                    html.Div(
+                        [html.Span(temperature_control_icon(), style={"marginRight": "8px"}), "Controle de Temperatura"],
+                        className="d-flex align-items-center"), href="/supervision", active=(pathname == "/supervision")
 
-            ),
+
+                ),
+
+                # Footer "Powered By"
+                create_dropdown_footer()
+            ], className="simple-dropdown-menu dropdown-menu-with-footer")
         ],
         nav=True, in_navbar=True,
         toggle_style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "fontWeight": "600"}
@@ -329,27 +350,32 @@ def create_header(pathname, user):
             html.Span("Configurações", style={"fontWeight": "600"})
         ], className="d-flex align-items-center"),
         children=[
-            dbc.DropdownMenuItem(
-                html.Div([html.Span(users_icon(), style={"marginRight": "8px"}), "Gerenciar Usuários"], className="d-flex align-items-center"),
-                href="/config/users", active=(pathname == "/config/users")
-            ),
-            dbc.DropdownMenuItem(
-                html.Div([
-                    html.Span(user_create_icon(), style={"marginRight": "8px"}),
-                    "Criar Novo Usuário"
-                ], className="d-flex align-items-center"),
-                href="/config/users/create",
-                active=(pathname == "/config/users/create")
-            ),
-            dbc.DropdownMenuItem(divider=True),
-            dbc.DropdownMenuItem(
-                html.Div([html.Span(sliders_icon(), style={"marginRight": "8px"}), "Preferências"], className="d-flex align-items-center"),
-                href="/config/preferences", disabled=True, style={"opacity": "0.5"}
-            ),
-            dbc.DropdownMenuItem(
-                html.Div([html.Span(logs_icon(), style={"marginRight": "8px"}), "Logs do Sistema"], className="d-flex align-items-center"),
-                href="/config/logs", disabled=True, style={"opacity": "0.5"}
-            ),
+            html.Div([
+                dbc.DropdownMenuItem(
+                    html.Div([html.Span(users_icon(), style={"marginRight": "8px"}), "Gerenciar Usuários"], className="d-flex align-items-center"),
+                    href="/config/users", active=(pathname == "/config/users")
+                ),
+                dbc.DropdownMenuItem(
+                    html.Div([
+                        html.Span(user_create_icon(), style={"marginRight": "8px"}),
+                        "Criar Novo Usuário"
+                    ], className="d-flex align-items-center"),
+                    href="/config/users/create",
+                    active=(pathname == "/config/users/create")
+                ),
+                dbc.DropdownMenuItem(divider=True),
+                dbc.DropdownMenuItem(
+                    html.Div([html.Span(sliders_icon(), style={"marginRight": "8px"}), "Preferências"], className="d-flex align-items-center"),
+                    href="/config/preferences", disabled=True, style={"opacity": "0.5"}
+                ),
+                dbc.DropdownMenuItem(
+                    html.Div([html.Span(logs_icon(), style={"marginRight": "8px"}), "Logs do Sistema"], className="d-flex align-items-center"),
+                    href="/config/logs", disabled=True, style={"opacity": "0.5"}
+                ),
+
+                # Footer "Powered By"
+                create_dropdown_footer()
+            ], className="simple-dropdown-menu dropdown-menu-with-footer")
         ],
         nav=True, in_navbar=True,
         toggle_style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "fontWeight": "600"}
@@ -446,6 +472,9 @@ def create_header(pathname, user):
                 html.Div([html.Span(logout_icon(), style={"marginRight": "8px"}), "Sair"], className="d-flex align-items-center text-danger"),
                 id="logout_button", style={"cursor": "pointer"}
             ),
+
+            # Footer "Powered By"
+            create_dropdown_footer()
         ],
         nav=True, in_navbar=True, align_end=True, caret=False,
         toggle_style={
