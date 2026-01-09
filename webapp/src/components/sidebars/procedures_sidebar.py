@@ -6,10 +6,10 @@ Exibe uma árvore de navegação hierárquica baseada no docs.yml.
 Suporta múltiplos níveis de aninhamento.
 """
 
-from dash import html
+from dash import html, dcc
 import dash_bootstrap_components as dbc
 
-from src.config.docs_config import load_docs_structure, get_docs_path
+from src.config.docs_config import load_docs_structure
 
 
 def create_nav_link(file_info, current_path, depth=0):
@@ -22,7 +22,7 @@ def create_nav_link(file_info, current_path, depth=0):
         depth (int): Nível de profundidade para indentação
 
     Returns:
-        html.A: Componente de link
+        dcc.Link: Componente de link com navegação SPA
     """
     # Construir URL completa
     file_path = file_info.get("path", "")
@@ -36,7 +36,10 @@ def create_nav_link(file_info, current_path, depth=0):
     # Calcular padding baseado na profundidade
     padding_left = 10 + (depth * 12)
 
-    return html.A(
+    # Criar estilo com padding se necessário
+    link_style = {"paddingLeft": f"{padding_left}px"} if depth > 0 else {}
+
+    return dcc.Link(
         [
             html.I(
                 className="bi bi-file-text me-2",
@@ -46,8 +49,7 @@ def create_nav_link(file_info, current_path, depth=0):
         ],
         href=url,
         className=f"proc-nav-link {'active' if is_active else ''}",
-        style={"paddingLeft": f"{padding_left}px"} if depth > 0 else None,
-        **{"data-depth": str(depth)}
+        style=link_style
     )
 
 
@@ -180,7 +182,7 @@ def create_procedures_sidebar_content(current_path="/maintenance/index.md"):
         index_url = f"/maintenance/{structure['index']}"
         is_active = current_path == index_url
         nav_items.append(
-            html.A(
+            dcc.Link(
                 [
                     html.I(className="bi bi-house-door me-2", style={"fontSize": "0.75rem"}),
                     html.Span("Início")
