@@ -14,6 +14,7 @@ from .energy_sidebar import (
     create_energy_sidebar_no_config,
     create_default_energy_sidebar_content
 )
+from .procedures_sidebar import create_procedures_sidebar_content
 
 __all__ = [
     'create_dashboard_sidebar_content',
@@ -22,5 +23,6 @@ __all__ = [
     'create_default_sidebar_content',
     'create_se03_cost_sidebar_content',
     'create_energy_sidebar_no_config',
-    'create_default_energy_sidebar_content'
+    'create_default_energy_sidebar_content',
+    'create_procedures_sidebar_content'
 ]

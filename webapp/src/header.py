@@ -111,6 +111,10 @@ def create_header(pathname, user):
                     html.Div([html.Span(alarm_icon(), style={"marginRight": "8px"}), "Alarmes"], className="d-flex align-items-center"),
                     href="/maintenance/alarms", active=(pathname == "/maintenance/alarms"),
                 ),
+                dbc.DropdownMenuItem(
+                    html.Div([html.Span(clipboard_icon(), style={"marginRight": "8px"}), "Procedimentos"], className="d-flex align-items-center"),
+                    href="/maintenance/procedures", active=(pathname == "/maintenance/procedures"),
+                ),
                 dbc.DropdownMenuItem(divider=True),
                 dbc.DropdownMenuItem(
                     html.Div([html.Span(history_icon(), style={"marginRight": "8px"}), "Histórico de Intervenções"], className="d-flex align-items-center"),

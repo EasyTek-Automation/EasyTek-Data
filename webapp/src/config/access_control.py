@@ -114,7 +114,19 @@ ROUTE_ACCESS = {
         "min_level": 1,
         "description": "Indicadores de Manutenção"
     },
-    
+    "/maintenance/procedures": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 1,
+        "description": "Procedimentos de Manutenção"
+    },
+    "/maintenance/preventive/daily.md": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 1,
+        "description": "Procedimentos de Manutenção"
+    },
+
     # ========================================
     # PRODUÇÃO
     # ========================================
@@ -389,10 +401,10 @@ MENU_ACCESS = {
 def get_route_config(pathname):
     """
     Retorna a configuração de acesso para uma rota.
-    
+
     Args:
         pathname (str): Caminho da rota
-        
+
     Returns:
         dict: Configuração da rota ou configuração padrão restritiva
     """
@@ -403,8 +415,21 @@ def get_route_config(pathname):
         "min_level": 3,
         "description": "Rota não configurada"
     }
-    
-    return ROUTE_ACCESS.get(pathname, default_config)
+
+    # Verificar se a rota existe no mapeamento
+    if pathname in ROUTE_ACCESS:
+        return ROUTE_ACCESS[pathname]
+
+    # Suporte a rotas dinâmicas de markdown (procedimentos de manutenção)
+    if pathname.startswith('/maintenance/') and pathname.endswith('.md'):
+        return {
+            "shared": False,
+            "perfis": ["manutencao"],
+            "min_level": 1,
+            "description": "Procedimento de manutenção"
+        }
+
+    return default_config
 
 
 def get_menu_config(menu_key):

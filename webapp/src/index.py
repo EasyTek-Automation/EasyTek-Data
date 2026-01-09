@@ -8,6 +8,7 @@ from flask_login import logout_user, current_user
 # --- Importações do Projeto ---
 from src.app import app
 from src.config import user_loader
+from src.config.docs_config import get_docs_path, check_file_exists
 from src import header
 from src import sidebar
 from src.components import stores
@@ -33,7 +34,7 @@ from src.pages.energy import overview as energy_overview, config as energy_confi
 from src.pages.production import states
 
 # Manutenção
-from src.pages.maintenance import alarms
+from src.pages.maintenance import alarms, procedures
 
 # Supervisório
 from src.pages.supervision import control as supervision_control
@@ -69,7 +70,8 @@ ROUTES = {
     
     # Manutenção
     "/maintenance/alarms": alarms.layout,
-    
+    "/maintenance/procedures": procedures.layout,
+
     # Supervisório
     "/supervision": supervision_control.layout,    
     
@@ -217,13 +219,18 @@ def route_and_prepare_content(pathname, sidebar_state):
     # ========================================
     # RESOLVER ROTA
     # ========================================
-    page_content = ROUTES.get(pathname)
-    
-    if page_content is None:
-        # 404 - Página não encontrada
-        page_content = _build_404_page(pathname)
-    elif callable(page_content):
-        page_content = page_content()
+
+    # Verificar se é uma rota de markdown (.md)
+    if pathname.startswith('/maintenance/') and pathname.endswith('.md'):
+        page_content = _render_markdown_route(pathname)
+    else:
+        page_content = ROUTES.get(pathname)
+
+        if page_content is None:
+            # 404 - Página não encontrada
+            page_content = _build_404_page(pathname)
+        elif callable(page_content):
+            page_content = page_content()
 
     # ========================================
     # MONTAR LAYOUT PRINCIPAL
@@ -313,10 +320,10 @@ def _build_main_layout(pathname, page_content, sidebar_state):
 def _build_404_page(pathname):
     """
     Constrói a página de erro 404.
-    
+
     Args:
         pathname (str): Rota não encontrada
-        
+
     Returns:
         dbc.Container: Layout da página 404
     """
@@ -327,17 +334,17 @@ def _build_404_page(pathname):
                     dbc.CardBody([
                         html.Div([
                             html.I(
-                                className="bi bi-exclamation-triangle-fill text-danger", 
+                                className="bi bi-exclamation-triangle-fill text-danger",
                                 style={"fontSize": "5rem"}
                             )
                         ], className="text-center mb-4"),
-                        
+
                         html.H2("404 - Página Não Encontrada", className="text-center mb-3"),
                         html.P(
-                            f"A rota '{pathname}' não existe.", 
+                            f"A rota '{pathname}' não existe.",
                             className="text-center text-muted mb-4"
                         ),
-                        
+
                         html.Div([
                             dbc.Button([
                                 html.I(className="bi bi-house-door me-2"),
@@ -345,10 +352,36 @@ def _build_404_page(pathname):
                             ], href="/", color="primary", size="lg")
                         ], className="text-center")
                     ], className="p-5")
-                ], className="shadow")
-            ], width={"size": 6, "offset": 3})
+                ], className="shadow", style={"borderRadius": "15px"})
+            ], width={"size": 10, "offset": 1}, lg={"size": 8, "offset": 2})
         ], className="mt-5")
-    ], fluid=True, style={"minHeight": "70vh", "display": "flex", "alignItems": "center"})
+    ], fluid=True, className="p-4")
+
+
+def _render_markdown_route(pathname):
+    """
+    Renderiza um arquivo markdown baseado na rota.
+
+    Mapeia URLs como /maintenance/preventive/daily.md para
+    o arquivo correspondente no volume de documentos.
+
+    Args:
+        pathname (str): Rota do arquivo markdown
+
+    Returns:
+        html.Div: Conteúdo renderizado ou mensagem de erro
+    """
+    # Extrair o caminho relativo do arquivo (remover /maintenance/ do início)
+    relative_path = pathname.replace('/maintenance/', '', 1)
+
+    # Verificar se o arquivo existe (inclui validação de segurança)
+    exists, file_path = check_file_exists(relative_path)
+
+    if not exists or file_path is None:
+        return _build_404_page(pathname)
+
+    # Renderizar o markdown
+    return procedures.render_markdown_file(file_path)
 
 
 # --- Callback para Revelar o Conteúdo ---

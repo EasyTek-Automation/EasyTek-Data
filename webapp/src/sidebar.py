@@ -14,7 +14,8 @@ from src.components.sidebars import (
     create_states_sidebar_content,
     create_superv_sidebar_content,
     create_default_sidebar_content,
-    create_default_energy_sidebar_content
+    create_default_energy_sidebar_content,
+    create_procedures_sidebar_content
 )
 
 
@@ -51,6 +52,14 @@ def get_sidebar_content_for_page(pathname):
     elif pathname in ["/utilities/energy", "/energy"]:
         return create_default_energy_sidebar_content()
 
+    # Procedures/Documentation pages (markdown files)
+    elif pathname.startswith('/maintenance/') and pathname.endswith('.md'):
+        return create_procedures_sidebar_content(current_path=pathname)
+
+    # Procedures index page
+    elif pathname == "/maintenance/procedures":
+        return create_procedures_sidebar_content(current_path="/maintenance/index.md")
+
     # Fallback para qualquer outra rota (reports, alarms, etc)
     else:
         return create_default_sidebar_content()
@@ -86,7 +95,7 @@ def create_sidebar_layout(app_instance, pathname="/", sidebar_content_style=None
             # Logo (sempre presente)
             html.Div([
                 html.Img(
-                    src="/assets/LogoAMG.png",
+                    src="/assets/logo.png",
                     style={
                         "width": "100%",
                         "max-height": "120px",

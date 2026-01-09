@@ -84,16 +84,30 @@ webapp/src/
 ├── app.py              # Flask server & Dash app initialization (includes favicon config)
 ├── run.py              # Application entry point
 ├── index.py            # Main routing and layout orchestration
+├── header.py           # Top navigation bar with mega menus
+├── sidebar.py          # Collapsible sidebar with dynamic content
 ├── callbacks.py        # Central callback registration
 ├── callbacks_registers/  # Callback modules (one per feature)
-├── components/         # Reusable UI components (graphs, cards, tables)
-│   ├── header.py       # Top navigation bar
-│   ├── sidebar.py      # Sidebar with logo
+│   ├── main_layout_callbacks.py
+│   ├── sidebar_content_callback.py
+│   ├── sidebar_filters_callback.py
+│   └── ... (23+ specialized callback modules)
+├── components/         # Reusable UI components
+│   ├── icons.py        # SVG icon components
+│   ├── stores.py       # Application dcc.Store components
+│   ├── dropdown_footer.py  # Reusable dropdown footer
 │   ├── headers/        # Page-specific header filter modules
 │   │   ├── energy_filters.py
 │   │   ├── states_filters.py
 │   │   └── default_filters.py
-│   └── icons.py        # SVG icon components
+│   ├── sidebars/       # Page-specific sidebar content modules
+│   │   ├── __init__.py
+│   │   ├── dashboard_sidebar.py
+│   │   ├── states_sidebar.py
+│   │   ├── superv_sidebar.py
+│   │   ├── energy_sidebar.py
+│   │   └── default_sidebar.py
+│   └── ... (graph and card components)
 ├── config/             # Configuration modules
 │   ├── access_control.py   # Route & menu permissions matrix
 │   ├── theme_config.py     # Dash Bootstrap theme configuration
@@ -101,14 +115,19 @@ webapp/src/
 ├── database/
 │   └── connection.py   # MongoDB connection & User model
 ├── pages/              # Page layouts organized by domain
-│   ├── auth/           # Login and registration
+│   ├── admin/          # User management (create_user, manage_users)
+│   ├── auth/           # Login, registration, change password
 │   ├── dashboards/     # Home, production OEE
 │   ├── energy/         # Energy monitoring pages
 │   ├── production/     # Production state tracking
-│   ├── maintenance/    # Alarms and work orders
+│   ├── maintenance/    # Alarms and procedures
 │   ├── supervision/    # Supervisory control (SCADA-like)
 │   ├── reports/        # Reporting pages
-│   └── common/         # Shared pages (404, access denied, under_development.py)
+│   └── common/         # Shared pages (access_denied, under_development)
+├── assets/             # Static files (CSS, images)
+│   ├── dropdown_menus.css  # Mega menu styling
+│   ├── markdown.css        # Markdown rendering styles
+│   └── ... (other CSS and images)
 └── utils/
     ├── permissions.py  # Access control logic
     └── helpers.py      # Utility functions
@@ -123,12 +142,23 @@ webapp/src/
 - Access control integrated into routing via `check_access()`
 - Main layout builder (`_build_main_layout()`) combines header, sidebar, and page content
 
+**Route Aliases** (defined in `index.py`):
+```python
+ROUTE_ALIASES = {
+    '/dashboard': '/production/oee',
+    '/states': '/production/states',
+    '/superv': '/supervision',
+    '/production/alarms': '/maintenance/alarms',
+    '/alarms': '/maintenance/alarms',
+}
+```
+
 #### 2. Access Control System
 
 **Two-dimensional permission model** (defined in `config/access_control.py`):
 
 - **Vertical (level)**: 1 = basic, 2 = advanced, 3 = admin
-- **Horizontal (perfil)**: manutencao, qualidade, producao, utilidades, admin
+- **Horizontal (perfil)**: manutencao, qualidade, producao, utilidades, admin, meio_ambiente, seguranca, engenharias
 
 Routes can be:
 - **Shared** (`shared=True`): All profiles can access if level requirement met
@@ -161,25 +191,43 @@ def register_callbacks(app):
 
 Each callback module in `callbacks_registers/` exports a `register_*_callbacks(app, ...)` function.
 
-#### 5. Header and Sidebar System
+#### 5. Header System (`header.py`)
 
-**Header**: Top navigation bar (`components/header.py`) with:
-- Page-specific filters loaded dynamically from `components/headers/` directory
-- Theme switcher using `ThemeSwitchAIO`
-- Hamburger menu for sidebar toggle
-- Profile icon and user menu
+Top navigation bar located at `src/header.py` with:
 
-**Sidebar**: Collapsible sidebar (`components/sidebar.py`) with:
-- Company logo display
-- Sidebar state (expanded/collapsed) stored in `dcc.Store`
-- Currently minimal - awaiting future menu items
+- **Mega Menu Navigation**: Multi-column dropdown menus for Utilities section
+  - Energia Elétrica (with substation options SE01-SE04)
+  - Água, Gás Natural, Ar Comprimido
+- **Dynamic Page Filters**: `get_filters_for_page(pathname)` loads filters from `components/headers/`
+- **Theme Switcher**: `ThemeSwitchAIO` component for light/dark mode
+- **Hamburger Menu**: Toggle for sidebar collapse/expand
+- **User Profile Dropdown**: Avatar, profile info, level badge, logout
+- **Permission-based Menus**: Uses `can_see_menu()` to show/hide items
 
-**Page-Specific Filters**: Located in `components/headers/`:
-- `energy_filters.py`: Equipment dropdowns and date/time pickers for energy pages
+**Page-Specific Filters** (in `components/headers/`):
+- `energy_filters.py`: Equipment dropdowns and date/time pickers
 - `states_filters.py`: Filters for production state monitoring
-- `default_filters.py`: Generic filter layout for other pages
+- `default_filters.py`: Generic filter layout
 
-#### 6. MongoDB Collections
+#### 6. Sidebar System (`sidebar.py`)
+
+Collapsible sidebar located at `src/sidebar.py` with:
+
+- **Company Logo**: Displayed at top
+- **Dynamic Content**: `get_sidebar_content_for_page(pathname)` loads content per route
+- **State Management**: Expanded/collapsed state stored in `dcc.Store`
+- **CSS Transitions**: Smooth collapse/expand animations
+
+**Page-Specific Sidebar Content** (in `components/sidebars/`):
+- `dashboard_sidebar.py`: Dashboard/OEE navigation
+- `states_sidebar.py`: Production states navigation
+- `superv_sidebar.py`: Supervision controls
+- `energy_sidebar.py`: Energy page options
+- `default_sidebar.py`: Generic fallback content
+
+**Important**: Sidebar content is determined AFTER route alias resolution.
+
+#### 7. MongoDB Collections
 
 Key collections referenced in codebase:
 - `usuarios`: User accounts
@@ -203,6 +251,7 @@ When user navigates:
 4. **Check permissions** via `check_access()`
 5. Load page layout or show access denied
 6. Build main layout with header, sidebar, content
+7. Load dynamic sidebar content based on resolved route
 
 ## Important Development Notes
 
@@ -212,7 +261,8 @@ When user navigates:
 2. Add route to `ROUTES` dict in `index.py`
 3. Add permission config to `ROUTE_ACCESS` in `config/access_control.py`
 4. If callbacks needed, create module in `callbacks_registers/` and register in `callbacks.py`
-5. Update sidebar menu in `sidebar.py` if navigation item needed
+5. If page needs custom sidebar content, add module in `components/sidebars/` and update `get_sidebar_content_for_page()` in `sidebar.py`
+6. If page needs custom header filters, add module in `components/headers/` and update `get_filters_for_page()` in `header.py`
 
 ### Modifying Access Control
 
@@ -232,7 +282,9 @@ When user navigates:
 - Bootstrap theme configured in `app.py`: `MINTY` and `darkly` templates loaded
 - Dash Bootstrap Components (dbc) used throughout
 - Custom theme toggle functionality via `ThemeSwitchAIO`
-- Custom CSS files in `assets/` directory for component-specific styling
+- Custom CSS files in `assets/` directory:
+  - `dropdown_menus.css`: Mega menu styling
+  - `markdown.css`: Markdown rendering styles
 - Favicon configured via `app.index_string` to use `/assets/favicon.ico`
 
 ### UI Components and Layouts
@@ -248,6 +300,11 @@ When user navigates:
 - Tab content loaded dynamically via callbacks
 - Under-development tabs use `get_under_development_content()` helper
 - Fully developed tabs (like SE03) include multiple graphs and KPI cards
+
+**Icon System** (`components/icons.py`):
+- Centralized SVG icon components
+- Used throughout header menus and UI elements
+- Consistent styling across the application
 
 ### MQTT Command Publishing
 
@@ -266,7 +323,7 @@ To send commands to equipment:
 ## Git Branch Structure
 
 - **Main branch**: `main`
-- Current feature branch pattern: `feature/[FeatureName]` (e.g., `feature/ProfileIcon`)
+- Current feature branch pattern: `feature/[FeatureName]` (e.g., `feature/mkdocs`)
 - Commit message style: Conventional Commits format
   - `feat(scope): description` for new features
   - `fix(scope): description` for bug fixes
