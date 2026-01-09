@@ -295,8 +295,8 @@ def _build_main_layout(pathname, page_content, sidebar_state):
                 style=sidebar_col_style
             ),
             html.Div(
-                [html.Div(page_content)], 
-                id="content-column", 
+                [html.Div(page_content)],
+                id="content-column",
                 style=content_col_style
             ),
         ], id="main-container", style={
