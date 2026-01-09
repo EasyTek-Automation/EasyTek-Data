@@ -112,13 +112,9 @@ def layout(pathname=None, reason=None, user=None):
                         
                     ], className="p-5")
                 ], className="shadow border-0")
-            ], width={"size": 6, "offset": 3})
+            ], width={"size": 10, "offset": 1}, lg={"size": 8, "offset": 2})
         ], className="mt-5")
-    ], fluid=True, style={
-        "minHeight": "70vh", 
-        "display": "flex", 
-        "alignItems": "center"
-    })
+    ], fluid=True, className="p-4")
 
 
 def layout_simple(message="Você não tem permissão para acessar esta página."):

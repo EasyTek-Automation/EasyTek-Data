@@ -2,9 +2,10 @@
 
 import dash
 import dash_bootstrap_components as dbc
-from flask import Flask
+from flask import Flask, send_from_directory, abort
 from flask_login import LoginManager
 import os
+from pathlib import Path
 from dash_bootstrap_templates import load_figure_template
 
 # --- Constantes ---
@@ -67,3 +68,40 @@ app.index_string = '''
 login_manager = LoginManager()
 login_manager.init_app(server)
 login_manager.login_view = '/login'
+
+
+# --- Rota para servir assets do volume de documentação ---
+def get_docs_base_path():
+    """Retorna o caminho do volume de documentação."""
+    env_path = os.environ.get("DOCS_PROCEDURES_PATH")
+    if env_path:
+        return Path(env_path)
+    # Fallback para desenvolvimento
+    return Path(__file__).parent.parent.parent / "docs" / "procedures"
+
+
+@server.route('/docs-assets/<path:filename>')
+def serve_docs_asset(filename):
+    """
+    Serve arquivos estáticos (imagens, etc.) do volume de documentação.
+    Rota: /docs-assets/Assets/Images/exemplo.png
+    """
+    docs_path = get_docs_base_path()
+
+    # Verificação de segurança: garantir que o arquivo está dentro do volume
+    try:
+        requested_path = (docs_path / filename).resolve()
+        if not str(requested_path).startswith(str(docs_path.resolve())):
+            abort(404)
+    except (OSError, ValueError):
+        abort(404)
+
+    # Verificar se o arquivo existe
+    if not requested_path.exists() or not requested_path.is_file():
+        abort(404)
+
+    # Servir o arquivo
+    return send_from_directory(
+        requested_path.parent,
+        requested_path.name
+    )

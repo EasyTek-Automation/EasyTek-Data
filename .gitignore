@@ -98,3 +98,8 @@ environments/**/portainer/
 /node-red-config/* 
 # Mas NÃO ignora o arquivo .gitkeep, para que a pasta vazia seja versionada. 
 !/node-red-config/.gitkeep
+
+nul
+NUL
+**/nul
+**/NUL

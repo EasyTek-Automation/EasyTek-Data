@@ -30,6 +30,7 @@ from src.callbacks_registers.change_password_callbacks import register_change_pa
 from src.callbacks_registers.manage_users_callbacks import register_manage_users_callbacks
 from src.callbacks_registers.energy_config_callbacks import register_energy_config_callbacks
 from src.callbacks_registers.energy_sidebar_callbacks import register_energy_sidebar_callbacks
+from src.callbacks_registers.procedures_collapse_callbacks import register_procedures_collapse_callbacks
 
 from src.pages.energy import callbacks as energy_callbacks
 
@@ -73,3 +74,6 @@ def register_callbacks(app):
     # Energy sidebar (MUST be after sidebar_content_callback)
     # This callback overrides the default sidebar for energy pages
     register_energy_sidebar_callbacks(app)
+
+    # Procedures collapse callbacks (for documentation navigation)
+    register_procedures_collapse_callbacks(app)
