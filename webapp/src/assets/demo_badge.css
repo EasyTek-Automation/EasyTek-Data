@@ -1,0 +1,287 @@
+/*
+ * Estilos para badges de dados de demonstração
+ * Garante aparência consistente em toda a aplicação
+ */
+
+/* ========================================
+   Badge Principal
+   ======================================== */
+
+.demo-data-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    text-transform: uppercase;
+    white-space: nowrap;
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: all 0.2s ease;
+}
+
+.demo-data-badge:hover {
+    opacity: 1 !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transform: translateY(-1px);
+}
+
+/* Ícone dentro do badge */
+.demo-data-badge .bi-exclamation-triangle-fill {
+    font-size: 0.9em;
+    animation: pulse-warning 2s ease-in-out infinite;
+}
+
+/* ========================================
+   Animação de Pulsação (Sutil)
+   ======================================== */
+
+@keyframes pulse-warning {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+/* ========================================
+   Badge em Card Headers
+   ======================================== */
+
+.card-header .demo-data-badge {
+    float: right;
+    margin-left: auto;
+}
+
+/* Garantir alinhamento quando há título e badge */
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* ========================================
+   Badge Sobreposto em Gráficos
+   ======================================== */
+
+/* Container do badge sobre gráfico */
+.graph-demo-badge-container {
+    position: relative;
+}
+
+.graph-demo-badge-overlay {
+    position: absolute;
+    z-index: 1000;
+    pointer-events: none;
+}
+
+/* Posições específicas */
+.graph-demo-badge-overlay.top-right {
+    top: 10px;
+    right: 10px;
+}
+
+.graph-demo-badge-overlay.top-left {
+    top: 10px;
+    left: 10px;
+}
+
+.graph-demo-badge-overlay.bottom-right {
+    bottom: 10px;
+    right: 10px;
+}
+
+.graph-demo-badge-overlay.bottom-left {
+    bottom: 10px;
+    left: 10px;
+}
+
+/* ========================================
+   Alerta de Página
+   ======================================== */
+
+.alert.alert-warning .demo-data-badge,
+.demo-page-warning {
+    border-color: rgba(255, 193, 7, 0.5);
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+}
+
+.demo-page-warning .bi-info-circle-fill {
+    color: #f39c12;
+    font-size: 1.1em;
+    margin-right: 0.5rem;
+}
+
+/* ========================================
+   Tamanhos Responsivos
+   ======================================== */
+
+/* Mobile */
+@media (max-width: 576px) {
+    .demo-data-badge {
+        font-size: 0.6rem !important;
+        padding: 0.1rem 0.3rem !important;
+    }
+
+    .graph-demo-badge-overlay {
+        top: 5px;
+        right: 5px;
+    }
+}
+
+/* Tablet */
+@media (min-width: 577px) and (max-width: 992px) {
+    .demo-data-badge {
+        font-size: 0.65rem !important;
+        padding: 0.15rem 0.35rem !important;
+    }
+}
+
+/* ========================================
+   Tema Escuro (Dark Mode)
+   ======================================== */
+
+[data-bs-theme="dark"] .demo-data-badge {
+    background-color: #856404 !important;
+    border-color: rgba(255, 193, 7, 0.4);
+    color: #ffc107 !important;
+}
+
+[data-bs-theme="dark"] .demo-data-badge:hover {
+    background-color: #9a7506 !important;
+    box-shadow: 0 2px 8px rgba(255, 193, 7, 0.2);
+}
+
+[data-bs-theme="dark"] .demo-page-warning {
+    background: linear-gradient(135deg, #332701 0%, #4a3a0d 100%);
+    border-color: rgba(255, 193, 7, 0.3);
+    color: #ffeaa7;
+}
+
+/* ========================================
+   Tooltip para Badge
+   ======================================== */
+
+.demo-badge-tooltip {
+    cursor: help;
+}
+
+.demo-badge-tooltip .tooltip-inner {
+    max-width: 250px;
+    text-align: left;
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+}
+
+/* ========================================
+   Badge em Tabelas
+   ======================================== */
+
+.table-demo-badge-header {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    padding: 0.5rem;
+    background-color: rgba(255, 193, 7, 0.1);
+    border-left: 3px solid #ffc107;
+    border-radius: 0.25rem;
+}
+
+[data-bs-theme="dark"] .table-demo-badge-header {
+    background-color: rgba(255, 193, 7, 0.05);
+    border-left-color: #856404;
+}
+
+/* ========================================
+   Animações de Entrada
+   ======================================== */
+
+.demo-data-badge {
+    animation: fadeInBadge 0.3s ease-out;
+}
+
+@keyframes fadeInBadge {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 0.9;
+        transform: scale(1);
+    }
+}
+
+/* ========================================
+   Print Styles
+   ======================================== */
+
+@media print {
+    .demo-data-badge {
+        background-color: #fff3cd !important;
+        color: #856404 !important;
+        border: 1px solid #856404 !important;
+        box-shadow: none !important;
+    }
+
+    .graph-demo-badge-overlay {
+        opacity: 0.8;
+    }
+}
+
+/* ========================================
+   Acessibilidade
+   ======================================== */
+
+/* Alto contraste para leitores de tela */
+@media (prefers-contrast: high) {
+    .demo-data-badge {
+        border-width: 2px;
+        font-weight: 700;
+    }
+}
+
+/* Respeitar preferência de movimento reduzido */
+@media (prefers-reduced-motion: reduce) {
+    .demo-data-badge,
+    .demo-data-badge .bi-exclamation-triangle-fill {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* ========================================
+   Estados de Interação
+   ======================================== */
+
+.demo-data-badge:focus {
+    outline: 2px solid #ffc107;
+    outline-offset: 2px;
+}
+
+.demo-data-badge:active {
+    transform: scale(0.98);
+}
+
+/* ========================================
+   Variantes de Cor (opcional para uso futuro)
+   ======================================== */
+
+.demo-data-badge.badge-info {
+    background-color: #17a2b8 !important;
+    border-color: rgba(23, 162, 184, 0.3);
+}
+
+.demo-data-badge.badge-success {
+    background-color: #28a745 !important;
+    border-color: rgba(40, 167, 69, 0.3);
+}
+
+/* ========================================
+   Compatibilidade com Bootstrap Icons
+   ======================================== */
+
+.demo-data-badge .bi {
+    vertical-align: middle;
+    line-height: 1;
+}

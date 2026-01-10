@@ -5,6 +5,7 @@ import dash_bootstrap_components as dbc
 from src.components.linegraph_energy import energygraph_card_layout
 from src.components.linegraph_energy02 import energygraph_card_layout02
 from src.components.bargraph_consumo_hora import consumptiongraph_card_layout
+from src.utils.demo_helpers import add_demo_badge_to_card_header
 
 def layout():
     """
@@ -103,6 +104,14 @@ def get_se03_content():
             # Fator de Potência
             dbc.Col([
                 dbc.Card([
+                    dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                     dbc.CardBody([
                         html.Div([
                             html.I(
@@ -123,6 +132,14 @@ def get_se03_content():
             # Demanda Máxima
             dbc.Col([
                 dbc.Card([
+                    dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                     dbc.CardBody([
                         html.Div([
                             html.I(
@@ -143,6 +160,14 @@ def get_se03_content():
             # THD Tensão
             dbc.Col([
                 dbc.Card([
+                    dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                     dbc.CardBody([
                         html.Div([
                             html.I(
@@ -163,6 +188,14 @@ def get_se03_content():
             # Consumo Total Hoje
             dbc.Col([
                 dbc.Card([
+                    dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                     dbc.CardBody([
                         html.Div([
                             html.I(
