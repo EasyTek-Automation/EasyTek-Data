@@ -10,6 +10,13 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime, timedelta
 import numpy as np
+from src.utils.demo_helpers import (
+      add_demo_badge_to_card_header,
+      add_page_demo_warning,      # Alerta no topo da página
+      create_demo_card,           # Card KPI com badge
+      create_demo_graph_card      # Gráfico com badge
+  )
+
 
 # ========================================
 # PALETA DE CORES MODERNA
@@ -453,6 +460,7 @@ spark_quality = [85, 88, 84, 97, 96, 79, 85, 88, 86, 87, 88, 77]
 # ========================================
 
 layout = dbc.Container([
+    add_page_demo_warning("/production/oee"),
     
     # ========================================
     # HEADER
@@ -492,6 +500,14 @@ layout = dbc.Container([
         # Card OEE
         dbc.Col([
             dbc.Card([
+                dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "OEE Geral",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                 dbc.CardBody([
                     html.Div([
                         html.Div([
@@ -522,6 +538,14 @@ layout = dbc.Container([
         # Card Energia
         dbc.Col([
             dbc.Card([
+                dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "Consumo Atual",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                 dbc.CardBody([
                     html.Div([
                         html.Div([
@@ -552,6 +576,14 @@ layout = dbc.Container([
         # Card Qualidade
         dbc.Col([
             dbc.Card([
+                dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "Qualidade",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                 dbc.CardBody([
                     html.Div([
                         html.Div([
@@ -582,6 +614,14 @@ layout = dbc.Container([
         # Card Alarmes
         dbc.Col([
             dbc.Card([
+                dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "Alarmes",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                 dbc.CardBody([
                     html.Div([
                         html.Div([
@@ -612,6 +652,14 @@ layout = dbc.Container([
     dbc.Row([
         dbc.Col([
             dbc.Card([
+                dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "Meta Produção",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                 dbc.CardBody([
                     create_progress_bar_visual()
                 ])
@@ -625,10 +673,14 @@ layout = dbc.Container([
     dbc.Row([
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader([
-                    html.I(className="bi bi-speedometer me-2"),
-                    html.Span("Indicadores OEE", className="fw-semibold")
-                ], className="bg-transparent border-bottom"),
+                dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "Indicadores OEE",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                 dbc.CardBody([
                     dbc.Row([
                         dbc.Col([
@@ -661,11 +713,14 @@ layout = dbc.Container([
     dbc.Row([
         # Donut - Distribuição de Paradas
         dbc.Col([
-            dbc.Card([
-                dbc.CardHeader([
-                    html.I(className="bi bi-pie-chart me-2"),
-                    html.Span("Distribuição de Paradas", className="fw-semibold")
-                ], className="bg-transparent border-bottom"),
+            dbc.Card([dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "Distribuição de Paradas",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                 dbc.CardBody([
                     dcc.Graph(
                         figure=create_donut_chart(paradas_labels, paradas_values, paradas_colors),
@@ -678,10 +733,14 @@ layout = dbc.Container([
         # Barras Horizontais - Produção por Linha
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader([
-                    html.I(className="bi bi-bar-chart-horizontal me-2"),
-                    html.Span("Produção por Linha (unidades)", className="fw-semibold")
-                ], className="bg-transparent border-bottom"),
+                dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "Produção por Linha",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                 dbc.CardBody([
                     dcc.Graph(
                         figure=create_horizontal_bar_chart(linhas, producao_linhas),
@@ -694,10 +753,14 @@ layout = dbc.Container([
         # Barras Comparativas - OEE por Turno
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader([
-                    html.I(className="bi bi-bar-chart me-2"),
-                    html.Span("OEE por Turno vs Meta", className="fw-semibold")
-                ], className="bg-transparent border-bottom"),
+                dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "OEE por Turno",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                 dbc.CardBody([
                     dcc.Graph(
                         figure=create_vertical_bar_comparison(turnos, oee_turnos, metas_turnos),
@@ -715,10 +778,14 @@ layout = dbc.Container([
         # Sunburst - Hierarquia de Consumo
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader([
-                    html.I(className="bi bi-diagram-3 me-2"),
-                    html.Span("Distribuição de Consumo Energético", className="fw-semibold")
-                ], className="bg-transparent border-bottom"),
+                dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "Distribuição de Consumo Energético",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                 dbc.CardBody([
                     dcc.Graph(
                         figure=create_sunburst_chart(sunburst_labels, sunburst_parents, sunburst_values),
@@ -731,10 +798,14 @@ layout = dbc.Container([
         # Área - Consumo por Hora
         dbc.Col([
             dbc.Card([
-                dbc.CardHeader([
-                    html.I(className="bi bi-graph-up me-2"),
-                    html.Span("Consumo Energético por Hora (kWh)", className="fw-semibold")
-                ], className="bg-transparent border-bottom"),
+                dbc.CardHeader(
+                    add_demo_badge_to_card_header(
+                        "Consumo Energético por Hora",
+                        page_path="/production/oee",
+                        size="sm"
+                    ),
+                    className="bg-transparent"
+                ),
                 dbc.CardBody([
                     dcc.Graph(
                         figure=create_area_chart_gradient(horas, consumo_hora),
@@ -754,6 +825,14 @@ layout = dbc.Container([
                 dbc.CardHeader([
                     html.Div([
                         html.Div([
+                            dbc.CardHeader(
+                                add_demo_badge_to_card_header(
+                                    "",
+                                    page_path="/production/oee",
+                                    size="sm"
+                                ),
+                                className="bg-transparent"
+                            ),
                             html.I(className="bi bi-table me-2"),
                             html.Span("Resumo de Produção por Turno", className="fw-semibold")
                         ]),

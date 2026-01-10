@@ -3,13 +3,20 @@
 from dash import html, dcc
 import dash_bootstrap_components as dbc
 from datetime import datetime
+from src.utils.demo_helpers import add_page_demo_warning, add_demo_badge_to_card_header
+from src.components.demo_badge import demo_data_badge
 
 def layout():
     """
     Dashboard principal - Visão geral de toda a fábrica
     """
     return dbc.Container([
-        
+
+        # ========================================
+        # ALERTA DE DADOS DE DEMONSTRAÇÃO
+        # ========================================
+        add_page_demo_warning("/"),
+
         # ========================================
         # HEADER DA PÁGINA
         # ========================================
@@ -47,6 +54,10 @@ def layout():
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
+                        # Badge de demonstração
+                        html.Div([
+                            demo_data_badge(size="sm")
+                        ], className="text-end mb-2"),
                         html.Div([
                             html.I(
                                 className="bi bi-gear-wide-connected text-primary",
@@ -76,6 +87,10 @@ def layout():
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
+                        # Badge de demonstração
+                        html.Div([
+                            demo_data_badge(size="sm")
+                        ], className="text-end mb-2"),
                         html.Div([
                             html.I(
                                 className="bi bi-lightning text-warning",
@@ -106,6 +121,10 @@ def layout():
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
+                        # Badge de demonstração
+                        html.Div([
+                            demo_data_badge(size="sm")
+                        ], className="text-end mb-2"),
                         html.Div([
                             html.I(
                                 className="bi bi-bell text-danger",
@@ -135,6 +154,10 @@ def layout():
             dbc.Col([
                 dbc.Card([
                     dbc.CardBody([
+                        # Badge de demonstração
+                        html.Div([
+                            demo_data_badge(size="sm")
+                        ], className="text-end mb-2"),
                         html.Div([
                             html.I(
                                 className="bi bi-thermometer-half text-info",
@@ -168,10 +191,12 @@ def layout():
             # Gráfico: OEE das últimas 24h
             dbc.Col([
                 dbc.Card([
-                    dbc.CardHeader([
-                        html.I(className="bi bi-graph-up me-2"),
-                        "OEE - Últimas 24 Horas"
-                    ]),
+                    dbc.CardHeader(
+                        add_demo_badge_to_card_header([
+                            html.I(className="bi bi-graph-up me-2"),
+                            "OEE - Últimas 24 Horas"
+                        ], page_path="/")
+                    ),
                     dbc.CardBody([
                         dcc.Loading(
                             id="loading-home-oee",
@@ -191,10 +216,12 @@ def layout():
             # Gráfico: Consumo de Energia
             dbc.Col([
                 dbc.Card([
-                    dbc.CardHeader([
-                        html.I(className="bi bi-lightning me-2"),
-                        "Consumo de Energia - Hoje"
-                    ]),
+                    dbc.CardHeader(
+                        add_demo_badge_to_card_header([
+                            html.I(className="bi bi-lightning me-2"),
+                            "Consumo de Energia - Hoje"
+                        ], page_path="/")
+                    ),
                     dbc.CardBody([
                         dcc.Loading(
                             id="loading-home-energy",
@@ -218,13 +245,15 @@ def layout():
         dbc.Row([
             dbc.Col([
                 dbc.Card([
-                    dbc.CardHeader([
-                        html.Div([
-                            html.I(className="bi bi-bell me-2"),
-                            html.Span("Alarmes Recentes"),
-                            dbc.Badge("3", color="danger", className="ms-2")
-                        ], className="d-flex align-items-center")
-                    ]),
+                    dbc.CardHeader(
+                        add_demo_badge_to_card_header([
+                            html.Div([
+                                html.I(className="bi bi-bell me-2"),
+                                html.Span("Alarmes Recentes"),
+                                dbc.Badge("3", color="danger", className="ms-2")
+                            ], className="d-flex align-items-center")
+                        ], page_path="/")
+                    ),
                     dbc.CardBody([
                         dbc.Table([
                             html.Thead([
