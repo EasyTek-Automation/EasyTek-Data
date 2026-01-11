@@ -354,3 +354,248 @@ def format_percentage(value):
     formatted = formatted.replace(".", ",")
 
     return f"{formatted}%"
+
+
+def calculate_costs_by_groups(consumption_df, demand_df, config, group1_equipment, group2_equipment):
+    """
+    Calcula custos de energia separados por 2 grupos de equipamentos.
+
+    IMPORTANTE:
+    - Consumo (kWh): calculado separadamente para cada grupo do período filtrado
+    - Demanda (kW): calculada do mês inteiro de TODOS os equipamentos
+    - Custo de demanda: dividido proporcionalmente ao consumo de cada grupo
+
+    Estratégia de divisão de demanda:
+    - Demanda é cobrada pela concessionária baseada no pico de TODOS os equipamentos
+    - Rateamos o custo de demanda proporcionalmente ao consumo (kWh) de cada grupo
+    - Fórmula: custo_demanda_grupo = custo_demanda_total × (kwh_grupo / kwh_total)
+
+    Args:
+        consumption_df: DataFrame para CONSUMO (período filtrado)
+                        Deve conter: DateTime, IDMaq, kwh_intervalo
+        demand_df: DataFrame para DEMANDA (mês inteiro)
+                   Deve conter: DateTime, IDMaq, kwh_intervalo
+        config: Dicionário com configuração de tarifas (mesmo formato de calculate_monthly_costs)
+        group1_equipment: Lista de IDs dos equipamentos do Grupo 1 (ex: ['SE03_MM02', 'SE03_MM04', 'SE03_MM06'])
+        group2_equipment: Lista de IDs dos equipamentos do Grupo 2 (ex: ['SE03_MM03', 'SE03_MM05', 'SE03_MM07'])
+
+    Returns:
+        dict or None: Dicionário com breakdown completo por grupo, ou None se não houver dados
+        {
+            'group1': {
+                'kwh_ponta': float,
+                'kwh_fora_ponta': float,
+                'custo_tusd_ponta': float,
+                'custo_tusd_fora_ponta': float,
+                'custo_energia_ponta': float,
+                'custo_energia_fora_ponta': float,
+                'custo_demanda_ponta': float,        # Proporcional ao consumo
+                'custo_demanda_fora_ponta': float,   # Proporcional ao consumo
+                'custo_total': float,
+                'equipment_list': list               # Lista de equipamentos incluídos
+            },
+            'group2': { ... },  # Mesma estrutura
+            'total': { ... },   # Mesma estrutura (soma dos dois grupos)
+            'demand_shared': {  # Informações sobre demanda compartilhada
+                'demand_ponta_kw': float,            # Demanda máxima ponta (todos equipamentos)
+                'demand_fora_ponta_kw': float,       # Demanda máxima fora ponta (todos)
+                'demand_ponta_pct': float,           # % da demanda contratada ponta
+                'demand_fora_ponta_pct': float,      # % da demanda contratada fora ponta
+                'custo_demanda_ponta_total': float,  # Custo total de demanda ponta
+                'custo_demanda_fora_ponta_total': float  # Custo total de demanda fora ponta
+            }
+        }
+    """
+    # Validar que não há equipamentos duplicados entre os grupos
+    overlap = set(group1_equipment) & set(group2_equipment)
+    if overlap:
+        print(f"AVISO: Equipamentos duplicados entre grupos: {overlap}")
+        # Remover duplicatas do grupo2
+        group2_equipment = [eq for eq in group2_equipment if eq not in overlap]
+
+    # Todos os equipamentos (para cálculo de demanda)
+    all_equipment = list(set(group1_equipment + group2_equipment))
+
+    if not all_equipment:
+        return None  # Sem equipamentos selecionados
+
+    # ========================================
+    # PASSO 1: Calcular DEMANDA do mês inteiro de TODOS os equipamentos
+    # ========================================
+    df_demand_all = demand_df[demand_df['IDMaq'].isin(all_equipment)].copy()
+
+    if df_demand_all.empty:
+        return None
+
+    # Classificar como ponta/fora-ponta
+    df_demand_all = classify_consumption_data(
+        df_demand_all,
+        config['horario_ponta_inicio'],
+        config['horario_ponta_fim']
+    )
+
+    # Calcular demanda máxima
+    demand = calculate_max_demand(df_demand_all)
+
+    # Calcular porcentagens da demanda contratada
+    demand_ponta_pct = (
+        (demand['ponta_kw'] / config['demanda_contratada_ponta_kw'] * 100)
+        if config['demanda_contratada_ponta_kw'] > 0
+        else 0
+    )
+
+    demand_fora_ponta_pct = (
+        (demand['fora_ponta_kw'] / config['demanda_contratada_fora_ponta_kw'] * 100)
+        if config['demanda_contratada_fora_ponta_kw'] > 0
+        else 0
+    )
+
+    # Calcular custos TOTAIS de demanda
+    custo_demanda_ponta_total = config['demanda_usd_ponta'] * (demand_ponta_pct / 100)
+    custo_demanda_fora_ponta_total = config['demanda_usd_fora_ponta'] * (demand_fora_ponta_pct / 100)
+
+    # ========================================
+    # PASSO 2: Calcular CONSUMO de cada grupo (período filtrado)
+    # ========================================
+    def calculate_group_costs(equipment_list, group_name):
+        """Helper para calcular custos de um grupo específico"""
+        if not equipment_list:
+            return {
+                'kwh_ponta': 0.0,
+                'kwh_fora_ponta': 0.0,
+                'custo_tusd_ponta': 0.0,
+                'custo_tusd_fora_ponta': 0.0,
+                'custo_energia_ponta': 0.0,
+                'custo_energia_fora_ponta': 0.0,
+                'custo_demanda_ponta': 0.0,
+                'custo_demanda_fora_ponta': 0.0,
+                'custo_total': 0.0,
+                'equipment_list': []
+            }
+
+        # Filtrar consumo do grupo
+        df_group = consumption_df[consumption_df['IDMaq'].isin(equipment_list)].copy()
+
+        if df_group.empty:
+            return {
+                'kwh_ponta': 0.0,
+                'kwh_fora_ponta': 0.0,
+                'custo_tusd_ponta': 0.0,
+                'custo_tusd_fora_ponta': 0.0,
+                'custo_energia_ponta': 0.0,
+                'custo_energia_fora_ponta': 0.0,
+                'custo_demanda_ponta': 0.0,
+                'custo_demanda_fora_ponta': 0.0,
+                'custo_total': 0.0,
+                'equipment_list': equipment_list
+            }
+
+        # Classificar como ponta/fora-ponta
+        df_group = classify_consumption_data(
+            df_group,
+            config['horario_ponta_inicio'],
+            config['horario_ponta_fim']
+        )
+
+        # Somar consumo (kWh)
+        kwh_ponta = df_group[df_group['is_peak'] == True]['kwh_intervalo'].sum()
+        kwh_fora_ponta = df_group[df_group['is_peak'] == False]['kwh_intervalo'].sum()
+
+        # Calcular custos de consumo (TUSD + Energia)
+        custo_tusd_ponta = kwh_ponta * config['preco_tusd_ponta']
+        custo_tusd_fora_ponta = kwh_fora_ponta * config['preco_tusd_fora_ponta']
+        custo_energia_ponta = kwh_ponta * config['preco_energia_ponta']
+        custo_energia_fora_ponta = kwh_fora_ponta * config['preco_energia_fora_ponta']
+
+        return {
+            'kwh_ponta': float(kwh_ponta),
+            'kwh_fora_ponta': float(kwh_fora_ponta),
+            'custo_tusd_ponta': float(custo_tusd_ponta),
+            'custo_tusd_fora_ponta': float(custo_tusd_fora_ponta),
+            'custo_energia_ponta': float(custo_energia_ponta),
+            'custo_energia_fora_ponta': float(custo_energia_fora_ponta),
+            'equipment_list': equipment_list
+        }
+
+    # Calcular para cada grupo
+    group1_costs = calculate_group_costs(group1_equipment, "Group 1")
+    group2_costs = calculate_group_costs(group2_equipment, "Group 2")
+
+    # ========================================
+    # PASSO 3: Ratear custos de demanda proporcionalmente ao consumo
+    # ========================================
+    kwh_total_group1 = group1_costs['kwh_ponta'] + group1_costs['kwh_fora_ponta']
+    kwh_total_group2 = group2_costs['kwh_ponta'] + group2_costs['kwh_fora_ponta']
+    kwh_total_geral = kwh_total_group1 + kwh_total_group2
+
+    if kwh_total_geral > 0:
+        # Proporção de cada grupo
+        group1_ratio = kwh_total_group1 / kwh_total_geral
+        group2_ratio = kwh_total_group2 / kwh_total_geral
+
+        # Dividir custos de demanda
+        group1_costs['custo_demanda_ponta'] = custo_demanda_ponta_total * group1_ratio
+        group1_costs['custo_demanda_fora_ponta'] = custo_demanda_fora_ponta_total * group1_ratio
+
+        group2_costs['custo_demanda_ponta'] = custo_demanda_ponta_total * group2_ratio
+        group2_costs['custo_demanda_fora_ponta'] = custo_demanda_fora_ponta_total * group2_ratio
+    else:
+        # Sem consumo, sem rateio de demanda
+        group1_costs['custo_demanda_ponta'] = 0.0
+        group1_costs['custo_demanda_fora_ponta'] = 0.0
+        group2_costs['custo_demanda_ponta'] = 0.0
+        group2_costs['custo_demanda_fora_ponta'] = 0.0
+
+    # ========================================
+    # PASSO 4: Calcular totais de cada grupo
+    # ========================================
+    group1_costs['custo_total'] = (
+        group1_costs['custo_tusd_ponta'] +
+        group1_costs['custo_tusd_fora_ponta'] +
+        group1_costs['custo_energia_ponta'] +
+        group1_costs['custo_energia_fora_ponta'] +
+        group1_costs['custo_demanda_ponta'] +
+        group1_costs['custo_demanda_fora_ponta']
+    )
+
+    group2_costs['custo_total'] = (
+        group2_costs['custo_tusd_ponta'] +
+        group2_costs['custo_tusd_fora_ponta'] +
+        group2_costs['custo_energia_ponta'] +
+        group2_costs['custo_energia_fora_ponta'] +
+        group2_costs['custo_demanda_ponta'] +
+        group2_costs['custo_demanda_fora_ponta']
+    )
+
+    # ========================================
+    # PASSO 5: Calcular totais gerais (soma dos grupos)
+    # ========================================
+    total_costs = {
+        'kwh_ponta': group1_costs['kwh_ponta'] + group2_costs['kwh_ponta'],
+        'kwh_fora_ponta': group1_costs['kwh_fora_ponta'] + group2_costs['kwh_fora_ponta'],
+        'custo_tusd_ponta': group1_costs['custo_tusd_ponta'] + group2_costs['custo_tusd_ponta'],
+        'custo_tusd_fora_ponta': group1_costs['custo_tusd_fora_ponta'] + group2_costs['custo_tusd_fora_ponta'],
+        'custo_energia_ponta': group1_costs['custo_energia_ponta'] + group2_costs['custo_energia_ponta'],
+        'custo_energia_fora_ponta': group1_costs['custo_energia_fora_ponta'] + group2_costs['custo_energia_fora_ponta'],
+        'custo_demanda_ponta': group1_costs['custo_demanda_ponta'] + group2_costs['custo_demanda_ponta'],
+        'custo_demanda_fora_ponta': group1_costs['custo_demanda_fora_ponta'] + group2_costs['custo_demanda_fora_ponta'],
+        'custo_total': group1_costs['custo_total'] + group2_costs['custo_total'],
+        'equipment_list': all_equipment
+    }
+
+    # ========================================
+    # PASSO 6: Retornar breakdown completo
+    # ========================================
+    return {
+        'group1': group1_costs,
+        'group2': group2_costs,
+        'total': total_costs,
+        'demand_shared': {
+            'demand_ponta_kw': float(demand['ponta_kw']),
+            'demand_fora_ponta_kw': float(demand['fora_ponta_kw']),
+            'demand_ponta_pct': float(demand_ponta_pct),
+            'demand_fora_ponta_pct': float(demand_fora_ponta_pct),
+            'custo_demanda_ponta_total': float(custo_demanda_ponta_total),
+            'custo_demanda_fora_ponta_total': float(custo_demanda_fora_ponta_total)
+        }
+    }
