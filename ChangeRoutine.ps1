@@ -56,3 +56,6 @@ git branch -D feature/bife-[numero]  # Descarta mudanças
 
 Total: [  0%] Completo
 
+git log --pretty=format:"%h | %an | %ad | %s" --date=format:"%d/%m/%Y %H:%M:%S" > git_log_relatorio.txt
+git log -p > git_log_completo_com_diff.txt
+git log --pretty=format:"%H | %an | %ad | %s" --date=format:"%d/%m/%Y %H:%M:%S"

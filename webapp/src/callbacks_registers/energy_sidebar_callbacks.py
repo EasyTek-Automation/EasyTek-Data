@@ -13,12 +13,12 @@ Funcionalidades:
 from dash import Input, Output
 from dash.exceptions import PreventUpdate
 from src.components.sidebars.energy_sidebar import (
-    create_se03_cost_sidebar_content,
+    create_se03_cost_sidebar_with_groups,
     create_energy_sidebar_no_config,
     create_default_energy_sidebar_content
 )
 from src.database.connection import get_mongo_connection
-from src.utils.energy_cost_calculator import calculate_monthly_costs, format_brl, format_percentage
+from src.utils.energy_cost_calculator import calculate_costs_by_groups, format_brl, format_percentage
 from datetime import datetime, timedelta
 import pandas as pd
 import pytz
@@ -83,9 +83,9 @@ def register_energy_sidebar_callbacks(app):
 
             # Determinar conteúdo baseado na tab ativa
             if active_tab == "se03":
-                # Tab SE03: mostrar custos (se config existir) ou mensagem
+                # Tab SE03: mostrar custos por grupo (se config existir) ou mensagem
                 if config:
-                    return create_se03_cost_sidebar_content()
+                    return create_se03_cost_sidebar_with_groups()
                 else:
                     return create_energy_sidebar_no_config()
             else:
@@ -98,34 +98,40 @@ def register_energy_sidebar_callbacks(app):
 
 
     # ========================================
-    # CALLBACK 2: Calcular e exibir custos da SE03
+    # CALLBACK 2: Calcular e exibir custos da SE03 POR GRUPO
     # ========================================
     @app.callback(
         [
-            # Outputs existentes
-            Output("se03-demand-ponta-pct", "children"),
-            Output("se03-demand-ponta-kw", "children"),
-            Output("se03-demand-fora-ponta-pct", "children"),
-            Output("se03-demand-fora-ponta-kw", "children"),
-            Output("se03-cost-total-current", "children"),
-            Output("se03-kwh-total-current", "children"),
-            Output("se03-cost-total-previous", "children"),
-            Output("se03-kwh-total-previous", "children"),
-            # Novos outputs DEBUG
-            Output("debug-period-info", "children"),
-            Output("debug-month-info", "children"),
-            Output("debug-records-count", "children"),
-            Output("debug-kwh-ponta", "children"),
-            Output("debug-kwh-fora-ponta", "children"),
-            Output("debug-tusd-ponta-calc", "children"),
-            Output("debug-tusd-fora-calc", "children"),
-            Output("debug-energia-ponta-calc", "children"),
-            Output("debug-energia-fora-calc", "children"),
-            Output("debug-demanda-ponta-calc", "children"),
-            Output("debug-demanda-fora-calc", "children"),
-            Output("debug-tusd-total", "children"),
-            Output("debug-energia-total", "children"),
-            Output("debug-demanda-total", "children"),
+            # Outputs: Demanda Compartilhada
+            Output("se03-demand-shared-ponta-kw", "children"),
+            Output("se03-demand-shared-ponta-pct", "children"),
+            Output("se03-demand-shared-fora-kw", "children"),
+            Output("se03-demand-shared-fora-pct", "children"),
+
+            # Outputs: Grupo 1 (Transversais)
+            Output("se03-group1-equipment-list", "children"),
+            Output("se03-group1-kwh-ponta", "children"),
+            Output("se03-group1-kwh-fora", "children"),
+            Output("se03-group1-custo-tusd", "children"),
+            Output("se03-group1-custo-energia", "children"),
+            Output("se03-group1-custo-demanda", "children"),
+            Output("se03-group1-custo-total", "children"),
+
+            # Outputs: Grupo 2 (Longitudinais)
+            Output("se03-group2-equipment-list", "children"),
+            Output("se03-group2-kwh-ponta", "children"),
+            Output("se03-group2-kwh-fora", "children"),
+            Output("se03-group2-custo-tusd", "children"),
+            Output("se03-group2-custo-energia", "children"),
+            Output("se03-group2-custo-demanda", "children"),
+            Output("se03-group2-custo-total", "children"),
+
+            # Outputs: Total Geral
+            Output("se03-total-kwh", "children"),
+            Output("se03-total-custo-tusd", "children"),
+            Output("se03-total-custo-energia", "children"),
+            Output("se03-total-custo-demanda", "children"),
+            Output("se03-total-custo-final", "children"),
         ],
         [
             Input("energy-tabs", "active_tab"),
@@ -134,22 +140,24 @@ def register_energy_sidebar_callbacks(app):
             Input("store-end-date", "data"),    # Filtro de data fim
             Input("store-start-hour", "data"),  # Filtro de hora início
             Input("store-end-hour", "data"),    # Filtro de hora fim
+            Input("machine-dropdown-group1", "value"),  # Equipamentos Transversais
+            Input("machine-dropdown-group2", "value"),  # Equipamentos Longitudinais
         ],
         prevent_initial_call=False
     )
-    def calculate_se03_costs(active_tab, n_intervals, start_date, end_date, start_hour, end_hour):
+    def calculate_se03_costs_by_groups(
+        active_tab, n_intervals, start_date, end_date, start_hour, end_hour,
+        group1_equipment, group2_equipment
+    ):
         """
-        Calcula e atualiza todos os custos da SE03 para o período selecionado.
+        Calcula e atualiza custos da SE03 SEPARADOS POR GRUPO (Transversais vs Longitudinais).
         Roda automaticamente a cada 10 segundos via interval-component.
 
-        Fluxo:
-        1. Verifica se tab ativa é "se03" (senão, não faz nada)
-        2. Carrega configuração de tarifas do MongoDB
-        3. Usa filtros de data/hora do usuário
-        4. Consulta dados de consumo do período selecionado (AMG_Consumo)
-        5. Calcula custos usando energy_cost_calculator
-        6. Consulta dados do período anterior (mesmo intervalo, shifted back)
-        7. Formata e retorna todos os valores
+        Funcionalidades:
+        - Calcula consumo (kWh) separado para cada grupo do período filtrado
+        - Calcula demanda (kW) do mês inteiro de TODOS os equipamentos
+        - Rateia custo de demanda proporcionalmente ao consumo de cada grupo
+        - Respeita filtros de equipamentos (permite testar impacto removendo equipamentos)
 
         Args:
             active_tab: Tab ativa do componente energy-tabs
@@ -158,12 +166,11 @@ def register_energy_sidebar_callbacks(app):
             end_date: Data final do filtro (string ISO ou None)
             start_hour: Hora inicial do filtro (string HH:MM ou None)
             end_hour: Hora final do filtro (string HH:MM ou None)
+            group1_equipment: Lista de equipamentos Transversais selecionados
+            group2_equipment: Lista de equipamentos Longitudinais selecionados
 
         Returns:
-            tuple: 12 strings formatadas com valores de custo ou "N/A" se não houver dados
-                   (demand_ponta_pct, demand_ponta_kw, demand_fora_ponta_pct, demand_fora_ponta_kw,
-                    tusd_ponta, tusd_fora_ponta, energia_ponta, energia_fora_ponta,
-                    total_current, kwh_current, total_previous, kwh_previous)
+            tuple: 23 strings formatadas com valores de custo ou "N/A" se não houver dados
         """
         # Só calcular quando tab SE03 estiver ativa
         if active_tab != "se03":
@@ -171,17 +178,29 @@ def register_energy_sidebar_callbacks(app):
 
         try:
             # ========================================
-            # PASSO 1: Carregar configuração de tarifas
+            # PASSO 1: Validar equipamentos selecionados
+            # ========================================
+            if not group1_equipment:
+                group1_equipment = []
+            if not group2_equipment:
+                group2_equipment = []
+
+            # Se nenhum equipamento selecionado, retornar N/A
+            if not group1_equipment and not group2_equipment:
+                return ["N/A"] * 23
+
+            # ========================================
+            # PASSO 2: Carregar configuração de tarifas
             # ========================================
             config_collection = get_mongo_connection("AMG_EnergyConfig")
             config = config_collection.find_one()
 
             if not config:
                 # Sem configuração - retornar placeholders
-                return ["---"] * 22
+                return ["---"] * 23
 
             # ========================================
-            # PASSO 2: Processar filtros de data/hora
+            # PASSO 3: Processar filtros de data/hora
             # ========================================
             tz = pytz.timezone('America/Sao_Paulo')
 
@@ -191,9 +210,6 @@ def register_energy_sidebar_callbacks(app):
                 period_end = now
                 period_start = now - timedelta(hours=24)
             else:
-                # Converter datas do filtro
-                from datetime import date as date_type
-
                 # Parse das datas (podem vir como string ISO)
                 if isinstance(start_date, str):
                     start_date_obj = datetime.fromisoformat(start_date.replace('Z', '+00:00')).date()
@@ -224,11 +240,8 @@ def register_energy_sidebar_callbacks(app):
             period_start_utc = period_start.astimezone(pytz.UTC).replace(tzinfo=None)
             period_end_utc = period_end.astimezone(pytz.UTC).replace(tzinfo=None)
 
-            # Calcular duração do período
-            period_duration = period_end - period_start
-
             # ========================================
-            # PASSO 3: Consultar dados do período selecionado
+            # PASSO 4: Consultar dados do período selecionado
             # ========================================
             consumo_collection = get_mongo_connection("AMG_Consumo")
 
@@ -240,20 +253,17 @@ def register_energy_sidebar_callbacks(app):
             }))
 
             if not current_period_data:
-                # Sem dados disponíveis para o período selecionado
-                return ["N/A"] * 22
+                # Sem dados disponíveis
+                return ["N/A"] * 23
 
             # Converter para DataFrame
             df_current = pd.DataFrame(current_period_data)
-
-            # Converter DateTime para timezone São Paulo
             df_current['DateTime'] = pd.to_datetime(df_current['DateTime'])
             df_current['DateTime'] = df_current['DateTime'].dt.tz_localize('UTC').dt.tz_convert('America/Sao_Paulo')
 
             # ========================================
-            # PASSO 4: Consultar dados do MÊS INTEIRO (para demanda)
+            # PASSO 5: Consultar dados do MÊS INTEIRO (para demanda)
             # ========================================
-            # Demanda é SEMPRE calculada no mês completo (padrão de cobrança)
             current_month_start = period_start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
             # Último dia do mês
@@ -276,8 +286,7 @@ def register_energy_sidebar_callbacks(app):
             }))
 
             if not full_month_data:
-                # Sem dados no mês
-                return ["N/A"] * 22
+                return ["N/A"] * 23
 
             # Converter para DataFrame
             df_full_month = pd.DataFrame(full_month_data)
@@ -285,152 +294,66 @@ def register_energy_sidebar_callbacks(app):
             df_full_month['DateTime'] = df_full_month['DateTime'].dt.tz_localize('UTC').dt.tz_convert('America/Sao_Paulo')
 
             # ========================================
-            # PASSO 5: Calcular custos MISTOS
-            # - Consumo (kWh): do período filtrado
-            # - Demanda (kW): do mês inteiro
+            # PASSO 6: Calcular custos POR GRUPO
             # ========================================
-            costs_current = calculate_monthly_costs(
-                consumption_df=df_current,      # Consumo do período filtrado
-                demand_df=df_full_month,        # Demanda do mês inteiro
-                config=config
+            costs = calculate_costs_by_groups(
+                consumption_df=df_current,
+                demand_df=df_full_month,
+                config=config,
+                group1_equipment=group1_equipment,
+                group2_equipment=group2_equipment
             )
 
-            if not costs_current:
-                # Cálculo falhou (ex: sem dados da SE03)
-                return ["N/A"] * 22
+            if not costs:
+                return ["N/A"] * 23
 
             # ========================================
-            # PASSO 6: Consultar dados do período anterior (comparação)
+            # PASSO 7: Formatar listas de equipamentos
             # ========================================
-            # Período anterior tem a mesma duração, shifted back
-            prev_period_end = period_start - timedelta(seconds=1)
-            prev_period_start = prev_period_end - period_duration
-
-            # Converter para UTC
-            prev_period_start_utc = prev_period_start.astimezone(pytz.UTC).replace(tzinfo=None)
-            prev_period_end_utc = prev_period_end.astimezone(pytz.UTC).replace(tzinfo=None)
-
-            previous_period_data = list(consumo_collection.find({
-                "DateTime": {
-                    "$gte": prev_period_start_utc,
-                    "$lte": prev_period_end_utc
-                }
-            }))
-
-            # Calcular custos do período anterior (se houver dados)
-            if previous_period_data:
-                df_previous = pd.DataFrame(previous_period_data)
-                df_previous['DateTime'] = pd.to_datetime(df_previous['DateTime'])
-                df_previous['DateTime'] = df_previous['DateTime'].dt.tz_localize('UTC').dt.tz_convert('America/Sao_Paulo')
-
-                # Mês do período anterior
-                prev_month_start = prev_period_start.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-                if prev_period_start.month == 12:
-                    prev_next_month = prev_period_start.replace(year=prev_period_start.year + 1, month=1, day=1)
-                else:
-                    prev_next_month = prev_period_start.replace(month=prev_period_start.month + 1, day=1)
-                prev_month_end = prev_next_month - timedelta(seconds=1)
-
-                prev_month_start_utc = prev_month_start.astimezone(pytz.UTC).replace(tzinfo=None)
-                prev_month_end_utc = prev_month_end.astimezone(pytz.UTC).replace(tzinfo=None)
-
-                # Query mês completo anterior
-                prev_full_month_data = list(consumo_collection.find({
-                    "DateTime": {
-                        "$gte": prev_month_start_utc,
-                        "$lte": prev_month_end_utc
-                    }
-                }))
-
-                if prev_full_month_data:
-                    df_prev_full_month = pd.DataFrame(prev_full_month_data)
-                    df_prev_full_month['DateTime'] = pd.to_datetime(df_prev_full_month['DateTime'])
-                    df_prev_full_month['DateTime'] = df_prev_full_month['DateTime'].dt.tz_localize('UTC').dt.tz_convert('America/Sao_Paulo')
-
-                    costs_previous = calculate_monthly_costs(
-                        consumption_df=df_previous,
-                        demand_df=df_prev_full_month,
-                        config=config
-                    )
-                else:
-                    costs_previous = None
-            else:
-                costs_previous = None
+            group1_names = [eq.replace("SE03_", "") for eq in costs['group1']['equipment_list']]
+            group2_names = [eq.replace("SE03_", "") for eq in costs['group2']['equipment_list']]
 
             # ========================================
-            # PASSO 6: Formatar valores para exibição
+            # PASSO 8: Retornar todos os valores formatados
             # ========================================
             return [
-                # ========================================
-                # OUTPUTS EXISTENTES (1-8)
-                # ========================================
-                # Demanda ponta
-                format_percentage(costs_current['demand_ponta_pct']),
-                f"{costs_current['demand_ponta_kw']:.0f} kW",
+                # Demanda Compartilhada (4 outputs)
+                f"{costs['demand_shared']['demand_ponta_kw']:.0f} kW",
+                format_percentage(costs['demand_shared']['demand_ponta_pct']),
+                f"{costs['demand_shared']['demand_fora_ponta_kw']:.0f} kW",
+                format_percentage(costs['demand_shared']['demand_fora_ponta_pct']),
 
-                # Demanda fora de ponta
-                format_percentage(costs_current['demand_fora_ponta_pct']),
-                f"{costs_current['demand_fora_ponta_kw']:.0f} kW",
+                # Grupo 1 - Transversais (7 outputs)
+                ", ".join(group1_names) if group1_names else "Nenhum",
+                f"{costs['group1']['kwh_ponta']:.0f} kWh",
+                f"{costs['group1']['kwh_fora_ponta']:.0f} kWh",
+                format_brl(costs['group1']['custo_tusd_ponta'] + costs['group1']['custo_tusd_fora_ponta']),
+                format_brl(costs['group1']['custo_energia_ponta'] + costs['group1']['custo_energia_fora_ponta']),
+                format_brl(costs['group1']['custo_demanda_ponta'] + costs['group1']['custo_demanda_fora_ponta']),
+                format_brl(costs['group1']['custo_total']),
 
-                # Totais do período atual
-                format_brl(costs_current['custo_total']),
-                f"{costs_current['kwh_ponta'] + costs_current['kwh_fora_ponta']:.0f} kWh",
+                # Grupo 2 - Longitudinais (7 outputs)
+                ", ".join(group2_names) if group2_names else "Nenhum",
+                f"{costs['group2']['kwh_ponta']:.0f} kWh",
+                f"{costs['group2']['kwh_fora_ponta']:.0f} kWh",
+                format_brl(costs['group2']['custo_tusd_ponta'] + costs['group2']['custo_tusd_fora_ponta']),
+                format_brl(costs['group2']['custo_energia_ponta'] + costs['group2']['custo_energia_fora_ponta']),
+                format_brl(costs['group2']['custo_demanda_ponta'] + costs['group2']['custo_demanda_fora_ponta']),
+                format_brl(costs['group2']['custo_total']),
 
-                # Totais do período anterior
-                format_brl(costs_previous['custo_total']) if costs_previous else "N/A",
-                f"{costs_previous['kwh_ponta'] + costs_previous['kwh_fora_ponta']:.0f} kWh" if costs_previous else "N/A",
-
-                # ========================================
-                # OUTPUTS DEBUG (9-22)
-                # ========================================
-                # 9. Informações do período (CONSUMO)
-                f"{period_start.strftime('%d/%m/%Y %H:%M')} até {period_end.strftime('%d/%m/%Y %H:%M')}",
-
-                # 10. Informações do mês (DEMANDA)
-                f"Mês inteiro: {current_month_start.strftime('%d/%m/%Y')} até {current_month_end.strftime('%d/%m/%Y')}",
-
-                # 11. Contagem de registros
-                f"Registros (período): {len(df_current)} | Registros (mês): {len(df_full_month)}",
-
-                # 12. kWh ponta
-                f"{costs_current['kwh_ponta']:.0f} kWh",
-
-                # 13. kWh fora de ponta
-                f"{costs_current['kwh_fora_ponta']:.0f} kWh",
-
-                # 14. Cálculo TUSD ponta
-                f"Ponta: {costs_current['kwh_ponta']:.0f} kWh × {format_brl(config['preco_tusd_ponta'])} = {format_brl(costs_current['custo_tusd_ponta'])}",
-
-                # 15. Cálculo TUSD fora de ponta
-                f"Fora: {costs_current['kwh_fora_ponta']:.0f} kWh × {format_brl(config['preco_tusd_fora_ponta'])} = {format_brl(costs_current['custo_tusd_fora_ponta'])}",
-
-                # 16. Cálculo Energia ponta
-                f"Ponta: {costs_current['kwh_ponta']:.0f} kWh × {format_brl(config['preco_energia_ponta'])} = {format_brl(costs_current['custo_energia_ponta'])}",
-
-                # 17. Cálculo Energia fora de ponta
-                f"Fora: {costs_current['kwh_fora_ponta']:.0f} kWh × {format_brl(config['preco_energia_fora_ponta'])} = {format_brl(costs_current['custo_energia_fora_ponta'])}",
-
-                # 18. Cálculo Demanda ponta (baseado no MÊS INTEIRO)
-                f"Ponta: {format_brl(config['demanda_usd_ponta'])} × {format_percentage(costs_current['demand_ponta_pct'])} = {format_brl(costs_current['custo_demanda_ponta'])}",
-
-                # 19. Cálculo Demanda fora de ponta (baseado no MÊS INTEIRO)
-                f"Fora: {format_brl(config['demanda_usd_fora_ponta'])} × {format_percentage(costs_current['demand_fora_ponta_pct'])} = {format_brl(costs_current['custo_demanda_fora_ponta'])}",
-
-                # 20. Total TUSD
-                format_brl(costs_current['custo_tusd_ponta'] + costs_current['custo_tusd_fora_ponta']),
-
-                # 21. Total Energia
-                format_brl(costs_current['custo_energia_ponta'] + costs_current['custo_energia_fora_ponta']),
-
-                # 22. Total Demanda
-                format_brl(costs_current['custo_demanda_ponta'] + costs_current['custo_demanda_fora_ponta']),
+                # Total Geral (5 outputs)
+                f"{costs['total']['kwh_ponta'] + costs['total']['kwh_fora_ponta']:.0f} kWh",
+                format_brl(costs['total']['custo_tusd_ponta'] + costs['total']['custo_tusd_fora_ponta']),
+                format_brl(costs['total']['custo_energia_ponta'] + costs['total']['custo_energia_fora_ponta']),
+                format_brl(costs['total']['custo_demanda_ponta'] + costs['total']['custo_demanda_fora_ponta']),
+                format_brl(costs['total']['custo_total']),
             ]
 
         except Exception as e:
             # Log de erro detalhado
-            print(f"Erro ao calcular custos da SE03: {e}")
+            print(f"Erro ao calcular custos por grupo da SE03: {e}")
             import traceback
             traceback.print_exc()
 
             # Retornar estado de erro
-            return ["Erro"] * 22
+            return ["Erro"] * 23

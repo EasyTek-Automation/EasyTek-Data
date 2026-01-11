@@ -9,10 +9,193 @@ from dash import html
 import dash_bootstrap_components as dbc
 
 
+def create_se03_cost_sidebar_with_groups():
+    """
+    VERSÃO DEBUG COM GRUPOS - Mostra custos separados por Transversais e Longitudinais.
+    Cria o conteúdo da sidebar para a tab SE03 com breakdown por grupo.
+    Os valores serão populados por callback.
+
+    Returns:
+        html.Div: Componente com breakdown detalhado dos custos por grupo
+    """
+    return html.Div([
+        # Título
+        html.H6([
+            html.I(className="bi bi-bug-fill me-2"),
+            "DEBUG - Custos por Grupo"
+        ], className="text-danger fw-bold mb-3"),
+
+        # Alerta de versão debug
+        dbc.Alert([
+            html.I(className="bi bi-info-circle-fill me-2"),
+            "Versão DEBUG - Custos separados por equipamento"
+        ], color="warning", className="py-2 small mb-3"),
+
+        # ========================================
+        # SEÇÃO: DEMANDA COMPARTILHADA
+        # ========================================
+        dbc.Card([
+            dbc.CardHeader("📊 Demanda (Mês Inteiro - Todos)", className="fw-bold small bg-info text-white"),
+            dbc.CardBody([
+                dbc.Alert([
+                    html.I(className="bi bi-info-circle-fill me-2"),
+                    html.Small("Demanda calculada do mês inteiro. Custo rateado proporcionalmente ao consumo.")
+                ], color="info", className="py-1 px-2 mb-2 small"),
+                html.Div([
+                    html.Span("Ponta:", className="text-muted small"),
+                    html.Span(id="se03-demand-shared-ponta-kw", children="-- kW", className="float-end small fw-bold")
+                ], className="d-flex justify-content-between mb-1"),
+                html.Div([
+                    html.Span("% Contratada:", className="text-muted small"),
+                    html.Span(id="se03-demand-shared-ponta-pct", children="---%", className="float-end small fw-bold text-warning")
+                ], className="d-flex justify-content-between mb-2"),
+                html.Hr(className="my-1"),
+                html.Div([
+                    html.Span("Fora Ponta:", className="text-muted small"),
+                    html.Span(id="se03-demand-shared-fora-kw", children="-- kW", className="float-end small fw-bold")
+                ], className="d-flex justify-content-between mb-1"),
+                html.Div([
+                    html.Span("% Contratada:", className="text-muted small"),
+                    html.Span(id="se03-demand-shared-fora-pct", children="---%", className="float-end small fw-bold text-info")
+                ], className="d-flex justify-content-between"),
+            ], className="py-2")
+        ], className="mb-3"),
+
+        # ========================================
+        # SEÇÃO: GRUPO 1 - TRANSVERSAIS
+        # ========================================
+        dbc.Card([
+            dbc.CardHeader([
+                html.I(className="bi bi-gear-wide-connected me-2"),
+                "Transversais"
+            ], className="fw-bold small", style={"backgroundColor": "#1f77b4", "color": "white"}),
+            dbc.CardBody([
+                html.Div(id="se03-group1-equipment-list", children="MM02, MM04, MM06", className="small text-muted mb-2"),
+
+                # Consumo
+                html.Div("⚡ Consumo (Período):", className="small fw-bold text-primary mb-1"),
+                html.Div([
+                    html.Span("Ponta:", className="text-muted small ps-2"),
+                    html.Span(id="se03-group1-kwh-ponta", children="-- kWh", className="float-end small")
+                ], className="d-flex justify-content-between mb-1"),
+                html.Div([
+                    html.Span("Fora Ponta:", className="text-muted small ps-2"),
+                    html.Span(id="se03-group1-kwh-fora", children="-- kWh", className="float-end small")
+                ], className="d-flex justify-content-between mb-2"),
+
+                # Custos
+                html.Div("💰 Custos:", className="small fw-bold text-success mb-1"),
+                html.Div([
+                    html.Span("TUSD:", className="text-muted small ps-2"),
+                    html.Span(id="se03-group1-custo-tusd", children="R$ --", className="float-end small")
+                ], className="d-flex justify-content-between mb-1"),
+                html.Div([
+                    html.Span("Energia:", className="text-muted small ps-2"),
+                    html.Span(id="se03-group1-custo-energia", children="R$ --", className="float-end small")
+                ], className="d-flex justify-content-between mb-1"),
+                html.Div([
+                    html.Span("Demanda:", className="text-muted small ps-2"),
+                    html.Span(id="se03-group1-custo-demanda", children="R$ --", className="float-end small")
+                ], className="d-flex justify-content-between mb-2"),
+
+                html.Hr(className="my-1"),
+                html.Div([
+                    html.Span("TOTAL:", className="small fw-bold"),
+                    html.Span(id="se03-group1-custo-total", children="R$ --", className="float-end small fw-bold text-primary")
+                ], className="d-flex justify-content-between"),
+            ], className="py-2")
+        ], className="mb-3"),
+
+        # ========================================
+        # SEÇÃO: GRUPO 2 - LONGITUDINAIS
+        # ========================================
+        dbc.Card([
+            dbc.CardHeader([
+                html.I(className="bi bi-gear-wide-connected me-2"),
+                "Longitudinais"
+            ], className="fw-bold small", style={"backgroundColor": "#ff7f0e", "color": "white"}),
+            dbc.CardBody([
+                html.Div(id="se03-group2-equipment-list", children="MM03, MM05, MM07", className="small text-muted mb-2"),
+
+                # Consumo
+                html.Div("⚡ Consumo (Período):", className="small fw-bold text-primary mb-1"),
+                html.Div([
+                    html.Span("Ponta:", className="text-muted small ps-2"),
+                    html.Span(id="se03-group2-kwh-ponta", children="-- kWh", className="float-end small")
+                ], className="d-flex justify-content-between mb-1"),
+                html.Div([
+                    html.Span("Fora Ponta:", className="text-muted small ps-2"),
+                    html.Span(id="se03-group2-kwh-fora", children="-- kWh", className="float-end small")
+                ], className="d-flex justify-content-between mb-2"),
+
+                # Custos
+                html.Div("💰 Custos:", className="small fw-bold text-success mb-1"),
+                html.Div([
+                    html.Span("TUSD:", className="text-muted small ps-2"),
+                    html.Span(id="se03-group2-custo-tusd", children="R$ --", className="float-end small")
+                ], className="d-flex justify-content-between mb-1"),
+                html.Div([
+                    html.Span("Energia:", className="text-muted small ps-2"),
+                    html.Span(id="se03-group2-custo-energia", children="R$ --", className="float-end small")
+                ], className="d-flex justify-content-between mb-1"),
+                html.Div([
+                    html.Span("Demanda:", className="text-muted small ps-2"),
+                    html.Span(id="se03-group2-custo-demanda", children="R$ --", className="float-end small")
+                ], className="d-flex justify-content-between mb-2"),
+
+                html.Hr(className="my-1"),
+                html.Div([
+                    html.Span("TOTAL:", className="small fw-bold"),
+                    html.Span(id="se03-group2-custo-total", children="R$ --", className="float-end small fw-bold text-warning")
+                ], className="d-flex justify-content-between"),
+            ], className="py-2")
+        ], className="mb-3"),
+
+        # ========================================
+        # SEÇÃO: TOTAL GERAL
+        # ========================================
+        dbc.Card([
+            dbc.CardHeader("🎯 Total Geral (SE03)", className="fw-bold small bg-success text-white"),
+            dbc.CardBody([
+                html.Div([
+                    html.Span("Consumo Total:", className="small"),
+                    html.Span(id="se03-total-kwh", children="-- kWh", className="float-end small fw-bold")
+                ], className="d-flex justify-content-between mb-1"),
+                html.Div([
+                    html.Span("TUSD Total:", className="small"),
+                    html.Span(id="se03-total-custo-tusd", children="R$ --", className="float-end small")
+                ], className="d-flex justify-content-between mb-1"),
+                html.Div([
+                    html.Span("Energia Total:", className="small"),
+                    html.Span(id="se03-total-custo-energia", children="R$ --", className="float-end small")
+                ], className="d-flex justify-content-between mb-1"),
+                html.Div([
+                    html.Span("Demanda Total:", className="small"),
+                    html.Span(id="se03-total-custo-demanda", children="R$ --", className="float-end small")
+                ], className="d-flex justify-content-between mb-2"),
+                html.Hr(className="my-1"),
+                html.Div([
+                    html.Span("CUSTO TOTAL:", className="small fw-bold text-success"),
+                    html.Span(id="se03-total-custo-final", children="R$ --", className="float-end small fw-bold text-success", style={"fontSize": "1.1rem"})
+                ], className="d-flex justify-content-between"),
+            ], className="py-2")
+        ], className="mb-2"),
+
+        html.Hr(className="my-2"),
+
+        # Rodapé
+        html.Small([
+            html.I(className="bi bi-gear-fill me-1"),
+            html.A("Configurar tarifas", href="/utilities/energy/config", className="text-decoration-none")
+        ], className="text-muted d-block", style={"fontSize": "0.65rem"}),
+
+    ], id="se03-cost-sidebar-groups", style={"padding": "10px"})
+
+
 def create_se03_cost_sidebar_content():
     """
-    VERSÃO DEBUG - Mostra cálculo detalhado passo a passo.
-    Cria o conteúdo da sidebar para a tab SE03 com breakdown completo.
+    VERSÃO DEBUG ANTIGA - Mantida para compatibilidade.
+    Mostra cálculo detalhado passo a passo SEM separação por grupos.
     Os valores serão populados por callback.
 
     Returns:
