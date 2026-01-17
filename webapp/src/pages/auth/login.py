@@ -56,7 +56,7 @@ def render_layout():
                     html.Div(
                         [
                             html.Span("Powered by:", style={'fontSize': '0.8rem', 'color': '#aaa', 'marginRight': '10px'}),
-                            html.Img(src="/assets/Logo.png", style={"height": "50px"})
+                            html.Img(src="/assets/logo.png", style={"height": "50px"})
                         ],
                         className="d-flex justify-content-end align-items-center"
                     )
