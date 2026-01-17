@@ -95,7 +95,7 @@ def create_sidebar_layout(app_instance, pathname="/", sidebar_content_style=None
             # Logo (sempre presente)
             html.Div([
                 html.Img(
-                    src="/assets/logo.png",
+                    src="/assets/LogoAMG.png",
                     style={
                         "width": "100%",
                         "max-height": "120px",
