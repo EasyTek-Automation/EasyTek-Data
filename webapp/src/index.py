@@ -28,7 +28,7 @@ from src.pages.auth import login, register, change_password
 from src.pages.dashboards import home, production_oee
 
 # Energia
-from src.pages.energy import overview as energy_overview, config as energy_config
+from src.pages.energy import overview as energy_overview, config as energy_config, water, gas, compressed_air
 
 # Produção
 from src.pages.production import states
@@ -94,19 +94,19 @@ ROUTES = {
     "/utilities/energy/costs": lambda: under_development.layout("Análise de Custos - Em Desenvolvimento"),
     
     # Água
-    "/utilities/water": lambda: under_development.utilities_development(),
+    "/utilities/water": water.layout,
     "/utilities/water/points": lambda: under_development.utilities_development(),
     "/utilities/water/history": lambda: under_development.utilities_development(),
     "/utilities/water/costs": lambda: under_development.utilities_development(),
     
     # Gás Natural
-    "/utilities/gas": lambda: under_development.utilities_development(),
+    "/utilities/gas": gas.layout,
     "/utilities/gas/points": lambda: under_development.utilities_development(),
     "/utilities/gas/history": lambda: under_development.utilities_development(),
     "/utilities/gas/costs": lambda: under_development.utilities_development(),
     
     # Ar Comprimido
-    "/utilities/compressed-air": lambda: under_development.utilities_development(),
+    "/utilities/compressed-air": compressed_air.layout,
     "/utilities/compressed-air/compressors": lambda: under_development.utilities_development(),
     "/utilities/compressed-air/efficiency": lambda: under_development.utilities_development(),
     

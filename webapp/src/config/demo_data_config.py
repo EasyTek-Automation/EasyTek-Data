@@ -33,9 +33,14 @@ DEMO_PAGES = {
     "/energy/se02": True,               # Subestação SE02
     "/energy/se03": True,               # Subestação SE03
     "/energy/se04": True,               # Subestação SE04
-    "/energy/water": True,              # Água
-    "/energy/gas": True,                # Gás Natural
-    "/energy/compressed-air": True,     # Ar Comprimido
+
+    # Utilidades
+    "/utilities/water": True,           # Água
+    "/utilities/gas": True,             # Gás Natural
+    "/utilities/compressed-air": True,  # Ar Comprimido
+    "/energy/water": True,              # Água (legacy)
+    "/energy/gas": True,                # Gás Natural (legacy)
+    "/energy/compressed-air": True,     # Ar Comprimido (legacy)
     "/energy/dashboard": True,          # Dashboard Integrado
 
     # Supervisório

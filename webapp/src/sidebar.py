@@ -17,6 +17,7 @@ from src.components.sidebars import (
     create_default_energy_sidebar_content,
     create_procedures_sidebar_content
 )
+from src.components.sidebars.water_sidebar import create_water_sidebar_content
 
 
 def get_sidebar_content_for_page(pathname):
@@ -51,6 +52,10 @@ def get_sidebar_content_for_page(pathname):
     # Energy pages - placeholder (will be updated by tab-aware callback)
     elif pathname in ["/utilities/energy", "/energy"]:
         return create_default_energy_sidebar_content()
+
+    # Water pages
+    elif pathname == "/utilities/water":
+        return create_water_sidebar_content()
 
     # Procedures/Documentation pages (markdown files)
     elif pathname.startswith('/maintenance/') and pathname.endswith('.md'):
