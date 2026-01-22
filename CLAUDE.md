@@ -73,6 +73,8 @@ MQTT_PASSWORD=password
 # Optional
 GATEWAY_URL=http://localhost:5001
 PORT=8050
+LOG_LEVEL=DEBUG  # Options: DEBUG, INFO, WARNING, ERROR
+DOCS_PROCEDURES_PATH=/path/to/procedures  # External volume for procedure documentation
 ```
 
 ## Architecture
@@ -91,11 +93,26 @@ webapp/src/
 │   ├── main_layout_callbacks.py
 │   ├── sidebar_content_callback.py
 │   ├── sidebar_filters_callback.py
-│   └── ... (23+ specialized callback modules)
+│   ├── sidebar_toggle_callback.py
+│   ├── sidebar_default_dates_callback.py
+│   ├── oeegraph_callback.py
+│   ├── kpicards_callback.py
+│   ├── energygraph_callback.py
+│   ├── hourlyconsumption_callback.py
+│   ├── states_callbacks.py
+│   ├── alarms_callbacks.py
+│   ├── procedures_collapse_callbacks.py
+│   ├── energy_config_callbacks.py
+│   ├── create_user_callbacks.py
+│   ├── manage_users_callbacks.py
+│   ├── change_password_callbacks.py
+│   ├── input_bridge_callbacks.py  # Bridge between header filters and sidebar
+│   └── ... (30+ specialized callback modules)
 ├── components/         # Reusable UI components
 │   ├── icons.py        # SVG icon components
 │   ├── stores.py       # Application dcc.Store components
 │   ├── dropdown_footer.py  # Reusable dropdown footer
+│   ├── demo_badge.py   # Demo data badge component
 │   ├── headers/        # Page-specific header filter modules
 │   │   ├── energy_filters.py
 │   │   ├── states_filters.py
@@ -105,22 +122,25 @@ webapp/src/
 │   │   ├── dashboard_sidebar.py
 │   │   ├── states_sidebar.py
 │   │   ├── superv_sidebar.py
-│   │   ├── energy_sidebar.py
+│   │   ├── energy_sidebar.py  # Includes SE03 cost calculations
+│   │   ├── procedures_sidebar.py  # Procedures documentation navigation
 │   │   └── default_sidebar.py
 │   └── ... (graph and card components)
 ├── config/             # Configuration modules
 │   ├── access_control.py   # Route & menu permissions matrix
 │   ├── theme_config.py     # Dash Bootstrap theme configuration
-│   └── user_loader.py      # Flask-Login user loader
+│   ├── user_loader.py      # Flask-Login user loader
+│   ├── docs_config.py      # Documentation/procedures system configuration
+│   └── demo_data_config.py # Demo data badges configuration
 ├── database/
 │   └── connection.py   # MongoDB connection & User model
 ├── pages/              # Page layouts organized by domain
 │   ├── admin/          # User management (create_user, manage_users)
 │   ├── auth/           # Login, registration, change password
 │   ├── dashboards/     # Home, production OEE
-│   ├── energy/         # Energy monitoring pages
+│   ├── energy/         # Energy monitoring pages (overview, config)
 │   ├── production/     # Production state tracking
-│   ├── maintenance/    # Alarms and procedures
+│   ├── maintenance/    # Alarms and procedures (markdown-based documentation)
 │   ├── supervision/    # Supervisory control (SCADA-like)
 │   ├── reports/        # Reporting pages
 │   └── common/         # Shared pages (access_denied, under_development)
@@ -130,7 +150,9 @@ webapp/src/
 │   └── ... (other CSS and images)
 └── utils/
     ├── permissions.py  # Access control logic
-    └── helpers.py      # Utility functions
+    ├── helpers.py      # Utility functions
+    ├── empty_state.py  # Empty state components
+    └── demo_helpers.py # Demo data helpers
 ```
 
 ### Key Architectural Patterns
@@ -153,12 +175,29 @@ ROUTE_ALIASES = {
 }
 ```
 
+**Utilities Routes Structure**:
+- `/utilities/energy`: Energy overview (alias: `/energy`)
+- `/utilities/energy/config`: Energy tariff configuration (admin only)
+- `/utilities/energy/se01-se04`: Individual substations (in development)
+- `/utilities/water`: Water consumption monitoring (in development)
+- `/utilities/gas`: Natural gas monitoring (in development)
+- `/utilities/compressed-air`: Compressed air system (in development)
+- `/utilities/dashboard`: Integrated utilities dashboard (in development)
+
 #### 2. Access Control System
 
 **Two-dimensional permission model** (defined in `config/access_control.py`):
 
 - **Vertical (level)**: 1 = basic, 2 = advanced, 3 = admin
-- **Horizontal (perfil)**: manutencao, qualidade, producao, utilidades, admin, meio_ambiente, seguranca, engenharias
+- **Horizontal (perfil)**:
+  - `manutencao` - Maintenance team
+  - `qualidade` - Quality control team
+  - `producao` - Production team
+  - `utilidades` - Utilities team (energy, water, gas, air)
+  - `admin` - System administrators
+  - `meio_ambiente` - Environmental team
+  - `seguranca` - Safety team
+  - `engenharias` - Engineering team
 
 Routes can be:
 - **Shared** (`shared=True`): All profiles can access if level requirement met
@@ -222,10 +261,21 @@ Collapsible sidebar located at `src/sidebar.py` with:
 - `dashboard_sidebar.py`: Dashboard/OEE navigation
 - `states_sidebar.py`: Production states navigation
 - `superv_sidebar.py`: Supervision controls
-- `energy_sidebar.py`: Energy page options
+- `energy_sidebar.py`: Energy page with dynamic cost calculations
+  - `create_se03_cost_sidebar_with_groups()`: Cost breakdown by equipment groups (Transversais/Longitudinais)
+  - `create_se03_cost_sidebar_content()`: Detailed step-by-step cost calculation (debug version)
+  - `create_energy_sidebar_no_config()`: Alert when tariff config is missing
+  - `create_default_energy_sidebar_content()`: Default for non-SE03 tabs
+- `procedures_sidebar.py`: Documentation navigation tree (hierarchical structure from docs.yml)
 - `default_sidebar.py`: Generic fallback content
 
 **Important**: Sidebar content is determined AFTER route alias resolution.
+
+**Date Filter Synchronization**:
+- Sidebar date pickers are synchronized with header date pickers via `input_bridge_callbacks.py`
+- Default dates are set by `sidebar_default_dates_callback.py` (last 7 days)
+- Changes in either header or sidebar filters update both locations
+- Stored in `dcc.Store` components for persistence during navigation
 
 #### 7. MongoDB Collections
 
@@ -236,6 +286,62 @@ Key collections referenced in codebase:
 - `DecapadoTemp`: Temperature sensor data
 - `AMG_EnergyData`: Energy consumption data
 - `AMG_Consumo`: Hourly consumption aggregates
+
+#### 8. Documentation System (`config/docs_config.py`)
+
+**Procedures Documentation System** for maintenance procedures:
+
+- **External Volume Support**: Documents stored in external volume via `DOCS_PROCEDURES_PATH` env var
+- **YAML Configuration**: `docs.yml` file defines navigation structure with sections/subsections
+- **Hot-Reload**: Automatic reload when `docs.yml` changes (modification time tracking)
+- **Fallback Mode**: Auto-scans directory if `docs.yml` doesn't exist
+- **Title Extraction**: Automatically extracts H1 titles from markdown files
+- **Security**: Path traversal protection to prevent access outside volume
+
+**Configuration Structure** (`docs.yml`):
+```yaml
+title: "Procedimentos"
+icon: "bi-book"
+index: "index.md"  # Optional homepage
+sections:
+  - name: "preventive"
+    label: "Manutenção Preventiva"
+    icon: "bi-calendar-check"
+    expanded: true
+    files:
+      - path: "preventive/procedure1.md"
+        title: "Auto-extracted or custom title"
+```
+
+**Key Functions**:
+- `get_docs_path()`: Returns volume path (env var or fallback)
+- `load_docs_structure()`: Loads and caches navigation structure
+- `get_markdown_title(filepath)`: Extracts title from markdown H1
+- `check_file_exists(relative_path)`: Validates file with security checks
+
+#### 9. Demo Data System (`config/demo_data_config.py`)
+
+**Demo Badge System** for indicating non-production data:
+
+- **Global Toggle**: `ENABLE_DEMO_BADGES` enables/disables all badges
+- **Per-Page Control**: `DEMO_PAGES` dict controls badges by route
+- **Per-Component Control**: `DEMO_COMPONENTS` dict controls by component type
+- **Helper Functions**: `should_show_demo_badge()`, `get_demo_pages()`
+
+**Usage Pattern**:
+```python
+from src.config.demo_data_config import should_show_demo_badge
+from src.components.demo_badge import create_demo_badge
+
+# In page layout
+if should_show_demo_badge(page_path="/production/oee"):
+    badge = create_demo_badge()
+```
+
+**Badge Display Logic**:
+1. Check global `ENABLE_DEMO_BADGES` flag
+2. Check page-specific or component-specific setting
+3. Render badge if both conditions are true
 
 ### Application Initialization Flow
 
@@ -292,7 +398,7 @@ When user navigates:
 **Under Development Pages** (`pages/common/under_development.py`):
 - Centralized layout function for pages not yet implemented
 - Uses responsive Bootstrap grid with offset columns for centering
-- Pre-configured variants: `states_development()`, `alarms_development()`, `maintenance_development()`, etc.
+- Pre-configured variants: `states_development()`, `alarms_development()`, `maintenance_development()`, `utilities_development()`, `config_development()`, etc.
 - Layout adapts correctly to sidebar collapse/expand states
 
 **Multi-Tab Pattern** (e.g., `pages/energy/overview.py`):
@@ -300,6 +406,21 @@ When user navigates:
 - Tab content loaded dynamically via callbacks
 - Under-development tabs use `get_under_development_content()` helper
 - Fully developed tabs (like SE03) include multiple graphs and KPI cards
+
+**Energy Cost Calculation System** (`pages/energy/overview.py` + `energy_sidebar.py`):
+- **SE03 Tab**: Advanced cost calculation with breakdown by equipment groups
+  - Transversais group: MM02, MM04, MM06
+  - Longitudinais group: MM03, MM05, MM07
+- **Cost Components**: TUSD (transmission), Energia (consumption), Demanda (demand charges)
+- **Time-of-Use Pricing**: Separate calculations for Ponta (peak) and Fora Ponta (off-peak)
+- **Demand Calculation**: Always uses full month data, prorated by consumption percentage
+- **Tariff Configuration**: Admin-only page at `/utilities/energy/config`
+- **Real-time Updates**: Sidebar updates dynamically when date range or equipment selection changes
+
+**Demo Badge Component** (`components/demo_badge.py`):
+- Consistent badge design for marking non-production data
+- Controlled by `demo_data_config.py` settings
+- Used across pages and components
 
 **Icon System** (`components/icons.py`):
 - Centralized SVG icon components
@@ -313,12 +434,94 @@ To send commands to equipment:
 2. Event gateway publishes to MQTT broker with TLS
 3. Payload format: `{"topic": "device/command", "payload": "command_data"}`
 
+### Documentation System (Procedures)
+
+**Adding/Updating Procedures**:
+1. Place markdown files in external volume (path defined by `DOCS_PROCEDURES_PATH`)
+2. Create or update `docs.yml` in the volume root with navigation structure
+3. System automatically reloads when `docs.yml` is modified
+4. Titles are auto-extracted from markdown H1 headers if not specified in YAML
+
+**docs.yml structure**:
+```yaml
+title: "Procedimentos"
+icon: "bi-book"
+sections:
+  - name: "category_name"
+    label: "Display Name"
+    icon: "bi-icon-name"
+    expanded: false
+    files:
+      - path: "relative/path/to/file.md"
+        title: "Optional custom title"
+```
+
+**Security Considerations**:
+- Path traversal is prevented - files must be within `DOCS_PROCEDURES_PATH`
+- Access control is enforced at the route level via `ROUTE_ACCESS`
+
+### Demo Data System
+
+**Managing Demo Badges**:
+1. Global control: Set `ENABLE_DEMO_BADGES = False` in `config/demo_data_config.py` to hide all badges
+2. Per-page control: Update `DEMO_PAGES` dict to enable/disable specific pages
+3. Per-component control: Update `DEMO_COMPONENTS` dict for specific components
+
+**Adding Demo Badge to New Page**:
+```python
+from src.config.demo_data_config import should_show_demo_badge
+from src.components.demo_badge import create_demo_badge
+
+def layout():
+    badge = create_demo_badge() if should_show_demo_badge(page_path="/your/route") else None
+    # Include badge in layout
+```
+
 ### Development Mode Features
 
 - Hot reload enabled when running via `run_local.py`
 - Debug mode provides detailed error messages
 - Loading overlay with spinner during initial page load
 - Environment validation on startup (checks required env vars)
+
+## Known Limitations and Future Features
+
+### In Development
+
+**Production Module**:
+- `/production/states`: Production state monitoring (under development)
+
+**Energy Module**:
+- SE01, SE02, SE04: Individual substation monitoring (SE03 is fully functional)
+- `/utilities/energy/history`: Historical consumption analysis
+- `/utilities/energy/costs`: Cost analysis dashboard
+
+**Utilities Module** (all under development):
+- Water consumption monitoring and cost tracking
+- Natural gas monitoring (measurement points, history, costs)
+- Compressed air system (compressors, efficiency analysis)
+- Integrated utilities dashboard (consolidated view of all utilities)
+
+**Maintenance Module**:
+- Work orders management system
+- Maintenance schedule/calendar
+- Maintenance history and analytics
+- Maintenance indicators/KPIs
+
+**Configuration Module**:
+- User preferences management
+- System logs viewer
+
+### Fully Functional Features
+
+- User authentication and authorization
+- OEE dashboard with production metrics
+- Energy monitoring for SE03 (with cost calculations)
+- Energy tariff configuration (admin only)
+- Alarm monitoring and history
+- Maintenance procedures documentation system
+- Supervisory control interface
+- User management (create, edit, delete users)
 
 ## Git Branch Structure
 
@@ -340,9 +543,11 @@ To send commands to equipment:
 ## Technology Stack
 
 - **Backend**: Flask 3.1.1 with Flask-Login 0.6.3
-- **Frontend**: Dash 3.1.1, Dash Bootstrap Components 2.0.3
+- **Frontend**: Dash 3.1.1, Dash Bootstrap Components 2.0.3, Dash Bootstrap Templates 2.1.0
 - **Database**: MongoDB via PyMongo 4.13.2
 - **Visualization**: Plotly 6.1.2
 - **Data Processing**: Pandas 2.3.1, NumPy 2.3.2
+- **Documentation**: Markdown 3.7, PyYAML (for docs.yml configuration)
 - **MQTT**: Paho-MQTT (in event-gateway)
 - **Web Server**: Gunicorn (production)
+- **Other**: python-dotenv 1.1.1, Werkzeug 3.1.3

@@ -234,25 +234,25 @@ ROUTE_ACCESS = {
     # ========================================
     "/utilities/gas": {
         "shared": False,
-        "perfis": ["manutencao"],
+        "perfis": ["utilidades", "manutencao"],
         "min_level": 1,
         "description": "Gás - Visão Geral"
     },
     "/utilities/gas/points": {
         "shared": False,
-        "perfis": ["manutencao"],
+        "perfis": ["utilidades", "manutencao"],
         "min_level": 1,
         "description": "Pontos de Medição de Gás"
     },
     "/utilities/gas/history": {
         "shared": False,
-        "perfis": ["manutencao"],
+        "perfis": ["utilidades", "manutencao"],
         "min_level": 1,
         "description": "Histórico de Gás"
     },
     "/utilities/gas/costs": {
         "shared": False,
-        "perfis": ["manutencao"],
+        "perfis": ["utilidades", "manutencao"],
         "min_level": 1,
         "description": "Custos de Gás"
     },
@@ -262,19 +262,19 @@ ROUTE_ACCESS = {
     # ========================================
     "/utilities/compressed-air": {
         "shared": False,
-        "perfis": ["manutencao"],
+        "perfis": ["utilidades", "manutencao"],
         "min_level": 1,
         "description": "Ar Comprimido - Visão Geral"
     },
     "/utilities/compressed-air/compressors": {
         "shared": False,
-        "perfis": ["manutencao"],
+        "perfis": ["utilidades", "manutencao"],
         "min_level": 1,
         "description": "Compressores"
     },
     "/utilities/compressed-air/efficiency": {
         "shared": False,
-        "perfis": ["manutencao"],
+        "perfis": ["utilidades", "manutencao"],
         "min_level": 1,
         "description": "Eficiência de Ar Comprimido"
     },

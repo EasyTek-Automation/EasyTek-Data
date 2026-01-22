@@ -215,8 +215,7 @@ def create_header(pathname, user):
                             ], className="d-flex align-items-center mb-2 px-2", style={"color": "#0dcaf0"}),
                             dbc.DropdownMenuItem(
                                 "📊 Visão Geral",
-                                href="/utilities/water",
-                                disabled=True,
+                                href="/utilities/water",                                
                                 style={"fontSize": "0.85rem", "paddingLeft": "0.5rem"}
                             ),
                             dbc.DropdownMenuItem(
@@ -250,7 +249,6 @@ def create_header(pathname, user):
                             dbc.DropdownMenuItem(
                                 "📊 Visão Geral",
                                 href="/utilities/gas",
-                                disabled=True,
                                 style={"fontSize": "0.85rem", "paddingLeft": "0.5rem"}
                             ),
                             dbc.DropdownMenuItem(
@@ -284,7 +282,6 @@ def create_header(pathname, user):
                             dbc.DropdownMenuItem(
                                 "📊 Visão Geral",
                                 href="/utilities/compressed-air",
-                                disabled=True,
                                 style={"fontSize": "0.85rem", "paddingLeft": "0.5rem"}
                             ),
                             dbc.DropdownMenuItem(
