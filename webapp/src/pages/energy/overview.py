@@ -2,10 +2,17 @@
 
 from dash import html, dcc, Input, Output
 import dash_bootstrap_components as dbc
-from src.components.linegraph_energy import energygraph_card_layout
-from src.components.linegraph_energy02 import energygraph_card_layout02
 from src.components.bargraph_consumo_hora import consumptiongraph_card_layout
-from src.utils.demo_helpers import add_demo_badge_to_card_header
+from src.components.energy_kpi_cards import (
+    create_fp_card,
+    create_desbalanco_card,
+    create_consumo_medio_card,
+    create_donut_chart_card
+)
+from src.components.demand_graphs import (
+    create_demand_transversais_layout,
+    create_demand_longitudinais_layout
+)
 
 def layout():
     """
@@ -64,25 +71,78 @@ def layout():
 
 def get_se03_content():
     """
-    Retorna o conteúdo completo da SE03 (já existente)
+    Retorna o conteúdo completo da SE03 com componentes otimizados
+
+    Estrutura:
+    - 4 cards de KPI (Fator de Potência, Desbalanceamento, Consumo Médio, Donut Chart)
+    - Gráfico de Demanda Temporal Transversais (kW + kVA)
+    - Gráfico de Demanda Temporal Longitudinais (kW + kVA)
+    - Gráfico de Consumo por Hora (já existente)
     """
     return html.Div([
-        # Gráficos de Tensão e Corrente lado a lado
+        # ========================================
+        # SEÇÃO: CARDS DE KPI DE ENERGIA
+        # ========================================
         dbc.Row([
             dbc.Col([
-                dbc.Card([
-                    dbc.CardBody([energygraph_card_layout])
-                ], className="shadow-sm")
-            ], xs=12, md=6, className="mb-3"),
-            
+                html.H4("Indicadores de Qualidade de Energia", className="mb-3")
+            ])
+        ]),
+
+        dbc.Row([
+            # Card 1: Fator de Potência Médio
             dbc.Col([
-                dbc.Card([
-                    dbc.CardBody([energygraph_card_layout02])
-                ], className="shadow-sm")
-            ], xs=12, md=6, className="mb-3"),
-        ], className="g-2 mb-3"),
-        
-        # Gráfico de Consumo por Hora (largura total)
+                create_fp_card()
+            ], xs=12, md=6, lg=3, className="mb-3 d-flex align-items-stretch"),
+
+            # Card 2: Desbalanceamento de Fases
+            dbc.Col([
+                create_desbalanco_card()
+            ], xs=12, md=6, lg=3, className="mb-3 d-flex align-items-stretch"),
+
+            # Card 3: Consumo Médio
+            dbc.Col([
+                create_consumo_medio_card()
+            ], xs=12, md=6, lg=3, className="mb-3 d-flex align-items-stretch"),
+
+            # Card 4: Gráfico de Rosca (Distribuição)
+            dbc.Col([
+                create_donut_chart_card()
+            ], xs=12, md=6, lg=3, className="mb-3 d-flex align-items-stretch"),
+        ], className="g-3"),
+
+        # ========================================
+        # SEÇÃO: GRÁFICOS DE DEMANDA TEMPORAL
+        # ========================================
+        dbc.Row([
+            dbc.Col([
+                html.H4("Demanda Temporal por Grupo de Equipamentos", className="mt-4 mb-3")
+            ])
+        ]),
+
+        # Gráfico de Demanda Transversais
+        dbc.Row([
+            dbc.Col([
+                create_demand_transversais_layout()
+            ])
+        ]),
+
+        # Gráfico de Demanda Longitudinais
+        dbc.Row([
+            dbc.Col([
+                create_demand_longitudinais_layout()
+            ])
+        ]),
+
+        # ========================================
+        # SEÇÃO: CONSUMO POR HORA (Mantido)
+        # ========================================
+        dbc.Row([
+            dbc.Col([
+                html.H4("Consumo de Energia por Hora", className="mt-4 mb-3")
+            ])
+        ]),
+
         dbc.Row([
             dbc.Col([
                 dbc.Card([
@@ -90,129 +150,6 @@ def get_se03_content():
                 ], className="shadow-sm")
             ])
         ]),
-        
-        # ========================================
-        # SEÇÃO: CARDS DE QUALIDADE DE ENERGIA
-        # ========================================
-        dbc.Row([
-            dbc.Col([
-                html.H4("Qualidade de Energia", className="mt-4 mb-3")
-            ])
-        ]),
-        
-        dbc.Row([
-            # Fator de Potência
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader(
-                    add_demo_badge_to_card_header(
-                        "",
-                        page_path="/production/oee",
-                        size="sm"
-                    ),
-                    className="bg-transparent"
-                ),
-                    dbc.CardBody([
-                        html.Div([
-                            html.I(
-                                className="bi bi-speedometer text-info",
-                                style={"fontSize": "2rem"}
-                            )
-                        ], className="text-center mb-2"),
-                        html.H6("Fator de Potência", className="text-center"),
-                        html.H4(
-                            "0.92",
-                            className="text-center text-success fw-bold mb-0"
-                        ),
-                        html.P("FP Médio", className="text-center text-muted small")
-                    ])
-                ], className="shadow-sm h-100")
-            ], md=3, className="mb-3"),
-            
-            # Demanda Máxima
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader(
-                    add_demo_badge_to_card_header(
-                        "",
-                        page_path="/production/oee",
-                        size="sm"
-                    ),
-                    className="bg-transparent"
-                ),
-                    dbc.CardBody([
-                        html.Div([
-                            html.I(
-                                className="bi bi-arrow-up-circle text-warning",
-                                style={"fontSize": "2rem"}
-                            )
-                        ], className="text-center mb-2"),
-                        html.H6("Demanda Máxima", className="text-center"),
-                        html.H4(
-                            "1.450 kW",
-                            className="text-center text-warning fw-bold mb-0"
-                        ),
-                        html.P("Pico do Dia", className="text-center text-muted small")
-                    ])
-                ], className="shadow-sm h-100")
-            ], md=3, className="mb-3"),
-            
-            # THD Tensão
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader(
-                    add_demo_badge_to_card_header(
-                        "",
-                        page_path="/production/oee",
-                        size="sm"
-                    ),
-                    className="bg-transparent"
-                ),
-                    dbc.CardBody([
-                        html.Div([
-                            html.I(
-                                className="bi bi-activity text-danger",
-                                style={"fontSize": "2rem"}
-                            )
-                        ], className="text-center mb-2"),
-                        html.H6("THD Tensão", className="text-center"),
-                        html.H4(
-                            "2.8%",
-                            className="text-center text-success fw-bold mb-0"
-                        ),
-                        html.P("Distorção Harmônica", className="text-center text-muted small")
-                    ])
-                ], className="shadow-sm h-100")
-            ], md=3, className="mb-3"),
-            
-            # Consumo Total Hoje
-            dbc.Col([
-                dbc.Card([
-                    dbc.CardHeader(
-                    add_demo_badge_to_card_header(
-                        "",
-                        page_path="/production/oee",
-                        size="sm"
-                    ),
-                    className="bg-transparent"
-                ),
-                    dbc.CardBody([
-                        html.Div([
-                            html.I(
-                                className="bi bi-bar-chart text-primary",
-                                style={"fontSize": "2rem"}
-                            )
-                        ], className="text-center mb-2"),
-                        html.H6("Consumo Hoje", className="text-center"),
-                        html.H4(
-                            "18.240 kWh",
-                            className="text-center text-primary fw-bold mb-0"
-                        ),
-                        html.P("Total Acumulado", className="text-center text-muted small")
-                    ])
-                ], className="shadow-sm h-100")
-            ], md=3, className="mb-3"),
-        ])
     ])
 
 

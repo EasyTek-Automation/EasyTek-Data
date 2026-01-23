@@ -1,8 +1,9 @@
 # callbacks/callbacks.py
 from src.database.connection import get_mongo_connection
 
-# Importe o novo registro de callback
-from src.callbacks_registers.energygraph_callback import register_energygraph_callbacks
+# Energy graph callbacks (SE03)
+from src.callbacks_registers.energy_kpi_callbacks import register_kpi_callbacks
+from src.callbacks_registers.demand_graph_callbacks import register_demand_callbacks
 
 # Seus imports existentes
 from src.callbacks_registers.oeegraph_callback import register_oeegraph_callbacks
@@ -56,8 +57,12 @@ def register_callbacks(app):
     register_states02_callbacks(app, collection_graph)
     register_storetheme_callbacks(app)
     register_states_switch_callback(app)
-    register_sp_callback(app)    
-    register_energygraph_callbacks(app, collection_energia)
+    register_sp_callback(app)
+
+    # Energy page callbacks (SE03 KPIs and demand graphs)
+    register_kpi_callbacks(app, collection_energia, collection_consumo)
+    register_demand_callbacks(app, collection_energia)
+
     register_tempgraph_callbacks(app, collection_temp)
     register_main_layout_callbacks(app)     
     register_hourlyconsumption_callbacks(app, collection_consumo)
