@@ -1,0 +1,9 @@
+Branch: feat/ConsumptionGraphUpdate
+Data: Thu, Jan 22, 2026  4:49:55 PM
+Último commit: 3aaac1c Feat(pages): Add new demo pages
+Tag: checkpoint-20260122-164932
+
+Checkpoint: graph type changed from bar to histogram
+Data: Thu, Jan 22, 2026  9:07:22 PM
+Commit: 9986380 chore(checkpoint): graph type changed from bar to histogram with transparent shadows
+Tag: checkpoint-20260122-210710

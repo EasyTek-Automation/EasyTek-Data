@@ -373,26 +373,34 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
             empty_fig = create_empty_state_figure('consumption', template)
             return empty_fig, visible_style
 
-        # --- 4) Criar o gráfico de barras ---
+        # --- 4) Criar o gráfico tipo histograma com áreas transparentes ---
         try:
             fig = go.Figure()
 
-            # Adiciona barra Transversais (se existir)
+            # Adiciona área Transversais (se existir)
             if has_group1 and "Grupo1_kWh" in df.columns:
-                fig.add_trace(go.Bar(
+                fig.add_trace(go.Scatter(
                     x=df["HoraStr"],
                     y=df["Grupo1_kWh"],
                     name="Transversais",
-                    marker_color="#1f77b4",  # Azul
+                    mode='lines',
+                    line=dict(color="#1f77b4", width=2),  # Azul
+                    fill='tozeroy',  # Preenche até o eixo zero
+                    fillcolor="rgba(31, 119, 180, 0.3)",  # Azul com 30% de opacidade
+                    hovertemplate='<b>Transversais</b><br>Hora: %{x}<br>Consumo: %{y:.2f} kWh<extra></extra>',
                 ))
 
-            # Adiciona barra Longitudinais (se existir)
+            # Adiciona área Longitudinais (se existir)
             if has_group2 and "Grupo2_kWh" in df.columns:
-                fig.add_trace(go.Bar(
+                fig.add_trace(go.Scatter(
                     x=df["HoraStr"],
                     y=df["Grupo2_kWh"],
                     name="Longitudinais",
-                    marker_color="#ff7f0e",  # Laranja
+                    mode='lines',
+                    line=dict(color="#ff7f0e", width=2),  # Laranja
+                    fill='tozeroy',  # Preenche até o eixo zero
+                    fillcolor="rgba(255, 127, 14, 0.3)",  # Laranja com 30% de opacidade
+                    hovertemplate='<b>Longitudinais</b><br>Hora: %{x}<br>Consumo: %{y:.2f} kWh<extra></extra>',
                 ))
 
             # Layout do gráfico
@@ -401,7 +409,6 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
                 xaxis_title="Hora",
                 yaxis_title="Consumo (kWh)",
                 template=template,
-                barmode='group',  # Barras lado a lado
                 margin=dict(l=40, r=10, t=50, b=40),
                 legend=dict(
                     orientation="h",
@@ -411,7 +418,11 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
                     x=1
                 ),
                 xaxis=dict(tickfont=dict(size=10)),
-                yaxis=dict(tickfont=dict(size=10)),
+                yaxis=dict(
+                    tickfont=dict(size=10),
+                    rangemode='tozero'  # Garante que o eixo Y começa em zero
+                ),
+                hovermode='x unified',  # Mostra todos os valores ao passar o mouse
             )
 
             logger.debug(f"[GRAPH_HOURLY] Figura gerada (ms={_duration_ms(t0)}), rows={len(df)}")
