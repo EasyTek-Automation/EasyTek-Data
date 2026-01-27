@@ -34,7 +34,7 @@ from src.pages.energy import overview as energy_overview, config as energy_confi
 from src.pages.production import states
 
 # Manutenção
-from src.pages.maintenance import alarms, procedures
+from src.pages.maintenance import alarms, procedures, indicators
 
 # Supervisório
 from src.pages.supervision import control as supervision_control
@@ -120,7 +120,7 @@ ROUTES = {
     "/maintenance/work-orders": lambda: under_development.maintenance_development(),
     "/maintenance/schedule": lambda: under_development.maintenance_development(),
     "/maintenance/history": lambda: under_development.maintenance_development(),
-    "/maintenance/indicators": lambda: under_development.maintenance_development(),
+    "/maintenance/indicators": indicators.layout,
     
     # Configurações
     "/config/users": manage_users.layout_wrapper,
