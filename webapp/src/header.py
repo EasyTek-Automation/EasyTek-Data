@@ -122,7 +122,7 @@ def create_header(pathname, user):
                 ),
                 dbc.DropdownMenuItem(
                     html.Div([html.Span(graph_icon(), style={"marginRight": "8px"}), "Indicadores de Manutenção"], className="d-flex align-items-center"),
-                    href="/maintenance/indicators", disabled=True, style={"opacity": "0.5"}
+                    href="/maintenance/indicators", disabled=False
                 ),
 
                 # Footer "Powered By"

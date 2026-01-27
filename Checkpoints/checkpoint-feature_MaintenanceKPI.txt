@@ -1,0 +1,4 @@
+Branch: feature/MaintenanceKPI
+Data: 27/01/2026 12:20:51
+Último commit: 0ab4813 fix: complete SE03 energy monitoring with KPI cards and demand graphs
+Tag: checkpoint-20260127-122051
