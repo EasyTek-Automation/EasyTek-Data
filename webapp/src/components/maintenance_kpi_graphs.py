@@ -256,11 +256,23 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
     # Calcular total (soma das categorias)
     values[0] = sum(v for v in values[1:len(categories_dict) + 1])
 
+    # Determinar formato de texto baseado no KPI
+    # MTBF e MTTR: mostrar valores absolutos em horas
+    # Taxa de Avaria: mostrar porcentagens
+    if kpi_name in ["MTBF", "MTTR"]:
+        text_display = 'label+text'
+        # Criar textos customizados com valores em horas
+        custom_text = [f"{v:.1f}h" for v in values]
+    else:
+        text_display = 'label+percent parent'
+        custom_text = None
+
     # Criar sunburst
     fig = go.Figure(go.Sunburst(
         labels=labels,
         parents=parents,
         values=values,
+        text=custom_text,
         branchvalues="total",
         marker=dict(
             line=dict(color='#fff', width=2),
@@ -271,7 +283,7 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
                 [1, '#6c757d']       # Cinza
             ]
         ),
-        textinfo='label+percent parent',
+        textinfo=text_display,
         hovertemplate='<b>%{label}</b><br>%{value:.1f} ' + unit + '<extra></extra>'
     ))
 
@@ -360,3 +372,226 @@ def create_kpi_summary_table(data_by_equipment: Dict[str, Dict[str, float]],
         ]),
         html.Tbody(rows)
     ], bordered=True, hover=True, responsive=True, striped=True, className="mb-0")
+
+
+def create_kpi_line_chart(months_list: List[int],
+                          values: List[float],
+                          avg_values: List[float],
+                          kpi_name: str,
+                          equipment_name: str,
+                          target_value: float,
+                          template: str = 'minty') -> go.Figure:
+    """
+    Cria gráfico híbrido (barras + linhas) mostrando evolução mensal.
+
+    Exibe:
+    - Barras do equipamento com cores condicionais baseadas em performance
+    - Linha da média geral (laranja tracejada)
+    - Linha da meta (vermelha pontilhada)
+
+    Lógica de Cores:
+    - MTBF (maior é melhor):
+      * Verde escuro: >= meta
+      * Verde claro: >= média e < meta
+      * Amarelo: < média e < meta
+      * Vermelho: muito abaixo
+    - MTTR/Taxa Avaria (menor é melhor):
+      * Verde escuro: <= meta
+      * Verde claro: <= média e > meta
+      * Amarelo: > média e > meta
+      * Vermelho: muito acima
+
+    Args:
+        months_list: Lista de meses [1, 2, 3, ..., 12]
+        values: Valores do equipamento por mês
+        avg_values: Média geral por mês (para comparação)
+        kpi_name: "MTBF", "MTTR" ou "Taxa de Avaria"
+        equipment_name: Nome do equipamento
+        target_value: Meta do KPI
+        template: 'minty' ou 'darkly'
+
+    Returns:
+        Figura Plotly com barras coloridas e linhas
+    """
+    month_names = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+                   "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+    x_labels = [month_names[m-1] for m in months_list]
+
+    # Determinar se maior ou menor é melhor
+    higher_is_better = kpi_name == "MTBF"
+
+    # Calcular cores para cada barra baseado em performance
+    bar_colors = []
+    for value, avg_value in zip(values, avg_values):
+        if higher_is_better:
+            # MTBF: maior é melhor
+            if value >= target_value:
+                color = '#198754'  # Verde escuro - Excelente (atende meta)
+            elif value >= avg_value:
+                color = '#20c997'  # Verde claro - Bom (acima da média)
+            elif value >= target_value * 0.8:
+                color = '#ffc107'  # Amarelo - Atenção (próximo da meta)
+            elif value >= target_value * 0.6:
+                color = '#fd7e14'  # Laranja - Ruim (abaixo da média)
+            else:
+                color = '#dc3545'  # Vermelho - Crítico (muito abaixo)
+        else:
+            # MTTR e Taxa de Avaria: menor é melhor
+            if value <= target_value:
+                color = '#198754'  # Verde escuro - Excelente (atende meta)
+            elif value <= avg_value:
+                color = '#20c997'  # Verde claro - Bom (abaixo da média)
+            elif value <= target_value * 1.2:
+                color = '#ffc107'  # Amarelo - Atenção (próximo da meta)
+            elif value <= target_value * 1.5:
+                color = '#fd7e14'  # Laranja - Ruim (acima da média)
+            else:
+                color = '#dc3545'  # Vermelho - Crítico (muito acima)
+
+        bar_colors.append(color)
+
+    fig = go.Figure()
+
+    # Barras do equipamento com cores condicionais
+    fig.add_trace(go.Bar(
+        x=x_labels,
+        y=values,
+        name=equipment_name,
+        marker=dict(
+            color=bar_colors,
+            cornerradius=4,
+            line=dict(width=0)
+        ),
+        text=[f'{v:.1f}' for v in values],
+        textposition='outside',
+        textfont=dict(size=10),
+        hovertemplate='<b>%{x}</b><br>Valor: %{y:.1f}<extra></extra>'
+    ))
+
+    # Linha da média geral (laranja tracejada)
+    fig.add_trace(go.Scatter(
+        x=x_labels,
+        y=avg_values,
+        mode='lines',
+        name='Média Geral',
+        line=dict(color='#fd7e14', width=2, dash='dash')
+    ))
+
+    # Linha da meta (vermelha pontilhada)
+    fig.add_trace(go.Scatter(
+        x=x_labels,
+        y=[target_value] * len(months_list),
+        mode='lines',
+        name='Meta',
+        line=dict(color='#dc3545', width=2, dash='dot')
+    ))
+
+    unit = "h" if kpi_name in ["MTBF", "MTTR"] else "%"
+
+    # Criar legenda de cores baseado no tipo de KPI
+    if higher_is_better:
+        color_legend = "Verde Escuro: ≥ Meta | Verde Claro: ≥ Média | Amarelo: < Média | Laranja/Vermelho: Abaixo"
+    else:
+        color_legend = "Verde Escuro: ≤ Meta | Verde Claro: ≤ Média | Amarelo: > Média | Laranja/Vermelho: Acima"
+
+    fig.update_layout(
+        template=template,
+        title=dict(
+            text=f"{kpi_name} - {equipment_name}<br><sub style='font-size: 9px'>{color_legend}</sub>",
+            x=0.5,
+            xanchor='center',
+            font=dict(size=14)
+        ),
+        xaxis=dict(title="Mês"),
+        yaxis=dict(title=f"{kpi_name} ({unit})", rangemode='tozero'),
+        hovermode='x unified',
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        bargap=0.2,  # Espaçamento entre barras
+        height=370,  # Aumentado para acomodar legenda
+        margin=dict(t=80, b=60, l=60, r=40)  # Margem superior aumentada
+    )
+
+    return fig
+
+
+def create_comparison_bar_chart(equipment_data: Dict[str, float],
+                                general_avg: Dict[str, float],
+                                equipment_name: str,
+                                template: str = 'minty') -> go.Figure:
+    """
+    Cria gráfico de barras comparando equipamento com média geral.
+
+    Mostra lado a lado: Equipamento vs Média Geral para os 3 KPIs.
+
+    Args:
+        equipment_data: {"mtbf": X, "mttr": Y, "breakdown_rate": Z}
+        general_avg: {"mtbf": X, "mttr": Y, "breakdown_rate": Z}
+        equipment_name: Nome do equipamento
+        template: 'minty' ou 'darkly'
+
+    Returns:
+        Figura Plotly com barras agrupadas
+    """
+    kpis = ["MTBF", "MTTR", "Taxa de Avaria"]
+    equipment_values = [
+        equipment_data["mtbf"],
+        equipment_data["mttr"],
+        equipment_data["breakdown_rate"]
+    ]
+    avg_values = [
+        general_avg["mtbf"],
+        general_avg["mttr"],
+        general_avg["breakdown_rate"]
+    ]
+
+    fig = go.Figure()
+
+    # Barras do equipamento
+    fig.add_trace(go.Bar(
+        x=kpis,
+        y=equipment_values,
+        name=equipment_name,
+        marker_color='#0d6efd',
+        text=[f'{v:.1f}' for v in equipment_values],
+        textposition='outside'
+    ))
+
+    # Barras da média geral
+    fig.add_trace(go.Bar(
+        x=kpis,
+        y=avg_values,
+        name='Média Geral',
+        marker_color='#6c757d',
+        text=[f'{v:.1f}' for v in avg_values],
+        textposition='outside'
+    ))
+
+    fig.update_layout(
+        template=template,
+        title=dict(
+            text=f"Comparação: {equipment_name} vs Média Geral",
+            x=0.5,
+            xanchor='center',
+            font=dict(size=14)
+        ),
+        barmode='group',
+        xaxis=dict(title=""),
+        yaxis=dict(title="Valor", rangemode='tozero'),
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        height=400,
+        margin=dict(t=60, b=60, l=60, r=40)
+    )
+
+    return fig

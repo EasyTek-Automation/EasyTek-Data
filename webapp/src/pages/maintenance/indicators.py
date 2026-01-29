@@ -12,6 +12,7 @@ from src.components.maintenance_kpi_cards import (
     create_equipment_count_card
 )
 from src.components.maintenance_kpi_graphs import create_empty_kpi_figure
+from src.utils.maintenance_demo_data import get_equipment_names, get_kpi_targets
 
 
 def layout():
@@ -67,13 +68,6 @@ def layout():
                         color="secondary",
                         size="sm",
                         outline=True
-                    ),
-                    dbc.Button(
-                        [html.I(className="bi bi-funnel me-2"), "Filtros"],
-                        id="btn-toggle-indicator-filters",
-                        color="secondary",
-                        size="sm",
-                        outline=True
                     )
                 ])
             ], width=4, className="text-end d-flex align-items-center justify-content-end")
@@ -87,80 +81,98 @@ def layout():
             dbc.Col([create_equipment_count_card()], xs=12, sm=6, md=3, className="mb-3")
         ], className="g-3 mb-4"),
 
-        # ==================== FILTERS (COLLAPSIBLE) ====================
-        dbc.Collapse([
-            dbc.Card([
-                dbc.CardBody([
-                    dbc.Row([
-                        dbc.Col([
-                            html.Label("Ano", className="form-label small fw-bold"),
-                            dcc.Dropdown(
-                                id="filter-indicator-year",
-                                options=[
-                                    {"label": "2024", "value": 2024},
-                                    {"label": "2025", "value": 2025},
-                                    {"label": "2026", "value": 2026}
-                                ],
-                                value=2026,
-                                clearable=False
-                            )
-                        ], md=2),
-                        dbc.Col([
-                            html.Label("Meses", className="form-label small fw-bold"),
-                            dcc.Dropdown(
-                                id="filter-indicator-months",
-                                options=[
-                                    {"label": "Janeiro", "value": 1},
-                                    {"label": "Fevereiro", "value": 2},
-                                    {"label": "Março", "value": 3},
-                                    {"label": "Abril", "value": 4},
-                                    {"label": "Maio", "value": 5},
-                                    {"label": "Junho", "value": 6},
-                                    {"label": "Julho", "value": 7},
-                                    {"label": "Agosto", "value": 8},
-                                    {"label": "Setembro", "value": 9},
-                                    {"label": "Outubro", "value": 10},
-                                    {"label": "Novembro", "value": 11},
-                                    {"label": "Dezembro", "value": 12}
-                                ],
-                                value=list(range(1, 13)),  # Todos os meses selecionados
-                                multi=True,
-                                placeholder="Selecione os meses"
-                            )
-                        ], md=8),
-                        dbc.Col([
-                            html.Label("Ações", className="form-label small fw-bold"),
-                            dbc.Button(
-                                [html.I(className="bi bi-check-circle me-2"), "Aplicar"],
-                                id="btn-apply-indicator-filters",
-                                color="primary",
-                                size="sm",
-                                className="w-100"
-                            )
-                        ], md=2, className="d-flex align-items-end")
-                    ])
-                ])
-            ], className="mb-3 shadow-sm")
-        ], id="collapse-indicator-filters", is_open=True),
-
         # ==================== TABS ====================
         dbc.Tabs([
-            # Tab 1: Visão Geral
+            # Tab 1: Geral (Todos Equipamentos)
             dbc.Tab(
-                label="Visão Geral",
-                tab_id="tab-overview",
+                label="📊 Geral",
+                tab_id="tab-general",
                 children=[
                     html.Div([
-                        # Seção: Gráficos de Barras
+                        # Seção: Hierarquias Sunburst (MOVIDA PARA CIMA)
+                        html.H5([
+                            html.I(className="bi bi-pie-chart-fill me-2"),
+                            "Hierarquia por Categoria"
+                        ], className="mt-4 mb-3"),
                         dbc.Row([
+                            # Sunburst MTBF
                             dbc.Col([
-                                html.H5([
-                                    html.I(className="bi bi-bar-chart-fill me-2"),
-                                    "Indicadores por Equipamento"
-                                ], className="mb-3")
-                            ], width=12)
-                        ]),
+                                dbc.Card([
+                                    dbc.CardHeader([
+                                        html.I(className="bi bi-clock-history me-2"),
+                                        html.Strong("Hierarquia MTBF")
+                                    ]),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            id="loading-sunburst-mtbf",
+                                            type="default",
+                                            children=dcc.Graph(
+                                                id='sunburst-chart-mtbf',
+                                                config={
+                                                    'displayModeBar': True,
+                                                    'displaylogo': False,
+                                                    'responsive': True
+                                                }
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], xs=12, md=4),
 
+                            # Sunburst MTTR
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader([
+                                        html.I(className="bi bi-tools me-2"),
+                                        html.Strong("Hierarquia MTTR")
+                                    ]),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            id="loading-sunburst-mttr",
+                                            type="default",
+                                            children=dcc.Graph(
+                                                id='sunburst-chart-mttr',
+                                                config={
+                                                    'displayModeBar': True,
+                                                    'displaylogo': False,
+                                                    'responsive': True
+                                                }
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], xs=12, md=4),
+
+                            # Sunburst Taxa Avaria
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader([
+                                        html.I(className="bi bi-exclamation-triangle me-2"),
+                                        html.Strong("Hierarquia Avarias")
+                                    ]),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            id="loading-sunburst-breakdown",
+                                            type="default",
+                                            children=dcc.Graph(
+                                                id='sunburst-chart-breakdown',
+                                                config={
+                                                    'displayModeBar': True,
+                                                    'displaylogo': False,
+                                                    'responsive': True
+                                                }
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], xs=12, md=4)
+                        ], className="mb-4"),
+
+                        # Seção: Gráficos de Barras (MOVIDA PARA BAIXO)
+                        html.H5([
+                            html.I(className="bi bi-bar-chart-fill me-2"),
+                            "Indicadores por Equipamento"
+                        ], className="mt-4 mb-3"),
                         dbc.Row([
                             # Gráfico MTBF
                             dbc.Col([
@@ -186,7 +198,7 @@ def layout():
                                             )
                                         )
                                     ])
-                                ], className="shadow-sm mb-4")
+                                ], className="shadow-sm")
                             ], xs=12, md=4),
 
                             # Gráfico MTTR
@@ -213,7 +225,7 @@ def layout():
                                             )
                                         )
                                     ])
-                                ], className="shadow-sm mb-4")
+                                ], className="shadow-sm")
                             ], xs=12, md=4),
 
                             # Gráfico Taxa de Avaria
@@ -240,123 +252,155 @@ def layout():
                                             )
                                         )
                                     ])
-                                ], className="shadow-sm mb-4")
+                                ], className="shadow-sm")
                             ], xs=12, md=4)
                         ], className="mb-4"),
 
                         # Seção: Tabela Resumo
+                        html.H5([
+                            html.I(className="bi bi-table me-2"),
+                            "Resumo Geral"
+                        ], className="mt-4 mb-3"),
+                        html.Div(
+                            id="kpi-summary-table-container",
+                            children=[
+                                html.P(
+                                    "Selecione os filtros e clique em 'Aplicar' para visualizar os dados.",
+                                    className="text-muted text-center py-4"
+                                )
+                            ]
+                        )
+                    ], className="p-3")
+                ]
+            ),
+
+            # Tab 2: Individual (Equipamento Selecionado)
+            dbc.Tab(
+                label="🔧 Individual",
+                tab_id="tab-individual",
+                children=[
+                    html.Div([
+                        # Seletor de Equipamento
                         dbc.Row([
                             dbc.Col([
-                                html.H5([
-                                    html.I(className="bi bi-table me-2"),
-                                    "Resumo por Equipamento"
-                                ], className="mb-3"),
-                                html.Div(
-                                    id="kpi-summary-table-container",
-                                    children=[
-                                        html.P(
-                                            "Selecione os filtros e clique em 'Aplicar' para visualizar os dados.",
-                                            className="text-muted text-center py-4"
+                                html.Label("Selecione o Equipamento:", className="form-label fw-bold"),
+                                dcc.Dropdown(
+                                    id="dropdown-equipment-individual",
+                                    options=[
+                                        {"label": name, "value": eq_id}
+                                        for eq_id, name in get_equipment_names().items()
+                                    ],
+                                    value="LONGI001",
+                                    clearable=False
+                                )
+                            ], md=4)
+                        ], className="mb-4"),
+
+                        # Cards de Resumo do Equipamento
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardBody([
+                                        html.H6("MTBF do Equipamento", className="text-muted mb-2"),
+                                        html.H3(id="individual-mtbf-value", children="--", className="mb-0")
+                                    ])
+                                ], className="shadow-sm h-100")
+                            ], md=4),
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardBody([
+                                        html.H6("MTTR do Equipamento", className="text-muted mb-2"),
+                                        html.H3(id="individual-mttr-value", children="--", className="mb-0")
+                                    ])
+                                ], className="shadow-sm h-100")
+                            ], md=4),
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardBody([
+                                        html.H6("Taxa de Avaria", className="text-muted mb-2"),
+                                        html.H3(id="individual-breakdown-value", children="--", className="mb-0")
+                                    ])
+                                ], className="shadow-sm h-100")
+                            ], md=4)
+                        ], className="mb-4"),
+
+                        # Gráficos de Linha (Evolução Temporal)
+                        html.H5([
+                            html.I(className="bi bi-graph-up me-2"),
+                            "Evolução Temporal"
+                        ], className="mt-4 mb-3"),
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader("MTBF - Evolução Mensal"),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            type="default",
+                                            children=dcc.Graph(
+                                                id="line-chart-mtbf-individual",
+                                                config={'displayModeBar': True, 'displaylogo': False}
+                                            )
                                         )
-                                    ]
-                                )
-                            ], width=12)
+                                    ])
+                                ], className="shadow-sm")
+                            ], md=4),
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader("MTTR - Evolução Mensal"),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            type="default",
+                                            children=dcc.Graph(
+                                                id="line-chart-mttr-individual",
+                                                config={'displayModeBar': True, 'displaylogo': False}
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], md=4),
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader("Taxa Avaria - Evolução Mensal"),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            type="default",
+                                            children=dcc.Graph(
+                                                id="line-chart-breakdown-individual",
+                                                config={'displayModeBar': True, 'displaylogo': False}
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], md=4)
+                        ], className="mb-4"),
+
+                        # Comparação com Média Geral
+                        html.H5([
+                            html.I(className="bi bi-bar-chart me-2"),
+                            "Comparação com Média Geral"
+                        ], className="mt-4 mb-3"),
+                        dbc.Row([
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader("Comparativo de Performance"),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            type="default",
+                                            children=dcc.Graph(
+                                                id="comparison-chart-individual",
+                                                config={'displayModeBar': True, 'displaylogo': False}
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ])
                         ])
-                    ], className="p-3")
-                ]
-            ),
 
-            # Tab 2: Hierarquia MTBF
-            dbc.Tab(
-                label="Hierarquia MTBF",
-                tab_id="tab-sunburst-mtbf",
-                children=[
-                    html.Div([
-                        dbc.Card([
-                            dbc.CardHeader([
-                                html.I(className="bi bi-pie-chart-fill me-2"),
-                                html.Strong("Hierarquia de MTBF por Categoria")
-                            ]),
-                            dbc.CardBody([
-                                dcc.Loading(
-                                    id="loading-sunburst-mtbf",
-                                    type="default",
-                                    children=dcc.Graph(
-                                        id='sunburst-chart-mtbf',
-                                        config={
-                                            'displayModeBar': True,
-                                            'displaylogo': False,
-                                            'responsive': True
-                                        }
-                                    )
-                                )
-                            ])
-                        ], className="shadow-sm")
-                    ], className="p-3")
-                ]
-            ),
-
-            # Tab 3: Hierarquia MTTR
-            dbc.Tab(
-                label="Hierarquia MTTR",
-                tab_id="tab-sunburst-mttr",
-                children=[
-                    html.Div([
-                        dbc.Card([
-                            dbc.CardHeader([
-                                html.I(className="bi bi-pie-chart-fill me-2"),
-                                html.Strong("Hierarquia de MTTR por Categoria")
-                            ]),
-                            dbc.CardBody([
-                                dcc.Loading(
-                                    id="loading-sunburst-mttr",
-                                    type="default",
-                                    children=dcc.Graph(
-                                        id='sunburst-chart-mttr',
-                                        config={
-                                            'displayModeBar': True,
-                                            'displaylogo': False,
-                                            'responsive': True
-                                        }
-                                    )
-                                )
-                            ])
-                        ], className="shadow-sm")
-                    ], className="p-3")
-                ]
-            ),
-
-            # Tab 4: Hierarquia Avarias
-            dbc.Tab(
-                label="Hierarquia Avarias",
-                tab_id="tab-sunburst-breakdown",
-                children=[
-                    html.Div([
-                        dbc.Card([
-                            dbc.CardHeader([
-                                html.I(className="bi bi-pie-chart-fill me-2"),
-                                html.Strong("Hierarquia de Taxa de Avaria por Categoria")
-                            ]),
-                            dbc.CardBody([
-                                dcc.Loading(
-                                    id="loading-sunburst-breakdown",
-                                    type="default",
-                                    children=dcc.Graph(
-                                        id='sunburst-chart-breakdown',
-                                        config={
-                                            'displayModeBar': True,
-                                            'displaylogo': False,
-                                            'responsive': True
-                                        }
-                                    )
-                                )
-                            ])
-                        ], className="shadow-sm")
                     ], className="p-3")
                 ]
             )
 
-        ], id="indicator-tabs", active_tab="tab-overview", className="mb-4"),
+        ], id="indicator-tabs", active_tab="tab-general", className="mb-4"),
 
         # ==================== STORES & DOWNLOADS ====================
         dcc.Store(id='store-indicator-filters', storage_type='session'),

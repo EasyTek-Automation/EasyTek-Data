@@ -12,6 +12,7 @@ from dash_bootstrap_templates import ThemeSwitchAIO
 from src.utils.maintenance_demo_data import (
     generate_monthly_kpi_data,
     calculate_kpi_averages,
+    calculate_general_avg_by_month,
     get_kpi_targets,
     get_equipment_names,
     get_equipment_categories
@@ -20,7 +21,9 @@ from src.components.maintenance_kpi_graphs import (
     create_kpi_bar_chart,
     create_kpi_sunburst_chart,
     create_kpi_summary_table,
-    create_empty_kpi_figure
+    create_empty_kpi_figure,
+    create_kpi_line_chart,
+    create_comparison_bar_chart
 )
 
 
@@ -33,22 +36,29 @@ def register_maintenance_kpi_callbacks(app):
     """
 
     # ============================================================
-    # CALLBACK 1: Toggle Filtros
+    # CALLBACK 1: Visibilidade Condicional dos Filtros
     # ============================================================
     @app.callback(
-        Output("collapse-indicator-filters", "is_open"),
-        Input("btn-toggle-indicator-filters", "n_clicks"),
-        State("collapse-indicator-filters", "is_open"),
-        prevent_initial_call=True
+        [
+            Output("div-reference-year", "style"),
+            Output("div-date-range", "style")
+        ],
+        Input("filter-period-type", "value")
     )
-    def toggle_filters(n_clicks, is_open):
-        """Toggle do painel de filtros."""
-        if n_clicks:
-            return not is_open
-        return is_open
+    def toggle_filter_visibility(period_type):
+        """
+        Mostra/esconde filtros baseado no tipo de período selecionado.
+
+        - year ou last12: Mostra ano referência, esconde date picker
+        - custom: Esconde ano referência, mostra date picker
+        """
+        if period_type in ["year", "last12"]:
+            return {"display": "block"}, {"display": "none"}
+        else:  # custom
+            return {"display": "none"}, {"display": "block"}
 
     # ============================================================
-    # CALLBACK 2: Carregar Dados Iniciais (ao abrir página)
+    # CALLBACK 2: Processar Filtros e Gerar Dados
     # ============================================================
     @app.callback(
         Output("store-indicator-filters", "data"),
@@ -57,14 +67,24 @@ def register_maintenance_kpi_callbacks(app):
             Input("interval-initial-load", "n_intervals")  # Carrega automaticamente
         ],
         [
-            State("filter-indicator-year", "value"),
-            State("filter-indicator-months", "value"),
+            State("filter-period-type", "value"),
+            State("filter-reference-year", "value"),
+            State("filter-date-range", "start_date"),
+            State("filter-date-range", "end_date"),
             State("store-indicator-filters", "data")
         ]
     )
-    def load_or_apply_filters(n_clicks, n_intervals, year, months, current_data):
+    def process_filters_and_load_data(n_clicks, n_intervals,
+                                      period_type, ref_year,
+                                      start_date, end_date,
+                                      current_data):
         """
-        Carrega dados automaticamente ao abrir a página OU quando clicar em Aplicar.
+        Processa filtros e gera dados baseado no tipo de período.
+
+        Lógica:
+        - year: Gera dados de todos os meses do ano selecionado
+        - last12: Gera dados dos últimos 12 meses a partir do ano ref
+        - custom: Gera dados do período start_date até end_date
         """
         ctx = dash.callback_context
 
@@ -73,29 +93,45 @@ def register_maintenance_kpi_callbacks(app):
 
         trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
-        # Se já tem dados carregados e trigger foi o interval, não recarregar
+        # Carregar apenas uma vez no início
         if trigger_id == "interval-initial-load" and current_data:
             raise PreventUpdate
 
-        # Se clicou em Aplicar, validar inputs
-        if trigger_id == "btn-apply-indicator-filters":
-            if not n_clicks or not year or not months:
-                raise PreventUpdate
-            if not isinstance(months, list) or len(months) == 0:
-                raise PreventUpdate
+        # Validar inputs baseado no tipo
+        if not period_type:
+            period_type = "last12"  # Padrão
 
-        # Se não tem dados ainda ou valores não são válidos, usar padrões
-        if not year or not months:
-            year = 2026
-            months = list(range(1, 13))
-        elif not isinstance(months, list):
-            months = [months] if months else list(range(1, 13))
+        if period_type in ["year", "last12"]:
+            if not ref_year:
+                ref_year = 2026
 
-        # Gerar dados com os filtros
+            if period_type == "year":
+                # Todos os meses do ano
+                months = list(range(1, 13))
+                year = ref_year
+            else:  # last12
+                # Últimos 12 meses a partir do ano
+                # Assumir que estamos em dez/2026, então últimos 12 = jan-dez 2026
+                months = list(range(1, 13))
+                year = ref_year
+
+        else:  # custom
+            if not start_date or not end_date:
+                # Usar padrão se não informado
+                year = 2026
+                months = list(range(1, 13))
+            else:
+                # TODO: Implementar lógica para extrair ano/meses do date range
+                # Por enquanto usar todos os meses de 2026
+                year = 2026
+                months = list(range(1, 13))
+
+        # Gerar dados
         all_equipment = list(get_equipment_names().keys())
         data = generate_monthly_kpi_data(year, months, all_equipment)
 
         return {
+            "period_type": period_type,
             "year": year,
             "months": months,
             "equipment_ids": all_equipment,
@@ -416,3 +452,132 @@ def register_maintenance_kpi_callbacks(app):
         current_data["data"] = new_data
 
         return current_data
+
+    # ============================================================
+    # CALLBACK 9: Atualizar Cards Individuais
+    # ============================================================
+    @app.callback(
+        [
+            Output("individual-mtbf-value", "children"),
+            Output("individual-mttr-value", "children"),
+            Output("individual-breakdown-value", "children")
+        ],
+        [
+            Input("store-indicator-filters", "data"),
+            Input("dropdown-equipment-individual", "value")
+        ]
+    )
+    def update_individual_cards(stored_data, equipment_id):
+        """
+        Atualiza os 3 cards de resumo do equipamento selecionado.
+        """
+        if not stored_data or not equipment_id:
+            return ["--", "--", "--"]
+
+        data = stored_data["data"]
+        equipment_ids = stored_data["equipment_ids"]
+        months = stored_data["months"]
+
+        # Calcular médias por equipamento
+        averages = calculate_kpi_averages(data, equipment_ids, months)
+
+        if not averages.get("by_equipment") or equipment_id not in averages["by_equipment"]:
+            return ["--", "--", "--"]
+
+        eq_data = averages["by_equipment"][equipment_id]
+
+        return [
+            f"{eq_data['mtbf']:.1f} h",
+            f"{eq_data['mttr']:.1f} h",
+            f"{eq_data['breakdown_rate']:.1f} %"
+        ]
+
+    # ============================================================
+    # CALLBACK 10: Atualizar Tab Individual (Gráficos)
+    # ============================================================
+    @app.callback(
+        [
+            Output("line-chart-mtbf-individual", "figure"),
+            Output("line-chart-mttr-individual", "figure"),
+            Output("line-chart-breakdown-individual", "figure"),
+            Output("comparison-chart-individual", "figure")
+        ],
+        [
+            Input("store-indicator-filters", "data"),
+            Input("dropdown-equipment-individual", "value"),
+            Input(ThemeSwitchAIO.ids.switch("theme"), "value")
+        ]
+    )
+    def update_individual_tab(stored_data, equipment_id, theme_switch_on):
+        """
+        Atualiza gráficos da tab Individual quando:
+        - Dados são carregados/atualizados
+        - Equipamento selecionado muda
+        - Tema muda
+        """
+        import plotly.graph_objects as go
+
+        template = 'minty' if theme_switch_on else 'darkly'
+
+        if not stored_data or not equipment_id:
+            # Retornar figuras vazias
+            return [go.Figure()] * 4
+
+        data = stored_data["data"]
+        targets = stored_data["targets"]
+        names = stored_data["names"]
+        months = stored_data["months"]
+        all_equipment = stored_data["equipment_ids"]
+
+        # Calcular médias gerais por mês
+        general_avg_by_month = calculate_general_avg_by_month(data, all_equipment, months)
+
+        # Dados do equipamento selecionado
+        eq_data_by_month = data.get(equipment_id, [])
+
+        if not eq_data_by_month or not general_avg_by_month:
+            return [go.Figure()] * 4
+
+        # Extrair valores por mês
+        mtbf_values = [m["mtbf"] for m in eq_data_by_month if m["month"] in months]
+        mttr_values = [m["mttr"] for m in eq_data_by_month if m["month"] in months]
+        breakdown_values = [m["breakdown_rate"] for m in eq_data_by_month if m["month"] in months]
+
+        mtbf_avg = [general_avg_by_month[m]["mtbf"] for m in months if m in general_avg_by_month]
+        mttr_avg = [general_avg_by_month[m]["mttr"] for m in months if m in general_avg_by_month]
+        breakdown_avg = [general_avg_by_month[m]["breakdown_rate"] for m in months if m in general_avg_by_month]
+
+        # Criar gráficos de linha
+        fig_mtbf = create_kpi_line_chart(
+            months, mtbf_values, mtbf_avg,
+            "MTBF", names.get(equipment_id, equipment_id), targets["mtbf"], template
+        )
+
+        fig_mttr = create_kpi_line_chart(
+            months, mttr_values, mttr_avg,
+            "MTTR", names.get(equipment_id, equipment_id), targets["mttr"], template
+        )
+
+        fig_breakdown = create_kpi_line_chart(
+            months, breakdown_values, breakdown_avg,
+            "Taxa de Avaria", names.get(equipment_id, equipment_id), targets["breakdown_rate"], template
+        )
+
+        # Gráfico de comparação
+        eq_summary = {
+            "mtbf": sum(mtbf_values) / len(mtbf_values) if mtbf_values else 0,
+            "mttr": sum(mttr_values) / len(mttr_values) if mttr_values else 0,
+            "breakdown_rate": sum(breakdown_values) / len(breakdown_values) if breakdown_values else 0
+        }
+
+        general_summary = {
+            "mtbf": sum(mtbf_avg) / len(mtbf_avg) if mtbf_avg else 0,
+            "mttr": sum(mttr_avg) / len(mttr_avg) if mttr_avg else 0,
+            "breakdown_rate": sum(breakdown_avg) / len(breakdown_avg) if breakdown_avg else 0
+        }
+
+        fig_comparison = create_comparison_bar_chart(
+            eq_summary, general_summary, names.get(equipment_id, equipment_id), template
+        )
+
+        return [fig_mtbf, fig_mttr, fig_breakdown, fig_comparison]
