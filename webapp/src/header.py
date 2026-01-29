@@ -49,7 +49,8 @@ from src.config.theme_config import URL_THEME_MINTY, URL_THEME_DARKLY
 from src.components.headers import (
     create_energy_filters,
     create_states_filters,
-    create_default_filters
+    create_default_filters,
+    create_maintenance_indicators_filters
 )
 
 # Footer reutilizável para dropdowns
@@ -67,6 +68,8 @@ def get_filters_for_page(pathname):
         return create_states_filters()
     elif pathname in ["/energy", "/utilities/energy"]:
         return create_energy_filters()
+    elif pathname == "/maintenance/indicators":
+        return create_maintenance_indicators_filters()
     else:
         return create_default_filters()
 

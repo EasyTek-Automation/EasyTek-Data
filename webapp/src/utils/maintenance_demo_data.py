@@ -258,3 +258,51 @@ def check_equipment_meets_targets(mtbf: float, mttr: float,
     breakdown_ok = breakdown_rate <= targets["breakdown_rate"]
 
     return mtbf_ok and mttr_ok and breakdown_ok
+
+
+def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
+                                   equipment_ids: List[str],
+                                   months: List[int]) -> Dict[int, Dict]:
+    """
+    Calcula média geral por mês (para todos equipamentos).
+
+    Útil para comparar equipamento individual com a média geral.
+
+    Args:
+        data: Dados gerados por generate_monthly_kpi_data()
+        equipment_ids: Lista de IDs dos equipamentos
+        months: Lista de meses a considerar
+
+    Returns:
+        Dicionário com médias por mês:
+        {
+            1: {"mtbf": X, "mttr": Y, "breakdown_rate": Z},
+            2: {...},
+            ...
+        }
+    """
+    result = {}
+
+    for month in months:
+        mtbf_sum = 0
+        mttr_sum = 0
+        breakdown_sum = 0
+        count = 0
+
+        for eq_id in equipment_ids:
+            for month_data in data[eq_id]:
+                if month_data["month"] == month:
+                    mtbf_sum += month_data["mtbf"]
+                    mttr_sum += month_data["mttr"]
+                    breakdown_sum += month_data["breakdown_rate"]
+                    count += 1
+                    break
+
+        if count > 0:
+            result[month] = {
+                "mtbf": round(mtbf_sum / count, 1),
+                "mttr": round(mttr_sum / count, 1),
+                "breakdown_rate": round(breakdown_sum / count, 1)
+            }
+
+    return result
