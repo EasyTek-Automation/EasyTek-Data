@@ -444,12 +444,12 @@ def layout():
         dcc.Store(id='store-indicator-filters', storage_type='session'),
         dcc.Download(id="download-indicators-data"),
 
-        # Interval para carregar dados automaticamente ao abrir a página
+        # Interval para carregamento inicial de dados (executa apenas 1 vez)
         dcc.Interval(
             id='interval-initial-load',
-            interval=500,  # 500ms
+            interval=500,  # 500ms (carrega rápido no início)
             n_intervals=0,
-            max_intervals=1  # Dispara apenas uma vez
+            max_intervals=1  # Executa apenas 1 vez no carregamento
         )
 
     ], fluid=True, className="p-4")

@@ -129,40 +129,123 @@ def get_kpi_targets(equipment_id: str = None) -> Dict[str, float]:
     """
     Retorna as metas configuradas para os KPIs de um equipamento específico.
 
+    Busca APENAS do MongoDB (AMG_MaintenanceTargets).
+    Se não encontrar configuração, retorna valores padrão.
+
     Args:
         equipment_id: ID do equipamento (ex: "LONGI001"). Se None, retorna meta geral.
 
     Returns:
         Dict com chaves: mtbf, mttr (em horas), breakdown_rate
     """
-    if equipment_id and equipment_id in EQUIPMENT_TARGETS_2026:
-        # Meta específica do equipamento
-        targets = EQUIPMENT_TARGETS_2026[equipment_id].copy()
-        # Converter MTTR de minutos para horas
-        targets["mttr"] = targets["mttr"] / 60.0
-        return targets
-    else:
-        # Meta geral da planta
-        targets = EQUIPMENT_TARGETS_2026["GENERAL"].copy()
-        # Converter MTTR de minutos para horas
-        targets["mttr"] = targets["mttr"] / 60.0
-        return targets
+    try:
+        from src.database.connection import get_mongo_connection
+        collection = get_mongo_connection("AMG_MaintenanceTargets")
+        config = collection.find_one()
+
+        if config and config.get("general"):
+            general = config.get("general", {})
+            equipment_targets = config.get("equipment_targets", {})
+
+            # Verificar se os valores gerais são válidos
+            if general.get("mtbf") is not None and general.get("mttr") is not None and general.get("breakdown_rate") is not None:
+                if equipment_id and equipment_id in equipment_targets:
+                    # Meta específica do equipamento
+                    eq_config = equipment_targets[equipment_id]
+                    mttr_value = eq_config.get("mttr", general.get("mttr"))
+                    return {
+                        "mtbf": eq_config.get("mtbf", general.get("mtbf")),
+                        "mttr": mttr_value / 60.0,  # min -> h
+                        "breakdown_rate": eq_config.get("breakdown_rate", general.get("breakdown_rate"))
+                    }
+                else:
+                    # Meta geral
+                    return {
+                        "mtbf": general.get("mtbf"),
+                        "mttr": general.get("mttr") / 60.0,  # min -> h
+                        "breakdown_rate": general.get("breakdown_rate")
+                    }
+    except Exception as e:
+        print(f"[ERRO] Falha ao buscar metas do MongoDB: {e}")
+
+    # Se não encontrou configuração, retornar valores padrão
+    print(f"[AVISO] Nenhuma configuração encontrada para {equipment_id or 'GENERAL'}. Configure as metas em /maintenance/config")
+    return {
+        "mtbf": 10.0,
+        "mttr": 0.5,
+        "breakdown_rate": 5.0
+    }
 
 
 def get_all_equipment_targets() -> Dict[str, Dict[str, float]]:
     """
     Retorna todas as metas de todos os equipamentos.
 
+    Busca APENAS do MongoDB (AMG_MaintenanceTargets).
+    Se não encontrar configuração, retorna valores padrão.
+
     Returns:
         Dict mapeando equipment_id -> {mtbf, mttr (horas), breakdown_rate}
     """
+    try:
+        from src.database.connection import get_mongo_connection
+        collection = get_mongo_connection("AMG_MaintenanceTargets")
+        config = collection.find_one()
+
+        if config and config.get("general"):
+            general = config.get("general", {})
+            equipment_targets = config.get("equipment_targets", {})
+
+            # Verificar se os valores gerais são válidos
+            if general.get("mtbf") is not None and general.get("mttr") is not None and general.get("breakdown_rate") is not None:
+                all_targets = {}
+
+                # Para cada equipamento no sistema, buscar meta específica ou usar geral
+                equipment_list = get_equipment_names()
+                for eq_id in equipment_list:
+                    if eq_id in equipment_targets:
+                        eq_config = equipment_targets[eq_id]
+                        mttr_value = eq_config.get("mttr", general.get("mttr"))
+                        all_targets[eq_id] = {
+                            "mtbf": eq_config.get("mtbf", general.get("mtbf")),
+                            "mttr": mttr_value / 60.0,  # min -> h
+                            "breakdown_rate": eq_config.get("breakdown_rate", general.get("breakdown_rate"))
+                        }
+                    else:
+                        # Usar meta geral
+                        all_targets[eq_id] = {
+                            "mtbf": general.get("mtbf"),
+                            "mttr": general.get("mttr") / 60.0,  # min -> h
+                            "breakdown_rate": general.get("breakdown_rate")
+                        }
+
+                # Adicionar meta geral também
+                all_targets["GENERAL"] = {
+                    "mtbf": general.get("mtbf"),
+                    "mttr": general.get("mttr") / 60.0,  # min -> h
+                    "breakdown_rate": general.get("breakdown_rate")
+                }
+
+                return all_targets
+    except Exception as e:
+        print(f"[ERRO] Falha ao buscar metas do MongoDB: {e}")
+
+    # Se não encontrou configuração, retornar valores padrão para todos equipamentos
+    print(f"[AVISO] Nenhuma configuração de metas encontrada. Configure as metas em /maintenance/config")
     all_targets = {}
-    for eq_id, targets in EQUIPMENT_TARGETS_2026.items():
-        all_targets[eq_id] = {
-            "mtbf": targets["mtbf"],
-            "mttr": targets["mttr"] / 60.0,  # Converter minutos para horas
-            "breakdown_rate": targets["breakdown_rate"]
-        }
+    equipment_list = get_equipment_names()
+
+    default_targets = {
+        "mtbf": 10.0,
+        "mttr": 0.5,
+        "breakdown_rate": 5.0
+    }
+
+    for eq_id in equipment_list:
+        all_targets[eq_id] = default_targets.copy()
+
+    all_targets["GENERAL"] = default_targets.copy()
+
     return all_targets
 
 

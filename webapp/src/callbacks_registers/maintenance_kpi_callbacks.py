@@ -108,9 +108,14 @@ def register_maintenance_kpi_callbacks(app):
 
         trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
-        # Carregar apenas uma vez no início
-        if trigger_id == "interval-initial-load" and current_data:
-            raise PreventUpdate
+        # Se interval disparou e NÃO há dados ainda, carregar dados iniciais
+        # Se botão apply foi clicado, sempre recarregar
+        if trigger_id == "interval-initial-load" and current_data and current_data.get("data"):
+            # Interval disparou mas já temos dados - apenas atualizar metas sem recarregar ZPP
+            print("[INFO] Interval: Atualizando apenas metas (dados já carregados)")
+            current_data["equipment_targets"] = get_all_equipment_targets()
+            current_data["targets"] = get_kpi_targets("GENERAL")
+            return current_data
 
         # Validar inputs baseado no tipo
         if not period_type:
@@ -537,38 +542,46 @@ def register_maintenance_kpi_callbacks(app):
     )
     def refresh_data(n_clicks, current_data):
         """
-        Atualiza dados (reais do ZPP ou fictícios) com mesmos filtros.
+        Força atualização completa de dados E metas do MongoDB.
+        Útil após salvar novas metas na página de configuração.
         """
         if not current_data:
             raise PreventUpdate
 
-        year = current_data["year"]
-        months = current_data["months"]
+        print("\n" + "="*80)
+        print(">>> REFRESH: Forçando atualização completa de dados e metas")
+        print("="*80)
 
-        # Re-buscar dados com mesmos parâmetros - INTEGRAÇÃO ZPP
+        year = current_data.get("year", 2025)
+        months = current_data.get("months", list(range(1, 13)))
+
+        # PASSO 1: Atualizar metas do MongoDB (SEMPRE)
+        print("[1/2] Atualizando metas do MongoDB...")
+        equipment_targets = get_all_equipment_targets()
+        general_targets = get_kpi_targets("GENERAL")
+        print(f"  - Meta geral MTBF: {general_targets['mtbf']:.1f}h")
+        print(f"  - Meta geral MTTR: {general_targets['mttr']*60:.0f}min")
+        print(f"  - Metas específicas: {len([k for k in equipment_targets.keys() if k != 'GENERAL'])} equipamentos")
+
+        # PASSO 2: Re-buscar dados do ZPP
         new_data = {}
         has_data = False
 
         if ZPP_KPI_AVAILABLE:
             try:
-                # Tentar buscar dados reais atualizados do ZPP
-                print(f"[INFO] Atualizando dados ZPP para {year}, meses {months}")
+                print(f"[2/2] Atualizando dados ZPP para {year}, meses {months}...")
                 new_data = fetch_zpp_kpi_data(year, months)
                 has_data = len(new_data) > 0
 
                 if has_data:
-                    print(f"[✓] Dados ZPP atualizados: {len(new_data)} equipamentos")
+                    print(f"  - ✓ Dados carregados: {len(new_data)} equipamentos")
                 else:
-                    print("[AVISO] Nenhum dado disponível no banco após atualização")
+                    print("  - ⚠ Nenhum dado disponível no banco")
             except Exception as e:
-                # Sem fallback - apenas informar erro
-                print(f"[ERRO] Erro ao atualizar dados ZPP: {e}")
-                print("[INFO] Nenhum dado será exibido")
+                print(f"  - ✗ ERRO ao atualizar dados ZPP: {e}")
                 has_data = False
         else:
-            # Módulo ZPP não disponível
-            print("[AVISO] Módulo ZPP não disponível")
-            print("[INFO] Nenhum dado será exibido")
+            print("[2/2] Módulo ZPP não disponível")
             has_data = False
 
         # Atualizar nomes e categorias se houver dados
@@ -580,11 +593,40 @@ def register_maintenance_kpi_callbacks(app):
             except Exception as e:
                 print(f"[AVISO] Erro ao atualizar nomes/categorias: {e}")
 
-        # Atualizar dados e flag
+        # Atualizar store com novos dados e metas
         current_data["data"] = new_data
         current_data["has_data"] = has_data
+        current_data["equipment_targets"] = equipment_targets
+        current_data["targets"] = general_targets
 
-        # IMPORTANTE: Sempre atualizar metas (mesmo sem dados)
+        print("="*80 + "\n")
+        return current_data
+
+    # ============================================================
+    # CALLBACK 8B: Auto-refresh ao navegar para a página
+    # ============================================================
+    @app.callback(
+        Output("store-indicator-filters", "data", allow_duplicate=True),
+        [Input("url", "pathname")],
+        [State("store-indicator-filters", "data")],
+        prevent_initial_call=True
+    )
+    def auto_refresh_on_navigation(pathname, current_data):
+        """
+        Atualiza metas quando usuário navega de volta para a página de indicadores.
+        Útil após salvar metas na página de configuração.
+        """
+        # Apenas atualizar se estiver na página de indicadores
+        if pathname != "/maintenance/indicators":
+            raise PreventUpdate
+
+        # Se não há dados ainda, deixar o interval inicial carregar
+        if not current_data or not current_data.get("data"):
+            raise PreventUpdate
+
+        print("[INFO] Navegação detectada - Atualizando metas do MongoDB...")
+
+        # Atualizar apenas as metas (não recarregar dados pesados do ZPP)
         current_data["equipment_targets"] = get_all_equipment_targets()
         current_data["targets"] = get_kpi_targets("GENERAL")
 

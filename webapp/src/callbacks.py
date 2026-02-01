@@ -33,6 +33,7 @@ from src.callbacks_registers.energy_config_callbacks import register_energy_conf
 from src.callbacks_registers.energy_sidebar_callbacks import register_energy_sidebar_callbacks
 from src.callbacks_registers.procedures_collapse_callbacks import register_procedures_collapse_callbacks
 from src.callbacks_registers.maintenance_kpi_callbacks import register_maintenance_kpi_callbacks
+from src.callbacks_registers.maintenance_config_callbacks import register_maintenance_config_callbacks
 
 from src.pages.energy import callbacks as energy_callbacks
 
@@ -86,3 +87,6 @@ def register_callbacks(app):
 
     # Maintenance KPI indicators callbacks
     register_maintenance_kpi_callbacks(app)
+
+    # Maintenance configuration callbacks
+    register_maintenance_config_callbacks(app)

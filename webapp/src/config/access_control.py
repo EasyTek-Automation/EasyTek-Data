@@ -114,6 +114,12 @@ ROUTE_ACCESS = {
         "min_level": 1,
         "description": "Indicadores de Manutenção"
     },
+    "/maintenance/config": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 3,  # Apenas administradores
+        "description": "Configuração de Metas de Manutenção"
+    },
     "/maintenance/procedures": {
         "shared": False,
         "perfis": ["manutencao"],

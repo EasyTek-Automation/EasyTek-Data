@@ -122,9 +122,32 @@ def create_header(pathname, user):
                     html.Div([html.Span(history_icon(), style={"marginRight": "8px"}), "Histórico de Intervenções"], className="d-flex align-items-center"),
                     href="/maintenance/history", disabled=True, style={"opacity": "0.5"}
                 ),
+
+                # Submenu: Indicadores de Manutenção
                 dbc.DropdownMenuItem(
-                    html.Div([html.Span(graph_icon(), style={"marginRight": "8px"}), "Indicadores de Manutenção"], className="d-flex align-items-center"),
-                    href="/maintenance/indicators", disabled=False
+                    html.Div([
+                        html.Span(graph_icon(), style={"marginRight": "8px"}),
+                        "Indicadores de Manutenção",
+                        html.Span(html.I(className="bi bi-chevron-right ms-2"), style={"marginLeft": "auto"})
+                    ], className="d-flex align-items-center justify-content-between"),
+                    header=True,
+                    className="dropdown-submenu-header"
+                ),
+                dbc.DropdownMenuItem(
+                    html.Div([
+                        html.Span(html.I(className="bi bi-speedometer2 me-2")),
+                        "Dashboard"
+                    ], className="d-flex align-items-center ps-4"),
+                    href="/maintenance/indicators",
+                    active=(pathname == "/maintenance/indicators")
+                ),
+                dbc.DropdownMenuItem(
+                    html.Div([
+                        html.Span(html.I(className="bi bi-sliders me-2")),
+                        "Configurar Metas"
+                    ], className="d-flex align-items-center ps-4"),
+                    href="/maintenance/config",
+                    active=(pathname == "/maintenance/config")
                 ),
 
                 # Footer "Powered By"
