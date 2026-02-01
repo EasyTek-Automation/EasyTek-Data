@@ -19,12 +19,69 @@ except ImportError as e:
     ZPP_AVAILABLE = False
 
 # ============================================
-# CONFIGURAÇÃO DE METAS (FÁCIL PERSONALIZAÇÃO)
+# CONFIGURAÇÃO DE METAS POR EQUIPAMENTO (2026)
+# ============================================
+# Metas individualizadas por equipamento (coluna 2026 da planilha SAP)
+EQUIPMENT_TARGETS_2026 = {
+    # Meta geral da planta
+    "GENERAL": {
+        "mtbf": 11.30,      # horas
+        "mttr": 39.00,      # minutos (já convertido)
+        "breakdown_rate": 5.1  # %
+    },
+    # Longitudinais
+    "LONGI001": {  # LCL 4,5
+        "mtbf": 11.3,
+        "mttr": 32,
+        "breakdown_rate": 3.2
+    },
+    "LONGI002": {  # LCL 8
+        "mtbf": 12,
+        "mttr": 40,
+        "breakdown_rate": 5.5
+    },
+    # Transversais
+    "TRANS003": {  # LCT 2,5
+        "mtbf": 15,
+        "mttr": 42,
+        "breakdown_rate": 2.5
+    },
+    "TRANS002": {  # LCT 8
+        "mtbf": 15,
+        "mttr": 40,
+        "breakdown_rate": 4.0
+    },
+    "TRANS001": {  # LCT 16
+        "mtbf": 20,
+        "mttr": 50,
+        "breakdown_rate": 4.0
+    },
+    # Prensas
+    "PRENS001": {  # Prensa 01
+        "mtbf": 9,
+        "mttr": 35,
+        "breakdown_rate": 4.5
+    },
+    "PRENS002": {  # Prensa 02
+        "mtbf": 11,
+        "mttr": 40,
+        "breakdown_rate": 5.0
+    },
+    # LWB (se existir no sistema)
+    "LWB": {
+        "mtbf": 30,
+        "mttr": 30,
+        "breakdown_rate": 2.0
+    }
+}
+
+# ============================================
+# METAS ANTIGAS (DEPRECADO - Manter para compatibilidade)
 # ============================================
 KPI_TARGETS = {
-    "mtbf": 20.0,           # horas - Mean Time Between Failures - EDITÁVEL AQUI
-    "mttr": 2.0,            # horas - Mean Time To Repair - EDITÁVEL AQUI
-    "breakdown_rate": 3.0   # % - Taxa de Avaria - EDITÁVEL AQUI
+    "mtbf": 11.30,          # horas - Meta geral (média da planta)
+    "mttr": 39.0 / 60,      # horas - Meta geral convertida de minutos
+    "breakdown_rate": 5.1   # % - Meta geral
 }
 
 # Dicionário de nomes de equipamentos (expansível e personalizável)
@@ -68,14 +125,45 @@ BASE_VALUES = {
 }
 
 
-def get_kpi_targets() -> Dict[str, float]:
+def get_kpi_targets(equipment_id: str = None) -> Dict[str, float]:
     """
-    Retorna as metas configuradas para os KPIs.
+    Retorna as metas configuradas para os KPIs de um equipamento específico.
+
+    Args:
+        equipment_id: ID do equipamento (ex: "LONGI001"). Se None, retorna meta geral.
 
     Returns:
-        Dict com chaves: mtbf, mttr, breakdown_rate
+        Dict com chaves: mtbf, mttr (em horas), breakdown_rate
     """
-    return KPI_TARGETS.copy()
+    if equipment_id and equipment_id in EQUIPMENT_TARGETS_2026:
+        # Meta específica do equipamento
+        targets = EQUIPMENT_TARGETS_2026[equipment_id].copy()
+        # Converter MTTR de minutos para horas
+        targets["mttr"] = targets["mttr"] / 60.0
+        return targets
+    else:
+        # Meta geral da planta
+        targets = EQUIPMENT_TARGETS_2026["GENERAL"].copy()
+        # Converter MTTR de minutos para horas
+        targets["mttr"] = targets["mttr"] / 60.0
+        return targets
+
+
+def get_all_equipment_targets() -> Dict[str, Dict[str, float]]:
+    """
+    Retorna todas as metas de todos os equipamentos.
+
+    Returns:
+        Dict mapeando equipment_id -> {mtbf, mttr (horas), breakdown_rate}
+    """
+    all_targets = {}
+    for eq_id, targets in EQUIPMENT_TARGETS_2026.items():
+        all_targets[eq_id] = {
+            "mtbf": targets["mtbf"],
+            "mttr": targets["mttr"] / 60.0,  # Converter minutos para horas
+            "breakdown_rate": targets["breakdown_rate"]
+        }
+    return all_targets
 
 
 def get_equipment_names() -> Dict[str, str]:

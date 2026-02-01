@@ -82,29 +82,29 @@ def create_kpi_bar_chart(equipment_ids: List[str],
                          values: List[float],
                          kpi_name: str,
                          average_value: float,
-                         target_value: float,
+                         target_values: Dict[str, float],  # ALTERADO: Dict de metas por equipamento
                          equipment_names_dict: Dict[str, str],
                          template: str = 'minty') -> go.Figure:
     """
-    Cria gráfico de barras com média, meta e linha de tendência.
+    Cria gráfico de barras com média e metas individualizadas por equipamento.
 
     Args:
         equipment_ids: Lista de IDs dos equipamentos
         values: Lista de valores do KPI
         kpi_name: "MTBF", "MTTR" ou "Taxa de Avaria"
         average_value: Valor médio calculado
-        target_value: Valor da meta
+        target_values: Dicionário de metas {equipment_id: meta_value}
         equipment_names_dict: Dicionário de nomes
         template: 'minty' ou 'darkly'
 
     Returns:
-        Figura Plotly com barras, linhas de média/meta e tendência
+        Figura Plotly com barras, linhas de média e tendência
     """
     # Converter MTTR de horas para minutos
     if kpi_name == "MTTR":
         values = [v * 60 for v in values]
         average_value = average_value * 60
-        target_value = target_value * 60
+        target_values = {eq_id: meta * 60 for eq_id, meta in target_values.items()}
 
     # Determinar unidade
     if kpi_name == "MTBF":
@@ -114,15 +114,18 @@ def create_kpi_bar_chart(equipment_ids: List[str],
     else:
         unit = "%"
 
-    # Lógica de cores das barras (verde: atende meta, vermelho: não atende)
+    # Lógica de cores das barras (verde: atende meta individual, vermelho: não atende)
     bar_colors = []
-    for val in values:
+    for eq_id, val in zip(equipment_ids, values):
+        # Obter meta específica do equipamento (fallback para média geral)
+        eq_target = target_values.get(eq_id, average_value)
+
         if kpi_name == "MTBF":
             # Maior é melhor
-            color = '#20c997' if val >= target_value else '#dc3545'
+            color = '#20c997' if val >= eq_target else '#dc3545'
         else:
             # Menor é melhor (MTTR, Taxa Avaria)
-            color = '#20c997' if val <= target_value else '#dc3545'
+            color = '#20c997' if val <= eq_target else '#dc3545'
         bar_colors.append(color)
 
     # Criar figura
@@ -157,21 +160,13 @@ def create_kpi_bar_chart(equipment_ids: List[str],
         line_dash="dash",
         line_color="#0d6efd",
         line_width=2,
-        annotation_text=f"Média: {average_value:.1f} {unit}",
+        annotation_text=f"Média Geral: {average_value:.1f} {unit}",
         annotation_position="top right",
         annotation=dict(font=dict(size=11))
     )
 
-    # Linha de meta (amarela tracejada)
-    fig.add_hline(
-        y=target_value,
-        line_dash="dash",
-        line_color="#ffc107",
-        line_width=2,
-        annotation_text=f"Meta: {target_value:.1f} {unit}",
-        annotation_position="bottom right",
-        annotation=dict(font=dict(size=11))
-    )
+    # NOTA: Metas individuais são refletidas nas cores das barras
+    # Verde = atende meta individual, Vermelho = não atende meta individual
 
     # Linha de tendência (polinomial grau 2)
     if len(values) >= 3:
@@ -335,37 +330,44 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
 
 
 def create_kpi_summary_table(data_by_equipment: Dict[str, Dict[str, float]],
-                             targets: Dict[str, float],
+                             targets: Dict[str, Dict[str, float]],  # ALTERADO: Dict de metas por equipamento
                              equipment_names_dict: Dict[str, str]) -> dbc.Table:
     """
-    Cria tabela resumo com todos KPIs por equipamento.
+    Cria tabela resumo com todos KPIs por equipamento com metas individualizadas.
 
     Args:
         data_by_equipment: {
             "LONGI001": {"mtbf": 22.3, "mttr": 1.8, "breakdown_rate": 2.9},
             ...
         }
-        targets: {"mtbf": 20.0, "mttr": 2.0, "breakdown_rate": 3.0}
+        targets: {
+            "LONGI001": {"mtbf": 11.3, "mttr": 0.533, "breakdown_rate": 3.2},
+            "GENERAL": {"mtbf": 11.3, "mttr": 0.65, "breakdown_rate": 5.1},
+            ...
+        }
         equipment_names_dict: Dicionário de nomes
 
     Returns:
         Componente dbc.Table
     """
-    from src.utils.maintenance_demo_data import check_equipment_meets_targets
-
     # Ordenar equipamentos por ID
     sorted_equipment = sorted(data_by_equipment.keys())
+
+    # Meta geral como fallback
+    general_target = targets.get("GENERAL", {"mtbf": 0, "mttr": 999, "breakdown_rate": 100})
 
     rows = []
     for eq_id in sorted_equipment:
         eq_data = data_by_equipment[eq_id]
 
-        # Verificar se atende todas as metas
-        meets_all = check_equipment_meets_targets(
-            eq_data["mtbf"],
-            eq_data["mttr"],
-            eq_data["breakdown_rate"]
-        )
+        # Obter meta específica do equipamento (ou usar meta geral como fallback)
+        eq_target = targets.get(eq_id, general_target)
+
+        # Verificar se atende todas as metas INDIVIDUAIS
+        mtbf_ok = eq_data["mtbf"] >= eq_target["mtbf"]
+        mttr_ok = eq_data["mttr"] <= eq_target["mttr"]
+        breakdown_ok = eq_data["breakdown_rate"] <= eq_target["breakdown_rate"]
+        meets_all = mtbf_ok and mttr_ok and breakdown_ok
 
         rows.append(
             html.Tr([
@@ -656,6 +658,291 @@ def create_comparison_bar_chart(equipment_data: Dict[str, float],
         ),
         height=400,
         margin=dict(t=60, b=60, l=60, r=40)
+    )
+
+    return fig
+
+
+def create_top_breakdowns_chart(breakdowns_data: List[Dict],
+                                  equipment_name: str,
+                                  template: str = 'minty') -> go.Figure:
+    """
+    Cria gráfico de barras horizontais mostrando as top paradas por duração.
+
+    Args:
+        breakdowns_data: Lista de dicionários com dados das paradas:
+            [
+                {
+                    "date": datetime.date(2025, 1, 15),
+                    "motivo": "201",
+                    "duracao_min": 120.5,
+                    "duracao_horas": 2.01,
+                    "descricao": "Avaria Elétrica"
+                },
+                ...
+            ]
+        equipment_name: Nome do equipamento
+        template: 'minty' ou 'darkly'
+
+    Returns:
+        Figura Plotly com barras horizontais ordenadas por duração
+    """
+    if not breakdowns_data:
+        # Retornar figura vazia com mensagem
+        is_dark = (template == 'darkly')
+        bg_color = '#2c2c2c' if is_dark else '#ffffff'
+        text_color = '#adb5bd' if is_dark else '#495057'
+
+        fig = go.Figure()
+        fig.add_annotation(
+            x=0.5, y=0.5,
+            text="Nenhuma parada registrada no período selecionado",
+            xref="paper", yref="paper",
+            showarrow=False,
+            font=dict(size=14, color=text_color)
+        )
+        fig.update_layout(
+            template=template,
+            plot_bgcolor=bg_color,
+            paper_bgcolor=bg_color,
+            xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+            yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+            height=400,
+            margin=dict(t=40, b=20, l=20, r=20)
+        )
+        return fig
+
+    # ✅ AGRUPAR: Mesmo dia + mesmo motivo = somar durações
+    from collections import defaultdict
+
+    grouped = defaultdict(lambda: {"duracao_horas": 0, "duracao_min": 0, "count": 0})
+
+    for bd in breakdowns_data:
+        # Chave única: data + descrição
+        key = (bd['date'], bd['descricao'])
+        grouped[key]['duracao_horas'] += bd['duracao_horas']
+        grouped[key]['duracao_min'] += bd['duracao_min']
+        grouped[key]['count'] += 1
+
+    # Reconstruir lista agrupada
+    aggregated_data = []
+    for (date, descricao), values in grouped.items():
+        aggregated_data.append({
+            'date': date,
+            'descricao': descricao,
+            'duracao_horas': round(values['duracao_horas'], 2),
+            'duracao_min': round(values['duracao_min'], 1),
+            'count': values['count']  # Quantas paradas foram somadas
+        })
+
+    # ✅ ORDENAR: Do maior para o menor (por duração)
+    aggregated_data.sort(key=lambda x: x['duracao_horas'], reverse=True)
+
+    # Limitar ao top 10 após agregação
+    aggregated_data = aggregated_data[:10]
+
+    # Criar labels para o eixo Y (data + descrição)
+    y_labels = [
+        f"{bd['date'].strftime('%d/%m')} - {bd['descricao']}"
+        for bd in aggregated_data
+    ]
+
+    # Valores de duração em horas (eixo X)
+    x_values = [bd['duracao_horas'] for bd in aggregated_data]
+
+    # Definir cores baseado na duração (gradiente de vermelho)
+    max_duration = max(x_values) if x_values else 1
+    colors = []
+    for duration in x_values:
+        # Gradiente de vermelho: mais escuro = maior duração
+        intensity = duration / max_duration
+        if intensity > 0.8:
+            color = '#8b0000'  # Vermelho escuro (DarkRed)
+        elif intensity > 0.6:
+            color = '#dc3545'  # Vermelho padrão (Bootstrap danger)
+        elif intensity > 0.4:
+            color = '#fd7e14'  # Laranja
+        elif intensity > 0.2:
+            color = '#ffc107'  # Amarelo
+        else:
+            color = '#20c997'  # Verde (paradas curtas)
+        colors.append(color)
+
+    # Texto nas barras (duração em formato legível + indicador de agrupamento)
+    text_values = []
+    hover_templates = []
+
+    for bd in aggregated_data:
+        # Texto na barra
+        if bd['duracao_horas'] >= 1:
+            base_text = f"{bd['duracao_horas']:.1f}h"
+        else:
+            base_text = f"{bd['duracao_min']:.0f}min"
+
+        # Se houver múltiplas paradas agrupadas, indicar
+        if bd['count'] > 1:
+            text_values.append(f"{base_text} ({bd['count']}x)")
+        else:
+            text_values.append(base_text)
+
+    # Criar figura
+    fig = go.Figure()
+
+    # Adicionar barras horizontais (invertidas para mostrar maior no topo)
+    fig.add_trace(go.Bar(
+        x=x_values,
+        y=y_labels,
+        orientation='h',
+        marker=dict(
+            color=colors,
+            line=dict(color='rgba(0,0,0,0.3)', width=1),
+            cornerradius=4
+        ),
+        text=text_values,
+        textposition='outside',
+        customdata=[[bd['count']] for bd in aggregated_data],
+        hovertemplate=(
+            '<b>%{y}</b><br>' +
+            'Duração Total: %{x:.2f}h<br>' +
+            'Paradas Agrupadas: %{customdata[0]}<br>' +
+            '<extra></extra>'
+        )
+    ))
+
+    # Layout
+    fig.update_layout(
+        template=template,
+        title=dict(
+            text=f"Top {len(breakdowns_data)} Paradas - {equipment_name}",
+            x=0.5,
+            xanchor='center',
+            font=dict(size=14)
+        ),
+        xaxis=dict(
+            title="Duração (horas)",
+            rangemode='tozero'
+        ),
+        yaxis=dict(
+            title="",
+            autorange='reversed',  # Inverter para maior ficar no topo
+            tickfont=dict(size=10)
+        ),
+        showlegend=False,
+        height=max(400, len(breakdowns_data) * 40),  # Altura dinâmica baseada no número de barras
+        margin=dict(t=60, b=60, l=250, r=80),  # Margem esquerda maior para labels
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=12,
+            font_family="Arial"
+        )
+    )
+
+    return fig
+
+
+def create_kpi_gauge(value: float,
+                     kpi_name: str,
+                     target_value: float,
+                     template: str = 'minty') -> go.Figure:
+    """
+    Cria gráfico gauge (velocímetro) para um KPI individual.
+
+    Args:
+        value: Valor atual do KPI
+        kpi_name: "MTBF", "MTTR" ou "Taxa de Avaria"
+        target_value: Meta do KPI
+        template: 'minty' ou 'darkly'
+
+    Returns:
+        Figura Plotly com gauge indicator
+    """
+    # Converter MTTR de horas para minutos
+    if kpi_name == "MTTR":
+        value = value * 60
+        target_value = target_value * 60
+
+    # Determinar unidade e configurações específicas
+    if kpi_name == "MTBF":
+        unit = "h"
+        max_range = max(target_value * 2, value * 1.2)  # Range dinâmico
+        higher_is_better = True
+        # Zonas do gauge (verde-amarelo-vermelho)
+        steps = [
+            {'range': [0, target_value * 0.5], 'color': '#dc3545'},      # Vermelho: muito abaixo
+            {'range': [target_value * 0.5, target_value], 'color': '#ffc107'},  # Amarelo: abaixo da meta
+            {'range': [target_value, max_range], 'color': '#20c997'}     # Verde: acima da meta
+        ]
+    elif kpi_name == "MTTR":
+        unit = "min"
+        max_range = max(target_value * 2, value * 1.2)
+        higher_is_better = False
+        # Zonas invertidas (menor é melhor)
+        steps = [
+            {'range': [0, target_value], 'color': '#20c997'},            # Verde: abaixo da meta
+            {'range': [target_value, target_value * 1.5], 'color': '#ffc107'},  # Amarelo: acima da meta
+            {'range': [target_value * 1.5, max_range], 'color': '#dc3545'}  # Vermelho: muito acima
+        ]
+    else:  # Taxa de Avaria
+        unit = "%"
+        max_range = max(target_value * 2, value * 1.2, 10)  # Mínimo de 10%
+        higher_is_better = False
+        steps = [
+            {'range': [0, target_value], 'color': '#20c997'},
+            {'range': [target_value, target_value * 1.5], 'color': '#ffc107'},
+            {'range': [target_value * 1.5, max_range], 'color': '#dc3545'}
+        ]
+
+    # Determinar cor da barra atual
+    if higher_is_better:
+        bar_color = '#20c997' if value >= target_value else '#dc3545'
+    else:
+        bar_color = '#20c997' if value <= target_value else '#dc3545'
+
+    # Criar gauge
+    fig = go.Figure(go.Indicator(
+        mode="gauge+number+delta",
+        value=value,
+        domain={'x': [0, 1], 'y': [0, 1]},
+        title={
+            'text': f"<b>{kpi_name}</b>",
+            'font': {'size': 18}
+        },
+        number={
+            'suffix': f" {unit}",
+            'font': {'size': 32}
+        },
+        delta={
+            'reference': target_value,
+            'increasing': {'color': '#20c997' if higher_is_better else '#dc3545'},
+            'decreasing': {'color': '#dc3545' if higher_is_better else '#20c997'},
+            'suffix': f" {unit}"
+        },
+        gauge={
+            'axis': {
+                'range': [0, max_range],
+                'ticksuffix': f" {unit}",
+                'tickfont': {'size': 12}
+            },
+            'bar': {'color': bar_color, 'thickness': 0.75},
+            'bgcolor': "white",
+            'borderwidth': 2,
+            'bordercolor': "gray",
+            'steps': steps,
+            'threshold': {
+                'line': {'color': "#0d6efd", 'width': 3},
+                'thickness': 0.75,
+                'value': target_value
+            }
+        }
+    ))
+
+    # Layout
+    fig.update_layout(
+        template=template,
+        height=280,
+        margin=dict(t=40, b=10, l=20, r=20),
+        paper_bgcolor='rgba(0,0,0,0)',
+        font={'family': "Arial"}
     )
 
     return fig

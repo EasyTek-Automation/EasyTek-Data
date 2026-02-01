@@ -460,6 +460,101 @@ def get_zpp_equipment_names() -> Dict[str, str]:
 
 # ==================== FUNÇÃO DE TESTE ====================
 
+def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List[int], top_n: int = 10) -> List[Dict]:
+    """
+    Busca as N paradas com maior duração para um equipamento específico
+
+    Args:
+        equipment_id: ID do equipamento (ex: "LONGI001")
+        year: Ano de referência (ex: 2025)
+        months: Lista de meses (ex: [1, 2, 3])
+        top_n: Número de paradas a retornar (padrão: 10)
+
+    Returns:
+        Lista de dicionários ordenada por duração (maior para menor):
+        [
+            {
+                "date": datetime.date(2025, 1, 15),
+                "motivo": "201",
+                "duracao_min": 120.5,
+                "duracao_horas": 2.01,
+                "descricao": "Avaria Elétrica"  # Descrição do campo 'descripcao_do_motivo'
+            },
+            ...
+        ]
+    """
+    try:
+        collection = get_mongo_connection("ZPP_Paradas_2025")
+
+        # Query MongoDB
+        query = {
+            "_year": year,
+            "_processed": True,
+            "linea": equipment_id,
+            "motivo": {"$in": BREAKDOWN_CODES}
+        }
+
+        # Buscar documentos - AGORA INCLUINDO descripcao_do_motivo
+        cursor = collection.find(
+            query,
+            {
+                "data_inicio": 1,
+                "motivo": 1,
+                "duracao_min": 1,
+                "descripcao_do_motivo": 1,  # ✅ BUSCAR DESCRIÇÃO REAL DO BANCO
+                "_id": 0
+            }
+        ).sort("duracao_min", -1).limit(top_n)  # Ordenar por duração DESC e limitar
+
+        # Processar dados
+        result = []
+        for record in cursor:
+            # Extrair data
+            date_obj = record.get("data_inicio")
+            if date_obj is None:
+                continue
+
+            # Converter para datetime se necessário
+            if isinstance(date_obj, dict) and "$date" in date_obj:
+                date_str = date_obj["$date"]
+                date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            elif isinstance(date_obj, datetime):
+                date = date_obj
+            else:
+                continue
+
+            # Filtrar por mês
+            if date.month not in months:
+                continue
+
+            motivo = record.get("motivo", "")
+            duracao_min = record.get("duracao_min", 0)
+
+            # ✅ USAR DESCRIÇÃO REAL DO BANCO DE DADOS
+            descricao = record.get("descripcao_do_motivo", f"Motivo {motivo}")
+
+            result.append({
+                "date": date.date(),
+                "motivo": motivo,
+                "duracao_min": float(duracao_min),
+                "duracao_horas": round(duracao_min / 60.0, 2),
+                "descricao": descricao  # ✅ DESCRIÇÃO DINÂMICA DO BANCO
+            })
+
+        # Ordenar por duração (maior para menor) - garantir ordem mesmo após filtro
+        result.sort(key=lambda x: x["duracao_min"], reverse=True)
+
+        # Limitar ao top_n após filtro de meses
+        result = result[:top_n]
+
+        print(f"[ZPP] Top {len(result)} paradas encontradas para {equipment_id}")
+        return result
+
+    except Exception as e:
+        print(f"[ERRO] Falha ao buscar top paradas: {e}")
+        return []
+
+
 if __name__ == "__main__":
     """Script de teste para validar cálculos"""
     print("\n" + "="*80)

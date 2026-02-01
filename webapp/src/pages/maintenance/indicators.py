@@ -285,32 +285,69 @@ def layout():
                             ], md=4)
                         ], className="mb-4"),
 
-                        # Cards de Resumo do Equipamento
+                        # Paradas Críticas + Gauges de Indicadores
                         dbc.Row([
                             dbc.Col([
                                 dbc.Card([
+                                    dbc.CardHeader([
+                                        html.I(className="bi bi-graph-up-arrow me-2"),
+                                        html.Strong("Paradas Críticas e Indicadores")
+                                    ]),
                                     dbc.CardBody([
-                                        html.H6("MTBF do Equipamento", className="text-muted mb-2"),
-                                        html.H3(id="individual-mtbf-value", children="--", className="mb-0")
-                                    ])
-                                ], className="shadow-sm h-100")
-                            ], md=4),
-                            dbc.Col([
-                                dbc.Card([
-                                    dbc.CardBody([
-                                        html.H6("MTTR do Equipamento", className="text-muted mb-2"),
-                                        html.H3(id="individual-mttr-value", children="--", className="mb-0")
-                                    ])
-                                ], className="shadow-sm h-100")
-                            ], md=4),
-                            dbc.Col([
-                                dbc.Card([
-                                    dbc.CardBody([
-                                        html.H6("Taxa de Avaria", className="text-muted mb-2"),
-                                        html.H3(id="individual-breakdown-value", children="--", className="mb-0")
-                                    ])
-                                ], className="shadow-sm h-100")
-                            ], md=4)
+                                        dbc.Row([
+                                            # Coluna 1/3: Gráfico de barras horizontais (Top Paradas)
+                                            dbc.Col([
+                                                html.H6("Top 10 Paradas com Maior Tempo", className="text-center mb-3"),
+                                                dcc.Loading(
+                                                    type="default",
+                                                    children=dcc.Graph(
+                                                        id="top-breakdowns-chart-individual",
+                                                        config={'displayModeBar': True, 'displaylogo': False}
+                                                    )
+                                                )
+                                            ], md=4, className="d-flex flex-column justify-content-center"),
+
+                                            # Coluna 2/3: 3 Gauges lado a lado
+                                            dbc.Col([
+                                                dbc.Row([
+                                                    # Gauge MTBF
+                                                    dbc.Col([
+                                                        dcc.Loading(
+                                                            type="default",
+                                                            children=dcc.Graph(
+                                                                id="gauge-mtbf-individual",
+                                                                config={'displayModeBar': False, 'displaylogo': False}
+                                                            )
+                                                        )
+                                                    ], md=4),
+
+                                                    # Gauge MTTR
+                                                    dbc.Col([
+                                                        dcc.Loading(
+                                                            type="default",
+                                                            children=dcc.Graph(
+                                                                id="gauge-mttr-individual",
+                                                                config={'displayModeBar': False, 'displaylogo': False}
+                                                            )
+                                                        )
+                                                    ], md=4),
+
+                                                    # Gauge Taxa de Avaria
+                                                    dbc.Col([
+                                                        dcc.Loading(
+                                                            type="default",
+                                                            children=dcc.Graph(
+                                                                id="gauge-breakdown-individual",
+                                                                config={'displayModeBar': False, 'displaylogo': False}
+                                                            )
+                                                        )
+                                                    ], md=4)
+                                                ], className="align-items-center")
+                                            ], md=8, className="d-flex align-items-center")
+                                        ], className="align-items-center")
+                                    ], className="p-3")
+                                ], className="shadow-sm")
+                            ])
                         ], className="mb-4"),
 
                         # Gráficos de Linha (Evolução Temporal)
@@ -383,7 +420,8 @@ def layout():
                                     ])
                                 ], className="shadow-sm")
                             ])
-                        ])
+                        ]),
+
 
                     ], className="p-3")
                 ]
