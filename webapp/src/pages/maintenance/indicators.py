@@ -281,8 +281,13 @@ def layout():
                                     options=[],
                                     placeholder="Selecione um equipamento...",
                                     clearable=False
+                                ),
+                                # Badges compactos com metas logo abaixo do dropdown
+                                html.Div(
+                                    id="equipment-targets-badges",
+                                    className="mt-2"
                                 )
-                            ], md=4)
+                            ], md=6)
                         ], className="mb-4"),
 
                         # Paradas Críticas + Gauges de Indicadores
@@ -307,8 +312,14 @@ def layout():
                                                 )
                                             ], md=4, className="d-flex flex-column justify-content-center"),
 
-                                            # Coluna 2/3: 3 Gauges lado a lado
+                                            # Coluna 2/3: 3 Gauges lado a lado com Metas
                                             dbc.Col([
+                                                # Metas do Equipamento
+                                                html.Div(
+                                                    id="equipment-targets-info",
+                                                    className="mb-3"
+                                                ),
+                                                # Gauges
                                                 dbc.Row([
                                                     # Gauge MTBF
                                                     dbc.Col([
@@ -343,7 +354,7 @@ def layout():
                                                         )
                                                     ], md=4)
                                                 ], className="align-items-center")
-                                            ], md=8, className="d-flex align-items-center")
+                                            ], md=8, className="d-flex flex-column")
                                         ], className="align-items-center")
                                     ], className="p-3")
                                 ], className="shadow-sm")

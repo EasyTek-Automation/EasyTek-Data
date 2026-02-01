@@ -845,7 +845,9 @@ def create_kpi_gauge(value: float,
                      target_value: float,
                      template: str = 'minty') -> go.Figure:
     """
-    Cria gráfico gauge (velocímetro) para um KPI individual.
+    Cria gráfico gauge (velocímetro) sofisticado para um KPI individual.
+
+    Design moderno com gradientes suaves, tipografia refinada e visual profissional.
 
     Args:
         value: Valor atual do KPI
@@ -854,8 +856,13 @@ def create_kpi_gauge(value: float,
         template: 'minty' ou 'darkly'
 
     Returns:
-        Figura Plotly com gauge indicator
+        Figura Plotly com gauge indicator sofisticado
     """
+    # Detectar tema escuro/claro
+    is_dark = (template == 'darkly')
+    bg_color = 'rgba(44, 44, 44, 0.05)' if is_dark else 'rgba(248, 249, 250, 0.8)'
+    text_color = '#e9ecef' if is_dark else '#2c3e50'
+
     # Converter MTTR de horas para minutos
     if kpi_name == "MTTR":
         value = value * 60
@@ -866,83 +873,135 @@ def create_kpi_gauge(value: float,
         unit = "h"
         max_range = max(target_value * 2, value * 1.2)  # Range dinâmico
         higher_is_better = True
-        # Zonas do gauge (verde-amarelo-vermelho)
+        # Cores sofisticadas com gradiente suave (vermelho → amarelo → verde)
         steps = [
-            {'range': [0, target_value * 0.5], 'color': '#dc3545'},      # Vermelho: muito abaixo
-            {'range': [target_value * 0.5, target_value], 'color': '#ffc107'},  # Amarelo: abaixo da meta
-            {'range': [target_value, max_range], 'color': '#20c997'}     # Verde: acima da meta
+            {'range': [0, target_value * 0.3], 'color': 'rgba(220, 53, 69, 0.15)'},      # Vermelho muito claro
+            {'range': [target_value * 0.3, target_value * 0.6], 'color': 'rgba(253, 126, 20, 0.15)'},  # Laranja claro
+            {'range': [target_value * 0.6, target_value * 0.85], 'color': 'rgba(255, 193, 7, 0.15)'},  # Amarelo claro
+            {'range': [target_value * 0.85, target_value], 'color': 'rgba(32, 201, 151, 0.15)'},       # Verde-água claro
+            {'range': [target_value, max_range], 'color': 'rgba(25, 135, 84, 0.2)'}                     # Verde-escuro claro
         ]
+        # Cor da barra com gradiente
+        if value >= target_value:
+            bar_color = '#198754'  # Verde profissional
+        elif value >= target_value * 0.85:
+            bar_color = '#20c997'  # Verde-água
+        elif value >= target_value * 0.6:
+            bar_color = '#ffc107'  # Amarelo
+        else:
+            bar_color = '#dc3545'  # Vermelho
+
     elif kpi_name == "MTTR":
         unit = "min"
         max_range = max(target_value * 2, value * 1.2)
         higher_is_better = False
-        # Zonas invertidas (menor é melhor)
+        # Zonas invertidas (menor é melhor) - cores suaves
         steps = [
-            {'range': [0, target_value], 'color': '#20c997'},            # Verde: abaixo da meta
-            {'range': [target_value, target_value * 1.5], 'color': '#ffc107'},  # Amarelo: acima da meta
-            {'range': [target_value * 1.5, max_range], 'color': '#dc3545'}  # Vermelho: muito acima
+            {'range': [0, target_value * 0.7], 'color': 'rgba(25, 135, 84, 0.2)'},                      # Verde-escuro
+            {'range': [target_value * 0.7, target_value], 'color': 'rgba(32, 201, 151, 0.15)'},        # Verde-água
+            {'range': [target_value, target_value * 1.3], 'color': 'rgba(255, 193, 7, 0.15)'},         # Amarelo
+            {'range': [target_value * 1.3, target_value * 1.7], 'color': 'rgba(253, 126, 20, 0.15)'},  # Laranja
+            {'range': [target_value * 1.7, max_range], 'color': 'rgba(220, 53, 69, 0.15)'}             # Vermelho
         ]
+        # Cor da barra
+        if value <= target_value * 0.7:
+            bar_color = '#198754'
+        elif value <= target_value:
+            bar_color = '#20c997'
+        elif value <= target_value * 1.3:
+            bar_color = '#ffc107'
+        else:
+            bar_color = '#dc3545'
+
     else:  # Taxa de Avaria
         unit = "%"
         max_range = max(target_value * 2, value * 1.2, 10)  # Mínimo de 10%
         higher_is_better = False
         steps = [
-            {'range': [0, target_value], 'color': '#20c997'},
-            {'range': [target_value, target_value * 1.5], 'color': '#ffc107'},
-            {'range': [target_value * 1.5, max_range], 'color': '#dc3545'}
+            {'range': [0, target_value * 0.7], 'color': 'rgba(25, 135, 84, 0.2)'},
+            {'range': [target_value * 0.7, target_value], 'color': 'rgba(32, 201, 151, 0.15)'},
+            {'range': [target_value, target_value * 1.3], 'color': 'rgba(255, 193, 7, 0.15)'},
+            {'range': [target_value * 1.3, target_value * 1.7], 'color': 'rgba(253, 126, 20, 0.15)'},
+            {'range': [target_value * 1.7, max_range], 'color': 'rgba(220, 53, 69, 0.15)'}
         ]
+        # Cor da barra
+        if value <= target_value * 0.7:
+            bar_color = '#198754'
+        elif value <= target_value:
+            bar_color = '#20c997'
+        elif value <= target_value * 1.3:
+            bar_color = '#ffc107'
+        else:
+            bar_color = '#dc3545'
 
-    # Determinar cor da barra atual
-    if higher_is_better:
-        bar_color = '#20c997' if value >= target_value else '#dc3545'
+    # Formatar valor de exibição
+    if kpi_name == "Taxa de Avaria":
+        value_display = round(value, 2)
+        delta_position = "bottom"
     else:
-        bar_color = '#20c997' if value <= target_value else '#dc3545'
+        value_display = round(value, 1)
+        delta_position = "bottom"
 
-    # Criar gauge
+    # Criar gauge sofisticado
     fig = go.Figure(go.Indicator(
         mode="gauge+number+delta",
-        value=value,
+        value=value_display,
         domain={'x': [0, 1], 'y': [0, 1]},
         title={
-            'text': f"<b>{kpi_name}</b>",
-            'font': {'size': 18}
+            'text': f"<b style='font-weight:600; letter-spacing:0.5px'>{kpi_name}</b>",
+            'font': {'size': 16, 'color': text_color, 'family': 'Segoe UI, Arial, sans-serif'}
         },
         number={
-            'suffix': f" {unit}",
-            'font': {'size': 32}
+            'suffix': f" <span style='font-size:0.7em; font-weight:400'>{unit}</span>",
+            'font': {'size': 40, 'color': bar_color, 'family': 'Segoe UI, Arial, sans-serif'},
+            'valueformat': '.2f' if kpi_name == "Taxa de Avaria" else '.1f'
         },
         delta={
             'reference': target_value,
-            'increasing': {'color': '#20c997' if higher_is_better else '#dc3545'},
-            'decreasing': {'color': '#dc3545' if higher_is_better else '#20c997'},
-            'suffix': f" {unit}"
+            'increasing': {'color': '#198754' if higher_is_better else '#dc3545'},
+            'decreasing': {'color': '#dc3545' if higher_is_better else '#198754'},
+            'suffix': f" {unit}",
+            'font': {'size': 12, 'family': 'Segoe UI, Arial, sans-serif'},
+            'position': delta_position,
+            'valueformat': '.2f' if kpi_name == "Taxa de Avaria" else '.1f'
         },
         gauge={
             'axis': {
                 'range': [0, max_range],
                 'ticksuffix': f" {unit}",
-                'tickfont': {'size': 12}
+                'tickfont': {'size': 10, 'color': text_color, 'family': 'Segoe UI, Arial, sans-serif'},
+                'tickwidth': 1,
+                'tickcolor': 'rgba(108, 117, 125, 0.3)',
+                'tickmode': 'auto',
+                'nticks': 6
             },
-            'bar': {'color': bar_color, 'thickness': 0.75},
-            'bgcolor': "white",
-            'borderwidth': 2,
-            'bordercolor': "gray",
+            'bar': {
+                'color': bar_color,
+                'thickness': 0.6,
+                'line': {'color': 'rgba(255, 255, 255, 0.3)', 'width': 1}
+            },
+            'bgcolor': bg_color,
+            'borderwidth': 1,
+            'bordercolor': 'rgba(108, 117, 125, 0.2)',
             'steps': steps,
             'threshold': {
-                'line': {'color': "#0d6efd", 'width': 3},
-                'thickness': 0.75,
+                'line': {'color': '#0d6efd', 'width': 2.5},
+                'thickness': 0.8,
                 'value': target_value
             }
         }
     ))
 
-    # Layout
+    # Layout sofisticado
     fig.update_layout(
         template=template,
-        height=280,
-        margin=dict(t=40, b=10, l=20, r=20),
+        height=300,
+        margin=dict(t=50, b=20, l=30, r=30),
         paper_bgcolor='rgba(0,0,0,0)',
-        font={'family': "Arial"}
+        font={
+            'family': "Segoe UI, -apple-system, BlinkMacSystemFont, Arial, sans-serif",
+            'color': text_color
+        }
     )
 
     return fig

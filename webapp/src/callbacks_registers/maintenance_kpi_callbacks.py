@@ -621,7 +621,171 @@ def register_maintenance_kpi_callbacks(app):
         return options, default_value
 
     # ============================================================
-    # CALLBACK 10: Atualizar Cards Individuais
+    # CALLBACK 9B: Exibir Badges de Metas abaixo do Dropdown
+    # ============================================================
+    @app.callback(
+        Output("equipment-targets-badges", "children"),
+        [
+            Input("store-indicator-filters", "data"),
+            Input("dropdown-equipment-individual", "value")
+        ]
+    )
+    def display_equipment_targets_badges(stored_data, equipment_id):
+        """
+        Exibe badges compactos com as metas do equipamento selecionado
+        logo abaixo do dropdown de seleção.
+        """
+        import dash_bootstrap_components as dbc
+        from dash import html
+
+        if not stored_data or not equipment_id:
+            return html.Div()
+
+        equipment_targets = stored_data.get("equipment_targets", {})
+
+        # Obter meta específica do equipamento (ou usar meta geral como fallback)
+        eq_target = equipment_targets.get(equipment_id, equipment_targets.get("GENERAL", {}))
+
+        if not eq_target:
+            return html.Div()
+
+        # Converter MTTR para minutos
+        mttr_target_min = eq_target.get("mttr", 0) * 60
+
+        # Verificar se é meta geral ou específica
+        is_general_target = equipment_id not in equipment_targets
+
+        return html.Div([
+            html.Small([
+                html.I(className="bi bi-bullseye me-1", style={"fontSize": "0.8rem"}),
+                html.Span("Metas 2026", className="text-muted fw-bold"),
+                html.Span(
+                    " (Geral)" if is_general_target else " (Específica)",
+                    className="text-muted",
+                    style={"fontSize": "0.75rem", "fontStyle": "italic"}
+                ),
+                html.Span(" | ", className="text-muted mx-1"),
+                dbc.Badge(
+                    f"MTBF ≥ {eq_target.get('mtbf', 0):.1f}h",
+                    color="success",
+                    className="me-1",
+                    pill=True,
+                    style={"fontSize": "0.75rem", "fontWeight": "normal"}
+                ),
+                dbc.Badge(
+                    f"MTTR ≤ {mttr_target_min:.0f}min",
+                    color="primary",
+                    className="me-1",
+                    pill=True,
+                    style={"fontSize": "0.75rem", "fontWeight": "normal"}
+                ),
+                dbc.Badge(
+                    f"Avaria ≤ {eq_target.get('breakdown_rate', 0):.1f}%",
+                    color="warning",
+                    className="",
+                    pill=True,
+                    style={"fontSize": "0.75rem", "fontWeight": "normal"}
+                )
+            ])
+        ], style={"lineHeight": "1.8"})
+
+    # ============================================================
+    # CALLBACK 10: Exibir Metas do Equipamento Selecionado
+    # ============================================================
+    @app.callback(
+        Output("equipment-targets-info", "children"),
+        [
+            Input("store-indicator-filters", "data"),
+            Input("dropdown-equipment-individual", "value")
+        ]
+    )
+    def display_equipment_targets(stored_data, equipment_id):
+        """
+        Exibe as metas do equipamento selecionado acima dos gauges.
+
+        Mostra:
+        - Nome do equipamento
+        - Meta MTBF
+        - Meta MTTR
+        - Meta Taxa de Avaria
+        """
+        import dash_bootstrap_components as dbc
+        from dash import html
+
+        if not stored_data or not equipment_id:
+            return html.Div()
+
+        equipment_targets = stored_data.get("equipment_targets", {})
+        names = stored_data.get("names", {})
+
+        # Obter meta específica do equipamento (ou usar meta geral como fallback)
+        eq_target = equipment_targets.get(equipment_id, equipment_targets.get("GENERAL", {}))
+        equipment_name = names.get(equipment_id, equipment_id)
+
+        if not eq_target:
+            return html.Div()
+
+        # Converter MTTR para minutos
+        mttr_target_min = eq_target.get("mttr", 0) * 60
+
+        # Verificar se é meta geral ou específica
+        is_general_target = equipment_id not in equipment_targets
+
+        return dbc.Alert([
+            dbc.Row([
+                dbc.Col([
+                    html.Div([
+                        html.I(className="bi bi-bullseye me-2", style={"fontSize": "1.1rem"}),
+                        html.Strong("Metas 2026", style={"fontSize": "0.95rem"}),
+                        html.Span(
+                            " (Geral)" if is_general_target else " (Específica)",
+                            className="text-muted ms-1",
+                            style={"fontSize": "0.85rem", "fontStyle": "italic"}
+                        )
+                    ], className="mb-2")
+                ], width=12)
+            ]),
+            dbc.Row([
+                # MTBF
+                dbc.Col([
+                    html.Div([
+                        html.Span("MTBF: ", className="text-muted", style={"fontSize": "0.85rem"}),
+                        html.Strong(
+                            f"{eq_target.get('mtbf', 0):.1f} h",
+                            style={"fontSize": "0.95rem", "color": "#198754"}
+                        )
+                    ])
+                ], width=4, className="text-center"),
+
+                # MTTR
+                dbc.Col([
+                    html.Div([
+                        html.Span("MTTR: ", className="text-muted", style={"fontSize": "0.85rem"}),
+                        html.Strong(
+                            f"{mttr_target_min:.0f} min",
+                            style={"fontSize": "0.95rem", "color": "#0d6efd"}
+                        )
+                    ])
+                ], width=4, className="text-center"),
+
+                # Taxa de Avaria
+                dbc.Col([
+                    html.Div([
+                        html.Span("Taxa Avaria: ", className="text-muted", style={"fontSize": "0.85rem"}),
+                        html.Strong(
+                            f"{eq_target.get('breakdown_rate', 0):.1f} %",
+                            style={"fontSize": "0.95rem", "color": "#fd7e14"}
+                        )
+                    ])
+                ], width=4, className="text-center")
+            ], className="g-0")
+        ], color="light", className="mb-2 py-2 px-3", style={
+            "borderLeft": "4px solid #0d6efd",
+            "boxShadow": "0 2px 4px rgba(0,0,0,0.05)"
+        })
+
+    # ============================================================
+    # CALLBACK 10B: Atualizar Cards Individuais (renumerado)
     # ============================================================
     @app.callback(
         [
