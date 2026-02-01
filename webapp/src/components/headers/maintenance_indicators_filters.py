@@ -71,7 +71,7 @@ def create_maintenance_indicators_filters():
                             {"label": "2025", "value": 2025},
                             {"label": "2026", "value": 2026}
                         ],
-                        value=current_year if current_year in [2024, 2025, 2026] else 2026,
+                        value=2025,  # Ano onde os dados ZPP estão disponíveis
                         clearable=False,
                         style={"fontSize": "0.85rem"}
                     )

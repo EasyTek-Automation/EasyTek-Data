@@ -2,8 +2,7 @@
 from dash.dependencies import Input, Output, State
 import pandas as pd
 import plotly.graph_objects as go
-from dash_bootstrap_templates import ThemeSwitchAIO
-from src.config.theme_config import TEMPLATE_THEME_MINTY, TEMPLATE_THEME_DARKLY
+from src.config.theme_config import TEMPLATE_THEME_MINTY
 import dash
 from dash import dcc
 import logging
@@ -22,15 +21,12 @@ def register_states_callbacks(app, collection_graph):
             Output('btn-export-states', 'color')
         ],
         [
-            Input('stored-graph-data', 'data'),
-            Input(ThemeSwitchAIO.ids.switch("theme"), "value")
+            Input('stored-graph-data', 'data')
         ]
     )
-    def update_states_graph_and_theme(stored_data, toggle):
+    def update_states_graph_and_theme(stored_data):
         # --- LÓGICA DEFENSIVA E PADRONIZADA ---
-        if toggle is None:
-            toggle = True
-        template = TEMPLATE_THEME_MINTY if toggle else TEMPLATE_THEME_DARKLY
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
         button_color = "primary"
         # --- FIM DA LÓGICA ---

@@ -7,16 +7,27 @@ from dash import Output, Input, State, dcc, html, no_update
 from dash.exceptions import PreventUpdate
 import dash
 import pandas as pd
-from dash_bootstrap_templates import ThemeSwitchAIO
+from src.config.theme_config import TEMPLATE_THEME_MINTY
 
+# Importar funções de cálculo e agregação (mantidas para processar dados ZPP)
 from src.utils.maintenance_demo_data import (
-    generate_monthly_kpi_data,
     calculate_kpi_averages,
     calculate_general_avg_by_month,
-    get_kpi_targets,
-    get_equipment_names,
-    get_equipment_categories
+    get_kpi_targets
 )
+
+# Importar funções de integração com ZPP
+try:
+    from src.utils.zpp_kpi_calculator import (
+        fetch_zpp_kpi_data,
+        get_zpp_equipment_names,
+        get_zpp_equipment_categories
+    )
+    ZPP_KPI_AVAILABLE = True
+except ImportError:
+    ZPP_KPI_AVAILABLE = False
+    print("[AVISO] Módulo ZPP KPI não disponível - nenhum dado será exibido")
+
 from src.components.maintenance_kpi_graphs import (
     create_kpi_bar_chart,
     create_kpi_sunburst_chart,
@@ -103,7 +114,7 @@ def register_maintenance_kpi_callbacks(app):
 
         if period_type in ["year", "last12"]:
             if not ref_year:
-                ref_year = 2026
+                ref_year = 2025  # Ano onde os dados ZPP estão disponíveis
 
             if period_type == "year":
                 # Todos os meses do ano
@@ -111,24 +122,74 @@ def register_maintenance_kpi_callbacks(app):
                 year = ref_year
             else:  # last12
                 # Últimos 12 meses a partir do ano
-                # Assumir que estamos em dez/2026, então últimos 12 = jan-dez 2026
+                # Assumir que estamos em dez/2025, então últimos 12 = jan-dez 2025
                 months = list(range(1, 13))
                 year = ref_year
 
         else:  # custom
             if not start_date or not end_date:
                 # Usar padrão se não informado
-                year = 2026
+                year = 2025  # Ano onde os dados ZPP estão disponíveis
                 months = list(range(1, 13))
             else:
                 # TODO: Implementar lógica para extrair ano/meses do date range
-                # Por enquanto usar todos os meses de 2026
-                year = 2026
+                # Por enquanto usar todos os meses de 2025
+                year = 2025  # Ano onde os dados ZPP estão disponíveis
                 months = list(range(1, 13))
 
-        # Gerar dados
-        all_equipment = list(get_equipment_names().keys())
-        data = generate_monthly_kpi_data(year, months, all_equipment)
+        # Buscar dados reais - INTEGRAÇÃO ZPP
+        print("\n" + "="*80)
+        print(">>> CALLBACK 2: CARREGANDO DADOS DE KPI")
+        print("="*80)
+        print(f"Ano: {year}, Meses: {months}")
+        print(f"ZPP_KPI_AVAILABLE: {ZPP_KPI_AVAILABLE}")
+
+        data = {}
+        all_equipment = []
+        has_data = False
+
+        if ZPP_KPI_AVAILABLE:
+            print("[TENTANDO] Buscar dados reais do ZPP...")
+            try:
+                # Tentar buscar dados reais do ZPP
+                data = fetch_zpp_kpi_data(year, months)
+                all_equipment = list(data.keys())
+                has_data = len(data) > 0
+
+                if has_data:
+                    print(f"[SUCESSO] Dados ZPP carregados!")
+                    print(f"  - Equipamentos: {all_equipment}")
+                    print(f"  - Total: {len(all_equipment)} equipamentos")
+                else:
+                    print("[AVISO] Nenhum dado disponível no banco para o período selecionado")
+                print("="*80 + "\n")
+            except Exception as e:
+                # Sem fallback - apenas informar erro
+                print(f"[ERRO] Falha ao carregar dados ZPP: {e}")
+                print("[INFO] Nenhum dado será exibido")
+                print("="*80 + "\n")
+                import traceback
+                traceback.print_exc()
+                has_data = False
+        else:
+            # Módulo ZPP não disponível - não mostrar nada
+            print("[AVISO] Módulo ZPP não disponível")
+            print("[INFO] Nenhum dado será exibido")
+            print("="*80 + "\n")
+            has_data = False
+
+        # Buscar nomes e categorias de equipamentos
+        if has_data and ZPP_KPI_AVAILABLE:
+            try:
+                names = get_zpp_equipment_names()
+                categories = get_zpp_equipment_categories()
+            except Exception as e:
+                print(f"[AVISO] Erro ao buscar nomes/categorias: {e}")
+                names = {eq: eq for eq in all_equipment}  # Fallback: usar IDs como nomes
+                categories = {}
+        else:
+            names = {}
+            categories = {}
 
         return {
             "period_type": period_type,
@@ -136,9 +197,10 @@ def register_maintenance_kpi_callbacks(app):
             "months": months,
             "equipment_ids": all_equipment,
             "data": data,
-            "targets": get_kpi_targets(),
-            "names": get_equipment_names(),
-            "categories": get_equipment_categories()
+            "targets": get_kpi_targets() if has_data else {},
+            "names": names,
+            "categories": categories,
+            "has_data": has_data  # Indicador se há dados disponíveis
         }
 
     # ============================================================
@@ -163,8 +225,8 @@ def register_maintenance_kpi_callbacks(app):
         """
         Atualiza os 4 cards de resumo com médias e badges de status.
         """
-        if not stored_data:
-            return ["--"] * 3 + ["Aguardando dados", "secondary"] * 3 + ["--"]
+        if not stored_data or not stored_data.get("has_data", False):
+            return ["--"] * 3 + ["Sem dados", "secondary"] * 3 + ["0"]
 
         data = stored_data["data"]
         targets = stored_data["targets"]
@@ -174,15 +236,20 @@ def register_maintenance_kpi_callbacks(app):
         # Calcular médias
         averages = calculate_kpi_averages(data, equipment_ids, months)
 
+        # Se não houver médias válidas após o cálculo
+        if not averages.get("by_equipment"):
+            return ["--"] * 3 + ["Sem dados", "secondary"] * 3 + ["0"]
+
         # MTBF (maior é melhor)
         mtbf_avg = averages["mtbf"]
         mtbf_meets_target = mtbf_avg >= targets["mtbf"]
         mtbf_badge_text = "✓ Acima da Meta" if mtbf_meets_target else "⚠ Abaixo da Meta"
         mtbf_badge_color = "success" if mtbf_meets_target else "danger"
 
-        # MTTR (menor é melhor)
-        mttr_avg = averages["mttr"]
-        mttr_meets_target = mttr_avg <= targets["mttr"]
+        # MTTR (menor é melhor) - converter de horas para minutos
+        mttr_avg_minutes = averages["mttr"] * 60
+        mttr_target_minutes = targets["mttr"] * 60
+        mttr_meets_target = mttr_avg_minutes <= mttr_target_minutes
         mttr_badge_text = "✓ Dentro da Meta" if mttr_meets_target else "⚠ Acima da Meta"
         mttr_badge_color = "success" if mttr_meets_target else "danger"
 
@@ -199,10 +266,10 @@ def register_maintenance_kpi_callbacks(app):
             f"{mtbf_avg:.1f} h",
             mtbf_badge_text,
             mtbf_badge_color,
-            f"{mttr_avg:.1f} h",
+            f"{mttr_avg_minutes:.1f} min",
             mttr_badge_text,
             mttr_badge_color,
-            f"{breakdown_avg:.1f} %",
+            f"{breakdown_avg:.2f} %",
             breakdown_badge_text,
             breakdown_badge_color,
             f"{eq_count}"
@@ -218,15 +285,14 @@ def register_maintenance_kpi_callbacks(app):
             Output("bar-chart-breakdown", "figure")
         ],
         [
-            Input("store-indicator-filters", "data"),
-            Input(ThemeSwitchAIO.ids.switch("theme"), "value")
+            Input("store-indicator-filters", "data")
         ]
     )
-    def update_bar_charts(stored_data, theme_switch_on):
+    def update_bar_charts(stored_data):
         """
         Atualiza os 3 gráficos de barras com médias, metas e tendências.
         """
-        template = 'minty' if theme_switch_on else 'darkly'
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
         if not stored_data:
             return [
@@ -288,17 +354,16 @@ def register_maintenance_kpi_callbacks(app):
             Output("sunburst-chart-breakdown", "figure")
         ],
         [
-            Input("store-indicator-filters", "data"),
-            Input(ThemeSwitchAIO.ids.switch("theme"), "value")
+            Input("store-indicator-filters", "data")
         ]
     )
-    def update_sunburst_charts(stored_data, theme_switch_on):
+    def update_sunburst_charts(stored_data):
         """
         Atualiza os 3 gráficos Sunburst hierárquicos.
         """
         import plotly.graph_objects as go
 
-        template = 'minty' if theme_switch_on else 'darkly'
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
         if not stored_data:
             # Retornar sunbursts vazios
@@ -351,11 +416,18 @@ def register_maintenance_kpi_callbacks(app):
         """
         Atualiza a tabela resumo com todos os KPIs por equipamento.
         """
-        if not stored_data:
-            return html.P(
-                "Selecione os filtros e clique em 'Aplicar' para visualizar os dados.",
-                className="text-muted text-center py-4"
-            )
+        if not stored_data or not stored_data.get("has_data", False):
+            return html.Div([
+                html.I(className="bi bi-inbox fs-1 text-muted mb-3"),
+                html.P(
+                    "Nenhum dado de manutenção disponível no banco de dados.",
+                    className="text-muted text-center"
+                ),
+                html.Small(
+                    "Os dados são carregados automaticamente quando disponíveis no sistema.",
+                    className="text-muted text-center d-block"
+                )
+            ], className="text-center py-5")
 
         data = stored_data["data"]
         targets = stored_data["targets"]
@@ -367,10 +439,13 @@ def register_maintenance_kpi_callbacks(app):
         averages = calculate_kpi_averages(data, equipment_ids, months)
 
         if not averages.get("by_equipment"):
-            return html.P(
-                "Não há dados disponíveis para o período selecionado.",
-                className="text-muted text-center py-4"
-            )
+            return html.Div([
+                html.I(className="bi bi-inbox fs-1 text-muted mb-3"),
+                html.P(
+                    "Nenhum dado disponível para o período selecionado.",
+                    className="text-muted text-center"
+                )
+            ], className="text-center py-5")
 
         # Criar tabela
         return create_kpi_summary_table(
@@ -408,7 +483,7 @@ def register_maintenance_kpi_callbacks(app):
                     "Ano": year,
                     "Mês": month_entry["month"],
                     "MTBF (h)": month_entry["mtbf"],
-                    "MTTR (h)": month_entry["mttr"],
+                    "MTTR (min)": month_entry["mttr"] * 60,  # Converter para minutos
                     "Taxa Avaria (%)": month_entry["breakdown_rate"]
                 })
 
@@ -435,26 +510,87 @@ def register_maintenance_kpi_callbacks(app):
     )
     def refresh_data(n_clicks, current_data):
         """
-        Regenera dados fictícios com mesmos filtros.
-        Simula atualização de dados em tempo real.
+        Atualiza dados (reais do ZPP ou fictícios) com mesmos filtros.
         """
         if not current_data:
             raise PreventUpdate
 
-        # Re-gerar dados com mesmos parâmetros
-        new_data = generate_monthly_kpi_data(
-            current_data["year"],
-            current_data["months"],
-            current_data["equipment_ids"]
-        )
+        year = current_data["year"]
+        months = current_data["months"]
 
-        # Atualizar apenas os dados, mantendo resto
+        # Re-buscar dados com mesmos parâmetros - INTEGRAÇÃO ZPP
+        new_data = {}
+        has_data = False
+
+        if ZPP_KPI_AVAILABLE:
+            try:
+                # Tentar buscar dados reais atualizados do ZPP
+                print(f"[INFO] Atualizando dados ZPP para {year}, meses {months}")
+                new_data = fetch_zpp_kpi_data(year, months)
+                has_data = len(new_data) > 0
+
+                if has_data:
+                    print(f"[✓] Dados ZPP atualizados: {len(new_data)} equipamentos")
+                else:
+                    print("[AVISO] Nenhum dado disponível no banco após atualização")
+            except Exception as e:
+                # Sem fallback - apenas informar erro
+                print(f"[ERRO] Erro ao atualizar dados ZPP: {e}")
+                print("[INFO] Nenhum dado será exibido")
+                has_data = False
+        else:
+            # Módulo ZPP não disponível
+            print("[AVISO] Módulo ZPP não disponível")
+            print("[INFO] Nenhum dado será exibido")
+            has_data = False
+
+        # Atualizar nomes e categorias se houver dados
+        if has_data and ZPP_KPI_AVAILABLE:
+            try:
+                current_data["names"] = get_zpp_equipment_names()
+                current_data["categories"] = get_zpp_equipment_categories()
+                current_data["equipment_ids"] = list(new_data.keys())
+            except Exception as e:
+                print(f"[AVISO] Erro ao atualizar nomes/categorias: {e}")
+
+        # Atualizar dados e flag
         current_data["data"] = new_data
+        current_data["has_data"] = has_data
 
         return current_data
 
     # ============================================================
-    # CALLBACK 9: Atualizar Cards Individuais
+    # CALLBACK 9: Popular Dropdown de Equipamentos
+    # ============================================================
+    @app.callback(
+        [
+            Output("dropdown-equipment-individual", "options"),
+            Output("dropdown-equipment-individual", "value")
+        ],
+        Input("store-indicator-filters", "data")
+    )
+    def populate_equipment_dropdown(stored_data):
+        """
+        Popula o dropdown de equipamentos com os dados carregados.
+        """
+        if not stored_data or not stored_data.get("has_data", False):
+            return [], None
+
+        equipment_ids = stored_data["equipment_ids"]
+        names = stored_data["names"]
+
+        options = [
+            {"label": names.get(eq_id, eq_id), "value": eq_id}
+            for eq_id in equipment_ids
+        ]
+
+        # Selecionar primeiro equipamento por padrão
+        default_value = equipment_ids[0] if equipment_ids else None
+
+        return options, default_value
+
+    # ============================================================
+    # CALLBACK 10: Atualizar Cards Individuais
     # ============================================================
     @app.callback(
         [
@@ -488,12 +624,12 @@ def register_maintenance_kpi_callbacks(app):
 
         return [
             f"{eq_data['mtbf']:.1f} h",
-            f"{eq_data['mttr']:.1f} h",
-            f"{eq_data['breakdown_rate']:.1f} %"
+            f"{eq_data['mttr'] * 60:.1f} min",
+            f"{eq_data['breakdown_rate']:.2f} %"
         ]
 
     # ============================================================
-    # CALLBACK 10: Atualizar Tab Individual (Gráficos)
+    # CALLBACK 11: Atualizar Tab Individual (Gráficos)
     # ============================================================
     @app.callback(
         [
@@ -504,20 +640,18 @@ def register_maintenance_kpi_callbacks(app):
         ],
         [
             Input("store-indicator-filters", "data"),
-            Input("dropdown-equipment-individual", "value"),
-            Input(ThemeSwitchAIO.ids.switch("theme"), "value")
+            Input("dropdown-equipment-individual", "value")
         ]
     )
-    def update_individual_tab(stored_data, equipment_id, theme_switch_on):
+    def update_individual_tab(stored_data, equipment_id):
         """
         Atualiza gráficos da tab Individual quando:
         - Dados são carregados/atualizados
         - Equipamento selecionado muda
-        - Tema muda
         """
         import plotly.graph_objects as go
 
-        template = 'minty' if theme_switch_on else 'darkly'
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
         if not stored_data or not equipment_id:
             # Retornar figuras vazias
@@ -581,3 +715,4 @@ def register_maintenance_kpi_callbacks(app):
         )
 
         return [fig_mtbf, fig_mttr, fig_breakdown, fig_comparison]
+

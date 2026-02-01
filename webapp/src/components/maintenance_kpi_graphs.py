@@ -100,8 +100,19 @@ def create_kpi_bar_chart(equipment_ids: List[str],
     Returns:
         Figura Plotly com barras, linhas de média/meta e tendência
     """
+    # Converter MTTR de horas para minutos
+    if kpi_name == "MTTR":
+        values = [v * 60 for v in values]
+        average_value = average_value * 60
+        target_value = target_value * 60
+
     # Determinar unidade
-    unit = "h" if kpi_name in ["MTBF", "MTTR"] else "%"
+    if kpi_name == "MTBF":
+        unit = "h"
+    elif kpi_name == "MTTR":
+        unit = "min"
+    else:
+        unit = "%"
 
     # Lógica de cores das barras (verde: atende meta, vermelho: não atende)
     bar_colors = []
@@ -117,6 +128,14 @@ def create_kpi_bar_chart(equipment_ids: List[str],
     # Criar figura
     fig = go.Figure()
 
+    # Formatar texto baseado no KPI
+    if kpi_name == "Taxa de Avaria":
+        text_values = [f'{v:.2f}' for v in values]
+        hover_format = '<b>%{x}</b><br>%{y:.2f} ' + unit + '<extra></extra>'
+    else:
+        text_values = [f'{v:.1f}' for v in values]
+        hover_format = '<b>%{x}</b><br>%{y:.1f} ' + unit + '<extra></extra>'
+
     # Adicionar barras
     fig.add_trace(go.Bar(
         x=[equipment_names_dict.get(eq_id, eq_id) for eq_id in equipment_ids],
@@ -127,9 +146,9 @@ def create_kpi_bar_chart(equipment_ids: List[str],
             line=dict(color='rgba(0,0,0,0.3)', width=1),
             cornerradius=4
         ),
-        text=[f'{v:.1f}' for v in values],
+        text=text_values,
         textposition='outside',
-        hovertemplate='<b>%{x}</b><br>%{y:.1f} ' + unit + '<extra></extra>'
+        hovertemplate=hover_format
     ))
 
     # Linha de média (azul tracejada)
@@ -225,7 +244,17 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
     Returns:
         Figura Plotly Sunburst com 3 níveis
     """
-    unit = "h" if kpi_name in ["MTBF", "MTTR"] else "%"
+    # Converter MTTR de horas para minutos
+    if kpi_name == "MTTR":
+        data_by_equipment = {k: v * 60 for k, v in data_by_equipment.items()}
+
+    # Determinar unidade
+    if kpi_name == "MTBF":
+        unit = "h"
+    elif kpi_name == "MTTR":
+        unit = "min"
+    else:
+        unit = "%"
 
     labels = ["Total"]
     parents = [""]
@@ -257,12 +286,15 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
     values[0] = sum(v for v in values[1:len(categories_dict) + 1])
 
     # Determinar formato de texto baseado no KPI
-    # MTBF e MTTR: mostrar valores absolutos em horas
+    # MTBF: mostrar valores absolutos em horas
+    # MTTR: mostrar valores absolutos em minutos
     # Taxa de Avaria: mostrar porcentagens
-    if kpi_name in ["MTBF", "MTTR"]:
+    if kpi_name == "MTBF":
         text_display = 'label+text'
-        # Criar textos customizados com valores em horas
         custom_text = [f"{v:.1f}h" for v in values]
+    elif kpi_name == "MTTR":
+        text_display = 'label+text'
+        custom_text = [f"{v:.1f}min" for v in values]
     else:
         text_display = 'label+percent parent'
         custom_text = None
@@ -343,11 +375,11 @@ def create_kpi_summary_table(data_by_equipment: Dict[str, Dict[str, float]],
                     className="text-center"
                 ),
                 html.Td(
-                    f"{eq_data['mttr']:.1f}",
+                    f"{eq_data['mttr'] * 60:.1f}",
                     className="text-center"
                 ),
                 html.Td(
-                    f"{eq_data['breakdown_rate']:.1f}",
+                    f"{eq_data['breakdown_rate']:.2f}",
                     className="text-center"
                 ),
                 html.Td([
@@ -365,7 +397,7 @@ def create_kpi_summary_table(data_by_equipment: Dict[str, Dict[str, float]],
             html.Tr([
                 html.Th("Equipamento"),
                 html.Th("MTBF (h)", className="text-center"),
-                html.Th("MTTR (h)", className="text-center"),
+                html.Th("MTTR (min)", className="text-center"),
                 html.Th("Taxa Avaria (%)", className="text-center"),
                 html.Th("Status", className="text-center"),
             ], className="table-light")
@@ -413,6 +445,12 @@ def create_kpi_line_chart(months_list: List[int],
     Returns:
         Figura Plotly com barras coloridas e linhas
     """
+    # Converter MTTR de horas para minutos
+    if kpi_name == "MTTR":
+        values = [v * 60 for v in values]
+        avg_values = [v * 60 for v in avg_values]
+        target_value = target_value * 60
+
     month_names = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
                    "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
     x_labels = [month_names[m-1] for m in months_list]
@@ -450,6 +488,14 @@ def create_kpi_line_chart(months_list: List[int],
 
         bar_colors.append(color)
 
+    # Formatar texto baseado no KPI
+    if kpi_name == "Taxa de Avaria":
+        text_values = [f'{v:.2f}' for v in values]
+        hover_format = '<b>%{x}</b><br>Valor: %{y:.2f}<extra></extra>'
+    else:
+        text_values = [f'{v:.1f}' for v in values]
+        hover_format = '<b>%{x}</b><br>Valor: %{y:.1f}<extra></extra>'
+
     fig = go.Figure()
 
     # Barras do equipamento com cores condicionais
@@ -462,10 +508,10 @@ def create_kpi_line_chart(months_list: List[int],
             cornerradius=4,
             line=dict(width=0)
         ),
-        text=[f'{v:.1f}' for v in values],
+        text=text_values,
         textposition='outside',
         textfont=dict(size=10),
-        hovertemplate='<b>%{x}</b><br>Valor: %{y:.1f}<extra></extra>'
+        hovertemplate=hover_format
     ))
 
     # Linha da média geral (laranja tracejada)
@@ -486,7 +532,13 @@ def create_kpi_line_chart(months_list: List[int],
         line=dict(color='#dc3545', width=2, dash='dot')
     ))
 
-    unit = "h" if kpi_name in ["MTBF", "MTTR"] else "%"
+    # Determinar unidade
+    if kpi_name == "MTBF":
+        unit = "h"
+    elif kpi_name == "MTTR":
+        unit = "min"
+    else:
+        unit = "%"
 
     # Criar legenda de cores baseado no tipo de KPI
     if higher_is_better:
@@ -541,13 +593,25 @@ def create_comparison_bar_chart(equipment_data: Dict[str, float],
     kpis = ["MTBF", "MTTR", "Taxa de Avaria"]
     equipment_values = [
         equipment_data["mtbf"],
-        equipment_data["mttr"],
+        equipment_data["mttr"] * 60,  # Converter MTTR para minutos
         equipment_data["breakdown_rate"]
     ]
     avg_values = [
         general_avg["mtbf"],
-        general_avg["mttr"],
+        general_avg["mttr"] * 60,  # Converter MTTR para minutos
         general_avg["breakdown_rate"]
+    ]
+
+    # Formatar texto: 1 casa para MTBF/MTTR, 2 casas para Taxa de Avaria
+    equipment_text = [
+        f'{equipment_values[0]:.1f}',  # MTBF
+        f'{equipment_values[1]:.1f}',  # MTTR
+        f'{equipment_values[2]:.2f}'   # Taxa de Avaria
+    ]
+    avg_text = [
+        f'{avg_values[0]:.1f}',  # MTBF
+        f'{avg_values[1]:.1f}',  # MTTR
+        f'{avg_values[2]:.2f}'   # Taxa de Avaria
     ]
 
     fig = go.Figure()
@@ -558,7 +622,7 @@ def create_comparison_bar_chart(equipment_data: Dict[str, float],
         y=equipment_values,
         name=equipment_name,
         marker_color='#0d6efd',
-        text=[f'{v:.1f}' for v in equipment_values],
+        text=equipment_text,
         textposition='outside'
     ))
 
@@ -568,7 +632,7 @@ def create_comparison_bar_chart(equipment_data: Dict[str, float],
         y=avg_values,
         name='Média Geral',
         marker_color='#6c757d',
-        text=[f'{v:.1f}' for v in avg_values],
+        text=avg_text,
         textposition='outside'
     ))
 

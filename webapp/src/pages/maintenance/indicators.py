@@ -12,7 +12,6 @@ from src.components.maintenance_kpi_cards import (
     create_equipment_count_card
 )
 from src.components.maintenance_kpi_graphs import create_empty_kpi_figure
-from src.utils.maintenance_demo_data import get_equipment_names, get_kpi_targets
 
 
 def layout():
@@ -31,13 +30,6 @@ def layout():
     """
 
     return dbc.Container([
-        # ==================== DEMO WARNING ====================
-        dbc.Alert([
-            html.I(className="bi bi-info-circle me-2"),
-            html.Strong("Dados Demonstrativos: "),
-            "Esta página está utilizando dados fictícios para avaliação de layout e UX."
-        ], color="info", className="mb-3", dismissable=True, id="demo-alert-indicators"),
-
         # ==================== HEADER ====================
         dbc.Row([
             dbc.Col([
@@ -286,11 +278,8 @@ def layout():
                                 html.Label("Selecione o Equipamento:", className="form-label fw-bold"),
                                 dcc.Dropdown(
                                     id="dropdown-equipment-individual",
-                                    options=[
-                                        {"label": name, "value": eq_id}
-                                        for eq_id, name in get_equipment_names().items()
-                                    ],
-                                    value="LONGI001",
+                                    options=[],
+                                    placeholder="Selecione um equipamento...",
                                     clearable=False
                                 )
                             ], md=4)

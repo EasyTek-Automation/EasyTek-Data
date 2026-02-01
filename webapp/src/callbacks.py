@@ -56,7 +56,7 @@ def register_callbacks(app):
     register_sidebar_default_dates_callback(app)
     register_states_callbacks(app, collection_graph)
     register_states02_callbacks(app, collection_graph)
-    register_storetheme_callbacks(app)
+    # register_storetheme_callbacks(app)  # Desabilitado - ThemeSwitchAIO removido
     register_states_switch_callback(app)
     register_sp_callback(app)
 

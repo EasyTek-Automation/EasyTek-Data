@@ -1,10 +1,22 @@
 """
 Maintenance Demo Data Generator
 Gera dados fictícios de KPIs de manutenção para demonstração
+Integrado com dados reais ZPP quando disponíveis
 """
 
 import random
 from typing import Dict, List
+
+# Importar funções de integração com ZPP (dados reais)
+try:
+    from src.utils.zpp_kpi_calculator import (
+        get_zpp_equipment_names,
+        get_zpp_equipment_categories
+    )
+    ZPP_AVAILABLE = True
+except ImportError as e:
+    print(f"[AVISO] Módulo ZPP não disponível: {e}")
+    ZPP_AVAILABLE = False
 
 # ============================================
 # CONFIGURAÇÃO DE METAS (FÁCIL PERSONALIZAÇÃO)
@@ -17,20 +29,20 @@ KPI_TARGETS = {
 
 # Dicionário de nomes de equipamentos (expansível e personalizável)
 EQUIPMENT_NAMES = {
-    "LONGI001": "LONGI001",  # Pode alterar lado direito depois para "Longitudinal 1"
-    "LONGI002": "LONGI002",
-    "PRENS001": "PRENS001",
-    "PRENS002": "PRENS002",
-    "TRANS001": "TRANS001",
-    "TRANS002": "TRANS002",
-    "TRANS003": "TRANS003"
+    "LONGI001": "LCL-4,5",  # Pode alterar lado direito depois para "Longitudinal 1"
+    "LONGI002": "LCL-08",
+    "PRENS001": "PRENSA-01",
+    "PRENS002": "PRENSA-02",
+    "TRANS001": "LCT-16",
+    "TRANS002": "LCT-08",
+    "TRANS003": "LCT-2,5"
 }
 
 # Categorias para hierarquia Sunburst
 EQUIPMENT_CATEGORIES = {
-    "Longitudinais": ["LONGI001", "LONGI002"],
-    "Prensas": ["PRENS001", "PRENS002"],
-    "Transversais": ["TRANS001", "TRANS002", "TRANS003"]
+    "Longitudinais": ["LCL-4,5", "LCL-08"],
+    "Prensas": ["PRENSA-01", "PRENSA-02"],
+    "Transversais": ["LCT-16", "LCT-08", "LCT-2,5"]
 }
 
 # Valores base para geração de dados fictícios (em torno das metas ±30%)
@@ -69,20 +81,46 @@ def get_kpi_targets() -> Dict[str, float]:
 def get_equipment_names() -> Dict[str, str]:
     """
     Retorna o dicionário de nomes dos equipamentos.
+    Tenta buscar dados reais do ZPP, com fallback para dados demo.
 
     Returns:
         Dict mapeando código técnico -> nome de exibição
     """
+    if ZPP_AVAILABLE:
+        try:
+            # Tentar buscar equipamentos reais do ZPP
+            zpp_names = get_zpp_equipment_names()
+            if zpp_names:
+                print(f"[INFO] Usando {len(zpp_names)} equipamentos reais do ZPP")
+                return zpp_names
+        except Exception as e:
+            print(f"[AVISO] Erro ao buscar equipamentos ZPP: {e}")
+            print("[INFO] Usando equipamentos demo como fallback")
+
+    # Fallback para dados demo
     return EQUIPMENT_NAMES.copy()
 
 
 def get_equipment_categories() -> Dict[str, List[str]]:
     """
     Retorna a hierarquia de categorias dos equipamentos.
+    Tenta buscar dados reais do ZPP, com fallback para dados demo.
 
     Returns:
         Dict mapeando categoria -> lista de equipment IDs
     """
+    if ZPP_AVAILABLE:
+        try:
+            # Tentar buscar categorias reais do ZPP
+            zpp_categories = get_zpp_equipment_categories()
+            if zpp_categories:
+                print(f"[INFO] Usando {len(zpp_categories)} categorias reais do ZPP")
+                return zpp_categories
+        except Exception as e:
+            print(f"[AVISO] Erro ao buscar categorias ZPP: {e}")
+            print("[INFO] Usando categorias demo como fallback")
+
+    # Fallback para dados demo
     return EQUIPMENT_CATEGORIES.copy()
 
 

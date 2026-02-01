@@ -6,8 +6,7 @@ import plotly.express as px
 import logging
 import dash
 from datetime import datetime, timedelta
-from dash_bootstrap_templates import ThemeSwitchAIO
-from src.config.theme_config import TEMPLATE_THEME_MINTY, TEMPLATE_THEME_DARKLY
+from src.config.theme_config import TEMPLATE_THEME_MINTY
 import time
 
 from src.metrics import filtrar_dados_mongo
@@ -30,13 +29,16 @@ def register_msgtable_callbacks(app, collection_table):
             Input('store-end-date', 'data'),
             Input('store-start-hour', 'data'),
             Input('store-end-hour', 'data'),
-            Input('url', 'pathname'),
-        Input(ThemeSwitchAIO.ids.switch("theme"), "value")
+            Input('url', 'pathname')
         ]
     )
-    def fetch_table_data(n_intervals, store_start_date, store_end_date, store_start_hour, store_end_hour, pathname,toggle):
+    def fetch_table_data(n_intervals, store_start_date, store_end_date, store_start_hour, store_end_hour, pathname):
         # Adiciona logs para rastreamento dos valores recebidos
-        template = TEMPLATE_THEME_MINTY if toggle else TEMPLATE_THEME_DARKLY
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
+
+        # Não executar este callback em páginas que têm seus próprios filtros/callbacks
+        if pathname in ["/maintenance/indicators"]:
+            raise dash.exceptions.PreventUpdate
 
         logger.info(f"Pathname atual: {pathname}")
         logger.info(f"Valores recebidos (Store): Start Date: {store_start_date}, End Date: {store_end_date}, Start Hour: {store_start_hour}, End Hour: {store_end_hour}")
@@ -97,11 +99,10 @@ def register_msgtable_callbacks(app, collection_table):
             Output("data-table", "style_cell")
         ],
         [
-            Input("stored-table-data", "data"),
-            Input(ThemeSwitchAIO.ids.switch("theme"), "value")
+            Input("stored-table-data", "data")
         ]
     )
-    def update_table(stored_data, toggle):
+    def update_table(stored_data):
         if toggle is None:
             toggle = True
         # Estilo para tornar o container visível

@@ -11,7 +11,6 @@ ATUALIZADO:
 
 from dash import html, dcc
 import dash_bootstrap_components as dbc
-from dash_bootstrap_templates import ThemeSwitchAIO
 
 # Importações de ícones
 from src.components.icons import (
@@ -502,8 +501,7 @@ def create_header(pathname, user):
         html.Div([
             filters_dropdown,
             html.Div(style={"width": "5px"}),
-            html.Div(ThemeSwitchAIO(aio_id="theme", themes=[URL_THEME_MINTY, URL_THEME_DARKLY]), style={"width": "80px"}),
-            html.Div(style={"width": "5px"}),
+            # ThemeSwitchAIO removido
             profile_dropdown,
         ], className="d-flex align-items-center"),
     ],
