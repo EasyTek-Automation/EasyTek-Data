@@ -1,5 +1,5 @@
 # callbacks/callbacks.py
-from src.database.connection import get_mongo_connection
+from src.database.connection import get_mongo_connection, get_connection_status
 
 # Energy graph callbacks (SE03)
 from src.callbacks_registers.energy_kpi_callbacks import register_kpi_callbacks
@@ -16,12 +16,12 @@ from src.callbacks_registers.sidebar_default_dates_callback import (
     register_sidebar_default_dates_callback,
 )
 from src.callbacks_registers.states_callbacks import register_states_callbacks
-from src.callbacks_registers.states_callbacks02 import register_states02_callbacks    
+from src.callbacks_registers.states_callbacks02 import register_states02_callbacks
 from src.callbacks_registers.storetheme import register_storetheme_callbacks
 from src.callbacks_registers.states_switch_callback import register_states_switch_callback
 from src.callbacks_registers.sp_callback import register_sp_callback
 from src.callbacks_registers.tempgraph_callback import register_tempgraph_callbacks
-from src.callbacks_registers.main_layout_callbacks import register_main_layout_callbacks 
+from src.callbacks_registers.main_layout_callbacks import register_main_layout_callbacks
 from src.callbacks_registers.hourlyconsumption_callback import register_hourlyconsumption_callbacks
 from src.callbacks_registers.sidebar_content_callback import register_sidebar_content_callback
 from src.callbacks_registers.home_callbacks import register_home_callbacks
@@ -34,18 +34,38 @@ from src.callbacks_registers.energy_sidebar_callbacks import register_energy_sid
 from src.callbacks_registers.procedures_collapse_callbacks import register_procedures_collapse_callbacks
 from src.callbacks_registers.maintenance_kpi_callbacks import register_maintenance_kpi_callbacks
 from src.callbacks_registers.maintenance_config_callbacks import register_maintenance_config_callbacks
+from src.callbacks_registers.database_error_callbacks import register_database_error_callbacks
 
 from src.pages.energy import callbacks as energy_callbacks
 
 # (Seu logger, se houver)
 
 def register_callbacks(app):
-    # Configurar conexões específicas para as coleções MongoDB
-    collection_graph = get_mongo_connection(collection_name='DecapadoPerformance')
-    collection_table = get_mongo_connection(collection_name='DecapadoFalhas')
-    collection_energia = get_mongo_connection(collection_name='AMG_EnergyData')
-    collection_temp = get_mongo_connection(collection_name='DecapadoTemp')
-    collection_consumo = get_mongo_connection(collection_name="AMG_Consumo")
+    """
+    Registra todos os callbacks da aplicação.
+
+    IMPORTANTE: Esta função NÃO falha se o MongoDB estiver offline.
+    As conexões são tentadas, mas se falharem, None é passado para os callbacks.
+    Cada callback individual deve verificar se recebeu None e tratar apropriadamente.
+    """
+
+    # Tentar configurar conexões (modo não-fatal)
+    print("\n🔌 Configurando conexões MongoDB...")
+
+    collection_graph = get_mongo_connection(collection_name='DecapadoPerformance', silent=False)
+    collection_table = get_mongo_connection(collection_name='DecapadoFalhas', silent=True)
+    collection_energia = get_mongo_connection(collection_name='AMG_EnergyData', silent=True)
+    collection_temp = get_mongo_connection(collection_name='DecapadoTemp', silent=True)
+    collection_consumo = get_mongo_connection(collection_name="AMG_Consumo", silent=True)
+
+    # Verificar status
+    status = get_connection_status()
+    if not status["available"]:
+        print(f"\n⚠️  MongoDB OFFLINE - Aplicação iniciará em modo degradado")
+        print(f"   Erro: {status['error']}")
+        print(f"   ℹ️  Os usuários verão mensagens amigáveis ao acessar páginas que precisam do banco.\n")
+    else:
+        print("✅ MongoDB conectado com sucesso!\n")
 
     # Registra os callbacks existentes (sem alterações aqui)
     register_input_bridge_callbacks(app)
@@ -90,3 +110,6 @@ def register_callbacks(app):
 
     # Maintenance configuration callbacks
     register_maintenance_config_callbacks(app)
+
+    # Database error handling callbacks
+    register_database_error_callbacks(app)

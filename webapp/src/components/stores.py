@@ -30,4 +30,7 @@ app_stores = [
     dcc.Store(id='stored-hourly-consumption-data', storage_type='session'),
     dcc.Store(id="store-selected-machine", storage_type='session'),
 
+    # Store para status de reconexão do banco de dados
+    dcc.Store(id='store-db-reconnect-status', storage_type='memory'),
+
 ]

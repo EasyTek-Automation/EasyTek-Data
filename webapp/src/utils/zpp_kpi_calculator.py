@@ -429,27 +429,48 @@ def get_zpp_equipment_names() -> Dict[str, str]:
     Returns:
         dict: {"LONGI001": "Longitudinal 001", ...}
     """
+    # Mapeamento manual de nomes customizados (opcional)
+    # Se um equipamento estiver neste dicionário, usa o nome customizado
+    # Caso contrário, gera automaticamente baseado no prefixo
+    CUSTOM_NAMES = {
+        "LONGI001": "LCL-4,5",  # Pode alterar lado direito depois para "Longitudinal 1"
+        "LONGI002": "LCL-08",
+        "PRENS001": "PRENSA-01",
+        "PRENS002": "PRENSA-02",
+        "TRANS001": "LCT-16",
+        "TRANS002": "LCT-08",
+        "TRANS003": "LCT-2,5"
+        }
+
     try:
         equipment_list = fetch_zpp_equipment_list()
 
-        # Criar nomes amigáveis baseado no ID
+        print(f"[DEBUG] get_zpp_equipment_names: {len(equipment_list)} equipamentos encontrados")
+        print(f"[DEBUG] CUSTOM_NAMES definidos: {list(CUSTOM_NAMES.keys())}")
+
+        # Criar nomes amigáveis
         names = {}
         for eq_id in equipment_list:
-            # Extrair tipo e número
-            if eq_id.startswith("LONGI"):
-                tipo = "Longitudinal"
-                numero = eq_id.replace("LONGI", "")
-            elif eq_id.startswith("PRENS"):
-                tipo = "Prensa"
-                numero = eq_id.replace("PRENS", "")
-            elif eq_id.startswith("TRANS"):
-                tipo = "Transversal"
-                numero = eq_id.replace("TRANS", "")
+            # Verificar se há nome customizado
+            if eq_id in CUSTOM_NAMES:
+                names[eq_id] = CUSTOM_NAMES[eq_id]
+                print(f"[DEBUG] Usando nome customizado: {eq_id} -> {CUSTOM_NAMES[eq_id]}")
             else:
-                tipo = "Equipamento"
-                numero = eq_id
+                # Gerar nome automaticamente baseado no prefixo
+                if eq_id.startswith("LONGI"):
+                    tipo = "Longitudinal"  # ← CUSTOMIZÁVEL
+                    numero = eq_id.replace("LONGI", "")
+                elif eq_id.startswith("PRENS"):
+                    tipo = "Prensa"  # ← CUSTOMIZÁVEL
+                    numero = eq_id.replace("PRENS", "")
+                elif eq_id.startswith("TRANS"):
+                    tipo = "Transversal"  # ← CUSTOMIZÁVEL
+                    numero = eq_id.replace("TRANS", "")
+                else:
+                    tipo = "Equipamento"
+                    numero = eq_id
 
-            names[eq_id] = f"{tipo} {numero}"
+                names[eq_id] = f"{tipo} {numero}"
 
         return names
 

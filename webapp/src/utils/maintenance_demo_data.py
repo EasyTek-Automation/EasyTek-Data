@@ -136,7 +136,7 @@ def get_kpi_targets(equipment_id: str = None) -> Dict[str, float]:
         equipment_id: ID do equipamento (ex: "LONGI001"). Se None, retorna meta geral.
 
     Returns:
-        Dict com chaves: mtbf, mttr (em horas), breakdown_rate
+        Dict com chaves: mtbf, mttr (em horas), breakdown_rate, alert_range
     """
     try:
         from src.database.connection import get_mongo_connection
@@ -149,6 +149,8 @@ def get_kpi_targets(equipment_id: str = None) -> Dict[str, float]:
 
             # Verificar se os valores gerais são válidos
             if general.get("mtbf") is not None and general.get("mttr") is not None and general.get("breakdown_rate") is not None:
+                alert_range = general.get("alert_range", 3.0)
+
                 if equipment_id and equipment_id in equipment_targets:
                     # Meta específica do equipamento
                     eq_config = equipment_targets[equipment_id]
@@ -156,14 +158,16 @@ def get_kpi_targets(equipment_id: str = None) -> Dict[str, float]:
                     return {
                         "mtbf": eq_config.get("mtbf", general.get("mtbf")),
                         "mttr": mttr_value / 60.0,  # min -> h
-                        "breakdown_rate": eq_config.get("breakdown_rate", general.get("breakdown_rate"))
+                        "breakdown_rate": eq_config.get("breakdown_rate", general.get("breakdown_rate")),
+                        "alert_range": alert_range
                     }
                 else:
                     # Meta geral
                     return {
                         "mtbf": general.get("mtbf"),
                         "mttr": general.get("mttr") / 60.0,  # min -> h
-                        "breakdown_rate": general.get("breakdown_rate")
+                        "breakdown_rate": general.get("breakdown_rate"),
+                        "alert_range": alert_range
                     }
     except Exception as e:
         print(f"[ERRO] Falha ao buscar metas do MongoDB: {e}")
@@ -173,7 +177,8 @@ def get_kpi_targets(equipment_id: str = None) -> Dict[str, float]:
     return {
         "mtbf": 10.0,
         "mttr": 0.5,
-        "breakdown_rate": 5.0
+        "breakdown_rate": 5.0,
+        "alert_range": 3.0
     }
 
 
@@ -199,6 +204,7 @@ def get_all_equipment_targets() -> Dict[str, Dict[str, float]]:
             # Verificar se os valores gerais são válidos
             if general.get("mtbf") is not None and general.get("mttr") is not None and general.get("breakdown_rate") is not None:
                 all_targets = {}
+                alert_range = general.get("alert_range", 3.0)
 
                 # Para cada equipamento no sistema, buscar meta específica ou usar geral
                 equipment_list = get_equipment_names()
@@ -209,21 +215,24 @@ def get_all_equipment_targets() -> Dict[str, Dict[str, float]]:
                         all_targets[eq_id] = {
                             "mtbf": eq_config.get("mtbf", general.get("mtbf")),
                             "mttr": mttr_value / 60.0,  # min -> h
-                            "breakdown_rate": eq_config.get("breakdown_rate", general.get("breakdown_rate"))
+                            "breakdown_rate": eq_config.get("breakdown_rate", general.get("breakdown_rate")),
+                            "alert_range": alert_range
                         }
                     else:
                         # Usar meta geral
                         all_targets[eq_id] = {
                             "mtbf": general.get("mtbf"),
                             "mttr": general.get("mttr") / 60.0,  # min -> h
-                            "breakdown_rate": general.get("breakdown_rate")
+                            "breakdown_rate": general.get("breakdown_rate"),
+                            "alert_range": alert_range
                         }
 
                 # Adicionar meta geral também
                 all_targets["GENERAL"] = {
                     "mtbf": general.get("mtbf"),
                     "mttr": general.get("mttr") / 60.0,  # min -> h
-                    "breakdown_rate": general.get("breakdown_rate")
+                    "breakdown_rate": general.get("breakdown_rate"),
+                    "alert_range": alert_range
                 }
 
                 return all_targets
@@ -238,7 +247,8 @@ def get_all_equipment_targets() -> Dict[str, Dict[str, float]]:
     default_targets = {
         "mtbf": 10.0,
         "mttr": 0.5,
-        "breakdown_rate": 5.0
+        "breakdown_rate": 5.0,
+        "alert_range": 3.0
     }
 
     for eq_id in equipment_list:

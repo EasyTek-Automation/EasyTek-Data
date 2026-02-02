@@ -13,6 +13,26 @@ from src.components.maintenance_kpi_cards import (
 )
 from src.components.maintenance_kpi_graphs import create_empty_kpi_figure
 
+# ==================== CONFIGURAÇÃO PLOTLY ====================
+# Configuração padrão para mode bar: apenas Print e Auto Scale
+PLOTLY_CONFIG = {
+    'displayModeBar': True,
+    'displaylogo': False,
+    'modeBarButtonsToRemove': [
+        'zoom2d', 'pan2d', 'select2d', 'lasso2d',
+        'zoomIn2d', 'zoomOut2d', 'resetScale2d',
+        'hoverClosestCartesian', 'hoverCompareCartesian',
+        'toggleSpikelines'
+    ],
+    'toImageButtonOptions': {
+        'format': 'png',
+        'filename': 'grafico_manutencao',
+        'height': None,
+        'width': None,
+        'scale': 2
+    }
+}
+
 
 def layout():
     """
@@ -97,14 +117,11 @@ def layout():
                                     dbc.CardBody([
                                         dcc.Loading(
                                             id="loading-sunburst-mtbf",
-                                            type="default",
+                                            type="circle",
+                                            color="#198754",
                                             children=dcc.Graph(
                                                 id='sunburst-chart-mtbf',
-                                                config={
-                                                    'displayModeBar': True,
-                                                    'displaylogo': False,
-                                                    'responsive': True
-                                                }
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -121,14 +138,11 @@ def layout():
                                     dbc.CardBody([
                                         dcc.Loading(
                                             id="loading-sunburst-mttr",
-                                            type="default",
+                                            type="circle",
+                                            color="#0d6efd",
                                             children=dcc.Graph(
                                                 id='sunburst-chart-mttr',
-                                                config={
-                                                    'displayModeBar': True,
-                                                    'displaylogo': False,
-                                                    'responsive': True
-                                                }
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -145,14 +159,11 @@ def layout():
                                     dbc.CardBody([
                                         dcc.Loading(
                                             id="loading-sunburst-breakdown",
-                                            type="default",
+                                            type="circle",
+                                            color="#ffc107",
                                             children=dcc.Graph(
                                                 id='sunburst-chart-breakdown',
-                                                config={
-                                                    'displayModeBar': True,
-                                                    'displaylogo': False,
-                                                    'responsive': True
-                                                }
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -176,17 +187,11 @@ def layout():
                                     dbc.CardBody([
                                         dcc.Loading(
                                             id="loading-bar-mtbf",
-                                            type="default",
+                                            type="circle",
+                                            color="#0d6efd",
                                             children=dcc.Graph(
                                                 id='bar-chart-mtbf',
-                                                figure=create_empty_kpi_figure("MTBF"),
-                                                config={
-                                                    'displayModeBar': True,
-                                                    'displaylogo': False,
-                                                    'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
-                                                    'doubleClick': 'reset',
-                                                    'responsive': True
-                                                }
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -203,17 +208,11 @@ def layout():
                                     dbc.CardBody([
                                         dcc.Loading(
                                             id="loading-bar-mttr",
-                                            type="default",
+                                            type="circle",
+                                            color="#0d6efd",
                                             children=dcc.Graph(
                                                 id='bar-chart-mttr',
-                                                figure=create_empty_kpi_figure("MTTR"),
-                                                config={
-                                                    'displayModeBar': True,
-                                                    'displaylogo': False,
-                                                    'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
-                                                    'doubleClick': 'reset',
-                                                    'responsive': True
-                                                }
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -230,17 +229,11 @@ def layout():
                                     dbc.CardBody([
                                         dcc.Loading(
                                             id="loading-bar-breakdown",
-                                            type="default",
+                                            type="circle",
+                                            color="#0d6efd",
                                             children=dcc.Graph(
                                                 id='bar-chart-breakdown',
-                                                figure=create_empty_kpi_figure("Taxa de Avaria"),
-                                                config={
-                                                    'displayModeBar': True,
-                                                    'displaylogo': False,
-                                                    'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
-                                                    'doubleClick': 'reset',
-                                                    'responsive': True
-                                                }
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -300,19 +293,20 @@ def layout():
                                     ]),
                                     dbc.CardBody([
                                         dbc.Row([
-                                            # Coluna 1/3: Gráfico de barras horizontais (Top Paradas)
+                                            # Coluna 1: Gráfico de barras horizontais (Top Paradas) - 42% do espaço
                                             dbc.Col([
                                                 html.H6("Top 10 Paradas com Maior Tempo", className="text-center mb-3"),
                                                 dcc.Loading(
-                                                    type="default",
+                                                    type="circle",
+                                                    color="#dc3545",
                                                     children=dcc.Graph(
                                                         id="top-breakdowns-chart-individual",
-                                                        config={'displayModeBar': True, 'displaylogo': False}
+                                                        config=PLOTLY_CONFIG
                                                     )
                                                 )
-                                            ], md=4, className="d-flex flex-column justify-content-center"),
+                                            ], md=5, className="d-flex flex-column justify-content-center"),
 
-                                            # Coluna 2/3: 3 Gauges lado a lado com Metas
+                                            # Coluna 2: 3 Gauges lado a lado com Metas - 58% do espaço
                                             dbc.Col([
                                                 # Metas do Equipamento
                                                 html.Div(
@@ -324,10 +318,11 @@ def layout():
                                                     # Gauge MTBF
                                                     dbc.Col([
                                                         dcc.Loading(
-                                                            type="default",
+                                                            type="circle",
+                                                            color="#198754",
                                                             children=dcc.Graph(
                                                                 id="gauge-mtbf-individual",
-                                                                config={'displayModeBar': False, 'displaylogo': False}
+                                                                config=PLOTLY_CONFIG
                                                             )
                                                         )
                                                     ], md=4),
@@ -335,10 +330,11 @@ def layout():
                                                     # Gauge MTTR
                                                     dbc.Col([
                                                         dcc.Loading(
-                                                            type="default",
+                                                            type="circle",
+                                                            color="#0d6efd",
                                                             children=dcc.Graph(
                                                                 id="gauge-mttr-individual",
-                                                                config={'displayModeBar': False, 'displaylogo': False}
+                                                                config=PLOTLY_CONFIG
                                                             )
                                                         )
                                                     ], md=4),
@@ -346,15 +342,16 @@ def layout():
                                                     # Gauge Taxa de Avaria
                                                     dbc.Col([
                                                         dcc.Loading(
-                                                            type="default",
+                                                            type="circle",
+                                                            color="#ffc107",
                                                             children=dcc.Graph(
                                                                 id="gauge-breakdown-individual",
-                                                                config={'displayModeBar': False, 'displaylogo': False}
+                                                                config=PLOTLY_CONFIG
                                                             )
                                                         )
                                                     ], md=4)
                                                 ], className="align-items-center")
-                                            ], md=8, className="d-flex flex-column")
+                                            ], md=7, className="d-flex flex-column")
                                         ], className="align-items-center")
                                     ], className="p-3")
                                 ], className="shadow-sm")
@@ -372,10 +369,11 @@ def layout():
                                     dbc.CardHeader("MTBF - Evolução Mensal"),
                                     dbc.CardBody([
                                         dcc.Loading(
-                                            type="default",
+                                            type="circle",
+                                            color="#198754",
                                             children=dcc.Graph(
                                                 id="line-chart-mtbf-individual",
-                                                config={'displayModeBar': True, 'displaylogo': False}
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -386,10 +384,11 @@ def layout():
                                     dbc.CardHeader("MTTR - Evolução Mensal"),
                                     dbc.CardBody([
                                         dcc.Loading(
-                                            type="default",
+                                            type="circle",
+                                            color="#0d6efd",
                                             children=dcc.Graph(
                                                 id="line-chart-mttr-individual",
-                                                config={'displayModeBar': True, 'displaylogo': False}
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -400,10 +399,11 @@ def layout():
                                     dbc.CardHeader("Taxa Avaria - Evolução Mensal"),
                                     dbc.CardBody([
                                         dcc.Loading(
-                                            type="default",
+                                            type="circle",
+                                            color="#ffc107",
                                             children=dcc.Graph(
                                                 id="line-chart-breakdown-individual",
-                                                config={'displayModeBar': True, 'displaylogo': False}
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -422,10 +422,11 @@ def layout():
                                     dbc.CardHeader("Comparativo de Performance"),
                                     dbc.CardBody([
                                         dcc.Loading(
-                                            type="default",
+                                            type="circle",
+                                            color="#6c757d",
                                             children=dcc.Graph(
                                                 id="comparison-chart-individual",
-                                                config={'displayModeBar': True, 'displaylogo': False}
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])

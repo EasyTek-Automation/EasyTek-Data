@@ -80,7 +80,7 @@ def layout():
                             className="mb-2"
                         ),
                         html.Small("Tempo médio entre falhas", className="text-muted")
-                    ], md=4),
+                    ], md=3),
 
                     # MTTR (minutos)
                     dbc.Col([
@@ -97,7 +97,7 @@ def layout():
                             className="mb-2"
                         ),
                         html.Small("Tempo médio para reparo", className="text-muted")
-                    ], md=4),
+                    ], md=3),
 
                     # Taxa de Avaria (%)
                     dbc.Col([
@@ -115,7 +115,38 @@ def layout():
                             className="mb-2"
                         ),
                         html.Small("Percentual de tempo em falha", className="text-muted")
-                    ], md=4),
+                    ], md=3),
+
+                    # Range de Alerta (%) - NOVO
+                    dbc.Col([
+                        dbc.Label([
+                            html.I(className="bi bi-sliders me-2"),
+                            "Range de Alerta (%)"
+                        ]),
+                        dbc.Input(
+                            id="input-general-alert-range",
+                            type="number",
+                            placeholder="Ex: 3.0",
+                            value=3.0,  # Valor padrão
+                            step=0.1,
+                            min=0.1,
+                            max=20,
+                            className="mb-2"
+                        ),
+                        html.Small([
+                            "Margem de tolerância para cores ",
+                            html.I(className="bi bi-info-circle-fill text-primary",
+                                  id="tooltip-alert-range-trigger",
+                                  style={"cursor": "pointer"})
+                        ], className="text-muted"),
+                        dbc.Tooltip(
+                            "Define a margem percentual para as cores: "
+                            "Verde (melhor e fora da margem), Amarelo (dentro da margem), Vermelho (pior e fora da margem). "
+                            "Exemplo: 3% significa que valores dentro de ±3% da meta ficam amarelos.",
+                            target="tooltip-alert-range-trigger",
+                            placement="top"
+                        )
+                    ], md=3),
                 ])
             ])
         ], className="mb-4"),

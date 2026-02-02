@@ -9,6 +9,9 @@ import dash
 import pandas as pd
 from src.config.theme_config import TEMPLATE_THEME_MINTY
 
+# Verificação de saúde do MongoDB
+from src.database.connection import get_connection_status, reconnect_mongodb
+
 # Importar funções de cálculo e agregação (mantidas para processar dados ZPP)
 from src.utils.maintenance_demo_data import (
     calculate_kpi_averages,
@@ -35,6 +38,7 @@ from src.components.maintenance_kpi_graphs import (
     create_kpi_sunburst_chart,
     create_kpi_summary_table,
     create_empty_kpi_figure,
+    create_no_data_figure,
     create_kpi_line_chart,
     create_comparison_bar_chart,
     create_top_breakdowns_chart,
@@ -110,6 +114,25 @@ def register_maintenance_kpi_callbacks(app):
 
         # Se interval disparou e NÃO há dados ainda, carregar dados iniciais
         # Se botão apply foi clicado, sempre recarregar
+        # ⚠️ VERIFICAÇÃO CRÍTICA: MongoDB disponível?
+        db_status = get_connection_status()
+        if not db_status["available"]:
+            print(f"❌ [CALLBACK KPI] MongoDB offline - retornando erro")
+            return {
+                "has_data": False,
+                "db_error": True,
+                "error_message": db_status.get("error", "MongoDB indisponível"),
+                "period_type": period_type or "last12",
+                "year": ref_year or 2025,
+                "months": list(range(1, 13)),
+                "equipment_ids": [],
+                "data": {},
+                "targets": {},
+                "equipment_targets": {},
+                "names": {},
+                "categories": {}
+            }
+
         if trigger_id == "interval-initial-load" and current_data and current_data.get("data"):
             # Interval disparou mas já temos dados - apenas atualizar metas sem recarregar ZPP
             print("[INFO] Interval: Atualizando apenas metas (dados já carregados)")
@@ -121,6 +144,9 @@ def register_maintenance_kpi_callbacks(app):
         if not period_type:
             period_type = "last12"  # Padrão
 
+        print(f"[FILTROS] Tipo selecionado: {period_type}")
+        print(f"[FILTROS] Ano ref: {ref_year}, Start: {start_date}, End: {end_date}")
+
         if period_type in ["year", "last12"]:
             if not ref_year:
                 ref_year = 2025  # Ano onde os dados ZPP estão disponíveis
@@ -129,22 +155,42 @@ def register_maintenance_kpi_callbacks(app):
                 # Todos os meses do ano
                 months = list(range(1, 13))
                 year = ref_year
+                print(f"[FILTROS] Modo 'Ano': {year}, meses {months}")
             else:  # last12
                 # Últimos 12 meses a partir do ano
                 # Assumir que estamos em dez/2025, então últimos 12 = jan-dez 2025
                 months = list(range(1, 13))
                 year = ref_year
+                print(f"[FILTROS] Modo 'Últimos 12': {year}, meses {months}")
 
         else:  # custom
             if not start_date or not end_date:
                 # Usar padrão se não informado
                 year = 2025  # Ano onde os dados ZPP estão disponíveis
                 months = list(range(1, 13))
+                print(f"[FILTROS] Modo 'Custom' SEM DATAS: usando padrão {year}, todos meses")
             else:
-                # TODO: Implementar lógica para extrair ano/meses do date range
-                # Por enquanto usar todos os meses de 2025
-                year = 2025  # Ano onde os dados ZPP estão disponíveis
-                months = list(range(1, 13))
+                # IMPLEMENTAR: Extrair ano/meses do date range
+                from datetime import datetime
+                start = datetime.fromisoformat(start_date) if isinstance(start_date, str) else start_date
+                end = datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
+
+                year = start.year
+                # Gerar lista de meses entre start e end
+                months = []
+                current = start
+                while current <= end:
+                    if current.month not in months:
+                        months.append(current.month)
+                    # Avançar para próximo mês
+                    if current.month == 12:
+                        current = current.replace(year=current.year + 1, month=1)
+                    else:
+                        current = current.replace(month=current.month + 1)
+
+                months = sorted(months)
+                print(f"[FILTROS] Modo 'Custom' COM DATAS: {start_date} a {end_date}")
+                print(f"[FILTROS] Resultado: {year}, meses {months}")
 
         # Buscar dados reais - INTEGRAÇÃO ZPP
         print("\n" + "="*80)
@@ -240,6 +286,10 @@ def register_maintenance_kpi_callbacks(app):
         """
         Atualiza os 4 cards de resumo com médias gerais comparadas com meta da planta.
         """
+        # Verificar se MongoDB está offline
+        if stored_data and stored_data.get("db_error"):
+            return ["--"] * 3 + ["BD Offline", "danger"] * 3 + ["0"]
+
         if not stored_data or not stored_data.get("has_data", False):
             return ["--"] * 3 + ["Sem dados", "secondary"] * 3 + ["0"]
 
@@ -255,27 +305,57 @@ def register_maintenance_kpi_callbacks(app):
         if not averages.get("by_equipment"):
             return ["--"] * 3 + ["Sem dados", "secondary"] * 3 + ["0"]
 
-        # ALTERADO: Usar meta geral da planta (GENERAL) para os cards de resumo
-        general_target = equipment_targets.get("GENERAL", {"mtbf": 0, "mttr": 999, "breakdown_rate": 100})
+        # Importar função helper para cores simplificadas
+        from src.components.maintenance_kpi_graphs import get_kpi_color
+
+        # Usar meta geral da planta (GENERAL) para os cards de resumo
+        general_target = equipment_targets.get("GENERAL", {"mtbf": 0, "mttr": 999, "breakdown_rate": 100, "alert_range": 3.0})
+        alert_range = general_target.get("alert_range", 3.0)
+
+        # Sistema de cores simplificado (3 cores com margem dinâmica)
+        # Verde: Melhor e fora da margem
+        # Amarelo: Dentro de ±alert_range% da meta
+        # Vermelho: Pior e fora da margem
 
         # MTBF (maior é melhor)
         mtbf_avg = averages["mtbf"]
-        mtbf_meets_target = mtbf_avg >= general_target["mtbf"]
-        mtbf_badge_text = "✓ Acima da Meta" if mtbf_meets_target else "⚠ Abaixo da Meta"
-        mtbf_badge_color = "success" if mtbf_meets_target else "danger"
+        mtbf_color_hex = get_kpi_color(mtbf_avg, general_target["mtbf"], "MTBF", margin_percent=alert_range)
+        if mtbf_color_hex == "#198754":  # Verde
+            mtbf_badge_text = "✓ Muito Acima"
+            mtbf_badge_color = "success"
+        elif mtbf_color_hex == "#ffc107":  # Amarelo
+            mtbf_badge_text = "≈ Dentro da Meta"
+            mtbf_badge_color = "warning"
+        else:  # Vermelho
+            mtbf_badge_text = "✗ Abaixo"
+            mtbf_badge_color = "danger"
 
-        # MTTR (menor é melhor) - converter de horas para minutos
+        # MTTR (menor é melhor) - converter para minutos
         mttr_avg_minutes = averages["mttr"] * 60
         mttr_target_minutes = general_target["mttr"] * 60
-        mttr_meets_target = mttr_avg_minutes <= mttr_target_minutes
-        mttr_badge_text = "✓ Dentro da Meta" if mttr_meets_target else "⚠ Acima da Meta"
-        mttr_badge_color = "success" if mttr_meets_target else "danger"
+        mttr_color_hex = get_kpi_color(mttr_avg_minutes, mttr_target_minutes, "MTTR", margin_percent=alert_range)
+        if mttr_color_hex == "#198754":  # Verde
+            mttr_badge_text = "✓ Muito Abaixo"
+            mttr_badge_color = "success"
+        elif mttr_color_hex == "#ffc107":  # Amarelo
+            mttr_badge_text = "≈ Dentro da Meta"
+            mttr_badge_color = "warning"
+        else:  # Vermelho
+            mttr_badge_text = "✗ Acima"
+            mttr_badge_color = "danger"
 
         # Taxa de Avaria (menor é melhor)
         breakdown_avg = averages["breakdown_rate"]
-        breakdown_meets_target = breakdown_avg <= general_target["breakdown_rate"]
-        breakdown_badge_text = "✓ Dentro da Meta" if breakdown_meets_target else "⚠ Acima da Meta"
-        breakdown_badge_color = "success" if breakdown_meets_target else "danger"
+        breakdown_color_hex = get_kpi_color(breakdown_avg, general_target["breakdown_rate"], "breakdown_rate", margin_percent=alert_range)
+        if breakdown_color_hex == "#198754":  # Verde
+            breakdown_badge_text = "✓ Muito Abaixo"
+            breakdown_badge_color = "success"
+        elif breakdown_color_hex == "#ffc107":  # Amarelo
+            breakdown_badge_text = "≈ Dentro da Meta"
+            breakdown_badge_color = "warning"
+        else:  # Vermelho
+            breakdown_badge_text = "✗ Acima"
+            breakdown_badge_color = "danger"
 
         # Contagem de equipamentos
         eq_count = len(equipment_ids)
@@ -310,13 +390,29 @@ def register_maintenance_kpi_callbacks(app):
         """
         Atualiza os 3 gráficos de barras com médias e metas individualizadas.
         """
+        print("\n" + "="*80)
+        print(">>> CALLBACK: update_bar_charts()")
+        print("="*80)
+
         template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
         if not stored_data:
+            print("[DEBUG] stored_data is None/empty - retornando gráficos vazios")
             return [
                 create_empty_kpi_figure("MTBF", template),
                 create_empty_kpi_figure("MTTR", template),
                 create_empty_kpi_figure("Taxa de Avaria", template)
+            ]
+
+        # ⚠️ Verificar se há erro de banco de dados
+        if stored_data.get("db_error"):
+            print("❌ [DEBUG] MongoDB offline - retornando gráficos de erro")
+            from src.components.maintenance_kpi_graphs import create_database_error_figure
+            error_msg = stored_data.get("error_message", "Banco de dados offline")
+            return [
+                create_database_error_figure("MTBF", error_msg, template),
+                create_database_error_figure("MTTR", error_msg, template),
+                create_database_error_figure("Taxa de Avaria", error_msg, template)
             ]
 
         data = stored_data["data"]
@@ -325,15 +421,25 @@ def register_maintenance_kpi_callbacks(app):
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
 
+        print(f"[DEBUG] Equipamentos: {len(equipment_ids)} -> {equipment_ids}")
+        print(f"[DEBUG] Meses recebidos: {months}")
+        print(f"[DEBUG] Dados por equipamento (primeiros 2):")
+        for idx, eq_id in enumerate(equipment_ids[:2]):
+            eq_data = data.get(eq_id, [])
+            print(f"  {eq_id}: {len(eq_data)} meses -> meses={[m['month'] for m in eq_data]}")
+
         # Calcular médias por equipamento
         averages = calculate_kpi_averages(data, equipment_ids, months)
+        print(f"[DEBUG] Médias calculadas para {len(averages['by_equipment'])} equipamentos")
+        print("="*80 + "\n")
 
         # Verificar se há dados válidos
         if not averages.get("by_equipment"):
+            print("[DEBUG] Sem dados após cálculo - retornando gráficos de 'sem dados'")
             return [
-                create_empty_kpi_figure("MTBF", template),
-                create_empty_kpi_figure("MTTR", template),
-                create_empty_kpi_figure("Taxa de Avaria", template)
+                create_no_data_figure("barra", template),
+                create_no_data_figure("barra", template),
+                create_no_data_figure("barra", template)
             ]
 
         # Preparar dados para gráficos
@@ -343,7 +449,8 @@ def register_maintenance_kpi_callbacks(app):
 
         # Preparar dicionários de metas individuais por equipamento
         # Fallback para meta geral se equipamento não tiver meta específica
-        general_target = equipment_targets.get("GENERAL", {"mtbf": 0, "mttr": 999, "breakdown_rate": 100})
+        general_target = equipment_targets.get("GENERAL", {"mtbf": 0, "mttr": 999, "breakdown_rate": 100, "alert_range": 3.0})
+        alert_range = general_target.get("alert_range", 3.0)
 
         mtbf_targets = {}
         mttr_targets = {}
@@ -356,22 +463,29 @@ def register_maintenance_kpi_callbacks(app):
             breakdown_targets[eq_id] = eq_target.get("breakdown_rate", general_target["breakdown_rate"])
 
         # Criar gráficos com metas individualizadas
+        # IMPORTANTE: A linha tracejada mostra a META DA PLANTA, não a média geral
         fig_mtbf = create_kpi_bar_chart(
             equipment_ids, mtbf_values, "MTBF",
-            averages["mtbf"], mtbf_targets,  # ALTERADO: Dict de metas
-            names, template
+            averages["mtbf"], mtbf_targets,
+            names, template,
+            plant_target=general_target["mtbf"],
+            margin_percent=alert_range
         )
 
         fig_mttr = create_kpi_bar_chart(
             equipment_ids, mttr_values, "MTTR",
-            averages["mttr"], mttr_targets,  # ALTERADO: Dict de metas
-            names, template
+            averages["mttr"], mttr_targets,
+            names, template,
+            plant_target=general_target["mttr"],
+            margin_percent=alert_range
         )
 
         fig_breakdown = create_kpi_bar_chart(
             equipment_ids, breakdown_values, "Taxa de Avaria",
-            averages["breakdown_rate"], breakdown_targets,  # ALTERADO: Dict de metas
-            names, template
+            averages["breakdown_rate"], breakdown_targets,
+            names, template,
+            plant_target=general_target["breakdown_rate"],
+            margin_percent=alert_range
         )
 
         return [fig_mtbf, fig_mttr, fig_breakdown]
@@ -397,42 +511,68 @@ def register_maintenance_kpi_callbacks(app):
 
         template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
-        if not stored_data:
-            # Retornar sunbursts vazios
-            empty_fig = go.Figure()
-            empty_fig.update_layout(template=template)
-            return [empty_fig] * 3
+        if not stored_data or not stored_data.get("has_data", False):
+            # Retornar sunbursts com mensagem de sem dados
+            return [
+                create_no_data_figure("sunburst", template),
+                create_no_data_figure("sunburst", template),
+                create_no_data_figure("sunburst", template)
+            ]
 
         data = stored_data["data"]
         names = stored_data["names"]
         categories = stored_data["categories"]
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
+        equipment_targets = stored_data.get("equipment_targets", {})
 
         # Calcular médias por equipamento
         averages = calculate_kpi_averages(data, equipment_ids, months)
 
         if not averages.get("by_equipment"):
-            empty_fig = go.Figure()
-            empty_fig.update_layout(template=template)
-            return [empty_fig] * 3
+            return [
+                create_no_data_figure("sunburst", template),
+                create_no_data_figure("sunburst", template),
+                create_no_data_figure("sunburst", template)
+            ]
 
         # Preparar dados para sunbursts (apenas valores por equipamento)
         mtbf_by_eq = {eq: averages["by_equipment"][eq]["mtbf"] for eq in equipment_ids}
         mttr_by_eq = {eq: averages["by_equipment"][eq]["mttr"] for eq in equipment_ids}
         breakdown_by_eq = {eq: averages["by_equipment"][eq]["breakdown_rate"] for eq in equipment_ids}
 
-        # Criar sunbursts
+        # Obter meta geral da planta
+        general_target = equipment_targets.get("GENERAL", {"mtbf": 0, "mttr": 999, "breakdown_rate": 100, "alert_range": 3.0})
+        alert_range = general_target.get("alert_range", 3.0)
+
+        # Preparar dicionários de metas por equipamento
+        mtbf_targets = {eq_id: equipment_targets.get(eq_id, general_target).get("mtbf", general_target["mtbf"])
+                       for eq_id in equipment_ids}
+        mttr_targets = {eq_id: equipment_targets.get(eq_id, general_target).get("mttr", general_target["mttr"])
+                       for eq_id in equipment_ids}
+        breakdown_targets = {eq_id: equipment_targets.get(eq_id, general_target).get("breakdown_rate", general_target["breakdown_rate"])
+                            for eq_id in equipment_ids}
+
+        # Criar sunbursts com cores baseadas na META GERAL DA PLANTA
         fig_mtbf = create_kpi_sunburst_chart(
-            mtbf_by_eq, "MTBF", categories, names, template
+            mtbf_by_eq, "MTBF", categories, names, template,
+            target_values=mtbf_targets,
+            plant_target=general_target["mtbf"],
+            margin_percent=alert_range
         )
 
         fig_mttr = create_kpi_sunburst_chart(
-            mttr_by_eq, "MTTR", categories, names, template
+            mttr_by_eq, "MTTR", categories, names, template,
+            target_values=mttr_targets,
+            plant_target=general_target["mttr"],
+            margin_percent=alert_range
         )
 
         fig_breakdown = create_kpi_sunburst_chart(
-            breakdown_by_eq, "Taxa de Avaria", categories, names, template
+            breakdown_by_eq, "Taxa de Avaria", categories, names, template,
+            target_values=breakdown_targets,
+            plant_target=general_target["breakdown_rate"],
+            margin_percent=alert_range
         )
 
         return [fig_mtbf, fig_mttr, fig_breakdown]
@@ -890,8 +1030,12 @@ def register_maintenance_kpi_callbacks(app):
         template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
         if not stored_data or not equipment_id or not stored_data.get("has_data", False):
-            # Retornar figuras vazias
-            return [go.Figure()] * 3
+            # Retornar figuras com mensagem de sem dados
+            return [
+                create_no_data_figure("gauge", template),
+                create_no_data_figure("gauge", template),
+                create_no_data_figure("gauge", template)
+            ]
 
         data = stored_data["data"]
         equipment_targets = stored_data["equipment_targets"]  # ALTERADO: Usar metas por equipamento
@@ -902,33 +1046,41 @@ def register_maintenance_kpi_callbacks(app):
         averages = calculate_kpi_averages(data, equipment_ids, months)
 
         if not averages.get("by_equipment") or equipment_id not in averages["by_equipment"]:
-            return [go.Figure()] * 3
+            return [
+                create_no_data_figure("gauge", template),
+                create_no_data_figure("gauge", template),
+                create_no_data_figure("gauge", template)
+            ]
 
         eq_data = averages["by_equipment"][equipment_id]
 
         # Obter meta específica do equipamento (ou usar meta geral como fallback)
         eq_target = equipment_targets.get(equipment_id, equipment_targets.get("GENERAL", {}))
+        alert_range = eq_target.get("alert_range", 3.0)
 
         # Criar gauges com meta individualizada
         fig_mtbf = create_kpi_gauge(
             value=eq_data['mtbf'],
             kpi_name="MTBF",
-            target_value=eq_target.get("mtbf", 0),  # ALTERADO: Meta individual
-            template=template
+            target_value=eq_target.get("mtbf", 0),
+            template=template,
+            margin_percent=alert_range
         )
 
         fig_mttr = create_kpi_gauge(
             value=eq_data['mttr'],
             kpi_name="MTTR",
-            target_value=eq_target.get("mttr", 999),  # ALTERADO: Meta individual
-            template=template
+            target_value=eq_target.get("mttr", 999),
+            template=template,
+            margin_percent=alert_range
         )
 
         fig_breakdown = create_kpi_gauge(
             value=eq_data['breakdown_rate'],
             kpi_name="Taxa de Avaria",
-            target_value=eq_target.get("breakdown_rate", 100),  # ALTERADO: Meta individual
-            template=template
+            target_value=eq_target.get("breakdown_rate", 100),
+            template=template,
+            margin_percent=alert_range
         )
 
         return [fig_mtbf, fig_mttr, fig_breakdown]
@@ -958,9 +1110,14 @@ def register_maintenance_kpi_callbacks(app):
 
         template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
-        if not stored_data or not equipment_id:
-            # Retornar figuras vazias
-            return [go.Figure()] * 4
+        if not stored_data or not equipment_id or not stored_data.get("has_data", False):
+            # Retornar figuras com mensagem de sem dados
+            return [
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template),
+                create_no_data_figure("comparacao", template)
+            ]
 
         data = stored_data["data"]
         equipment_targets = stored_data["equipment_targets"]  # ALTERADO: Usar metas por equipamento
@@ -975,7 +1132,12 @@ def register_maintenance_kpi_callbacks(app):
         eq_data_by_month = data.get(equipment_id, [])
 
         if not eq_data_by_month or not general_avg_by_month:
-            return [go.Figure()] * 4
+            return [
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template),
+                create_no_data_figure("comparacao", template)
+            ]
 
         # Extrair valores por mês
         mtbf_values = [m["mtbf"] for m in eq_data_by_month if m["month"] in months]
@@ -986,29 +1148,42 @@ def register_maintenance_kpi_callbacks(app):
         mttr_avg = [general_avg_by_month[m]["mttr"] for m in months if m in general_avg_by_month]
         breakdown_avg = [general_avg_by_month[m]["breakdown_rate"] for m in months if m in general_avg_by_month]
 
+        # Verificar se há valores extraídos após filtragem
+        if not mtbf_values or not mttr_values or not breakdown_values or not mtbf_avg or not mttr_avg or not breakdown_avg:
+            return [
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template),
+                create_no_data_figure("comparacao", template)
+            ]
+
         # Obter meta específica do equipamento (ou usar meta geral como fallback)
         eq_target = equipment_targets.get(equipment_id, equipment_targets.get("GENERAL", {}))
+        alert_range = eq_target.get("alert_range", 3.0)
 
         # Criar gráficos de linha com meta individualizada
         fig_mtbf = create_kpi_line_chart(
             months, mtbf_values, mtbf_avg,
             "MTBF", names.get(equipment_id, equipment_id),
-            eq_target.get("mtbf", 0),  # ALTERADO: Meta individual
-            template
+            eq_target.get("mtbf", 0),
+            template,
+            margin_percent=alert_range
         )
 
         fig_mttr = create_kpi_line_chart(
             months, mttr_values, mttr_avg,
             "MTTR", names.get(equipment_id, equipment_id),
-            eq_target.get("mttr", 999),  # ALTERADO: Meta individual
-            template
+            eq_target.get("mttr", 999),
+            template,
+            margin_percent=alert_range
         )
 
         fig_breakdown = create_kpi_line_chart(
             months, breakdown_values, breakdown_avg,
             "Taxa de Avaria", names.get(equipment_id, equipment_id),
-            eq_target.get("breakdown_rate", 100),  # ALTERADO: Meta individual
-            template
+            eq_target.get("breakdown_rate", 100),
+            template,
+            margin_percent=alert_range
         )
 
         # Gráfico de comparação
@@ -1050,9 +1225,9 @@ def register_maintenance_kpi_callbacks(app):
 
         template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
-        if not stored_data or not equipment_id:
-            # Retornar figura vazia
-            return go.Figure()
+        if not stored_data or not equipment_id or not stored_data.get("has_data", False):
+            # Retornar figura com mensagem de sem dados
+            return create_no_data_figure("paradas", template)
 
         year = stored_data.get("year")
         months = stored_data.get("months", [])
@@ -1088,37 +1263,9 @@ def register_maintenance_kpi_callbacks(app):
                 import traceback
                 traceback.print_exc()
 
-                # Retornar figura vazia com mensagem de erro
-                fig = go.Figure()
-                fig.add_annotation(
-                    x=0.5, y=0.5,
-                    text=f"Erro ao carregar dados: {str(e)}",
-                    xref="paper", yref="paper",
-                    showarrow=False,
-                    font=dict(size=14, color='#dc3545')
-                )
-                fig.update_layout(
-                    template=template,
-                    xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
-                    yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
-                    height=400
-                )
-                return fig
+                # Retornar figura com mensagem de erro
+                return create_no_data_figure("paradas", template)
         else:
             # Módulo ZPP não disponível
-            fig = go.Figure()
-            fig.add_annotation(
-                x=0.5, y=0.5,
-                text="Módulo ZPP não disponível",
-                xref="paper", yref="paper",
-                showarrow=False,
-                font=dict(size=14, color='#6c757d')
-            )
-            fig.update_layout(
-                template=template,
-                xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
-                yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
-                height=400
-            )
-            return fig
+            return create_no_data_figure("paradas", template)
 

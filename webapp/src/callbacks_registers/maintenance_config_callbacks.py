@@ -124,6 +124,7 @@ def register_maintenance_config_callbacks(app):
         [Output("input-general-mtbf", "value"),
          Output("input-general-mttr", "value"),
          Output("input-general-breakdown-rate", "value"),
+         Output("input-general-alert-range", "value"),
          Output({"type": "equipment-mtbf", "index": ALL}, "value"),
          Output({"type": "equipment-mttr", "index": ALL}, "value"),
          Output({"type": "equipment-breakdown", "index": ALL}, "value")],
@@ -131,30 +132,22 @@ def register_maintenance_config_callbacks(app):
          Input("url", "pathname")]
     )
     def load_config(equipment_list, pathname):
-        """
-        Carrega configuração existente do MongoDB.
-
-        Returns:
-            tuple: Valores para metas gerais + listas de valores para equipamentos
-        """
         if pathname != "/maintenance/config" or not equipment_list:
-            return None, None, None, [], [], []
+            return None, None, None, 3.0, [], [], []
 
         try:
             collection = get_mongo_connection("AMG_MaintenanceTargets")
             config = collection.find_one()
 
             if not config:
-                # Sem configuração salva
-                return None, None, None, [None] * len(equipment_list), [None] * len(equipment_list), [None] * len(equipment_list)
+                return None, None, None, 3.0, [None] * len(equipment_list), [None] * len(equipment_list), [None] * len(equipment_list)
 
-            # Metas gerais
             general = config.get("general", {})
             general_mtbf = general.get("mtbf")
             general_mttr = general.get("mttr")
             general_breakdown = general.get("breakdown_rate")
+            alert_range = general.get("alert_range", 3.0)
 
-            # Metas por equipamento (em ordem da lista)
             equipment_targets = config.get("equipment_targets", {})
 
             mtbf_values = []
@@ -167,11 +160,11 @@ def register_maintenance_config_callbacks(app):
                 mttr_values.append(eq_config.get("mttr"))
                 breakdown_values.append(eq_config.get("breakdown_rate"))
 
-            return general_mtbf, general_mttr, general_breakdown, mtbf_values, mttr_values, breakdown_values
+            return general_mtbf, general_mttr, general_breakdown, alert_range, mtbf_values, mttr_values, breakdown_values
 
         except Exception as e:
             print(f"[ERRO] Falha ao carregar configuração: {e}")
-            return None, None, None, [None] * len(equipment_list), [None] * len(equipment_list), [None] * len(equipment_list)
+            return None, None, None, 3.0, [None] * len(equipment_list), [None] * len(equipment_list), [None] * len(equipment_list)
 
     # ========================================
     # CALLBACK 3: SALVAR CONFIGURAÇÃO ⭐
@@ -182,13 +175,14 @@ def register_maintenance_config_callbacks(app):
         [State("input-general-mtbf", "value"),
          State("input-general-mttr", "value"),
          State("input-general-breakdown-rate", "value"),
+         State("input-general-alert-range", "value"),
          State("maintenance-equipment-list", "data"),
          State({"type": "equipment-mtbf", "index": ALL}, "value"),
          State({"type": "equipment-mttr", "index": ALL}, "value"),
          State({"type": "equipment-breakdown", "index": ALL}, "value")],
         prevent_initial_call=True
     )
-    def save_config(n_clicks, general_mtbf, general_mttr, general_breakdown,
+    def save_config(n_clicks, general_mtbf, general_mttr, general_breakdown, alert_range,
                     equipment_list, eq_mtbf_values, eq_mttr_values, eq_breakdown_values):
         """
         Salva configuração no MongoDB com validação.
@@ -247,6 +241,19 @@ def register_maintenance_config_callbacks(app):
                 "Taxa de Avaria não pode exceder 100%."
             ], color="warning", dismissable=True)
 
+        # VALIDAÇÃO 5: Alert range
+        if alert_range is None:
+            alert_range = 3.0
+        try:
+            alert_range = float(alert_range)
+            if alert_range < 0.1 or alert_range > 20:
+                raise ValueError("Range deve estar entre 0.1% e 20%")
+        except (ValueError, TypeError) as e:
+            return dbc.Alert([
+                html.I(className="bi bi-x-circle me-2"),
+                f"Erro no Range de Alerta: {str(e)}"
+            ], color="danger", dismissable=True)
+
         # CONSTRUIR DOCUMENTO DE CONFIGURAÇÃO
         config_document = {
             "version": 1,
@@ -255,7 +262,8 @@ def register_maintenance_config_callbacks(app):
             "general": {
                 "mtbf": general_mtbf,
                 "mttr": general_mttr,
-                "breakdown_rate": general_breakdown
+                "breakdown_rate": general_breakdown,
+                "alert_range": alert_range
             },
             "equipment_targets": {}
         }
@@ -354,6 +362,7 @@ def register_maintenance_config_callbacks(app):
         [Output("input-general-mtbf", "value", allow_duplicate=True),
          Output("input-general-mttr", "value", allow_duplicate=True),
          Output("input-general-breakdown-rate", "value", allow_duplicate=True),
+         Output("input-general-alert-range", "value", allow_duplicate=True),
          Output({"type": "equipment-mtbf", "index": ALL}, "value", allow_duplicate=True),
          Output({"type": "equipment-mttr", "index": ALL}, "value", allow_duplicate=True),
          Output({"type": "equipment-breakdown", "index": ALL}, "value", allow_duplicate=True),
@@ -370,7 +379,7 @@ def register_maintenance_config_callbacks(app):
             tuple: None para todos os campos + mensagem de confirmação
         """
         if not n_clicks:
-            return [None, None, None, [], [], [], None]
+            return [None, None, None, 3.0, [], [], [], None]
 
         num_equipment = len(equipment_list) if equipment_list else 0
 
@@ -379,4 +388,4 @@ def register_maintenance_config_callbacks(app):
             "Formulário limpo. Preencha novamente para salvar."
         ], color="info", dismissable=True, duration=4000)
 
-        return None, None, None, [None] * num_equipment, [None] * num_equipment, [None] * num_equipment, alert
+        return None, None, None, 3.0, [None] * num_equipment, [None] * num_equipment, [None] * num_equipment, alert

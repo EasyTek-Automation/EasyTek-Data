@@ -10,16 +10,234 @@ import dash_bootstrap_components as dbc
 from typing import Dict, List
 
 
+# ==================== SISTEMA DE CORES SIMPLIFICADO ====================
+
+def get_kpi_color(value: float, reference: float, kpi_type: str, margin_percent: float = 3.0) -> str:
+    """
+    Calcula a cor baseada no valor vs referência com margem de tolerância.
+
+    Sistema de 3 cores:
+    - Verde (#198754): Melhor que referência e fora da margem
+    - Amarelo (#ffc107): Dentro da margem de ±3% da referência
+    - Vermelho (#dc3545): Pior que referência e fora da margem
+
+    Args:
+        value: Valor atual do KPI
+        reference: Valor de referência (meta ou média geral)
+        kpi_type: Tipo do KPI ("MTBF", "MTTR", "breakdown_rate")
+        margin_percent: Margem de tolerância em % (padrão 3%)
+
+    Returns:
+        String com código hexadecimal da cor
+    """
+    # Calcular margem de tolerância
+    margin = reference * (margin_percent / 100.0)
+    lower_bound = reference - margin
+    upper_bound = reference + margin
+
+    # MTBF: Maior é melhor
+    if kpi_type == "MTBF":
+        if value >= upper_bound:
+            return "#198754"  # Verde - muito acima da referência
+        elif value >= lower_bound:
+            return "#ffc107"  # Amarelo - dentro da margem
+        else:
+            return "#dc3545"  # Vermelho - abaixo da referência
+
+    # MTTR e Taxa de Avaria: Menor é melhor
+    else:  # "MTTR" ou "breakdown_rate"
+        if value <= lower_bound:
+            return "#198754"  # Verde - muito abaixo da referência
+        elif value <= upper_bound:
+            return "#ffc107"  # Amarelo - dentro da margem
+        else:
+            return "#dc3545"  # Vermelho - acima da referência
+
+
+def get_multiple_colors(values: List[float], references: List[float],
+                       kpi_type: str, margin_percent: float = 3.0) -> List[str]:
+    """
+    Calcula cores para múltiplos valores (para gráficos de barras).
+
+    Args:
+        values: Lista de valores
+        references: Lista de referências (mesmo tamanho que values)
+        kpi_type: Tipo do KPI
+        margin_percent: Margem de tolerância em %
+
+    Returns:
+        Lista de cores (strings hex)
+    """
+    return [
+        get_kpi_color(val, ref, kpi_type, margin_percent)
+        for val, ref in zip(values, references)
+    ]
+
+
+def create_database_error_figure(kpi_name: str = "KPI", error_message: str = None, template: str = 'minty') -> go.Figure:
+    """
+    Cria figura para quando o BANCO DE DADOS está OFFLINE (erro de conexão).
+
+    Args:
+        kpi_name: Nome do KPI
+        error_message: Mensagem de erro técnica (opcional)
+        template: Template do tema ('minty' ou 'darkly')
+
+    Returns:
+        Figura Plotly com mensagem de erro de banco de dados
+    """
+    is_dark = (template == 'darkly')
+    bg_color = '#2c2c2c' if is_dark else '#fff3cd'  # Fundo amarelo claro para alerta
+    text_color = '#e0e0e0' if is_dark else '#856404'
+    subtitle_color = '#a0a0a0' if is_dark else '#6c757d'
+
+    fig = go.Figure()
+
+    # Ícone de banco de dados com problema
+    fig.add_annotation(
+        x=0.5, y=0.65,
+        text="<span style='font-size:80px;'>🔌</span>",
+        xref="paper", yref="paper",
+        showarrow=False,
+        xanchor='center', yanchor='middle'
+    )
+
+    # Título
+    fig.add_annotation(
+        x=0.5, y=0.45,
+        text="<b>Banco de Dados Offline</b>",
+        xref="paper", yref="paper",
+        showarrow=False,
+        xanchor='center', yanchor='middle',
+        font=dict(size=18, color=text_color)
+    )
+
+    # Mensagem principal
+    fig.add_annotation(
+        x=0.5, y=0.35,
+        text=f"Não foi possível carregar os dados de {kpi_name}",
+        xref="paper", yref="paper",
+        showarrow=False,
+        xanchor='center', yanchor='middle',
+        font=dict(size=14, color=subtitle_color)
+    )
+
+    # Submensagem
+    fig.add_annotation(
+        x=0.5, y=0.25,
+        text="O MongoDB está inacessível. Verifique se o serviço está rodando.",
+        xref="paper", yref="paper",
+        showarrow=False,
+        xanchor='center', yanchor='middle',
+        font=dict(size=12, color=subtitle_color)
+    )
+
+    # Detalhes técnicos (se fornecidos)
+    if error_message:
+        fig.add_annotation(
+            x=0.5, y=0.15,
+            text=f"<i>Erro: {error_message[:80]}...</i>",
+            xref="paper", yref="paper",
+            showarrow=False,
+            xanchor='center', yanchor='middle',
+            font=dict(size=10, color=subtitle_color)
+        )
+
+    fig.update_layout(
+        template=template,
+        plot_bgcolor=bg_color,
+        paper_bgcolor=bg_color,
+        xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+        yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+        height=400,
+        margin=dict(t=20, b=20, l=20, r=20),
+        hovermode=False
+    )
+
+    return fig
+
+
+def create_no_data_figure(graph_type: str = "geral", template: str = 'minty') -> go.Figure:
+    """
+    Cria figura para quando NÃO HÁ DADOS NO BANCO (estado de erro).
+
+    Args:
+        graph_type: Tipo do gráfico ("geral", "sunburst", "gauge", "linha", etc)
+        template: Template do tema ('minty' ou 'darkly')
+
+    Returns:
+        Figura Plotly com mensagem de sem dados
+    """
+    is_dark = (template == 'darkly')
+    bg_color = '#2c2c2c' if is_dark else '#f8f9fa'
+    text_color = '#e0e0e0' if is_dark else '#2c3e50'
+    subtitle_color = '#a0a0a0' if is_dark else '#6c757d'
+
+    fig = go.Figure()
+
+    # Ícone grande de sem dados
+    fig.add_annotation(
+        x=0.5, y=0.65,
+        text="<span style='font-size:80px;'>📭</span>",
+        xref="paper", yref="paper",
+        showarrow=False,
+        xanchor='center', yanchor='middle'
+    )
+
+    # Título
+    fig.add_annotation(
+        x=0.5, y=0.45,
+        text="<b>Nenhum Dado Disponível</b>",
+        xref="paper", yref="paper",
+        showarrow=False,
+        xanchor='center', yanchor='middle',
+        font=dict(size=18, color=text_color)
+    )
+
+    # Mensagem
+    fig.add_annotation(
+        x=0.5, y=0.35,
+        text="Não há dados de manutenção no banco de dados",
+        xref="paper", yref="paper",
+        showarrow=False,
+        xanchor='center', yanchor='middle',
+        font=dict(size=14, color=subtitle_color)
+    )
+
+    # Submensagem
+    fig.add_annotation(
+        x=0.5, y=0.25,
+        text="Os dados são carregados automaticamente quando disponíveis",
+        xref="paper", yref="paper",
+        showarrow=False,
+        xanchor='center', yanchor='middle',
+        font=dict(size=12, color=subtitle_color)
+    )
+
+    fig.update_layout(
+        template=template,
+        plot_bgcolor=bg_color,
+        paper_bgcolor=bg_color,
+        xaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+        yaxis=dict(showgrid=False, showticklabels=False, zeroline=False),
+        height=400,
+        margin=dict(t=20, b=20, l=20, r=20),
+        hovermode=False
+    )
+
+    return fig
+
+
 def create_empty_kpi_figure(kpi_name: str, template: str = 'minty') -> go.Figure:
     """
-    Cria figura vazia para placeholder quando não há dados.
+    Cria figura vazia para placeholder quando dados estão sendo carregados.
 
     Args:
         kpi_name: Nome do KPI ("MTBF", "MTTR", "Taxa de Avaria")
         template: Template do tema ('minty' ou 'darkly')
 
     Returns:
-        Figura Plotly com mensagem de placeholder
+        Figura Plotly com mensagem de carregamento
     """
     is_dark = (template == 'darkly')
     bg_color = '#2c2c2c' if is_dark else '#ffffff'
@@ -84,27 +302,32 @@ def create_kpi_bar_chart(equipment_ids: List[str],
                          average_value: float,
                          target_values: Dict[str, float],  # ALTERADO: Dict de metas por equipamento
                          equipment_names_dict: Dict[str, str],
-                         template: str = 'minty') -> go.Figure:
+                         template: str = 'minty',
+                         plant_target: float = None,
+                         margin_percent: float = 3.0) -> go.Figure:
     """
-    Cria gráfico de barras com média e metas individualizadas por equipamento.
+    Cria gráfico de barras com meta da planta e metas individualizadas por equipamento.
 
     Args:
         equipment_ids: Lista de IDs dos equipamentos
         values: Lista de valores do KPI
         kpi_name: "MTBF", "MTTR" ou "Taxa de Avaria"
-        average_value: Valor médio calculado
+        average_value: Valor médio calculado (usado para colorir barras)
         target_values: Dicionário de metas {equipment_id: meta_value}
         equipment_names_dict: Dicionário de nomes
         template: 'minty' ou 'darkly'
+        plant_target: Meta geral da planta (exibida como linha de referência)
 
     Returns:
-        Figura Plotly com barras, linhas de média e tendência
+        Figura Plotly com barras, linha de meta da planta e tendência
     """
     # Converter MTTR de horas para minutos
     if kpi_name == "MTTR":
         values = [v * 60 for v in values]
         average_value = average_value * 60
         target_values = {eq_id: meta * 60 for eq_id, meta in target_values.items()}
+        if plant_target is not None:
+            plant_target = plant_target * 60
 
     # Determinar unidade
     if kpi_name == "MTBF":
@@ -114,19 +337,13 @@ def create_kpi_bar_chart(equipment_ids: List[str],
     else:
         unit = "%"
 
-    # Lógica de cores das barras (verde: atende meta individual, vermelho: não atende)
-    bar_colors = []
-    for eq_id, val in zip(equipment_ids, values):
-        # Obter meta específica do equipamento (fallback para média geral)
-        eq_target = target_values.get(eq_id, average_value)
-
-        if kpi_name == "MTBF":
-            # Maior é melhor
-            color = '#20c997' if val >= eq_target else '#dc3545'
-        else:
-            # Menor é melhor (MTTR, Taxa Avaria)
-            color = '#20c997' if val <= eq_target else '#dc3545'
-        bar_colors.append(color)
+    # Sistema de cores simplificado (3 cores)
+    # Na TAB GERAL: Compara com MÉDIA GERAL (planta), não com meta individual
+    # Verde: Melhor que média e fora da margem
+    # Amarelo: Dentro de ±margin_percent% da média
+    # Vermelho: Pior que média e fora da margem
+    references = [average_value] * len(values)  # Usar média geral como referência
+    bar_colors = get_multiple_colors(values, references, kpi_name, margin_percent=margin_percent)
 
     # Criar figura
     fig = go.Figure()
@@ -154,13 +371,17 @@ def create_kpi_bar_chart(equipment_ids: List[str],
         hovertemplate=hover_format
     ))
 
-    # Linha de média (azul tracejada)
+    # Linha de meta da planta (azul tracejada)
+    # Se meta da planta não foi fornecida, usa a média como fallback
+    reference_value = plant_target if plant_target is not None else average_value
+    reference_label = "Meta da Planta" if plant_target is not None else "Média Geral"
+
     fig.add_hline(
-        y=average_value,
+        y=reference_value,
         line_dash="dash",
         line_color="#0d6efd",
         line_width=2,
-        annotation_text=f"Média Geral: {average_value:.1f} {unit}",
+        annotation_text=f"{reference_label}: {reference_value:.1f} {unit}",
         annotation_position="top right",
         annotation=dict(font=dict(size=11))
     )
@@ -225,9 +446,12 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
                                kpi_name: str,
                                categories_dict: Dict[str, List[str]],
                                equipment_names_dict: Dict[str, str],
-                               template: str = 'minty') -> go.Figure:
+                               template: str = 'minty',
+                               target_values: Dict[str, float] = None,
+                               plant_target: float = None,
+                               margin_percent: float = 3.0) -> go.Figure:
     """
-    Cria gráfico Sunburst com hierarquia por categoria.
+    Cria gráfico Sunburst com hierarquia por categoria e cores baseadas em performance.
 
     Args:
         data_by_equipment: {"LONGI001": 22.3, "PRENS001": 18.5, ...}
@@ -235,9 +459,11 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
         categories_dict: EQUIPMENT_CATEGORIES do maintenance_demo_data
         equipment_names_dict: EQUIPMENT_NAMES do maintenance_demo_data
         template: 'minty' ou 'darkly'
+        target_values: Dicionário de metas por equipamento (opcional)
+        plant_target: Meta geral da planta (opcional)
 
     Returns:
-        Figura Plotly Sunburst com 3 níveis
+        Figura Plotly Sunburst com 3 níveis e cores de performance
     """
     # Converter MTTR de horas para minutos
     if kpi_name == "MTTR":
@@ -254,9 +480,12 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
     labels = ["Total"]
     parents = [""]
     values = [0]  # Será calculado como soma das categorias
-    text_info = []
+    colors = ['#6c757d']  # Cor neutra para o centro (Total)
 
-    # Adicionar categorias (anel 1)
+    # Usar meta da planta se disponível, senão usar target_values individuais
+    use_plant_target = plant_target is not None
+
+    # Adicionar categorias (anel 1) - cor neutra
     for cat_name, eq_list in categories_dict.items():
         labels.append(cat_name)
         parents.append("Total")
@@ -268,14 +497,32 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
             if eq_id in data_by_equipment
         )
         values.append(cat_value)
+        colors.append('#94a3b8')  # Cor neutra para categorias
 
-    # Adicionar equipamentos individuais (anel 2)
+    # Adicionar equipamentos individuais (anel 2) com cores de performance
     for cat_name, eq_list in categories_dict.items():
         for eq_id in eq_list:
             if eq_id in data_by_equipment:
                 labels.append(equipment_names_dict.get(eq_id, eq_id))
                 parents.append(cat_name)
-                values.append(data_by_equipment[eq_id])
+                eq_value = data_by_equipment[eq_id]
+                values.append(eq_value)
+
+                # Determinar cor baseada em performance (sistema de 3 cores)
+                if use_plant_target:
+                    # Usar meta geral da planta
+                    target = plant_target
+                elif target_values and eq_id in target_values:
+                    # Usar meta individual do equipamento
+                    target = target_values[eq_id]
+                else:
+                    # Sem meta definida - usar cor neutra
+                    colors.append('#6c757d')
+                    continue
+
+                # Calcular cor usando função helper
+                color = get_kpi_color(eq_value, target, kpi_name, margin_percent=margin_percent)
+                colors.append(color)
 
     # Calcular total (soma das categorias)
     values[0] = sum(v for v in values[1:len(categories_dict) + 1])
@@ -294,7 +541,7 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
         text_display = 'label+percent parent'
         custom_text = None
 
-    # Criar sunburst
+    # Criar sunburst com cores de performance
     fig = go.Figure(go.Sunburst(
         labels=labels,
         parents=parents,
@@ -302,13 +549,8 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
         text=custom_text,
         branchvalues="total",
         marker=dict(
-            line=dict(color='#fff', width=2),
-            colorscale=[
-                [0, '#0d6efd'],      # Azul
-                [0.33, '#20c997'],   # Verde
-                [0.66, '#fd7e14'],   # Laranja
-                [1, '#6c757d']       # Cinza
-            ]
+            colors=colors,  # Cores customizadas baseadas em performance
+            line=dict(color='#fff', width=2)
         ),
         textinfo=text_display,
         hovertemplate='<b>%{label}</b><br>%{value:.1f} ' + unit + '<extra></extra>'
@@ -360,29 +602,38 @@ def create_kpi_summary_table(data_by_equipment: Dict[str, Dict[str, float]],
     for eq_id in sorted_equipment:
         eq_data = data_by_equipment[eq_id]
 
-        # Obter meta específica do equipamento (ou usar meta geral como fallback)
-        eq_target = targets.get(eq_id, general_target)
-
-        # Verificar se atende todas as metas INDIVIDUAIS
-        mtbf_ok = eq_data["mtbf"] >= eq_target["mtbf"]
-        mttr_ok = eq_data["mttr"] <= eq_target["mttr"]
-        breakdown_ok = eq_data["breakdown_rate"] <= eq_target["breakdown_rate"]
+        # ⚠️ NA ABA GERAL: Comparar SEMPRE com a META GERAL DA PLANTA
+        # (não com metas individuais dos equipamentos)
+        mtbf_ok = eq_data["mtbf"] >= general_target["mtbf"]
+        mttr_ok = eq_data["mttr"] <= general_target["mttr"]
+        breakdown_ok = eq_data["breakdown_rate"] <= general_target["breakdown_rate"]
         meets_all = mtbf_ok and mttr_ok and breakdown_ok
+
+        # Formatar valores com META GERAL (Valor/Meta Planta)
+        mtbf_actual = eq_data['mtbf']
+        mtbf_target = general_target['mtbf']  # ← Meta geral da planta
+        mttr_actual = eq_data['mttr'] * 60  # Converter para minutos
+        mttr_target = general_target['mttr'] * 60  # ← Meta geral da planta
+        breakdown_actual = eq_data['breakdown_rate']
+        breakdown_target = general_target['breakdown_rate']  # ← Meta geral da planta
 
         rows.append(
             html.Tr([
                 html.Td(equipment_names_dict.get(eq_id, eq_id)),
                 html.Td(
-                    f"{eq_data['mtbf']:.1f}",
-                    className="text-center"
+                    f"{mtbf_actual:.1f}/{mtbf_target:.1f}",
+                    className="text-center",
+                    style={"fontWeight": "500"}
                 ),
                 html.Td(
-                    f"{eq_data['mttr'] * 60:.1f}",
-                    className="text-center"
+                    f"{mttr_actual:.1f}/{mttr_target:.1f}",
+                    className="text-center",
+                    style={"fontWeight": "500"}
                 ),
                 html.Td(
-                    f"{eq_data['breakdown_rate']:.2f}",
-                    className="text-center"
+                    f"{breakdown_actual:.2f}/{breakdown_target:.2f}",
+                    className="text-center",
+                    style={"fontWeight": "500"}
                 ),
                 html.Td([
                     dbc.Badge(
@@ -398,9 +649,21 @@ def create_kpi_summary_table(data_by_equipment: Dict[str, Dict[str, float]],
         html.Thead([
             html.Tr([
                 html.Th("Equipamento"),
-                html.Th("MTBF (h)", className="text-center"),
-                html.Th("MTTR (min)", className="text-center"),
-                html.Th("Taxa Avaria (%)", className="text-center"),
+                html.Th([
+                    "MTBF (h)",
+                    html.Br(),
+                    html.Small("Valor/Meta", className="text-muted")
+                ], className="text-center"),
+                html.Th([
+                    "MTTR (min)",
+                    html.Br(),
+                    html.Small("Valor/Meta", className="text-muted")
+                ], className="text-center"),
+                html.Th([
+                    "Taxa Avaria (%)",
+                    html.Br(),
+                    html.Small("Valor/Meta", className="text-muted")
+                ], className="text-center"),
                 html.Th("Status", className="text-center"),
             ], className="table-light")
         ]),
@@ -414,7 +677,8 @@ def create_kpi_line_chart(months_list: List[int],
                           kpi_name: str,
                           equipment_name: str,
                           target_value: float,
-                          template: str = 'minty') -> go.Figure:
+                          template: str = 'minty',
+                          margin_percent: float = 3.0) -> go.Figure:
     """
     Cria gráfico híbrido (barras + linhas) mostrando evolução mensal.
 
@@ -457,38 +721,17 @@ def create_kpi_line_chart(months_list: List[int],
                    "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
     x_labels = [month_names[m-1] for m in months_list]
 
-    # Determinar se maior ou menor é melhor
-    higher_is_better = kpi_name == "MTBF"
+    # Sistema de cores simplificado (3 cores apenas)
+    # Verde: Melhor que meta e fora da margem de 3%
+    # Amarelo: Dentro de ±3% da meta
+    # Vermelho: Pior que meta e fora da margem de 3%
 
-    # Calcular cores para cada barra baseado em performance
-    bar_colors = []
-    for value, avg_value in zip(values, avg_values):
-        if higher_is_better:
-            # MTBF: maior é melhor
-            if value >= target_value:
-                color = '#198754'  # Verde escuro - Excelente (atende meta)
-            elif value >= avg_value:
-                color = '#20c997'  # Verde claro - Bom (acima da média)
-            elif value >= target_value * 0.8:
-                color = '#ffc107'  # Amarelo - Atenção (próximo da meta)
-            elif value >= target_value * 0.6:
-                color = '#fd7e14'  # Laranja - Ruim (abaixo da média)
-            else:
-                color = '#dc3545'  # Vermelho - Crítico (muito abaixo)
-        else:
-            # MTTR e Taxa de Avaria: menor é melhor
-            if value <= target_value:
-                color = '#198754'  # Verde escuro - Excelente (atende meta)
-            elif value <= avg_value:
-                color = '#20c997'  # Verde claro - Bom (abaixo da média)
-            elif value <= target_value * 1.2:
-                color = '#ffc107'  # Amarelo - Atenção (próximo da meta)
-            elif value <= target_value * 1.5:
-                color = '#fd7e14'  # Laranja - Ruim (acima da média)
-            else:
-                color = '#dc3545'  # Vermelho - Crítico (muito acima)
+    # Determinar se maior é melhor (para lógica de cores)
+    higher_is_better = (kpi_name == "MTBF")
 
-        bar_colors.append(color)
+    # Usar meta como referência para coloração (não média)
+    references = [target_value] * len(values)
+    bar_colors = get_multiple_colors(values, references, kpi_name, margin_percent=margin_percent)
 
     # Formatar texto baseado no KPI
     if kpi_name == "Taxa de Avaria":
@@ -542,11 +785,11 @@ def create_kpi_line_chart(months_list: List[int],
     else:
         unit = "%"
 
-    # Criar legenda de cores baseado no tipo de KPI
+    # Criar legenda de cores baseado no tipo de KPI (sistema de 3 cores)
     if higher_is_better:
-        color_legend = "Verde Escuro: ≥ Meta | Verde Claro: ≥ Média | Amarelo: < Média | Laranja/Vermelho: Abaixo"
+        color_legend = "🟢 Verde: Acima da Meta | 🟡 Amarelo: ±3% da Meta | 🔴 Vermelho: Abaixo da Meta"
     else:
-        color_legend = "Verde Escuro: ≤ Meta | Verde Claro: ≤ Média | Amarelo: > Média | Laranja/Vermelho: Acima"
+        color_legend = "🟢 Verde: Abaixo da Meta | 🟡 Amarelo: ±3% da Meta | 🔴 Vermelho: Acima da Meta"
 
     fig.update_layout(
         template=template,
@@ -843,7 +1086,8 @@ def create_top_breakdowns_chart(breakdowns_data: List[Dict],
 def create_kpi_gauge(value: float,
                      kpi_name: str,
                      target_value: float,
-                     template: str = 'minty') -> go.Figure:
+                     template: str = 'minty',
+                     margin_percent: float = 3.0) -> go.Figure:
     """
     Cria gráfico gauge (velocímetro) sofisticado para um KPI individual.
 
@@ -868,71 +1112,47 @@ def create_kpi_gauge(value: float,
         value = value * 60
         target_value = target_value * 60
 
-    # Determinar unidade e configurações específicas
+    # Sistema de cores simplificado (3 cores apenas)
+    # Verde: Muito melhor que meta
+    # Amarelo: Dentro de ±3% da meta
+    # Vermelho: Pior que meta
+
     if kpi_name == "MTBF":
         unit = "h"
-        max_range = max(target_value * 2, value * 1.2)  # Range dinâmico
+        max_range = max(target_value * 2, value * 1.2)
         higher_is_better = True
-        # Cores sofisticadas com gradiente suave (vermelho → amarelo → verde)
-        steps = [
-            {'range': [0, target_value * 0.3], 'color': 'rgba(220, 53, 69, 0.15)'},      # Vermelho muito claro
-            {'range': [target_value * 0.3, target_value * 0.6], 'color': 'rgba(253, 126, 20, 0.15)'},  # Laranja claro
-            {'range': [target_value * 0.6, target_value * 0.85], 'color': 'rgba(255, 193, 7, 0.15)'},  # Amarelo claro
-            {'range': [target_value * 0.85, target_value], 'color': 'rgba(32, 201, 151, 0.15)'},       # Verde-água claro
-            {'range': [target_value, max_range], 'color': 'rgba(25, 135, 84, 0.2)'}                     # Verde-escuro claro
-        ]
-        # Cor da barra com gradiente
-        if value >= target_value:
-            bar_color = '#198754'  # Verde profissional
-        elif value >= target_value * 0.85:
-            bar_color = '#20c997'  # Verde-água
-        elif value >= target_value * 0.6:
-            bar_color = '#ffc107'  # Amarelo
-        else:
-            bar_color = '#dc3545'  # Vermelho
-
     elif kpi_name == "MTTR":
         unit = "min"
         max_range = max(target_value * 2, value * 1.2)
         higher_is_better = False
-        # Zonas invertidas (menor é melhor) - cores suaves
-        steps = [
-            {'range': [0, target_value * 0.7], 'color': 'rgba(25, 135, 84, 0.2)'},                      # Verde-escuro
-            {'range': [target_value * 0.7, target_value], 'color': 'rgba(32, 201, 151, 0.15)'},        # Verde-água
-            {'range': [target_value, target_value * 1.3], 'color': 'rgba(255, 193, 7, 0.15)'},         # Amarelo
-            {'range': [target_value * 1.3, target_value * 1.7], 'color': 'rgba(253, 126, 20, 0.15)'},  # Laranja
-            {'range': [target_value * 1.7, max_range], 'color': 'rgba(220, 53, 69, 0.15)'}             # Vermelho
-        ]
-        # Cor da barra
-        if value <= target_value * 0.7:
-            bar_color = '#198754'
-        elif value <= target_value:
-            bar_color = '#20c997'
-        elif value <= target_value * 1.3:
-            bar_color = '#ffc107'
-        else:
-            bar_color = '#dc3545'
-
     else:  # Taxa de Avaria
         unit = "%"
-        max_range = max(target_value * 2, value * 1.2, 10)  # Mínimo de 10%
+        max_range = max(target_value * 2, value * 1.2, 10)
         higher_is_better = False
+
+    # Calcular margem dinâmica
+    margin = target_value * (margin_percent / 100.0)
+    lower_bound = target_value - margin
+    upper_bound = target_value + margin
+
+    # Zonas simplificadas (3 cores)
+    if kpi_name == "MTBF":
+        # Maior é melhor
         steps = [
-            {'range': [0, target_value * 0.7], 'color': 'rgba(25, 135, 84, 0.2)'},
-            {'range': [target_value * 0.7, target_value], 'color': 'rgba(32, 201, 151, 0.15)'},
-            {'range': [target_value, target_value * 1.3], 'color': 'rgba(255, 193, 7, 0.15)'},
-            {'range': [target_value * 1.3, target_value * 1.7], 'color': 'rgba(253, 126, 20, 0.15)'},
-            {'range': [target_value * 1.7, max_range], 'color': 'rgba(220, 53, 69, 0.15)'}
+            {'range': [0, lower_bound], 'color': 'rgba(220, 53, 69, 0.1)'},       # Vermelho claro
+            {'range': [lower_bound, upper_bound], 'color': 'rgba(255, 193, 7, 0.1)'},  # Amarelo claro
+            {'range': [upper_bound, max_range], 'color': 'rgba(25, 135, 84, 0.1)'}     # Verde claro
         ]
-        # Cor da barra
-        if value <= target_value * 0.7:
-            bar_color = '#198754'
-        elif value <= target_value:
-            bar_color = '#20c997'
-        elif value <= target_value * 1.3:
-            bar_color = '#ffc107'
-        else:
-            bar_color = '#dc3545'
+    else:
+        # Menor é melhor (MTTR e Taxa Avaria)
+        steps = [
+            {'range': [0, lower_bound], 'color': 'rgba(25, 135, 84, 0.1)'},       # Verde claro
+            {'range': [lower_bound, upper_bound], 'color': 'rgba(255, 193, 7, 0.1)'},  # Amarelo claro
+            {'range': [upper_bound, max_range], 'color': 'rgba(220, 53, 69, 0.1)'}     # Vermelho claro
+        ]
+
+    # Cor da barra usando função helper
+    bar_color = get_kpi_color(value, target_value, kpi_name, margin_percent=margin_percent)
 
     # Formatar valor de exibição
     if kpi_name == "Taxa de Avaria":
