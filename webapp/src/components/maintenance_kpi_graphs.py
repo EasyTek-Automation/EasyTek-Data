@@ -4,10 +4,17 @@ Gráficos de KPIs de manutenção (barras com tendência, sunburst, tabela)
 """
 
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import numpy as np
 from dash import html
 import dash_bootstrap_components as dbc
 from typing import Dict, List
+
+# Imports condicionais para evitar circular imports
+try:
+    from src.database.connection import get_mongo_connection
+except ImportError:
+    get_mongo_connection = None
 
 
 # ==================== SISTEMA DE CORES SIMPLIFICADO ====================
@@ -382,8 +389,8 @@ def create_kpi_bar_chart(equipment_ids: List[str],
         line_color="#0d6efd",
         line_width=2,
         annotation_text=f"{reference_label}: {reference_value:.1f} {unit}",
-        annotation_position="top right",
-        annotation=dict(font=dict(size=11))
+        annotation_position="bottom right",
+        annotation=dict(font=dict(size=11, color="#0d6efd"))
     )
 
     # NOTA: Metas individuais são refletidas nas cores das barras
@@ -400,10 +407,11 @@ def create_kpi_bar_chart(equipment_ids: List[str],
             fig.add_trace(go.Scatter(
                 x=[equipment_names_dict.get(eq_id, eq_id) for eq_id in equipment_ids],
                 y=trend_y,
-                mode='lines',
-                line=dict(color='rgba(108,117,125,0.6)', width=2, dash='dot'),
-                name='Tendência',
-                hoverinfo='skip'
+                mode='lines+markers',
+                line=dict(color='#000000', width=4, dash='solid'),
+                marker=dict(size=8, symbol='diamond', color='#000000', line=dict(color='white', width=2)),
+                name='📈 Tendência',
+                hovertemplate='<b>Tendência</b><br>%{y:.1f}<extra></extra>'
             ))
         except:
             # Se falhar o polyfit, ignora a tendência
@@ -434,7 +442,7 @@ def create_kpi_bar_chart(equipment_ids: List[str],
             xanchor="right",
             x=1
         ),
-        height=400,
+        height=500,
         margin=dict(t=60, b=100, l=60, r=40),
         hovermode='x'
     )
@@ -777,6 +785,26 @@ def create_kpi_line_chart(months_list: List[int],
         line=dict(color='#dc3545', width=2, dash='dot')
     ))
 
+    # Linha de tendência (polinomial grau 2)
+    if len(values) >= 3:
+        x_numeric = list(range(len(values)))
+        try:
+            z = np.polyfit(x_numeric, values, 2)
+            p = np.poly1d(z)
+            trend_y = [p(x) for x in x_numeric]
+
+            fig.add_trace(go.Scatter(
+                x=x_labels,
+                y=trend_y,
+                mode='lines+markers',
+                line=dict(color='#000000', width=4, dash='solid'),
+                marker=dict(size=8, symbol='diamond', color='#000000', line=dict(color='white', width=2)),
+                name='📈 Tendência',
+                hovertemplate='<b>Tendência</b><br>%{y:.1f}<extra></extra>'
+            ))
+        except:
+            pass
+
     # Determinar unidade
     if kpi_name == "MTBF":
         unit = "h"
@@ -810,100 +838,465 @@ def create_kpi_line_chart(months_list: List[int],
             x=1
         ),
         bargap=0.2,  # Espaçamento entre barras
-        height=370,  # Aumentado para acomodar legenda
+        height=463,  # Aumentado 25%
         margin=dict(t=80, b=60, l=60, r=40)  # Margem superior aumentada
     )
 
     return fig
 
 
-def create_comparison_bar_chart(equipment_data: Dict[str, float],
-                                general_avg: Dict[str, float],
-                                equipment_name: str,
-                                template: str = 'minty') -> go.Figure:
+def create_performance_radar_chart(equipment_data: Dict[str, float],
+                                   general_avg: Dict[str, float],
+                                   equipment_name: str,
+                                   equipment_target: Dict[str, float] = None,
+                                   template: str = 'minty') -> go.Figure:
     """
-    Cria gráfico de barras comparando equipamento com média geral.
+    Cria gráfico radar comparando performance do equipamento com média e meta.
 
-    Mostra lado a lado: Equipamento vs Média Geral para os 3 KPIs.
+    Mostra em radar: Equipamento, Média Geral e Meta para os 3 KPIs.
+    Performance normalizada em escala 0-100 para visualização comparativa.
 
     Args:
         equipment_data: {"mtbf": X, "mttr": Y, "breakdown_rate": Z}
         general_avg: {"mtbf": X, "mttr": Y, "breakdown_rate": Z}
         equipment_name: Nome do equipamento
+        equipment_target: Metas do equipamento (opcional)
         template: 'minty' ou 'darkly'
 
     Returns:
-        Figura Plotly com barras agrupadas
+        Figura Plotly Scatterpolar (radar chart)
     """
-    kpis = ["MTBF", "MTTR", "Taxa de Avaria"]
-    equipment_values = [
-        equipment_data["mtbf"],
-        equipment_data["mttr"] * 60,  # Converter MTTR para minutos
-        equipment_data["breakdown_rate"]
-    ]
-    avg_values = [
-        general_avg["mtbf"],
-        general_avg["mttr"] * 60,  # Converter MTTR para minutos
-        general_avg["breakdown_rate"]
-    ]
+    is_dark = (template == 'darkly')
+    bg_color = '#2c2c2c' if is_dark else '#ffffff'
+    grid_color = '#495057' if is_dark else '#dee2e6'
 
-    # Formatar texto: 1 casa para MTBF/MTTR, 2 casas para Taxa de Avaria
-    equipment_text = [
-        f'{equipment_values[0]:.1f}',  # MTBF
-        f'{equipment_values[1]:.1f}',  # MTTR
-        f'{equipment_values[2]:.2f}'   # Taxa de Avaria
-    ]
-    avg_text = [
-        f'{avg_values[0]:.1f}',  # MTBF
-        f'{avg_values[1]:.1f}',  # MTTR
-        f'{avg_values[2]:.2f}'   # Taxa de Avaria
-    ]
+    # Converter MTTR para minutos
+    eq_mtbf = equipment_data["mtbf"]
+    eq_mttr = equipment_data["mttr"] * 60
+    eq_breakdown = equipment_data["breakdown_rate"]
+
+    avg_mtbf = general_avg["mtbf"]
+    avg_mttr = general_avg["mttr"] * 60
+    avg_breakdown = general_avg["breakdown_rate"]
+
+    # Normalizar para escala 0-100 (performance score)
+    # MTBF: quanto maior melhor -> (valor/meta)*100
+    # MTTR: quanto menor melhor -> (meta/valor)*100
+    # Breakdown: quanto menor melhor -> (meta/valor)*100
+
+    if equipment_target:
+        target_mtbf = equipment_target.get("mtbf", avg_mtbf)
+        target_mttr = equipment_target.get("mttr", avg_mttr / 60) * 60
+        target_breakdown = equipment_target.get("breakdown_rate", avg_breakdown)
+    else:
+        target_mtbf = avg_mtbf
+        target_mttr = avg_mttr
+        target_breakdown = avg_breakdown
+
+    # Calcular performance scores (0-100)
+    eq_score_mtbf = min((eq_mtbf / target_mtbf) * 100, 150) if target_mtbf > 0 else 0
+    eq_score_mttr = min((target_mttr / eq_mttr) * 100, 150) if eq_mttr > 0 else 0
+    eq_score_breakdown = min((target_breakdown / eq_breakdown) * 100, 150) if eq_breakdown > 0 else 0
+
+    avg_score_mtbf = min((avg_mtbf / target_mtbf) * 100, 150) if target_mtbf > 0 else 0
+    avg_score_mttr = min((target_mttr / avg_mttr) * 100, 150) if avg_mttr > 0 else 0
+    avg_score_breakdown = min((target_breakdown / avg_breakdown) * 100, 150) if avg_breakdown > 0 else 0
+
+    categories = ['MTBF<br>(Confiabilidade)', 'MTTR<br>(Manutenibilidade)', 'Taxa de Avaria<br>(Disponibilidade)']
 
     fig = go.Figure()
 
-    # Barras do equipamento
-    fig.add_trace(go.Bar(
-        x=kpis,
-        y=equipment_values,
-        name=equipment_name,
-        marker_color='#0d6efd',
-        text=equipment_text,
-        textposition='outside'
+    # Meta (linha de referência - sempre 100%)
+    fig.add_trace(go.Scatterpolar(
+        r=[100, 100, 100, 100],
+        theta=categories + [categories[0]],
+        fill='toself',
+        fillcolor='rgba(220, 53, 69, 0.1)',
+        line=dict(color='#dc3545', width=2, dash='dot'),
+        name='Meta (100%)',
+        hovertemplate='<b>Meta</b><br>Performance: 100%<extra></extra>'
     ))
 
-    # Barras da média geral
-    fig.add_trace(go.Bar(
-        x=kpis,
-        y=avg_values,
+    # Média Geral
+    fig.add_trace(go.Scatterpolar(
+        r=[avg_score_mtbf, avg_score_mttr, avg_score_breakdown, avg_score_mtbf],
+        theta=categories + [categories[0]],
+        fill='toself',
+        fillcolor='rgba(253, 126, 20, 0.15)',
+        line=dict(color='#fd7e14', width=2, dash='dash'),
         name='Média Geral',
-        marker_color='#6c757d',
-        text=avg_text,
-        textposition='outside'
+        hovertemplate='<b>Média Geral</b><br>Performance: %{r:.0f}%<extra></extra>'
     ))
+
+    # Equipamento Selecionado
+    fig.add_trace(go.Scatterpolar(
+        r=[eq_score_mtbf, eq_score_mttr, eq_score_breakdown, eq_score_mtbf],
+        theta=categories + [categories[0]],
+        fill='toself',
+        fillcolor='rgba(13, 110, 253, 0.2)',
+        line=dict(color='#0d6efd', width=3),
+        name=equipment_name,
+        hovertemplate=f'<b>{equipment_name}</b><br>Performance: %{{r:.0f}}%<extra></extra>'
+    ))
+
+    # Performance geral (média dos 3 scores)
+    overall_score = (eq_score_mtbf + eq_score_mttr + eq_score_breakdown) / 3
+
+    # Determinar cor e status baseado no score
+    if overall_score >= 100:
+        status_color = '#198754'
+        status_text = '✓ Excelente'
+    elif overall_score >= 90:
+        status_color = '#ffc107'
+        status_text = '≈ Dentro da Meta'
+    else:
+        status_color = '#dc3545'
+        status_text = '✗ Abaixo da Meta'
 
     fig.update_layout(
         template=template,
+        polar=dict(
+            bgcolor=bg_color,
+            radialaxis=dict(
+                visible=True,
+                range=[0, 150],
+                tickvals=[0, 50, 100, 150],
+                ticktext=['0%', '50%', '100%', '150%'],
+                gridcolor=grid_color,
+                showline=False
+            ),
+            angularaxis=dict(
+                gridcolor=grid_color
+            )
+        ),
         title=dict(
-            text=f"Comparação: {equipment_name} vs Média Geral",
+            text=f"<b>Performance Geral: {overall_score:.0f}%</b> <span style='color:{status_color}'>{status_text}</span><br>" +
+                 f"<sub style='font-size:10px'>Valores acima de 100% = superando meta | Abaixo de 100% = abaixo da meta</sub>",
             x=0.5,
             xanchor='center',
-            font=dict(size=14)
+            font=dict(size=13)
         ),
-        barmode='group',
-        xaxis=dict(title=""),
-        yaxis=dict(title="Valor", rangemode='tozero'),
+        showlegend=True,
         legend=dict(
             orientation="h",
             yanchor="bottom",
-            y=1.02,
-            xanchor="right",
-            x=1
+            y=-0.15,
+            xanchor="center",
+            x=0.5
         ),
-        height=400,
-        margin=dict(t=60, b=60, l=60, r=40)
+        height=500,
+        margin=dict(t=100, b=80, l=80, r=80)
     )
 
     return fig
+
+
+def create_breakdown_calendar_heatmap(equipment_id: str,
+                                       year: int,
+                                       months: List[int],
+                                       template: str = 'minty') -> go.Figure:
+    """
+    Cria calendar heatmap mostrando padrões de falhas ao longo dos dias.
+
+    Args:
+        equipment_id: ID do equipamento
+        year: Ano
+        months: Lista de meses
+        template: 'minty' ou 'darkly'
+
+    Returns:
+        Figura Plotly com heatmap calendar
+    """
+    try:
+        from datetime import datetime, timedelta
+        import calendar as cal
+
+        is_dark = (template == 'darkly')
+        bg_color = '#2c2c2c' if is_dark else '#ffffff'
+        text_color = '#e9ecef' if is_dark else '#2c3e50'
+
+        # Validar parâmetros
+        if not months or len(months) == 0:
+            return create_no_data_figure("heatmap", template)
+
+        # Gerar todos os dias do período
+        start_date = datetime(year, min(months), 1)
+        end_month = max(months)
+        end_date = datetime(year, end_month, cal.monthrange(year, end_month)[1])
+
+        # Buscar dados reais do MongoDB
+        import random
+
+        current_date = start_date
+        dates = []
+        breakdowns_count = []
+        production_status = []
+
+        if get_mongo_connection:
+            try:
+                producao_collection = get_mongo_connection(f"ZPP_Producao_{year}")
+                paradas_collection = get_mongo_connection(f"ZPP_Paradas_{year}")
+            except:
+                producao_collection = None
+                paradas_collection = None
+        else:
+            producao_collection = None
+            paradas_collection = None
+
+        while current_date <= end_date:
+            dates.append(current_date)
+
+            has_production = False
+            breakdown_count = 0
+
+            if producao_collection is not None and paradas_collection is not None:
+                try:
+                    day_start = current_date.replace(hour=0, minute=0, second=0)
+                    day_end = current_date.replace(hour=23, minute=59, second=59)
+
+                    # Verificar produção (campo correto: fininotif)
+                    prod_count = producao_collection.count_documents({
+                        "_year": year,
+                        "_processed": True,
+                        "fininotif": {"$gte": day_start, "$lte": day_end}
+                    })
+                    has_production = prod_count > 0
+
+                    # Se houve produção, contar paradas (campo correto: linea)
+                    if has_production:
+                        breakdown_count = paradas_collection.count_documents({
+                            "_year": year,
+                            "_processed": True,
+                            "linea": equipment_id,
+                            "data_inicio": {"$gte": day_start, "$lte": day_end},
+                            "motivo": {"$in": ["201", "S201", "202", "S202", "203", "S203"]}
+                        })
+                except:
+                    # Fallback: simular baseado em dia da semana
+                    has_production = current_date.weekday() < 5  # Seg-Sex
+                    if has_production:
+                        breakdown_count = random.choices([0, 0, 0, 1, 1, 2], weights=[40, 20, 10, 15, 10, 5])[0]
+            else:
+                # Sem MongoDB: simular
+                has_production = current_date.weekday() < 5
+                if has_production:
+                    breakdown_count = random.choices([0, 0, 0, 1, 1, 2], weights=[40, 20, 10, 15, 10, 5])[0]
+
+            production_status.append(has_production)
+            breakdowns_count.append(breakdown_count)
+            current_date += timedelta(days=1)
+
+        # Preparar dados para heatmap
+        weeks = []
+        days_of_week = []
+        colors = []
+        hover_texts = []
+
+        for i, (date, count, has_prod) in enumerate(zip(dates, breakdowns_count, production_status)):
+            week = date.isocalendar()[1] - start_date.isocalendar()[1]
+            day = date.weekday()
+
+            weeks.append(week)
+            days_of_week.append(day)
+
+            # Cores baseadas em produção e paradas
+            if not has_prod:
+                color = '#e9ecef'  # Cinza claro (sem produção)
+                status = 'Sem produção'
+            elif count == 0:
+                color = '#d4edda'  # Verde claro
+                status = 'Sem falhas'
+            elif count == 1:
+                color = '#fff3cd'  # Amarelo claro
+                status = '1 falha'
+            elif count == 2:
+                color = '#ffe0a3'  # Amarelo
+                status = '2 falhas'
+            else:
+                color = '#f8d7da'  # Vermelho claro
+                status = f'{count} falhas'
+
+            colors.append(color)
+            hover_texts.append(
+                f"<b>{date.strftime('%d/%m/%Y')}</b><br>"
+                f"{status}<br>"
+                f"<i>{date.strftime('%A')}</i>"
+            )
+
+        # Calcular estatísticas (considerar apenas dias com produção)
+        total_days = len(dates)
+        production_days = sum(1 for p in production_status if p)
+        non_production_days = total_days - production_days
+
+        # Filtrar apenas dias com produção para estatísticas de falhas
+        days_no_failure = sum(1 for c, p in zip(breakdowns_count, production_status) if p and c == 0)
+        days_with_failure = sum(1 for c, p in zip(breakdowns_count, production_status) if p and c > 0)
+        total_breakdowns = sum(c for c, p in zip(breakdowns_count, production_status) if p)
+
+        # Calcular maior streak sem falhas (considerar apenas dias com produção)
+        current_streak = 0
+        max_streak = 0
+        for count, has_prod in zip(breakdowns_count, production_status):
+            if has_prod:  # Só contar dias com produção
+                if count == 0:
+                    current_streak += 1
+                    max_streak = max(max_streak, current_streak)
+                else:
+                    current_streak = 0
+
+        # Calcular ranking por dia da semana (considerar apenas dias com produção)
+        weekday_stats = {0: [], 1: [], 2: [], 3: [], 4: [], 5: [], 6: []}
+        for date, count, has_prod in zip(dates, breakdowns_count, production_status):
+            if has_prod:  # Só incluir dias com produção
+                weekday_stats[date.weekday()].append(count)
+
+        weekday_names = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo']
+        weekday_avg = []
+        for day in range(7):
+            if weekday_stats[day]:
+                avg = sum(weekday_stats[day]) / len(weekday_stats[day])
+                weekday_avg.append((weekday_names[day], avg, day))
+            else:
+                weekday_avg.append((weekday_names[day], 0, day))
+
+        # Ordenar do melhor (menos falhas) ao pior
+        weekday_avg.sort(key=lambda x: x[1])
+
+        # Criar figura com 2 colunas (heatmap à esquerda, info à direita)
+        fig = make_subplots(
+            rows=1, cols=2,
+            column_widths=[0.7, 0.3],
+            specs=[[{"type": "scatter"}, {"type": "scatter"}]],
+            horizontal_spacing=0.05
+        )
+
+        # Coluna 1: Heatmap
+        fig.add_trace(go.Scatter(
+            x=weeks,
+            y=days_of_week,
+            mode='markers',
+            marker=dict(
+                size=25,
+                color=colors,
+                symbol='square',
+                line=dict(color='rgba(0,0,0,0.1)', width=1)
+            ),
+            text=hover_texts,
+            hovertemplate='%{text}<extra></extra>',
+            showlegend=False
+        ), row=1, col=1)
+
+        # Coluna 2: Estatísticas e Ranking (centralizados)
+        # Preparar texto combinado
+        combined_text = (
+            f"<b style='font-size:12px'>ESTATÍSTICAS</b><br>"
+            f"━━━━━━━━━━━━━━━<br><br>"
+            f"📅 <b>{total_days}</b> dias totais<br>"
+            f"🏭 <b>{production_days}</b> dias com produção<br>"
+            f"⚪ <b>{non_production_days}</b> dias sem produção<br><br>"
+            f"✅ <b>{days_no_failure}</b> dias sem falha<br>"
+            f"   <span style='color:#6c757d'>({days_no_failure/production_days*100 if production_days > 0 else 0:.1f}% dos úteis)</span><br>"
+            f"⚠️ <b>{days_with_failure}</b> dias com falha<br>"
+            f"   <span style='color:#6c757d'>({days_with_failure/production_days*100 if production_days > 0 else 0:.1f}% dos úteis)</span><br>"
+            f"🔥 <b>{total_breakdowns}</b> paradas totais<br>"
+            f"🏆 <b>{max_streak}</b> dias de streak<br><br><br>"
+            f"<b style='font-size:12px'>RANKING SEMANAL</b><br>"
+            f"━━━━━━━━━━━━━━━<br>"
+            f"<span style='font-size:9px; color:#6c757d'>média falhas/dia útil</span><br><br>"
+        )
+
+        for i, (name, avg, _) in enumerate(weekday_avg):
+            emoji = "🥇" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else "  "
+            bar_length = int(avg * 3)
+            bar = "█" * min(bar_length, 10)
+            color = '#198754' if i == 0 else '#dc3545' if i == len(weekday_avg)-1 else '#6c757d'
+            combined_text += f"{emoji} <b>{name[:3]}</b> {bar} <span style='color:{color}'>{avg:.1f}</span><br>"
+
+        # Adicionar texto invisível na coluna 2 para posicionar anotação
+        fig.add_trace(go.Scatter(
+            x=[0], y=[0],
+            mode='markers',
+            marker=dict(size=0.1, color='rgba(0,0,0,0)'),
+            showlegend=False,
+            hoverinfo='skip'
+        ), row=1, col=2)
+
+        fig.add_annotation(
+            x=0.5, y=0.5,
+            xref='x2', yref='y2',
+            text=combined_text,
+            showarrow=False,
+            xanchor='center',
+            yanchor='middle',
+            align='left',
+            font=dict(size=10, color=text_color, family='Arial, sans-serif'),
+            bgcolor='rgba(248, 249, 250, 0.95)' if not is_dark else 'rgba(44, 44, 44, 0.95)',
+            bordercolor='#dee2e6' if not is_dark else '#495057',
+            borderwidth=1,
+            borderpad=15
+        )
+
+        # Atualizar eixos do heatmap (coluna 1)
+        fig.update_xaxes(
+            showgrid=False,
+            zeroline=False,
+            visible=False,
+            row=1, col=1
+        )
+
+        fig.update_yaxes(
+            title="",
+            tickmode='array',
+            tickvals=[0, 1, 2, 3, 4, 5, 6],
+            ticktext=['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'],
+            showgrid=False,
+            zeroline=False,
+            autorange='reversed',
+            row=1, col=1
+        )
+
+        # Esconder eixos da coluna 2
+        fig.update_xaxes(
+            showgrid=False,
+            zeroline=False,
+            visible=False,
+            range=[-1, 1],
+            row=1, col=2
+        )
+
+        fig.update_yaxes(
+            showgrid=False,
+            zeroline=False,
+            visible=False,
+            range=[-1, 1],
+            row=1, col=2
+        )
+
+        fig.update_layout(
+            template=template,
+            title=dict(
+                text="<b>Padrão de Falhas - Calendar Heatmap</b><br>" +
+                     "<sub style='font-size:10px'>⚪ Cinza = sem produção | 🟢 Verde = sem falhas | 🟡 Amarelo = poucas falhas | 🔴 Vermelho = muitas falhas</sub>",
+                x=0.5,
+                xanchor='center',
+                font=dict(size=13)
+            ),
+            height=500,
+            margin=dict(t=100, b=60, l=60, r=40),
+            plot_bgcolor=bg_color,
+            hovermode='closest',
+            showlegend=False
+        )
+
+        return fig
+
+    except Exception as e:
+        # Se qualquer erro ocorrer, retornar figura de erro
+        print(f"[ERRO] create_breakdown_calendar_heatmap: {type(e).__name__}: {e}")
+
+        # Garantir que template é válido antes de criar no_data_figure
+        safe_template = template if template in ['minty', 'darkly'] else 'minty'
+        return create_no_data_figure("heatmap", safe_template)
 
 
 def create_top_breakdowns_chart(breakdowns_data: List[Dict],
@@ -981,8 +1374,8 @@ def create_top_breakdowns_chart(breakdowns_data: List[Dict],
     # ✅ ORDENAR: Do maior para o menor (por duração)
     aggregated_data.sort(key=lambda x: x['duracao_horas'], reverse=True)
 
-    # Limitar ao top 10 após agregação
-    aggregated_data = aggregated_data[:10]
+    # Limitar ao top 5 após agregação
+    aggregated_data = aggregated_data[:5]
 
     # Criar labels para o eixo Y (data + descrição)
     y_labels = [

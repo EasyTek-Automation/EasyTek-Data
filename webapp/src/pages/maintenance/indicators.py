@@ -295,7 +295,7 @@ def layout():
                                         dbc.Row([
                                             # Coluna 1: Gráfico de barras horizontais (Top Paradas) - 42% do espaço
                                             dbc.Col([
-                                                html.H6("Top 10 Paradas com Maior Tempo", className="text-center mb-3"),
+                                                html.H6("Top 5 Paradas com Maior Tempo", className="text-center mb-3"),
                                                 dcc.Loading(
                                                     type="circle",
                                                     color="#dc3545",
@@ -411,15 +411,19 @@ def layout():
                             ], md=4)
                         ], className="mb-4"),
 
-                        # Comparação com Média Geral
+                        # Performance Radar e Calendar Heatmap
                         html.H5([
-                            html.I(className="bi bi-bar-chart me-2"),
-                            "Comparação com Média Geral"
+                            html.I(className="bi bi-diagram-3 me-2"),
+                            "Análise de Performance e Padrões"
                         ], className="mt-4 mb-3"),
                         dbc.Row([
+                            # Radar Chart (Performance)
                             dbc.Col([
                                 dbc.Card([
-                                    dbc.CardHeader("Comparativo de Performance"),
+                                    dbc.CardHeader([
+                                        html.I(className="bi bi-pentagon me-2"),
+                                        "Performance Multidimensional"
+                                    ]),
                                     dbc.CardBody([
                                         dcc.Loading(
                                             type="circle",
@@ -431,7 +435,27 @@ def layout():
                                         )
                                     ])
                                 ], className="shadow-sm")
-                            ])
+                            ], md=6),
+
+                            # Calendar Heatmap (Padrão de Falhas)
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader([
+                                        html.I(className="bi bi-calendar-week me-2"),
+                                        "Padrão Temporal de Falhas"
+                                    ]),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            type="circle",
+                                            color="#6c757d",
+                                            children=dcc.Graph(
+                                                id="calendar-heatmap-individual",
+                                                config=PLOTLY_CONFIG
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], md=6)
                         ]),
 
 

@@ -40,7 +40,8 @@ from src.components.maintenance_kpi_graphs import (
     create_empty_kpi_figure,
     create_no_data_figure,
     create_kpi_line_chart,
-    create_comparison_bar_chart,
+    create_performance_radar_chart,
+    create_breakdown_calendar_heatmap,
     create_top_breakdowns_chart,
     create_kpi_gauge
 )
@@ -1093,7 +1094,8 @@ def register_maintenance_kpi_callbacks(app):
             Output("line-chart-mtbf-individual", "figure"),
             Output("line-chart-mttr-individual", "figure"),
             Output("line-chart-breakdown-individual", "figure"),
-            Output("comparison-chart-individual", "figure")
+            Output("comparison-chart-individual", "figure"),
+            Output("calendar-heatmap-individual", "figure")
         ],
         [
             Input("store-indicator-filters", "data"),
@@ -1116,7 +1118,8 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
-                create_no_data_figure("comparacao", template)
+                create_no_data_figure("comparacao", template),
+                create_no_data_figure("heatmap", template)
             ]
 
         data = stored_data["data"]
@@ -1136,7 +1139,8 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
-                create_no_data_figure("comparacao", template)
+                create_no_data_figure("comparacao", template),
+                create_no_data_figure("heatmap", template)
             ]
 
         # Extrair valores por mês
@@ -1154,7 +1158,8 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
-                create_no_data_figure("comparacao", template)
+                create_no_data_figure("comparacao", template),
+                create_no_data_figure("heatmap", template)
             ]
 
         # Obter meta específica do equipamento (ou usar meta geral como fallback)
@@ -1199,11 +1204,18 @@ def register_maintenance_kpi_callbacks(app):
             "breakdown_rate": sum(breakdown_avg) / len(breakdown_avg) if breakdown_avg else 0
         }
 
-        fig_comparison = create_comparison_bar_chart(
-            eq_summary, general_summary, names.get(equipment_id, equipment_id), template
+        fig_comparison = create_performance_radar_chart(
+            eq_summary, general_summary, names.get(equipment_id, equipment_id),
+            equipment_target=eq_target, template=template
         )
 
-        return [fig_mtbf, fig_mttr, fig_breakdown, fig_comparison]
+        # Calendar heatmap
+        year = stored_data.get("year", 2025)
+        fig_calendar = create_breakdown_calendar_heatmap(
+            equipment_id, year, months, template
+        )
+
+        return [fig_mtbf, fig_mttr, fig_breakdown, fig_comparison, fig_calendar]
 
     # ============================================================
     # CALLBACK 13: Atualizar Top Paradas Gráfico
@@ -1233,15 +1245,15 @@ def register_maintenance_kpi_callbacks(app):
         months = stored_data.get("months", [])
         names = stored_data.get("names", {})
 
-        # Buscar top 10 paradas do equipamento
+        # Buscar top 5 paradas do equipamento
         if ZPP_KPI_AVAILABLE:
             try:
-                print(f"[INFO] Buscando top 10 paradas para {equipment_id}")
+                print(f"[INFO] Buscando top 5 paradas para {equipment_id}")
                 breakdowns_data = fetch_top_breakdowns_by_equipment(
                     equipment_id=equipment_id,
                     year=year,
                     months=months,
-                    top_n=10
+                    top_n=5
                 )
 
                 if breakdowns_data:
