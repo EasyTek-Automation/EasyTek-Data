@@ -6,8 +6,7 @@ import pandas as pd
 import plotly.express as px
 import logging
 import dash
-from dash_bootstrap_templates import ThemeSwitchAIO
-from src.config.theme_config import TEMPLATE_THEME_MINTY, TEMPLATE_THEME_DARKLY
+from src.config.theme_config import TEMPLATE_THEME_MINTY
 from dash.dependencies import Input, Output, State # Adicione State
 from dash import dcc # Adicione dcc para usar dcc.send_data_frame
 
@@ -60,13 +59,10 @@ def register_tempgraph_callbacks(app, collection_temp):
         [Output('temp-graph', 'figure'),
          Output('temp-graph', 'style')],
         [Input('stored-temp-data', 'data'), # <-- Lê do seu próprio Store
-         Input('url', 'pathname')],
-        [Input(ThemeSwitchAIO.ids.switch("theme"), "value")]
+         Input('url', 'pathname')]
     )
-    def update_temp_graph(stored_data, pathname, toggle):
-        if toggle is None:
-            toggle = True
-        template = TEMPLATE_THEME_MINTY if toggle else TEMPLATE_THEME_DARKLY
+    def update_temp_graph(stored_data, pathname):
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
         visible_style = {'visibility': 'visible', 'height': '450px'}
         error_style = {'visibility': 'visible', 'height': '450px'}

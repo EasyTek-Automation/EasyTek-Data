@@ -7,8 +7,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import logging
 import dash
-from dash_bootstrap_templates import ThemeSwitchAIO
-from src.config.theme_config import TEMPLATE_THEME_MINTY, TEMPLATE_THEME_DARKLY
+from src.config.theme_config import TEMPLATE_THEME_MINTY
 from dash import dcc
 from src.utils.empty_state import create_empty_state_figure, create_error_state_figure
 import os
@@ -301,22 +300,17 @@ def register_hourlyconsumption_callbacks(app, collection_consumo):
         [
             Input("stored-hourly-consumption-data", "data"),
             Input("url", "pathname"),
-        ],
-        [
-            Input(ThemeSwitchAIO.ids.switch("theme"), "value"),
-        ],
+        ]
     )
-    def update_hourly_consumption_graph(stored_data, pathname, toggle):
+    def update_hourly_consumption_graph(stored_data, pathname):
         t0 = time.perf_counter()
 
-        if toggle is None:
-            toggle = True
-        template = TEMPLATE_THEME_MINTY if toggle else TEMPLATE_THEME_DARKLY
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
         visible_style = {"visibility": "visible", "height": "450px"}
         error_style = {"visibility": "visible", "height": "450px"}
 
-        logger.debug(f"[GRAPH_HOURLY] Update pathname={pathname} toggle={toggle}")
+        logger.debug(f"[GRAPH_HOURLY] Update pathname={pathname} template={template}")
 
         # --- 1) Sem dados ou erro ---
         if (not stored_data) or (isinstance(stored_data, dict) and "error" in stored_data):

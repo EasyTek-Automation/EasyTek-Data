@@ -2,7 +2,6 @@
 
 from dash.dependencies import Input, Output
 from dash import html
-from dash_bootstrap_templates import ThemeSwitchAIO
 
 def register_sidebar_filter_callbacks(app):
     @app.callback(
@@ -34,17 +33,11 @@ def register_sidebar_filter_callbacks(app):
             Output('label-group1', 'style'),
             Output('label-group2', 'style'),
         ],
-        [Input(ThemeSwitchAIO.ids.switch("theme"), "value")]
+        [Input('url', 'pathname')]  # Dummy input para não deixar callback vazio
     )
-    def update_filter_styles(toggle):
-        if toggle is None:
-            toggle = True
-        
-        # ========== LÓGICA DE TEMA ==========
-        # toggle = True  -> TEMA CLARO (Minty)
-        # toggle = False -> TEMA ESCURO (Darkly)
-        
-        is_light_theme = toggle
+    def update_filter_styles(pathname):
+        # ========== TEMA FIXO EM CLARO (Minty) ==========
+        is_light_theme = True
         
         # Cores para o tema CLARO (Minty)
         light_bg = "white"

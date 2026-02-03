@@ -13,6 +13,7 @@ def register_storetheme_callbacks(app):
     def update_theme_store(switch_value, stored_theme):
         """
         Este callback sincroniza o interruptor de tema com o dcc.Store.
+        SEMPRE inicia com tema Minty (claro).
         """
         # ctx.triggered_id nos diz qual Input acionou o callback
         triggered_id = callback_context.triggered_id
@@ -21,15 +22,9 @@ def register_storetheme_callbacks(app):
         if triggered_id == ThemeSwitchAIO.ids.switch("theme"):
             # Salva o novo valor do interruptor no store e o retorna para o próprio interruptor
             return switch_value, switch_value
-        
-        # Se o callback foi acionado pelo carregamento da página (o store foi lido)
-        # e o store tem um valor salvo
-        elif stored_theme is not None:
-            # Aplica o valor salvo no store ao interruptor
-            return stored_theme, stored_theme
-            
-        # Caso inicial (primeira visita, nenhum valor no store)
-        # Mantém o valor padrão do interruptor (True, que é o tema claro 'minty')
+
+        # SEMPRE força tema Minty na inicialização (ignora stored_theme)
+        # True = Minty (tema claro)
         return True, True
 
     # Callback para conectar o tema dinâmico ao Dash

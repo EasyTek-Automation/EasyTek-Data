@@ -1,36 +1,105 @@
 """
 Maintenance Demo Data Generator
 Gera dados fictícios de KPIs de manutenção para demonstração
+Integrado com dados reais ZPP quando disponíveis
 """
 
 import random
 from typing import Dict, List
 
+# Importar funções de integração com ZPP (dados reais)
+try:
+    from src.utils.zpp_kpi_calculator import (
+        get_zpp_equipment_names,
+        get_zpp_equipment_categories
+    )
+    ZPP_AVAILABLE = True
+except ImportError as e:
+    print(f"[AVISO] Módulo ZPP não disponível: {e}")
+    ZPP_AVAILABLE = False
+
 # ============================================
-# CONFIGURAÇÃO DE METAS (FÁCIL PERSONALIZAÇÃO)
+# CONFIGURAÇÃO DE METAS POR EQUIPAMENTO (2026)
+# ============================================
+# Metas individualizadas por equipamento (coluna 2026 da planilha SAP)
+EQUIPMENT_TARGETS_2026 = {
+    # Meta geral da planta
+    "GENERAL": {
+        "mtbf": 11.30,      # horas
+        "mttr": 39.00,      # minutos (já convertido)
+        "breakdown_rate": 5.1  # %
+    },
+    # Longitudinais
+    "LONGI001": {  # LCL 4,5
+        "mtbf": 11.3,
+        "mttr": 32,
+        "breakdown_rate": 3.2
+    },
+    "LONGI002": {  # LCL 8
+        "mtbf": 12,
+        "mttr": 40,
+        "breakdown_rate": 5.5
+    },
+    # Transversais
+    "TRANS003": {  # LCT 2,5
+        "mtbf": 15,
+        "mttr": 42,
+        "breakdown_rate": 2.5
+    },
+    "TRANS002": {  # LCT 8
+        "mtbf": 15,
+        "mttr": 40,
+        "breakdown_rate": 4.0
+    },
+    "TRANS001": {  # LCT 16
+        "mtbf": 20,
+        "mttr": 50,
+        "breakdown_rate": 4.0
+    },
+    # Prensas
+    "PRENS001": {  # Prensa 01
+        "mtbf": 9,
+        "mttr": 35,
+        "breakdown_rate": 4.5
+    },
+    "PRENS002": {  # Prensa 02
+        "mtbf": 11,
+        "mttr": 40,
+        "breakdown_rate": 5.0
+    },
+    # LWB (se existir no sistema)
+    "LWB": {
+        "mtbf": 30,
+        "mttr": 30,
+        "breakdown_rate": 2.0
+    }
+}
+
+# ============================================
+# METAS ANTIGAS (DEPRECADO - Manter para compatibilidade)
 # ============================================
 KPI_TARGETS = {
-    "mtbf": 20.0,           # horas - Mean Time Between Failures - EDITÁVEL AQUI
-    "mttr": 2.0,            # horas - Mean Time To Repair - EDITÁVEL AQUI
-    "breakdown_rate": 3.0   # % - Taxa de Avaria - EDITÁVEL AQUI
+    "mtbf": 11.30,          # horas - Meta geral (média da planta)
+    "mttr": 39.0 / 60,      # horas - Meta geral convertida de minutos
+    "breakdown_rate": 5.1   # % - Meta geral
 }
 
 # Dicionário de nomes de equipamentos (expansível e personalizável)
 EQUIPMENT_NAMES = {
-    "LONGI001": "LONGI001",  # Pode alterar lado direito depois para "Longitudinal 1"
-    "LONGI002": "LONGI002",
-    "PRENS001": "PRENS001",
-    "PRENS002": "PRENS002",
-    "TRANS001": "TRANS001",
-    "TRANS002": "TRANS002",
-    "TRANS003": "TRANS003"
+    "LONGI001": "LCL-4,5",  # Pode alterar lado direito depois para "Longitudinal 1"
+    "LONGI002": "LCL-08",
+    "PRENS001": "PRENSA-01",
+    "PRENS002": "PRENSA-02",
+    "TRANS001": "LCT-16",
+    "TRANS002": "LCT-08",
+    "TRANS003": "LCT-2,5"
 }
 
 # Categorias para hierarquia Sunburst
 EQUIPMENT_CATEGORIES = {
-    "Longitudinais": ["LONGI001", "LONGI002"],
-    "Prensas": ["PRENS001", "PRENS002"],
-    "Transversais": ["TRANS001", "TRANS002", "TRANS003"]
+    "Longitudinais": ["LCL-4,5", "LCL-08"],
+    "Prensas": ["PRENSA-01", "PRENSA-02"],
+    "Transversais": ["LCT-16", "LCT-08", "LCT-2,5"]
 }
 
 # Valores base para geração de dados fictícios (em torno das metas ±30%)
@@ -56,33 +125,183 @@ BASE_VALUES = {
 }
 
 
-def get_kpi_targets() -> Dict[str, float]:
+def get_kpi_targets(equipment_id: str = None) -> Dict[str, float]:
     """
-    Retorna as metas configuradas para os KPIs.
+    Retorna as metas configuradas para os KPIs de um equipamento específico.
+
+    Busca APENAS do MongoDB (AMG_MaintenanceTargets).
+    Se não encontrar configuração, retorna valores padrão.
+
+    Args:
+        equipment_id: ID do equipamento (ex: "LONGI001"). Se None, retorna meta geral.
 
     Returns:
-        Dict com chaves: mtbf, mttr, breakdown_rate
+        Dict com chaves: mtbf, mttr (em horas), breakdown_rate, alert_range
     """
-    return KPI_TARGETS.copy()
+    try:
+        from src.database.connection import get_mongo_connection
+        collection = get_mongo_connection("AMG_MaintenanceTargets")
+        config = collection.find_one()
+
+        if config and config.get("general"):
+            general = config.get("general", {})
+            equipment_targets = config.get("equipment_targets", {})
+
+            # Verificar se os valores gerais são válidos
+            if general.get("mtbf") is not None and general.get("mttr") is not None and general.get("breakdown_rate") is not None:
+                alert_range = general.get("alert_range", 3.0)
+
+                if equipment_id and equipment_id in equipment_targets:
+                    # Meta específica do equipamento
+                    eq_config = equipment_targets[equipment_id]
+                    mttr_value = eq_config.get("mttr", general.get("mttr"))
+                    return {
+                        "mtbf": eq_config.get("mtbf", general.get("mtbf")),
+                        "mttr": mttr_value / 60.0,  # min -> h
+                        "breakdown_rate": eq_config.get("breakdown_rate", general.get("breakdown_rate")),
+                        "alert_range": alert_range
+                    }
+                else:
+                    # Meta geral
+                    return {
+                        "mtbf": general.get("mtbf"),
+                        "mttr": general.get("mttr") / 60.0,  # min -> h
+                        "breakdown_rate": general.get("breakdown_rate"),
+                        "alert_range": alert_range
+                    }
+    except Exception as e:
+        print(f"[ERRO] Falha ao buscar metas do MongoDB: {e}")
+
+    # Se não encontrou configuração, retornar valores padrão
+    print(f"[AVISO] Nenhuma configuração encontrada para {equipment_id or 'GENERAL'}. Configure as metas em /maintenance/config")
+    return {
+        "mtbf": 10.0,
+        "mttr": 0.5,
+        "breakdown_rate": 5.0,
+        "alert_range": 3.0
+    }
+
+
+def get_all_equipment_targets() -> Dict[str, Dict[str, float]]:
+    """
+    Retorna todas as metas de todos os equipamentos.
+
+    Busca APENAS do MongoDB (AMG_MaintenanceTargets).
+    Se não encontrar configuração, retorna valores padrão.
+
+    Returns:
+        Dict mapeando equipment_id -> {mtbf, mttr (horas), breakdown_rate}
+    """
+    try:
+        from src.database.connection import get_mongo_connection
+        collection = get_mongo_connection("AMG_MaintenanceTargets")
+        config = collection.find_one()
+
+        if config and config.get("general"):
+            general = config.get("general", {})
+            equipment_targets = config.get("equipment_targets", {})
+
+            # Verificar se os valores gerais são válidos
+            if general.get("mtbf") is not None and general.get("mttr") is not None and general.get("breakdown_rate") is not None:
+                all_targets = {}
+                alert_range = general.get("alert_range", 3.0)
+
+                # Para cada equipamento no sistema, buscar meta específica ou usar geral
+                equipment_list = get_equipment_names()
+                for eq_id in equipment_list:
+                    if eq_id in equipment_targets:
+                        eq_config = equipment_targets[eq_id]
+                        mttr_value = eq_config.get("mttr", general.get("mttr"))
+                        all_targets[eq_id] = {
+                            "mtbf": eq_config.get("mtbf", general.get("mtbf")),
+                            "mttr": mttr_value / 60.0,  # min -> h
+                            "breakdown_rate": eq_config.get("breakdown_rate", general.get("breakdown_rate")),
+                            "alert_range": alert_range
+                        }
+                    else:
+                        # Usar meta geral
+                        all_targets[eq_id] = {
+                            "mtbf": general.get("mtbf"),
+                            "mttr": general.get("mttr") / 60.0,  # min -> h
+                            "breakdown_rate": general.get("breakdown_rate"),
+                            "alert_range": alert_range
+                        }
+
+                # Adicionar meta geral também
+                all_targets["GENERAL"] = {
+                    "mtbf": general.get("mtbf"),
+                    "mttr": general.get("mttr") / 60.0,  # min -> h
+                    "breakdown_rate": general.get("breakdown_rate"),
+                    "alert_range": alert_range
+                }
+
+                return all_targets
+    except Exception as e:
+        print(f"[ERRO] Falha ao buscar metas do MongoDB: {e}")
+
+    # Se não encontrou configuração, retornar valores padrão para todos equipamentos
+    print(f"[AVISO] Nenhuma configuração de metas encontrada. Configure as metas em /maintenance/config")
+    all_targets = {}
+    equipment_list = get_equipment_names()
+
+    default_targets = {
+        "mtbf": 10.0,
+        "mttr": 0.5,
+        "breakdown_rate": 5.0,
+        "alert_range": 3.0
+    }
+
+    for eq_id in equipment_list:
+        all_targets[eq_id] = default_targets.copy()
+
+    all_targets["GENERAL"] = default_targets.copy()
+
+    return all_targets
 
 
 def get_equipment_names() -> Dict[str, str]:
     """
     Retorna o dicionário de nomes dos equipamentos.
+    Tenta buscar dados reais do ZPP, com fallback para dados demo.
 
     Returns:
         Dict mapeando código técnico -> nome de exibição
     """
+    if ZPP_AVAILABLE:
+        try:
+            # Tentar buscar equipamentos reais do ZPP
+            zpp_names = get_zpp_equipment_names()
+            if zpp_names:
+                print(f"[INFO] Usando {len(zpp_names)} equipamentos reais do ZPP")
+                return zpp_names
+        except Exception as e:
+            print(f"[AVISO] Erro ao buscar equipamentos ZPP: {e}")
+            print("[INFO] Usando equipamentos demo como fallback")
+
+    # Fallback para dados demo
     return EQUIPMENT_NAMES.copy()
 
 
 def get_equipment_categories() -> Dict[str, List[str]]:
     """
     Retorna a hierarquia de categorias dos equipamentos.
+    Tenta buscar dados reais do ZPP, com fallback para dados demo.
 
     Returns:
         Dict mapeando categoria -> lista de equipment IDs
     """
+    if ZPP_AVAILABLE:
+        try:
+            # Tentar buscar categorias reais do ZPP
+            zpp_categories = get_zpp_equipment_categories()
+            if zpp_categories:
+                print(f"[INFO] Usando {len(zpp_categories)} categorias reais do ZPP")
+                return zpp_categories
+        except Exception as e:
+            print(f"[AVISO] Erro ao buscar categorias ZPP: {e}")
+            print("[INFO] Usando categorias demo como fallback")
+
+    # Fallback para dados demo
     return EQUIPMENT_CATEGORIES.copy()
 
 

@@ -9,10 +9,11 @@ from pathlib import Path
 from dash_bootstrap_templates import load_figure_template
 
 # --- Constantes ---
-FONT_AWESOME = ["https://use.fontawesome.com/releases/v5.10.2/css/all.css"]
+# Recursos locais para modo offline
+FONT_AWESOME = ["/assets/vendor/fontawesome/css/all.min.css"]
 
-# Define a folha de estilos que você já usa
-external_stylesheets = [dbc.themes.MINTY]
+# Define a folha de estilos que você já usa (agora local)
+external_stylesheets = ["/assets/vendor/bootstrap/minty/bootstrap.min.css"]
 
 # ADICIONE ESTA LINHA PARA CARREGAR OS TEMAS PARA OS GRÁFICOS
 load_figure_template("minty")
@@ -38,8 +39,8 @@ app = dash.Dash(
         title="EasyTek-Data",
     meta_tags=[
         {"name": "viewport", "content": "width=device-width, initial-scale=1"},
-
-        {"rel": "preload", "href": "https://use.fontawesome.com/releases/v5.10.2/css/all.css", "as": "style"}
+        # Preload Font Awesome local para otimização
+        {"rel": "preload", "href": "/assets/vendor/fontawesome/css/all.min.css", "as": "style"}
     ]
   )
 

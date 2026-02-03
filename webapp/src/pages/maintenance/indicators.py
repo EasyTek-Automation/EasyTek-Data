@@ -12,7 +12,26 @@ from src.components.maintenance_kpi_cards import (
     create_equipment_count_card
 )
 from src.components.maintenance_kpi_graphs import create_empty_kpi_figure
-from src.utils.maintenance_demo_data import get_equipment_names, get_kpi_targets
+
+# ==================== CONFIGURAÇÃO PLOTLY ====================
+# Configuração padrão para mode bar: apenas Print e Auto Scale
+PLOTLY_CONFIG = {
+    'displayModeBar': True,
+    'displaylogo': False,
+    'modeBarButtonsToRemove': [
+        'zoom2d', 'pan2d', 'select2d', 'lasso2d',
+        'zoomIn2d', 'zoomOut2d', 'resetScale2d',
+        'hoverClosestCartesian', 'hoverCompareCartesian',
+        'toggleSpikelines'
+    ],
+    'toImageButtonOptions': {
+        'format': 'png',
+        'filename': 'grafico_manutencao',
+        'height': None,
+        'width': None,
+        'scale': 2
+    }
+}
 
 
 def layout():
@@ -31,13 +50,6 @@ def layout():
     """
 
     return dbc.Container([
-        # ==================== DEMO WARNING ====================
-        dbc.Alert([
-            html.I(className="bi bi-info-circle me-2"),
-            html.Strong("Dados Demonstrativos: "),
-            "Esta página está utilizando dados fictícios para avaliação de layout e UX."
-        ], color="info", className="mb-3", dismissable=True, id="demo-alert-indicators"),
-
         # ==================== HEADER ====================
         dbc.Row([
             dbc.Col([
@@ -105,14 +117,11 @@ def layout():
                                     dbc.CardBody([
                                         dcc.Loading(
                                             id="loading-sunburst-mtbf",
-                                            type="default",
+                                            type="circle",
+                                            color="#198754",
                                             children=dcc.Graph(
                                                 id='sunburst-chart-mtbf',
-                                                config={
-                                                    'displayModeBar': True,
-                                                    'displaylogo': False,
-                                                    'responsive': True
-                                                }
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -129,14 +138,11 @@ def layout():
                                     dbc.CardBody([
                                         dcc.Loading(
                                             id="loading-sunburst-mttr",
-                                            type="default",
+                                            type="circle",
+                                            color="#0d6efd",
                                             children=dcc.Graph(
                                                 id='sunburst-chart-mttr',
-                                                config={
-                                                    'displayModeBar': True,
-                                                    'displaylogo': False,
-                                                    'responsive': True
-                                                }
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -153,14 +159,11 @@ def layout():
                                     dbc.CardBody([
                                         dcc.Loading(
                                             id="loading-sunburst-breakdown",
-                                            type="default",
+                                            type="circle",
+                                            color="#ffc107",
                                             children=dcc.Graph(
                                                 id='sunburst-chart-breakdown',
-                                                config={
-                                                    'displayModeBar': True,
-                                                    'displaylogo': False,
-                                                    'responsive': True
-                                                }
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -184,17 +187,11 @@ def layout():
                                     dbc.CardBody([
                                         dcc.Loading(
                                             id="loading-bar-mtbf",
-                                            type="default",
+                                            type="circle",
+                                            color="#0d6efd",
                                             children=dcc.Graph(
                                                 id='bar-chart-mtbf',
-                                                figure=create_empty_kpi_figure("MTBF"),
-                                                config={
-                                                    'displayModeBar': True,
-                                                    'displaylogo': False,
-                                                    'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
-                                                    'doubleClick': 'reset',
-                                                    'responsive': True
-                                                }
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -211,17 +208,11 @@ def layout():
                                     dbc.CardBody([
                                         dcc.Loading(
                                             id="loading-bar-mttr",
-                                            type="default",
+                                            type="circle",
+                                            color="#0d6efd",
                                             children=dcc.Graph(
                                                 id='bar-chart-mttr',
-                                                figure=create_empty_kpi_figure("MTTR"),
-                                                config={
-                                                    'displayModeBar': True,
-                                                    'displaylogo': False,
-                                                    'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
-                                                    'doubleClick': 'reset',
-                                                    'responsive': True
-                                                }
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -238,17 +229,11 @@ def layout():
                                     dbc.CardBody([
                                         dcc.Loading(
                                             id="loading-bar-breakdown",
-                                            type="default",
+                                            type="circle",
+                                            color="#0d6efd",
                                             children=dcc.Graph(
                                                 id='bar-chart-breakdown',
-                                                figure=create_empty_kpi_figure("Taxa de Avaria"),
-                                                config={
-                                                    'displayModeBar': True,
-                                                    'displaylogo': False,
-                                                    'modeBarButtonsToRemove': ['lasso2d', 'select2d'],
-                                                    'doubleClick': 'reset',
-                                                    'responsive': True
-                                                }
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -286,42 +271,91 @@ def layout():
                                 html.Label("Selecione o Equipamento:", className="form-label fw-bold"),
                                 dcc.Dropdown(
                                     id="dropdown-equipment-individual",
-                                    options=[
-                                        {"label": name, "value": eq_id}
-                                        for eq_id, name in get_equipment_names().items()
-                                    ],
-                                    value="LONGI001",
+                                    options=[],
+                                    placeholder="Selecione um equipamento...",
                                     clearable=False
+                                ),
+                                # Badges compactos com metas logo abaixo do dropdown
+                                html.Div(
+                                    id="equipment-targets-badges",
+                                    className="mt-2"
                                 )
-                            ], md=4)
+                            ], md=6)
                         ], className="mb-4"),
 
-                        # Cards de Resumo do Equipamento
+                        # Paradas Críticas + Gauges de Indicadores
                         dbc.Row([
                             dbc.Col([
                                 dbc.Card([
+                                    dbc.CardHeader([
+                                        html.I(className="bi bi-graph-up-arrow me-2"),
+                                        html.Strong("Paradas Críticas e Indicadores")
+                                    ]),
                                     dbc.CardBody([
-                                        html.H6("MTBF do Equipamento", className="text-muted mb-2"),
-                                        html.H3(id="individual-mtbf-value", children="--", className="mb-0")
-                                    ])
-                                ], className="shadow-sm h-100")
-                            ], md=4),
-                            dbc.Col([
-                                dbc.Card([
-                                    dbc.CardBody([
-                                        html.H6("MTTR do Equipamento", className="text-muted mb-2"),
-                                        html.H3(id="individual-mttr-value", children="--", className="mb-0")
-                                    ])
-                                ], className="shadow-sm h-100")
-                            ], md=4),
-                            dbc.Col([
-                                dbc.Card([
-                                    dbc.CardBody([
-                                        html.H6("Taxa de Avaria", className="text-muted mb-2"),
-                                        html.H3(id="individual-breakdown-value", children="--", className="mb-0")
-                                    ])
-                                ], className="shadow-sm h-100")
-                            ], md=4)
+                                        dbc.Row([
+                                            # Coluna 1: Gráfico de barras horizontais (Top Paradas) - 42% do espaço
+                                            dbc.Col([
+                                                html.H6("Top 5 Paradas com Maior Tempo", className="text-center mb-3"),
+                                                dcc.Loading(
+                                                    type="circle",
+                                                    color="#dc3545",
+                                                    children=dcc.Graph(
+                                                        id="top-breakdowns-chart-individual",
+                                                        config=PLOTLY_CONFIG
+                                                    )
+                                                )
+                                            ], md=5, className="d-flex flex-column justify-content-center"),
+
+                                            # Coluna 2: 3 Gauges lado a lado com Metas - 58% do espaço
+                                            dbc.Col([
+                                                # Metas do Equipamento
+                                                html.Div(
+                                                    id="equipment-targets-info",
+                                                    className="mb-3"
+                                                ),
+                                                # Gauges
+                                                dbc.Row([
+                                                    # Gauge MTBF
+                                                    dbc.Col([
+                                                        dcc.Loading(
+                                                            type="circle",
+                                                            color="#198754",
+                                                            children=dcc.Graph(
+                                                                id="gauge-mtbf-individual",
+                                                                config=PLOTLY_CONFIG
+                                                            )
+                                                        )
+                                                    ], md=4),
+
+                                                    # Gauge MTTR
+                                                    dbc.Col([
+                                                        dcc.Loading(
+                                                            type="circle",
+                                                            color="#0d6efd",
+                                                            children=dcc.Graph(
+                                                                id="gauge-mttr-individual",
+                                                                config=PLOTLY_CONFIG
+                                                            )
+                                                        )
+                                                    ], md=4),
+
+                                                    # Gauge Taxa de Avaria
+                                                    dbc.Col([
+                                                        dcc.Loading(
+                                                            type="circle",
+                                                            color="#ffc107",
+                                                            children=dcc.Graph(
+                                                                id="gauge-breakdown-individual",
+                                                                config=PLOTLY_CONFIG
+                                                            )
+                                                        )
+                                                    ], md=4)
+                                                ], className="align-items-center")
+                                            ], md=7, className="d-flex flex-column")
+                                        ], className="align-items-center")
+                                    ], className="p-3")
+                                ], className="shadow-sm")
+                            ])
                         ], className="mb-4"),
 
                         # Gráficos de Linha (Evolução Temporal)
@@ -335,10 +369,11 @@ def layout():
                                     dbc.CardHeader("MTBF - Evolução Mensal"),
                                     dbc.CardBody([
                                         dcc.Loading(
-                                            type="default",
+                                            type="circle",
+                                            color="#198754",
                                             children=dcc.Graph(
                                                 id="line-chart-mtbf-individual",
-                                                config={'displayModeBar': True, 'displaylogo': False}
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -349,10 +384,11 @@ def layout():
                                     dbc.CardHeader("MTTR - Evolução Mensal"),
                                     dbc.CardBody([
                                         dcc.Loading(
-                                            type="default",
+                                            type="circle",
+                                            color="#0d6efd",
                                             children=dcc.Graph(
                                                 id="line-chart-mttr-individual",
-                                                config={'displayModeBar': True, 'displaylogo': False}
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -363,10 +399,11 @@ def layout():
                                     dbc.CardHeader("Taxa Avaria - Evolução Mensal"),
                                     dbc.CardBody([
                                         dcc.Loading(
-                                            type="default",
+                                            type="circle",
+                                            color="#ffc107",
                                             children=dcc.Graph(
                                                 id="line-chart-breakdown-individual",
-                                                config={'displayModeBar': True, 'displaylogo': False}
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
@@ -374,27 +411,53 @@ def layout():
                             ], md=4)
                         ], className="mb-4"),
 
-                        # Comparação com Média Geral
+                        # Performance Radar e Calendar Heatmap
                         html.H5([
-                            html.I(className="bi bi-bar-chart me-2"),
-                            "Comparação com Média Geral"
+                            html.I(className="bi bi-diagram-3 me-2"),
+                            "Análise de Performance e Padrões"
                         ], className="mt-4 mb-3"),
                         dbc.Row([
+                            # Radar Chart (Performance)
                             dbc.Col([
                                 dbc.Card([
-                                    dbc.CardHeader("Comparativo de Performance"),
+                                    dbc.CardHeader([
+                                        html.I(className="bi bi-pentagon me-2"),
+                                        "Performance Multidimensional"
+                                    ]),
                                     dbc.CardBody([
                                         dcc.Loading(
-                                            type="default",
+                                            type="circle",
+                                            color="#6c757d",
                                             children=dcc.Graph(
                                                 id="comparison-chart-individual",
-                                                config={'displayModeBar': True, 'displaylogo': False}
+                                                config=PLOTLY_CONFIG
                                             )
                                         )
                                     ])
                                 ], className="shadow-sm")
-                            ])
-                        ])
+                            ], md=6),
+
+                            # Calendar Heatmap (Padrão de Falhas)
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader([
+                                        html.I(className="bi bi-calendar-week me-2"),
+                                        "Padrão Temporal de Falhas"
+                                    ]),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            type="circle",
+                                            color="#6c757d",
+                                            children=dcc.Graph(
+                                                id="calendar-heatmap-individual",
+                                                config=PLOTLY_CONFIG
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], md=6)
+                        ]),
+
 
                     ], className="p-3")
                 ]
@@ -406,12 +469,12 @@ def layout():
         dcc.Store(id='store-indicator-filters', storage_type='session'),
         dcc.Download(id="download-indicators-data"),
 
-        # Interval para carregar dados automaticamente ao abrir a página
+        # Interval para carregamento inicial de dados (executa apenas 1 vez)
         dcc.Interval(
             id='interval-initial-load',
-            interval=500,  # 500ms
+            interval=500,  # 500ms (carrega rápido no início)
             n_intervals=0,
-            max_intervals=1  # Dispara apenas uma vez
+            max_intervals=1  # Executa apenas 1 vez no carregamento
         )
 
     ], fluid=True, className="p-4")

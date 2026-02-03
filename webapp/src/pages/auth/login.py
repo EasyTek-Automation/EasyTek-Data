@@ -5,12 +5,12 @@ import dash_bootstrap_components as dbc
 from werkzeug.security import check_password_hash
 from flask_login import login_user
 from dash.exceptions import PreventUpdate
-from dash_bootstrap_templates import ThemeSwitchAIO, template_from_url
+from dash_bootstrap_templates import template_from_url
 import dash
 
 from src.app import app
 from src.database.connection import get_user_by_email
-from src.config.theme_config import URL_THEME_MINTY, URL_THEME_DARKLY
+from src.config.theme_config import URL_THEME_MINTY
 
 
 
@@ -35,7 +35,7 @@ def render_layout():
                     html.Div(
                         [
                             html.Img(src="/assets/LogoAMG.png", style={"height": "100px"}),
-                            ThemeSwitchAIO(aio_id="theme", themes=[URL_THEME_MINTY, URL_THEME_DARKLY]),
+                            # ThemeSwitchAIO removido
                         ],
                         className="d-flex justify-content-between align-items-center"
                     ),
@@ -65,7 +65,7 @@ def render_layout():
                 width=12
             )
         )
-    ], fluid=True, className=template_from_url(URL_THEME_DARKLY), id="login-container",
+    ], fluid=True, className=template_from_url(URL_THEME_MINTY), id="login-container",
        style={"height": "100vh", "display": "flex", "align-items": "center", "justify-content": "center"})
     
     return login_layout

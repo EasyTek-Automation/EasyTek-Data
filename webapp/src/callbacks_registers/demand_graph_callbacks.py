@@ -7,8 +7,7 @@ from dash import Input, Output
 from datetime import datetime
 import pytz
 import pandas as pd
-from dash_bootstrap_templates import ThemeSwitchAIO
-from src.config.theme_config import TEMPLATE_THEME_MINTY, TEMPLATE_THEME_DARKLY
+from src.config.theme_config import TEMPLATE_THEME_MINTY
 from src.components.demand_graphs import (
     create_empty_demand_figure,
     create_demand_figure,
@@ -32,11 +31,10 @@ def register_demand_callbacks(app, collection_energia):
             Input('store-end-date', 'data'),
             Input('store-start-hour', 'data'),
             Input('store-end-hour', 'data'),
-            Input('machine-dropdown-group1', 'value'),
-            Input(ThemeSwitchAIO.ids.switch("theme"), "value")
+            Input('machine-dropdown-group1', 'value')
         ]
     )
-    def update_demand_transversais(start_date, end_date, start_hour, end_hour, selected_machines, toggle):
+    def update_demand_transversais(start_date, end_date, start_hour, end_hour, selected_machines):
         """
         Atualiza gráfico de demanda temporal - Transversais
 
@@ -44,9 +42,7 @@ def register_demand_callbacks(app, collection_energia):
         """
         try:
             # Template do tema
-            if toggle is None:
-                toggle = True
-            template = TEMPLATE_THEME_MINTY if toggle else TEMPLATE_THEME_DARKLY
+            template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
             # Validar inputs
             if not start_date or not end_date:
@@ -195,11 +191,10 @@ def register_demand_callbacks(app, collection_energia):
             Input('store-end-date', 'data'),
             Input('store-start-hour', 'data'),
             Input('store-end-hour', 'data'),
-            Input('machine-dropdown-group2', 'value'),
-            Input(ThemeSwitchAIO.ids.switch("theme"), "value")
+            Input('machine-dropdown-group2', 'value')
         ]
     )
-    def update_demand_longitudinais(start_date, end_date, start_hour, end_hour, selected_machines, toggle):
+    def update_demand_longitudinais(start_date, end_date, start_hour, end_hour, selected_machines):
         """
         Atualiza gráfico de demanda temporal - Longitudinais
 
@@ -207,9 +202,7 @@ def register_demand_callbacks(app, collection_energia):
         """
         try:
             # Template do tema
-            if toggle is None:
-                toggle = True
-            template = TEMPLATE_THEME_MINTY if toggle else TEMPLATE_THEME_DARKLY
+            template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
             # Validar inputs
             if not start_date or not end_date:

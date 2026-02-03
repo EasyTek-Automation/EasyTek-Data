@@ -77,6 +77,76 @@ LOG_LEVEL=DEBUG  # Options: DEBUG, INFO, WARNING, ERROR
 DOCS_PROCEDURES_PATH=/path/to/procedures  # External volume for procedure documentation
 ```
 
+### Offline Mode
+
+A aplicação está configurada para funcionar **completamente offline**, sem dependências de CDNs externos. Todos os recursos (Bootstrap themes, Font Awesome) são servidos localmente.
+
+#### Recursos Localizados
+
+- **Bootstrap Themes**: Minty (tema claro) e Darkly (tema escuro) do Bootswatch 5.3.6
+- **Font Awesome**: Versão 5.10.2 (CSS + webfonts)
+- **Localização**: `webapp/src/assets/vendor/`
+
+#### Scripts de Gerenciamento
+
+```bash
+# Download de recursos externos (primeira configuração ou atualização)
+cd webapp
+python scripts/download_offline_resources.py
+
+# Validação de configuração offline
+python scripts/validate_offline.py
+```
+
+**Download de Recursos**: Baixa automaticamente Bootstrap e Font Awesome dos CDNs e ajusta URLs internas do CSS para caminhos relativos locais.
+
+**Validação**: Verifica que:
+- Todos os 6 arquivos de recursos estão presentes
+- Nenhuma referência a CDNs no código
+- Configurações corretas em `app.py` e `theme_config.py`
+
+#### Estrutura de Assets
+
+```
+webapp/src/assets/
+├── vendor/                    # Recursos de terceiros
+│   ├── bootstrap/
+│   │   ├── minty/
+│   │   │   └── bootstrap.min.css
+│   │   └── darkly/
+│   │       └── bootstrap.min.css
+│   └── fontawesome/
+│       ├── css/
+│       │   └── all.min.css
+│       └── webfonts/
+│           ├── fa-brands-400.woff2
+│           ├── fa-regular-400.woff2
+│           └── fa-solid-900.woff2
+├── [CSS customizados...]
+└── favicon.ico
+```
+
+#### Atualizando Versões
+
+Para atualizar Bootstrap ou Font Awesome:
+
+1. Editar URLs em `webapp/scripts/download_offline_resources.py`
+2. Executar: `python scripts/download_offline_resources.py`
+3. Testar aplicação
+4. Validar: `python scripts/validate_offline.py`
+
+**Documentação completa**: Ver `webapp/scripts/README.md`
+
+#### Teste Offline
+
+Para verificar que a aplicação funciona sem internet:
+
+1. Desconectar Wi-Fi/Ethernet
+2. Iniciar aplicação: `python webapp/src/run.py`
+3. Abrir navegador: `http://localhost:8050`
+4. Verificar DevTools → Network tab (nenhuma requisição externa deve falhar)
+5. Testar comutação de temas e navegação entre páginas
+
 ## Architecture
 
 ### Application Structure

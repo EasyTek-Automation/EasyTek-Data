@@ -6,8 +6,7 @@ import pandas as pd
 import plotly.express as px
 import logging
 import dash
-from dash_bootstrap_templates import ThemeSwitchAIO
-from src.config.theme_config import TEMPLATE_THEME_MINTY, TEMPLATE_THEME_DARKLY
+from src.config.theme_config import TEMPLATE_THEME_MINTY
 from dash import dcc
 from src.utils.empty_state import create_empty_state_figure, create_error_state_figure
 import os
@@ -236,13 +235,10 @@ def register_energygraph_callbacks(app, collection_energia):
     @app.callback(
         [Output("energy-graph", "figure"), Output("energy-graph", "style")],
         [Input("stored-energy-data", "data"), Input("url", "pathname")],
-        [Input(ThemeSwitchAIO.ids.switch("theme"), "value")],
     )
-    def update_energy_graph(stored_data, pathname, toggle):
+    def update_energy_graph(stored_data, pathname):
         t0 = time.perf_counter()
-        if toggle is None:
-            toggle = True
-        template = TEMPLATE_THEME_MINTY if toggle else TEMPLATE_THEME_DARKLY
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
         visible_style = {"visibility": "visible", "height": "450px"}
         error_style = {"visibility": "visible", "height": "450px"}
@@ -354,13 +350,10 @@ def register_energygraph_callbacks(app, collection_energia):
     @app.callback(
         [Output("current-graph", "figure"), Output("current-graph", "style")],
         [Input("stored-energy-data", "data"), Input("url", "pathname")],
-        [Input(ThemeSwitchAIO.ids.switch("theme"), "value")],
     )
-    def update_current_graph(stored_data, pathname, toggle):
+    def update_current_graph(stored_data, pathname):
         t0 = time.perf_counter()
-        if toggle is None:
-            toggle = True
-        template = TEMPLATE_THEME_MINTY if toggle else TEMPLATE_THEME_DARKLY
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
         visible_style = {"visibility": "visible", "height": "450px"}
         error_style = {"visibility": "visible", "height": "450px"}

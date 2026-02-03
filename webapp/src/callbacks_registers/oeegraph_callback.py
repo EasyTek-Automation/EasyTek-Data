@@ -6,8 +6,7 @@ import plotly.express as px
 import logging
 import dash
 from dash import dcc # Importar dcc para send_data_frame
-from dash_bootstrap_templates import ThemeSwitchAIO
-from src.config.theme_config import TEMPLATE_THEME_MINTY, TEMPLATE_THEME_DARKLY
+from src.config.theme_config import TEMPLATE_THEME_MINTY
 
 # A importação de 'time' e 'filtrar_dados_mongo' não são usadas aqui, podem ser removidas se não forem necessárias em outro lugar.
 # import time
@@ -61,16 +60,11 @@ def register_oeegraph_callbacks(app, collection_graph):
         [
             Input('stored-graph-data', 'data'),
             Input('url', 'pathname')
-        ],
-        [
-            Input(ThemeSwitchAIO.ids.switch("theme"), "value")
         ]
     )
-    def update_oee_graph_and_theme(stored_data, pathname, toggle):
+    def update_oee_graph_and_theme(stored_data, pathname):
         # --- LÓGICA DEFENSIVA E PADRONIZADA ---
-        if toggle is None:
-            toggle = True
-        template = TEMPLATE_THEME_MINTY if toggle else TEMPLATE_THEME_DARKLY
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
         button_color = "primary"
         # --- FIM DA LÓGICA ---

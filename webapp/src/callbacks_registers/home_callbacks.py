@@ -2,8 +2,7 @@
 
 from dash.dependencies import Input, Output
 import plotly.graph_objects as go
-from dash_bootstrap_templates import ThemeSwitchAIO
-from src.config.theme_config import TEMPLATE_THEME_MINTY, TEMPLATE_THEME_DARKLY
+from src.config.theme_config import TEMPLATE_THEME_MINTY
 import pandas as pd
 from datetime import datetime, timedelta
 import logging
@@ -22,18 +21,15 @@ def register_home_callbacks(app):
             Output("graph-home-oee", "style")
         ],
         [
-            Input("interval-component", "n_intervals"),
-            Input(ThemeSwitchAIO.ids.switch("theme"), "value")
+            Input("interval-component", "n_intervals")
         ]
     )
-    def update_home_oee_graph(n_intervals, toggle):
+    def update_home_oee_graph(n_intervals):
         """
         Gráfico de OEE simplificado para home.
         Retorna figura E style para evitar flash branco.
         """
-        if toggle is None:
-            toggle = True
-        template = TEMPLATE_THEME_MINTY if toggle else TEMPLATE_THEME_DARKLY
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
         
         # Style visível (gráfico pronto)
         visible_style = {"visibility": "visible", "height": "250px"}
@@ -119,18 +115,15 @@ def register_home_callbacks(app):
             Output("graph-home-energy", "style")
         ],
         [
-            Input("interval-component", "n_intervals"),
-            Input(ThemeSwitchAIO.ids.switch("theme"), "value")
+            Input("interval-component", "n_intervals")
         ]
     )
-    def update_home_energy_graph(n_intervals, toggle):
+    def update_home_energy_graph(n_intervals):
         """
         Gráfico de energia simplificado para home.
         Retorna figura E style para evitar flash branco.
         """
-        if toggle is None:
-            toggle = True
-        template = TEMPLATE_THEME_MINTY if toggle else TEMPLATE_THEME_DARKLY
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
         
         # Style visível (gráfico pronto)
         visible_style = {"visibility": "visible", "height": "250px"}
