@@ -804,13 +804,49 @@ def register_maintenance_kpi_callbacks(app):
         return options, default_value
 
     # ============================================================
+    # CALLBACK 9A: Debounce do Dropdown de Equipamentos
+    # ============================================================
+    @app.callback(
+        [
+            Output("store-equipment-debounce", "data"),
+            Output("interval-equipment-debounce", "disabled")
+        ],
+        Input("dropdown-equipment-individual", "value"),
+        State("store-equipment-debounce", "data")
+    )
+    def start_equipment_debounce(dropdown_value, current_stored):
+        """
+        Inicia o timer de debounce quando o dropdown muda.
+        Evita múltiplas execuções ao trocar rapidamente de equipamento.
+        """
+        if dropdown_value is None:
+            raise PreventUpdate
+
+        # Ativar o interval para disparar após 300ms
+        return dropdown_value, False
+
+    @app.callback(
+        Output("interval-equipment-debounce", "disabled", allow_duplicate=True),
+        Input("interval-equipment-debounce", "n_intervals"),
+        State("store-equipment-debounce", "data"),
+        prevent_initial_call=True
+    )
+    def stop_debounce_interval(n_intervals, stored_value):
+        """
+        Desativa o interval após disparar o debounce.
+        """
+        if n_intervals > 0:
+            return True  # Desativar interval
+        raise PreventUpdate
+
+    # ============================================================
     # CALLBACK 9B: Exibir Badges de Metas abaixo do Dropdown
     # ============================================================
     @app.callback(
         Output("equipment-targets-badges", "children"),
         [
             Input("store-indicator-filters", "data"),
-            Input("dropdown-equipment-individual", "value")
+            Input("store-equipment-debounce", "data")  # ✅ Usando debounce
         ]
     )
     def display_equipment_targets_badges(stored_data, equipment_id):
@@ -879,7 +915,7 @@ def register_maintenance_kpi_callbacks(app):
         Output("equipment-targets-info", "children"),
         [
             Input("store-indicator-filters", "data"),
-            Input("dropdown-equipment-individual", "value")
+            Input("store-equipment-debounce", "data")
         ]
     )
     def display_equipment_targets(stored_data, equipment_id):
@@ -978,7 +1014,7 @@ def register_maintenance_kpi_callbacks(app):
         ],
         [
             Input("store-indicator-filters", "data"),
-            Input("dropdown-equipment-individual", "value")
+            Input("store-equipment-debounce", "data")
         ]
     )
     def update_individual_cards(stored_data, equipment_id):
@@ -1017,7 +1053,7 @@ def register_maintenance_kpi_callbacks(app):
         ],
         [
             Input("store-indicator-filters", "data"),
-            Input("dropdown-equipment-individual", "value")
+            Input("store-equipment-debounce", "data")
         ]
     )
     def update_individual_gauges(stored_data, equipment_id):
@@ -1087,6 +1123,28 @@ def register_maintenance_kpi_callbacks(app):
         return [fig_mtbf, fig_mttr, fig_breakdown]
 
     # ============================================================
+    # CALLBACK 11B: Toggle Calendar Collapse
+    # ============================================================
+    @app.callback(
+        [
+            Output("calendar-collapse", "is_open"),
+            Output("calendar-collapse-icon", "className")
+        ],
+        Input("calendar-collapse-button", "n_clicks"),
+        State("calendar-collapse", "is_open")
+    )
+    def toggle_calendar_collapse(n_clicks, is_open):
+        """
+        Controla expansão/colapso do calendar heatmap.
+        """
+        if n_clicks is None:
+            raise PreventUpdate
+
+        new_state = not is_open
+        icon_class = "bi bi-chevron-up me-2" if new_state else "bi bi-chevron-down me-2"
+        return new_state, icon_class
+
+    # ============================================================
     # CALLBACK 12: Atualizar Gráficos de Linha (Evolução Temporal)
     # ============================================================
     @app.callback(
@@ -1094,12 +1152,11 @@ def register_maintenance_kpi_callbacks(app):
             Output("line-chart-mtbf-individual", "figure"),
             Output("line-chart-mttr-individual", "figure"),
             Output("line-chart-breakdown-individual", "figure"),
-            Output("comparison-chart-individual", "figure"),
-            Output("calendar-heatmap-individual", "figure")
+            Output("comparison-chart-individual", "figure")
         ],
         [
             Input("store-indicator-filters", "data"),
-            Input("dropdown-equipment-individual", "value")
+            Input("store-equipment-debounce", "data")
         ]
     )
     def update_individual_tab(stored_data, equipment_id):
@@ -1118,8 +1175,7 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
-                create_no_data_figure("comparacao", template),
-                create_no_data_figure("heatmap", template)
+                create_no_data_figure("comparacao", template)
             ]
 
         data = stored_data["data"]
@@ -1139,8 +1195,7 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
-                create_no_data_figure("comparacao", template),
-                create_no_data_figure("heatmap", template)
+                create_no_data_figure("comparacao", template)
             ]
 
         # Extrair valores por mês
@@ -1158,8 +1213,7 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
-                create_no_data_figure("comparacao", template),
-                create_no_data_figure("heatmap", template)
+                create_no_data_figure("comparacao", template)
             ]
 
         # Obter meta específica do equipamento (ou usar meta geral como fallback)
@@ -1209,13 +1263,42 @@ def register_maintenance_kpi_callbacks(app):
             equipment_target=eq_target, template=template
         )
 
-        # Calendar heatmap
+        return [fig_mtbf, fig_mttr, fig_breakdown, fig_comparison]
+
+    # ============================================================
+    # CALLBACK 12B: Atualizar Calendar Heatmap (Lazy Loading)
+    # ============================================================
+    @app.callback(
+        Output("calendar-heatmap-individual", "figure"),
+        [
+            Input("calendar-collapse", "is_open"),
+            Input("store-indicator-filters", "data"),
+            Input("store-equipment-debounce", "data")
+        ]
+    )
+    def update_calendar_heatmap(is_open, stored_data, equipment_id):
+        """
+        Atualiza calendar heatmap APENAS quando o collapse é aberto (lazy loading).
+        Isso economiza recursos ao não carregar o gráfico pesado até que seja necessário.
+        """
+        template = TEMPLATE_THEME_MINTY
+
+        # Só carregar se o collapse estiver aberto
+        if not is_open:
+            raise PreventUpdate
+
+        if not stored_data or not equipment_id or not stored_data.get("has_data", False):
+            return create_no_data_figure("heatmap", template)
+
         year = stored_data.get("year", 2025)
+        months = stored_data.get("months", [])
+
+        # ✅ OTIMIZADO: Agora usa agregação ao invés de loop de consultas
         fig_calendar = create_breakdown_calendar_heatmap(
             equipment_id, year, months, template
         )
 
-        return [fig_mtbf, fig_mttr, fig_breakdown, fig_comparison, fig_calendar]
+        return fig_calendar
 
     # ============================================================
     # CALLBACK 13: Atualizar Top Paradas Gráfico
@@ -1224,7 +1307,7 @@ def register_maintenance_kpi_callbacks(app):
         Output("top-breakdowns-chart-individual", "figure"),
         [
             Input("store-indicator-filters", "data"),
-            Input("dropdown-equipment-individual", "value")
+            Input("store-equipment-debounce", "data")
         ]
     )
     def update_top_breakdowns_chart(stored_data, equipment_id):

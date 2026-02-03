@@ -1024,10 +1024,9 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
         end_month = max(months)
         end_date = datetime(year, end_month, cal.monthrange(year, end_month)[1])
 
-        # Buscar dados reais do MongoDB
+        # ✅ OTIMIZAÇÃO: Agregação única ao invés de loop de consultas
         import random
 
-        current_date = start_date
         dates = []
         breakdowns_count = []
         production_status = []
@@ -1036,55 +1035,88 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
             try:
                 producao_collection = get_mongo_connection(f"ZPP_Producao_{year}")
                 paradas_collection = get_mongo_connection(f"ZPP_Paradas_{year}")
-            except:
-                producao_collection = None
-                paradas_collection = None
-        else:
-            producao_collection = None
-            paradas_collection = None
 
-        while current_date <= end_date:
-            dates.append(current_date)
+                # Pipeline de agregação para produção (1 consulta para todo período)
+                prod_pipeline = [
+                    {
+                        "$match": {
+                            "_year": year,
+                            "_processed": True,
+                            "fininotif": {"$gte": start_date, "$lte": end_date}
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": {
+                                "$dateToString": {"format": "%Y-%m-%d", "date": "$fininotif"}
+                            },
+                            "count": {"$sum": 1}
+                        }
+                    }
+                ]
 
-            has_production = False
-            breakdown_count = 0
-
-            if producao_collection is not None and paradas_collection is not None:
-                try:
-                    day_start = current_date.replace(hour=0, minute=0, second=0)
-                    day_end = current_date.replace(hour=23, minute=59, second=59)
-
-                    # Verificar produção (campo correto: fininotif)
-                    prod_count = producao_collection.count_documents({
-                        "_year": year,
-                        "_processed": True,
-                        "fininotif": {"$gte": day_start, "$lte": day_end}
-                    })
-                    has_production = prod_count > 0
-
-                    # Se houve produção, contar paradas (campo correto: linea)
-                    if has_production:
-                        breakdown_count = paradas_collection.count_documents({
+                # Pipeline de agregação para paradas (1 consulta para todo período)
+                paradas_pipeline = [
+                    {
+                        "$match": {
                             "_year": year,
                             "_processed": True,
                             "linea": equipment_id,
-                            "data_inicio": {"$gte": day_start, "$lte": day_end},
+                            "data_inicio": {"$gte": start_date, "$lte": end_date},
                             "motivo": {"$in": ["201", "S201", "202", "S202", "203", "S203"]}
-                        })
-                except:
-                    # Fallback: simular baseado em dia da semana
-                    has_production = current_date.weekday() < 5  # Seg-Sex
-                    if has_production:
-                        breakdown_count = random.choices([0, 0, 0, 1, 1, 2], weights=[40, 20, 10, 15, 10, 5])[0]
-            else:
-                # Sem MongoDB: simular
-                has_production = current_date.weekday() < 5
-                if has_production:
-                    breakdown_count = random.choices([0, 0, 0, 1, 1, 2], weights=[40, 20, 10, 15, 10, 5])[0]
+                        }
+                    },
+                    {
+                        "$group": {
+                            "_id": {
+                                "$dateToString": {"format": "%Y-%m-%d", "date": "$data_inicio"}
+                            },
+                            "count": {"$sum": 1}
+                        }
+                    }
+                ]
 
-            production_status.append(has_production)
-            breakdowns_count.append(breakdown_count)
-            current_date += timedelta(days=1)
+                # Executar agregações
+                prod_results = {doc["_id"]: doc["count"] for doc in producao_collection.aggregate(prod_pipeline)}
+                paradas_results = {doc["_id"]: doc["count"] for doc in paradas_collection.aggregate(paradas_pipeline)}
+
+                # Gerar datas e popular contadores
+                current_date = start_date
+                while current_date <= end_date:
+                    dates.append(current_date)
+                    date_str = current_date.strftime("%Y-%m-%d")
+
+                    # Verificar se houve produção neste dia
+                    has_production = date_str in prod_results
+                    production_status.append(has_production)
+
+                    # Contar paradas se houve produção
+                    breakdown_count = paradas_results.get(date_str, 0) if has_production else 0
+                    breakdowns_count.append(breakdown_count)
+
+                    current_date += timedelta(days=1)
+
+            except Exception as e:
+                print(f"[AVISO] Erro ao buscar dados agregados: {e}")
+                # Fallback: simular dados
+                current_date = start_date
+                while current_date <= end_date:
+                    dates.append(current_date)
+                    has_production = current_date.weekday() < 5  # Seg-Sex
+                    production_status.append(has_production)
+                    breakdown_count = random.choices([0, 0, 0, 1, 1, 2], weights=[40, 20, 10, 15, 10, 5])[0] if has_production else 0
+                    breakdowns_count.append(breakdown_count)
+                    current_date += timedelta(days=1)
+        else:
+            # Sem MongoDB: simular
+            current_date = start_date
+            while current_date <= end_date:
+                dates.append(current_date)
+                has_production = current_date.weekday() < 5
+                production_status.append(has_production)
+                breakdown_count = random.choices([0, 0, 0, 1, 1, 2], weights=[40, 20, 10, 15, 10, 5])[0] if has_production else 0
+                breakdowns_count.append(breakdown_count)
+                current_date += timedelta(days=1)
 
         # Preparar dados para heatmap
         weeks = []
