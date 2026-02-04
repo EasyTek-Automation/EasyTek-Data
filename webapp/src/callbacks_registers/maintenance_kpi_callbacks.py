@@ -6,6 +6,7 @@ Callbacks para a página de indicadores de manutenção
 from dash import Output, Input, State, dcc, html, no_update
 from dash.exceptions import PreventUpdate
 import dash
+import dash_bootstrap_components as dbc
 import pandas as pd
 from src.config.theme_config import TEMPLATE_THEME_MINTY
 
@@ -804,49 +805,13 @@ def register_maintenance_kpi_callbacks(app):
         return options, default_value
 
     # ============================================================
-    # CALLBACK 9A: Debounce do Dropdown de Equipamentos
-    # ============================================================
-    @app.callback(
-        [
-            Output("store-equipment-debounce", "data"),
-            Output("interval-equipment-debounce", "disabled")
-        ],
-        Input("dropdown-equipment-individual", "value"),
-        State("store-equipment-debounce", "data")
-    )
-    def start_equipment_debounce(dropdown_value, current_stored):
-        """
-        Inicia o timer de debounce quando o dropdown muda.
-        Evita múltiplas execuções ao trocar rapidamente de equipamento.
-        """
-        if dropdown_value is None:
-            raise PreventUpdate
-
-        # Ativar o interval para disparar após 300ms
-        return dropdown_value, False
-
-    @app.callback(
-        Output("interval-equipment-debounce", "disabled", allow_duplicate=True),
-        Input("interval-equipment-debounce", "n_intervals"),
-        State("store-equipment-debounce", "data"),
-        prevent_initial_call=True
-    )
-    def stop_debounce_interval(n_intervals, stored_value):
-        """
-        Desativa o interval após disparar o debounce.
-        """
-        if n_intervals > 0:
-            return True  # Desativar interval
-        raise PreventUpdate
-
-    # ============================================================
     # CALLBACK 9B: Exibir Badges de Metas abaixo do Dropdown
     # ============================================================
     @app.callback(
         Output("equipment-targets-badges", "children"),
         [
             Input("store-indicator-filters", "data"),
-            Input("store-equipment-debounce", "data")  # ✅ Usando debounce
+            Input("dropdown-equipment-individual", "value")
         ]
     )
     def display_equipment_targets_badges(stored_data, equipment_id):
@@ -915,7 +880,7 @@ def register_maintenance_kpi_callbacks(app):
         Output("equipment-targets-info", "children"),
         [
             Input("store-indicator-filters", "data"),
-            Input("store-equipment-debounce", "data")
+            Input("dropdown-equipment-individual", "value")
         ]
     )
     def display_equipment_targets(stored_data, equipment_id):
@@ -1014,7 +979,7 @@ def register_maintenance_kpi_callbacks(app):
         ],
         [
             Input("store-indicator-filters", "data"),
-            Input("store-equipment-debounce", "data")
+            Input("dropdown-equipment-individual", "value")
         ]
     )
     def update_individual_cards(stored_data, equipment_id):
@@ -1053,7 +1018,7 @@ def register_maintenance_kpi_callbacks(app):
         ],
         [
             Input("store-indicator-filters", "data"),
-            Input("store-equipment-debounce", "data")
+            Input("dropdown-equipment-individual", "value")
         ]
     )
     def update_individual_gauges(stored_data, equipment_id):
@@ -1145,18 +1110,20 @@ def register_maintenance_kpi_callbacks(app):
         return new_state, icon_class
 
     # ============================================================
-    # CALLBACK 12: Atualizar Gráficos de Linha (Evolução Temporal)
+    # CALLBACK 12: Atualizar Gráficos de Linha (Evolução Temporal) + Estatísticas
     # ============================================================
     @app.callback(
         [
             Output("line-chart-mtbf-individual", "figure"),
             Output("line-chart-mttr-individual", "figure"),
             Output("line-chart-breakdown-individual", "figure"),
-            Output("comparison-chart-individual", "figure")
+            Output("comparison-chart-individual", "figure"),
+            Output("calendar-heatmap-individual", "figure"),
+            Output("heatmap-stats-card", "children")  # NOVO: Card de estatísticas
         ],
         [
             Input("store-indicator-filters", "data"),
-            Input("store-equipment-debounce", "data")
+            Input("dropdown-equipment-individual", "value")
         ]
     )
     def update_individual_tab(stored_data, equipment_id):
@@ -1175,7 +1142,8 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
-                create_no_data_figure("comparacao", template)
+                create_no_data_figure("comparacao", template),
+                create_no_data_figure("heatmap", template)
             ]
 
         data = stored_data["data"]
@@ -1195,7 +1163,8 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
-                create_no_data_figure("comparacao", template)
+                create_no_data_figure("comparacao", template),
+                create_no_data_figure("heatmap", template)
             ]
 
         # Extrair valores por mês
@@ -1213,7 +1182,8 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
-                create_no_data_figure("comparacao", template)
+                create_no_data_figure("comparacao", template),
+                create_no_data_figure("heatmap", template)
             ]
 
         # Obter meta específica do equipamento (ou usar meta geral como fallback)
@@ -1263,42 +1233,79 @@ def register_maintenance_kpi_callbacks(app):
             equipment_target=eq_target, template=template
         )
 
-        return [fig_mtbf, fig_mttr, fig_breakdown, fig_comparison]
-
-    # ============================================================
-    # CALLBACK 12B: Atualizar Calendar Heatmap (Lazy Loading)
-    # ============================================================
-    @app.callback(
-        Output("calendar-heatmap-individual", "figure"),
-        [
-            Input("calendar-collapse", "is_open"),
-            Input("store-indicator-filters", "data"),
-            Input("store-equipment-debounce", "data")
-        ]
-    )
-    def update_calendar_heatmap(is_open, stored_data, equipment_id):
-        """
-        Atualiza calendar heatmap APENAS quando o collapse é aberto (lazy loading).
-        Isso economiza recursos ao não carregar o gráfico pesado até que seja necessário.
-        """
-        template = TEMPLATE_THEME_MINTY
-
-        # Só carregar se o collapse estiver aberto
-        if not is_open:
-            raise PreventUpdate
-
-        if not stored_data or not equipment_id or not stored_data.get("has_data", False):
-            return create_no_data_figure("heatmap", template)
-
+        # Calendar heatmap (✅ OTIMIZADO: usa agregação ao invés de loop)
         year = stored_data.get("year", 2025)
-        months = stored_data.get("months", [])
-
-        # ✅ OTIMIZADO: Agora usa agregação ao invés de loop de consultas
-        fig_calendar = create_breakdown_calendar_heatmap(
+        fig_calendar, stats = create_breakdown_calendar_heatmap(
             equipment_id, year, months, template
         )
 
-        return fig_calendar
+        # Criar card de estatísticas em 2 colunas
+        stats_content = dbc.Row([
+            # COLUNA ESQUERDA
+            dbc.Col([
+                # Estatísticas Gerais
+                html.H6("📊 Estatísticas", className="mb-2"),
+                html.Hr(className="my-2"),
+                html.Small([
+                    f"📅 {stats['total_days']} dias | 🏭 {stats['production_days']} úteis", html.Br(),
+                    f"✅ {stats['days_no_failure']} sem falha ({stats['days_no_failure']/stats['production_days']*100 if stats['production_days'] > 0 else 0:.0f}%)", html.Br(),
+                    f"⚠️ {stats['days_with_failure']} com falha ({stats['days_with_failure']/stats['production_days']*100 if stats['production_days'] > 0 else 0:.0f}%)", html.Br(),
+                    f"🔥 {stats['total_breakdowns']} paradas | 🏆 {stats['max_streak']} streak",
+                ]),
+
+                # Melhor Dia
+                html.H6("💚 Melhor Dia", className="mb-2 mt-3"),
+                html.Hr(className="my-2"),
+                html.Small([
+                    html.B(stats['best_weekday_name'], style={"color": "#198754", "fontSize": "1.1rem"}), html.Br(),
+                    f"📊 {stats['best_weekday_avg']:.2f} falhas/dia", html.Br(),
+                    f"📅 {stats['best_weekday_days_count']} dias", html.Br(),
+                    f"✅ {stats['best_weekday_zero_failures']} sem falhas ({stats['best_weekday_zero_pct']:.0f}%)",
+                ]),
+
+                # Tendência
+                html.H6("📈 Tendência", className="mb-2 mt-3"),
+                html.Hr(className="my-2"),
+                html.Small([
+                    html.Span([stats['trend_icon'], " ", html.B(stats['trend_text'])], style={"color": stats['trend_color']}), html.Br(),
+                    f"1ª: {stats['first_half_avg']:.2f} | 2ª: {stats['second_half_avg']:.2f}",
+                ]),
+            ], md=6),
+
+            # COLUNA DIREITA
+            dbc.Col([
+                # Pior Dia
+                html.H6("🔴 Pior Dia", className="mb-2"),
+                html.Hr(className="my-2"),
+                html.Small([
+                    html.B(stats['worst_weekday_name'], style={"color": "#dc3545", "fontSize": "1.1rem"}), html.Br(),
+                    f"📊 {stats['worst_weekday_avg']:.2f} falhas/dia", html.Br(),
+                    f"📅 {stats['worst_weekday_days_count']} dias", html.Br(),
+                    f"⚠️ {stats['worst_weekday_with_failures']} com falhas ({stats['worst_weekday_with_failures_pct']:.0f}%)",
+                ]),
+
+                # Dias Críticos
+                html.H6("🔥 Dias Críticos", className="mb-2 mt-3"),
+                html.Hr(className="my-2"),
+                html.Small([
+                    f"⚠️ {stats['critical_days']} dias (2+ falhas)", html.Br(),
+                    f"{stats['critical_days_pct']:.1f}% dos úteis",
+                ]),
+
+                # Ranking
+                html.H6("📅 Ranking", className="mb-2 mt-3"),
+                html.Hr(className="my-2"),
+                html.Small([
+                    html.Div([
+                        f"{'🥇' if i == 0 else '🥈' if i == 1 else '🥉' if i == 2 else '  '} ",
+                        html.Span(name[:3], style={"color": "#dc3545" if name == stats['worst_weekday_name'] else "#198754" if name == stats['best_weekday_name'] else "#6c757d"}),
+                        html.Span(f" {avg:.2f}", style={"color": "#dc3545" if name == stats['worst_weekday_name'] else "#198754" if name == stats['best_weekday_name'] else "#6c757d"})
+                    ]) for i, (name, avg, _) in enumerate(stats['weekday_avg'])
+                ])
+            ], md=6)
+        ])
+
+        return [fig_mtbf, fig_mttr, fig_breakdown, fig_comparison, fig_calendar, stats_content]
 
     # ============================================================
     # CALLBACK 13: Atualizar Top Paradas Gráfico
@@ -1307,7 +1314,7 @@ def register_maintenance_kpi_callbacks(app):
         Output("top-breakdowns-chart-individual", "figure"),
         [
             Input("store-indicator-filters", "data"),
-            Input("store-equipment-debounce", "data")
+            Input("dropdown-equipment-individual", "value")
         ]
     )
     def update_top_breakdowns_chart(stored_data, equipment_id):

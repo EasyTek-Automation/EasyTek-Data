@@ -411,17 +411,52 @@ def layout():
                             ], md=4)
                         ], className="mb-4"),
 
-                        # Performance Radar
+                        # Performance Radar e Calendar Heatmap
                         html.H5([
                             html.I(className="bi bi-diagram-3 me-2"),
-                            "Análise de Performance"
+                            "Análise de Performance e Padrões"
                         ], className="mt-4 mb-3"),
                         dbc.Row([
+                            # Calendar Heatmap (Padrão de Falhas) - 33%
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader([
+                                        html.I(className="bi bi-calendar-week me-2"),
+                                        html.Strong("Padrão Temporal de Falhas")
+                                    ]),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            type="circle",
+                                            color="#6c757d",
+                                            children=dcc.Graph(
+                                                id="calendar-heatmap-individual",
+                                                config=PLOTLY_CONFIG
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], md=4, lg=4),
+
+                            # Estatísticas (NOVO) - 33%
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader([
+                                        html.I(className="bi bi-bar-chart me-2"),
+                                        html.Strong("Estatísticas")
+                                    ]),
+                                    dbc.CardBody(
+                                        id="heatmap-stats-card",
+                                        style={"fontSize": "0.85rem", "height": "530px", "overflowY": "auto"}
+                                    )
+                                ], className="shadow-sm")
+                            ], md=4, lg=4),
+
+                            # Radar Chart (Performance) - 33%
                             dbc.Col([
                                 dbc.Card([
                                     dbc.CardHeader([
                                         html.I(className="bi bi-pentagon me-2"),
-                                        "Performance Multidimensional"
+                                        html.Strong("Performance Geral")
                                     ]),
                                     dbc.CardBody([
                                         dcc.Loading(
@@ -434,42 +469,8 @@ def layout():
                                         )
                                     ])
                                 ], className="shadow-sm")
-                            ])
-                        ], className="mb-4"),
-
-                        # Calendar Heatmap (Lazy Loading com Collapse)
-                        html.H5([
-                            html.I(className="bi bi-calendar-week me-2"),
-                            "Padrão Temporal de Falhas"
-                        ], className="mt-4 mb-3"),
-                        dbc.Card([
-                            dbc.CardHeader([
-                                dbc.Button(
-                                    [
-                                        html.I(className="bi bi-chevron-down me-2", id="calendar-collapse-icon"),
-                                        "Clique para visualizar o calendário de falhas"
-                                    ],
-                                    id="calendar-collapse-button",
-                                    color="link",
-                                    className="text-decoration-none p-0",
-                                    style={"width": "100%", "textAlign": "left"}
-                                )
-                            ]),
-                            dbc.Collapse(
-                                dbc.CardBody([
-                                    dcc.Loading(
-                                        type="circle",
-                                        color="#6c757d",
-                                        children=dcc.Graph(
-                                            id="calendar-heatmap-individual",
-                                            config=PLOTLY_CONFIG
-                                        )
-                                    )
-                                ]),
-                                id="calendar-collapse",
-                                is_open=False
-                            )
-                        ], className="shadow-sm"),
+                            ], md=4, lg=4)
+                        ]),
 
 
                     ], className="p-3")
@@ -480,16 +481,7 @@ def layout():
 
         # ==================== STORES & DOWNLOADS ====================
         dcc.Store(id='store-indicator-filters', storage_type='session'),
-        dcc.Store(id='store-equipment-debounce', storage_type='memory'),
         dcc.Download(id="download-indicators-data"),
-
-        # Interval para debounce do dropdown (300ms)
-        dcc.Interval(
-            id='interval-equipment-debounce',
-            interval=300,
-            n_intervals=0,
-            disabled=True
-        ),
 
         # Interval para carregamento inicial de dados (executa apenas 1 vez)
         dcc.Interval(

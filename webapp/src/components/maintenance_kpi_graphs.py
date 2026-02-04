@@ -1194,15 +1194,55 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
         # Ordenar do melhor (menos falhas) ao pior
         weekday_avg.sort(key=lambda x: x[1])
 
-        # Criar figura com 2 colunas (heatmap à esquerda, info à direita)
-        fig = make_subplots(
-            rows=1, cols=2,
-            column_widths=[0.7, 0.3],
-            specs=[[{"type": "scatter"}, {"type": "scatter"}]],
-            horizontal_spacing=0.05
-        )
+        # ✨ ESTATÍSTICAS APRIMORADAS
 
-        # Coluna 1: Heatmap
+        # 1. Melhor e Pior DIA DA SEMANA (do ranking anual)
+        best_weekday_name, best_weekday_avg, best_weekday_num = weekday_avg[0]  # Primeiro = melhor
+        worst_weekday_name, worst_weekday_avg, worst_weekday_num = weekday_avg[-1]  # Último = pior
+
+        # Estatísticas detalhadas do melhor dia da semana
+        best_weekday_days_count = len(weekday_stats[best_weekday_num])
+        best_weekday_total_failures = sum(weekday_stats[best_weekday_num])
+        best_weekday_zero_failures = sum(1 for c in weekday_stats[best_weekday_num] if c == 0)
+        best_weekday_zero_pct = (best_weekday_zero_failures / best_weekday_days_count * 100) if best_weekday_days_count > 0 else 0
+
+        # Estatísticas detalhadas do pior dia da semana
+        worst_weekday_days_count = len(weekday_stats[worst_weekday_num])
+        worst_weekday_total_failures = sum(weekday_stats[worst_weekday_num])
+        worst_weekday_with_failures = sum(1 for c in weekday_stats[worst_weekday_num] if c > 0)
+        worst_weekday_with_failures_pct = (worst_weekday_with_failures / worst_weekday_days_count * 100) if worst_weekday_days_count > 0 else 0
+
+        # 2. Dias Críticos (2+ falhas)
+        critical_days = sum(1 for c, p in zip(breakdowns_count, production_status) if p and c >= 2)
+        critical_days_pct = (critical_days / production_days * 100) if production_days > 0 else 0
+
+        # 3. Tendência (primeira metade vs segunda metade do período)
+        mid_point = len(dates) // 2
+        first_half_failures = sum(c for i, (c, p) in enumerate(zip(breakdowns_count, production_status)) if i < mid_point and p)
+        second_half_failures = sum(c for i, (c, p) in enumerate(zip(breakdowns_count, production_status)) if i >= mid_point and p)
+        first_half_days = sum(1 for i, p in enumerate(production_status) if i < mid_point and p)
+        second_half_days = sum(1 for i, p in enumerate(production_status) if i >= mid_point and p)
+
+        first_half_avg = first_half_failures / first_half_days if first_half_days > 0 else 0
+        second_half_avg = second_half_failures / second_half_days if second_half_days > 0 else 0
+
+        if second_half_avg > first_half_avg * 1.2:
+            trend_icon = "📈"
+            trend_text = "Piora"
+            trend_color = "#dc3545"
+        elif second_half_avg < first_half_avg * 0.8:
+            trend_icon = "📉"
+            trend_text = "Melhora"
+            trend_color = "#198754"
+        else:
+            trend_icon = "➡️"
+            trend_text = "Estável"
+            trend_color = "#6c757d"
+
+        # Criar figura simples - APENAS O HEATMAP
+        fig = go.Figure()
+
+        # Adicionar heatmap
         fig.add_trace(go.Scatter(
             x=weeks,
             y=days_of_week,
@@ -1216,64 +1256,15 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
             text=hover_texts,
             hovertemplate='%{text}<extra></extra>',
             showlegend=False
-        ), row=1, col=1)
+        ))
 
-        # Coluna 2: Estatísticas e Ranking (centralizados)
-        # Preparar texto combinado
-        combined_text = (
-            f"<b style='font-size:12px'>ESTATÍSTICAS</b><br>"
-            f"━━━━━━━━━━━━━━━<br><br>"
-            f"📅 <b>{total_days}</b> dias totais<br>"
-            f"🏭 <b>{production_days}</b> dias com produção<br>"
-            f"⚪ <b>{non_production_days}</b> dias sem produção<br><br>"
-            f"✅ <b>{days_no_failure}</b> dias sem falha<br>"
-            f"   <span style='color:#6c757d'>({days_no_failure/production_days*100 if production_days > 0 else 0:.1f}% dos úteis)</span><br>"
-            f"⚠️ <b>{days_with_failure}</b> dias com falha<br>"
-            f"   <span style='color:#6c757d'>({days_with_failure/production_days*100 if production_days > 0 else 0:.1f}% dos úteis)</span><br>"
-            f"🔥 <b>{total_breakdowns}</b> paradas totais<br>"
-            f"🏆 <b>{max_streak}</b> dias de streak<br><br><br>"
-            f"<b style='font-size:12px'>RANKING SEMANAL</b><br>"
-            f"━━━━━━━━━━━━━━━<br>"
-            f"<span style='font-size:9px; color:#6c757d'>média falhas/dia útil</span><br><br>"
-        )
-
-        for i, (name, avg, _) in enumerate(weekday_avg):
-            emoji = "🥇" if i == 0 else "🥈" if i == 1 else "🥉" if i == 2 else "  "
-            bar_length = int(avg * 3)
-            bar = "█" * min(bar_length, 10)
-            color = '#198754' if i == 0 else '#dc3545' if i == len(weekday_avg)-1 else '#6c757d'
-            combined_text += f"{emoji} <b>{name[:3]}</b> {bar} <span style='color:{color}'>{avg:.1f}</span><br>"
-
-        # Adicionar texto invisível na coluna 2 para posicionar anotação
-        fig.add_trace(go.Scatter(
-            x=[0], y=[0],
-            mode='markers',
-            marker=dict(size=0.1, color='rgba(0,0,0,0)'),
-            showlegend=False,
-            hoverinfo='skip'
-        ), row=1, col=2)
-
-        fig.add_annotation(
-            x=0.5, y=0.5,
-            xref='x2', yref='y2',
-            text=combined_text,
-            showarrow=False,
-            xanchor='center',
-            yanchor='middle',
-            align='left',
-            font=dict(size=10, color=text_color, family='Arial, sans-serif'),
-            bgcolor='rgba(248, 249, 250, 0.95)' if not is_dark else 'rgba(44, 44, 44, 0.95)',
-            bordercolor='#dee2e6' if not is_dark else '#495057',
-            borderwidth=1,
-            borderpad=15
-        )
-
-        # Atualizar eixos do heatmap (coluna 1)
+        # Coluna 2: Estatísticas e Ranking (layout em 2 colunas)
+        # Layout profissional com 2 colunas lado a lado
+        # Atualizar eixos do heatmap
         fig.update_xaxes(
             showgrid=False,
             zeroline=False,
-            visible=False,
-            row=1, col=1
+            visible=False
         )
 
         fig.update_yaxes(
@@ -1283,25 +1274,7 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
             ticktext=['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'],
             showgrid=False,
             zeroline=False,
-            autorange='reversed',
-            row=1, col=1
-        )
-
-        # Esconder eixos da coluna 2
-        fig.update_xaxes(
-            showgrid=False,
-            zeroline=False,
-            visible=False,
-            range=[-1, 1],
-            row=1, col=2
-        )
-
-        fig.update_yaxes(
-            showgrid=False,
-            zeroline=False,
-            visible=False,
-            range=[-1, 1],
-            row=1, col=2
+            autorange='reversed'
         )
 
         fig.update_layout(
@@ -1320,7 +1293,38 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
             showlegend=False
         )
 
-        return fig
+        # Preparar estatísticas para retorno
+        stats_dict = {
+            'total_days': total_days,
+            'production_days': production_days,
+            'non_production_days': non_production_days,
+            'days_no_failure': days_no_failure,
+            'days_with_failure': days_with_failure,
+            'total_breakdowns': total_breakdowns,
+            'max_streak': max_streak,
+            'best_weekday_name': best_weekday_name,
+            'best_weekday_avg': best_weekday_avg,
+            'best_weekday_days_count': best_weekday_days_count,
+            'best_weekday_zero_failures': best_weekday_zero_failures,
+            'best_weekday_zero_pct': best_weekday_zero_pct,
+            'best_weekday_total_failures': best_weekday_total_failures,
+            'worst_weekday_name': worst_weekday_name,
+            'worst_weekday_avg': worst_weekday_avg,
+            'worst_weekday_days_count': worst_weekday_days_count,
+            'worst_weekday_with_failures': worst_weekday_with_failures,
+            'worst_weekday_with_failures_pct': worst_weekday_with_failures_pct,
+            'worst_weekday_total_failures': worst_weekday_total_failures,
+            'critical_days': critical_days,
+            'critical_days_pct': critical_days_pct,
+            'trend_icon': trend_icon,
+            'trend_text': trend_text,
+            'trend_color': trend_color,
+            'first_half_avg': first_half_avg,
+            'second_half_avg': second_half_avg,
+            'weekday_avg': weekday_avg
+        }
+
+        return fig, stats_dict
 
     except Exception as e:
         # Se qualquer erro ocorrer, retornar figura de erro
