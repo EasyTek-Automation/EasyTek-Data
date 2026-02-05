@@ -420,12 +420,6 @@ def create_kpi_bar_chart(equipment_ids: List[str],
     # Layout
     fig.update_layout(
         template=template,
-        title=dict(
-            text=f"{kpi_name} por Equipamento",
-            x=0.5,
-            xanchor='center',
-            font=dict(size=16)
-        ),
         xaxis=dict(
             title="Equipamento",
             tickangle=-45
@@ -439,11 +433,11 @@ def create_kpi_bar_chart(equipment_ids: List[str],
             orientation="h",
             yanchor="bottom",
             y=1.02,
-            xanchor="right",
-            x=1
+            xanchor="left",
+            x=0
         ),
-        height=500,
-        margin=dict(t=60, b=100, l=60, r=40),
+        height=350,
+        margin=dict(t=20, b=100, l=60, r=40),
         hovermode='x'
     )
 
@@ -650,14 +644,8 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
 
     fig.update_layout(
         template=template,
-        title=dict(
-            text=f"Hierarquia de {kpi_name}",
-            x=0.5,
-            xanchor='center',
-            font=dict(size=16)
-        ),
         height=500,
-        margin=dict(t=50, b=20, l=20, r=20)
+        margin=dict(t=20, b=20, l=20, r=20)
     )
 
     return fig
@@ -899,20 +887,8 @@ def create_kpi_line_chart(months_list: List[int],
     else:
         unit = "%"
 
-    # Criar legenda de cores baseado no tipo de KPI (sistema de 3 cores)
-    if higher_is_better:
-        color_legend = "🟢 Verde: Acima da Meta | 🟡 Amarelo: ±3% da Meta | 🔴 Vermelho: Abaixo da Meta"
-    else:
-        color_legend = "🟢 Verde: Abaixo da Meta | 🟡 Amarelo: ±3% da Meta | 🔴 Vermelho: Acima da Meta"
-
     fig.update_layout(
         template=template,
-        title=dict(
-            text=f"{kpi_name} - {equipment_name}<br><sub style='font-size: 9px'>{color_legend}</sub>",
-            x=0.5,
-            xanchor='center',
-            font=dict(size=14)
-        ),
         xaxis=dict(title="Mês"),
         yaxis=dict(title=f"{kpi_name} ({unit})", rangemode='tozero'),
         hovermode='x unified',
@@ -920,12 +896,12 @@ def create_kpi_line_chart(months_list: List[int],
             orientation="h",
             yanchor="bottom",
             y=1.02,
-            xanchor="right",
-            x=1
+            xanchor="left",
+            x=0
         ),
         bargap=0.2,  # Espaçamento entre barras
-        height=463,  # Aumentado 25%
-        margin=dict(t=80, b=60, l=60, r=40)  # Margem superior aumentada
+        height=350,
+        margin=dict(t=20, b=60, l=60, r=40)
     )
 
     return fig
@@ -1493,14 +1469,14 @@ def create_top_breakdowns_chart(breakdowns_data: List[Dict],
             'count': values['count']  # Quantas paradas foram somadas
         })
 
-    # ✅ ORDENAR: Do maior para o menor (por duração)
-    aggregated_data.sort(key=lambda x: x['duracao_horas'], reverse=True)
+    # ✅ ORDENAR: Do maior para o menor (por duração em minutos)
+    aggregated_data.sort(key=lambda x: x['duracao_min'], reverse=True)
 
     # Limitar ao top 5 após agregação
     aggregated_data = aggregated_data[:5]
 
     # Criar labels para o eixo Y com quebra de linha
-    def wrap_text(text: str, max_chars_per_line: int = 30) -> str:
+    def wrap_text(text: str, max_chars_per_line: int = 20) -> str:
         """Quebra texto em múltiplas linhas"""
         words = text.split()
         lines = []
@@ -1535,11 +1511,12 @@ def create_top_breakdowns_chart(breakdowns_data: List[Dict],
         for bd in aggregated_data
     ]
 
-    # Valores de duração em horas (eixo X)
-    x_values = [bd['duracao_horas'] for bd in aggregated_data]
+    # Valores de duração em minutos (eixo X)
+    x_values = [bd['duracao_min'] for bd in aggregated_data]
 
-    # Definir cores baseado na duração (gradiente de vermelho)
+    # Calcular valor máximo para escala do eixo X (sempre +50 min)
     max_duration = max(x_values) if x_values else 1
+    x_axis_max = max_duration + 50  # Sempre 50 minutos a mais que o máximo
     colors = []
     for duration in x_values:
         # Gradiente de vermelho: mais escuro = maior duração
@@ -1556,16 +1533,13 @@ def create_top_breakdowns_chart(breakdowns_data: List[Dict],
             color = '#20c997'  # Verde (paradas curtas)
         colors.append(color)
 
-    # Texto nas barras (duração em formato legível + indicador de agrupamento)
+    # Texto nas barras (duração em minutos + indicador de agrupamento)
     text_values = []
     hover_templates = []
 
     for bd in aggregated_data:
-        # Texto na barra
-        if bd['duracao_horas'] >= 1:
-            base_text = f"{bd['duracao_horas']:.1f}h"
-        else:
-            base_text = f"{bd['duracao_min']:.0f}min"
+        # Texto na barra - sempre em minutos
+        base_text = f"{bd['duracao_min']:.0f}min"
 
         # Se houver múltiplas paradas agrupadas, indicar
         if bd['count'] > 1:
@@ -1588,10 +1562,11 @@ def create_top_breakdowns_chart(breakdowns_data: List[Dict],
         ),
         text=text_values,
         textposition='outside',
+        textfont=dict(size=11),
         customdata=[[bd['count'], y_labels_full[i]] for i, bd in enumerate(aggregated_data)],
         hovertemplate=(
             '<b>%{customdata[1]}</b><br>' +  # Descrição completa
-            'Duração Total: %{x:.2f}h<br>' +
+            'Duração Total: %{x:.0f} min<br>' +
             'Paradas Agrupadas: %{customdata[0]}<br>' +
             '<extra></extra>'
         )
@@ -1604,26 +1579,33 @@ def create_top_breakdowns_chart(breakdowns_data: List[Dict],
             text=f"Top {len(breakdowns_data)} Paradas - {equipment_name}",
             x=0.5,
             xanchor='center',
-            font=dict(size=14)
+            y=0.98,
+            yanchor='top',
+            font=dict(size=12),
+            pad=dict(t=0, b=5)
         ),
         xaxis=dict(
-            title="Duração (horas)",
-            rangemode='tozero'
+            title=dict(
+                text="Duração (minutos)",
+                font=dict(size=10)
+            ),
+            range=[0, x_axis_max]  # 0 até máximo dos dados + 50 min
         ),
         yaxis=dict(
             title="",
             autorange='reversed',  # Inverter para maior ficar no topo
-            tickfont=dict(size=11),
+            tickfont=dict(size=9),
             tickmode='linear',
             side='left',
-            automargin=True  # Ajusta margem automaticamente
+            automargin=True  # Habilitar margem automática para os labels
         ),
         showlegend=False,
-        height=max(500, len(breakdowns_data) * 80),  # Altura maior para acomodar quebras de linha
-        margin=dict(t=30, b=30, l=10, r=20),  # Margens mínimas - máximo espaço para barras
+        height=max(400, len(breakdowns_data) * 80),  # Altura aumentada para dar espaço aos textos
+        margin=dict(t=25, b=20, l=10, r=80),  # Margem direita grande para texto dos valores
+        bargap=0.5,  # Espaçamento entre barras (50% gap = barras mais finas)
         hoverlabel=dict(
             bgcolor="white",
-            font_size=12,
+            font_size=11,
             font_family="Arial"
         )
     )
@@ -1717,11 +1699,11 @@ def create_kpi_gauge(value: float,
         domain={'x': [0, 1], 'y': [0, 1]},
         title={
             'text': f"<b style='font-weight:600; letter-spacing:0.5px'>{kpi_name}</b>",
-            'font': {'size': 16, 'color': text_color, 'family': 'Segoe UI, Arial, sans-serif'}
+            'font': {'size': 11, 'color': text_color, 'family': 'Segoe UI, Arial, sans-serif'}
         },
         number={
             'suffix': f" <span style='font-size:0.7em; font-weight:400'>{unit}</span>",
-            'font': {'size': 40, 'color': bar_color, 'family': 'Segoe UI, Arial, sans-serif'},
+            'font': {'size': 22, 'color': bar_color, 'family': 'Segoe UI, Arial, sans-serif'},
             'valueformat': '.2f' if kpi_name == "Taxa de Avaria" else '.1f'
         },
         delta={
@@ -1729,7 +1711,7 @@ def create_kpi_gauge(value: float,
             'increasing': {'color': '#198754' if higher_is_better else '#dc3545'},
             'decreasing': {'color': '#dc3545' if higher_is_better else '#198754'},
             'suffix': f" {unit}",
-            'font': {'size': 12, 'family': 'Segoe UI, Arial, sans-serif'},
+            'font': {'size': 8, 'family': 'Segoe UI, Arial, sans-serif'},
             'position': delta_position,
             'valueformat': '.2f' if kpi_name == "Taxa de Avaria" else '.1f'
         },
@@ -1737,11 +1719,11 @@ def create_kpi_gauge(value: float,
             'axis': {
                 'range': [0, max_range],
                 'ticksuffix': f" {unit}",
-                'tickfont': {'size': 10, 'color': text_color, 'family': 'Segoe UI, Arial, sans-serif'},
+                'tickfont': {'size': 7, 'color': text_color, 'family': 'Segoe UI, Arial, sans-serif'},
                 'tickwidth': 1,
                 'tickcolor': 'rgba(108, 117, 125, 0.3)',
                 'tickmode': 'auto',
-                'nticks': 6
+                'nticks': 5
             },
             'bar': {
                 'color': bar_color,
@@ -1763,9 +1745,8 @@ def create_kpi_gauge(value: float,
     # Layout sofisticado
     fig.update_layout(
         template=template,
-        height=300,
-        margin=dict(t=50, b=20, l=30, r=30),
-        paper_bgcolor='rgba(0,0,0,0)',
+        height=180,
+        margin=dict(t=30, b=10, l=15, r=15),
         font={
             'family': "Segoe UI, -apple-system, BlinkMacSystemFont, Arial, sans-serif",
             'color': text_color

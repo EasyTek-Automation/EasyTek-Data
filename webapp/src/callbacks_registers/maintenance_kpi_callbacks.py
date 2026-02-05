@@ -1446,18 +1446,12 @@ def register_maintenance_kpi_callbacks(app):
         # Buscar top 5 paradas do equipamento
         if ZPP_KPI_AVAILABLE:
             try:
-                print(f"[INFO] Buscando top 5 paradas para {equipment_id}")
                 breakdowns_data = fetch_top_breakdowns_by_equipment(
                     equipment_id=equipment_id,
                     year=year,
                     months=months,
                     top_n=5
                 )
-
-                if breakdowns_data:
-                    print(f"[SUCESSO] {len(breakdowns_data)} paradas encontradas")
-                else:
-                    print(f"[AVISO] Nenhuma parada encontrada para {equipment_id}")
 
                 # Criar gráfico
                 fig = create_top_breakdowns_chart(

@@ -304,13 +304,14 @@ class ZPPProcessor:
         year = self.extract_year_from_data(df_clean, file_type)
         df_prepared = self.prepare_dataframe(df_clean, file_type, year, file_name)
 
+        # FIXME: Collections fixas por enquanto - refatorar depois
         if file_type == 'zppprd':
-            collection_name = f'ZPP_Producao_{year}'
+            collection_name = 'ZPP_Producao_2025'
         else:
-            collection_name = f'ZPP_Paradas_{year}'
+            collection_name = 'ZPP_Paradas_2025'
 
-        logger.info(f"  [OK] Ano detectado: {year}")
-        logger.info(f"  [OK] Collection: {collection_name}\n")
+        logger.info(f"  [OK] Ano detectado nos dados: {year}")
+        logger.info(f"  [OK] Collection (fixa): {collection_name}\n")
 
         # 4. Upload ao MongoDB
         logger.info("Etapa 4/5: Fazendo upload ao MongoDB...")

@@ -657,25 +657,53 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
     try:
         collection = get_mongo_connection("ZPP_Paradas_2025")
 
-        # Query MongoDB
-        query = {
-            "_year": year,
-            "_processed": True,
-            "linea": equipment_id,
-            "motivo": {"$in": BREAKDOWN_CODES}
-        }
-
-        # Buscar documentos - INCLUINDO observacao_de_notificacao
-        cursor = collection.find(
-            query,
+        # Construir pipeline de agregação para filtrar por mês primeiro
+        # Usar $expr para comparar mês extraído de data_inicio
+        pipeline = [
+            # Stage 1: Filtrar por equipamento, ano, códigos de parada
             {
-                "data_inicio": 1,
-                "motivo": 1,
-                "duracao_min": 1,
-                "observacao_de_notificacao": 1,  # ✅ BUSCAR OBSERVAÇÃO DA NOTIFICAÇÃO
-                "_id": 0
+                "$match": {
+                    "_year": year,
+                    "_processed": True,
+                    "linea": equipment_id,
+                    "motivo": {"$in": BREAKDOWN_CODES},
+                    "data_inicio": {"$exists": True}  # Garantir que data_inicio existe
+                }
+            },
+            # Stage 2: Adicionar campo calculado com o mês extraído
+            {
+                "$addFields": {
+                    "_month": {"$month": "$data_inicio"}
+                }
+            },
+            # Stage 3: Filtrar pelos meses desejados
+            {
+                "$match": {
+                    "_month": {"$in": months}
+                }
+            },
+            # Stage 4: Ordenar por duração (maior para menor)
+            {
+                "$sort": {"duracao_min": -1}
+            },
+            # Stage 5: Limitar ao top_n
+            {
+                "$limit": top_n
+            },
+            # Stage 6: Projetar apenas os campos necessários
+            {
+                "$project": {
+                    "data_inicio": 1,
+                    "motivo": 1,
+                    "duracao_min": 1,
+                    "observacao_de_notificacao": 1,
+                    "_id": 0
+                }
             }
-        ).sort("duracao_min", -1).limit(top_n)  # Ordenar por duração DESC e limitar
+        ]
+
+        # Executar pipeline
+        cursor = collection.aggregate(pipeline)
 
         # Processar dados
         result = []
@@ -694,10 +722,6 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
             else:
                 continue
 
-            # Filtrar por mês
-            if date.month not in months:
-                continue
-
             motivo = record.get("motivo", "")
             duracao_min = record.get("duracao_min", 0)
 
@@ -712,13 +736,6 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
                 "descricao": descricao  # ✅ OBSERVAÇÃO DA NOTIFICAÇÃO
             })
 
-        # Ordenar por duração (maior para menor) - garantir ordem mesmo após filtro
-        result.sort(key=lambda x: x["duracao_min"], reverse=True)
-
-        # Limitar ao top_n após filtro de meses
-        result = result[:top_n]
-
-        print(f"[ZPP] Top {len(result)} paradas encontradas para {equipment_id}")
         return result
 
     except Exception as e:
