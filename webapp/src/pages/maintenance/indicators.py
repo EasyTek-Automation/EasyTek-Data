@@ -171,6 +171,64 @@ def layout():
                             ], xs=12, md=4)
                         ], className="mb-4"),
 
+                        # Seção: Evolução Temporal Geral (NOVO)
+                        html.H5([
+                            html.I(className="bi bi-graph-up me-2"),
+                            "Evolução Temporal da Planta"
+                        ], className="mt-4 mb-3"),
+                        dbc.Row([
+                            # Gráfico MTBF - Evolução Mensal
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader("MTBF - Evolução Mensal"),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            type="circle",
+                                            color="#198754",
+                                            children=dcc.Graph(
+                                                id="line-chart-mtbf-general",
+                                                config=PLOTLY_CONFIG
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], md=4),
+
+                            # Gráfico MTTR - Evolução Mensal
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader("MTTR - Evolução Mensal"),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            type="circle",
+                                            color="#0d6efd",
+                                            children=dcc.Graph(
+                                                id="line-chart-mttr-general",
+                                                config=PLOTLY_CONFIG
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], md=4),
+
+                            # Gráfico Taxa Avaria - Evolução Mensal
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader("Taxa Avaria - Evolução Mensal"),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            type="circle",
+                                            color="#ffc107",
+                                            children=dcc.Graph(
+                                                id="line-chart-breakdown-general",
+                                                config=PLOTLY_CONFIG
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], md=4)
+                        ], className="mb-4"),
+
                         # Seção: Gráficos de Barras (MOVIDA PARA BAIXO)
                         html.H5([
                             html.I(className="bi bi-bar-chart-fill me-2"),

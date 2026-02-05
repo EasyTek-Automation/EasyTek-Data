@@ -450,6 +450,67 @@ def create_kpi_bar_chart(equipment_ids: List[str],
     return fig
 
 
+def _calculate_sunburst_averages(labels: List[str],
+                                  parents: List[str],
+                                  values: List[float],
+                                  categories_dict: Dict[str, List[str]],
+                                  data_by_equipment: Dict[str, float],
+                                  unit: str,
+                                  plant_average: float = None) -> List[str]:
+    """
+    Calcula médias para cada nível do sunburst ao invés de mostrar somas.
+
+    Níveis:
+    - Centro: Média da PLANTA (passada como parâmetro ou calculada)
+    - Categorias: Média dos equipamentos da categoria
+    - Equipamentos: Valor individual
+
+    Args:
+        labels: Lista de labels do sunburst
+        parents: Lista de parents do sunburst
+        values: Lista de valores (somas) do sunburst
+        categories_dict: Dicionário de categorias e equipamentos
+        data_by_equipment: Dados originais por equipamento
+        unit: Unidade ("h", "min", "%")
+        plant_average: Média da planta (valores mensais). Se None, calcula média dos equipamentos.
+
+    Returns:
+        Lista de strings formatadas com médias para cada nível
+    """
+    custom_text = []
+
+    # Se não foi passada média da planta, calcular média dos equipamentos
+    if plant_average is None:
+        total_equipment_count = len(data_by_equipment)
+        total_sum = sum(data_by_equipment.values())
+        plant_average = total_sum / total_equipment_count if total_equipment_count > 0 else 0
+
+    for i, (label, parent, value) in enumerate(zip(labels, parents, values)):
+        if parent == "":
+            # Nível 0: Planta (raiz)
+            # Mostrar MÉDIA DA PLANTA (média dos valores mensais)
+            custom_text.append(f"Média: {plant_average:.1f}{unit}")
+
+        elif parent == "Planta":
+            # Nível 1: Categoria
+            # Média dos equipamentos nesta categoria
+            cat_name = label
+            # Contar quantos equipamentos desta categoria têm dados
+            num_equipments = len([
+                eq for eq in categories_dict.get(cat_name, [])
+                if eq in data_by_equipment
+            ])
+            avg = value / num_equipments if num_equipments > 0 else 0
+            custom_text.append(f"Média: {avg:.1f}{unit}")
+
+        else:
+            # Nível 2: Equipamento individual
+            # Mostrar valor absoluto (não faz sentido média de 1 item)
+            custom_text.append(f"{value:.1f}{unit}")
+
+    return custom_text
+
+
 def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
                                kpi_name: str,
                                categories_dict: Dict[str, List[str]],
@@ -457,7 +518,9 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
                                template: str = 'minty',
                                target_values: Dict[str, float] = None,
                                plant_target: float = None,
-                               margin_percent: float = 3.0) -> go.Figure:
+                               margin_percent: float = 3.0,
+                               show_average: bool = True,
+                               plant_average: float = None) -> go.Figure:
     """
     Cria gráfico Sunburst com hierarquia por categoria e cores baseadas em performance.
 
@@ -469,6 +532,9 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
         template: 'minty' ou 'darkly'
         target_values: Dicionário de metas por equipamento (opcional)
         plant_target: Meta geral da planta (opcional)
+        margin_percent: Margem de tolerância para cores (%)
+        show_average: Se True, labels mostram MÉDIA; se False, mostram SOMA (default: True)
+        plant_average: Média da planta (valores mensais). Se None, calcula média dos equipamentos.
 
     Returns:
         Figura Plotly Sunburst com 3 níveis e cores de performance
@@ -485,10 +551,10 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
     else:
         unit = "%"
 
-    labels = ["Total"]
+    labels = ["Planta"]
     parents = [""]
     values = [0]  # Será calculado como soma das categorias
-    colors = ['#6c757d']  # Cor neutra para o centro (Total)
+    colors = ['#6c757d']  # Cor neutra para o centro (Planta)
 
     # Usar meta da planta se disponível, senão usar target_values individuais
     use_plant_target = plant_target is not None
@@ -496,7 +562,7 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
     # Adicionar categorias (anel 1) - cor neutra
     for cat_name, eq_list in categories_dict.items():
         labels.append(cat_name)
-        parents.append("Total")
+        parents.append("Planta")
 
         # Calcular soma dos equipamentos desta categoria
         cat_value = sum(
@@ -538,16 +604,31 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
     # Determinar formato de texto baseado no KPI
     # MTBF: mostrar valores absolutos em horas
     # MTTR: mostrar valores absolutos em minutos
-    # Taxa de Avaria: mostrar porcentagens
+    # Taxa de Avaria: mostrar valores absolutos em porcentagem (não percent parent!)
     if kpi_name == "MTBF":
         text_display = 'label+text'
-        custom_text = [f"{v:.1f}h" for v in values]
+        if show_average:
+            custom_text = _calculate_sunburst_averages(labels, parents, values, categories_dict, data_by_equipment, "h", plant_average=plant_average)
+        else:
+            custom_text = [f"{v:.1f}h" for v in values]
     elif kpi_name == "MTTR":
         text_display = 'label+text'
-        custom_text = [f"{v:.1f}min" for v in values]
-    else:
-        text_display = 'label+percent parent'
-        custom_text = None
+        if show_average:
+            # MTTR: converter plant_average para minutos
+            plant_avg_min = plant_average * 60 if plant_average is not None else None
+            custom_text = _calculate_sunburst_averages(labels, parents, values, categories_dict, data_by_equipment, "min", plant_average=plant_avg_min)
+        else:
+            custom_text = [f"{v:.1f}min" for v in values]
+    else:  # Taxa de Avaria
+        text_display = 'label+text'
+        if show_average:
+            custom_text = _calculate_sunburst_averages(labels, parents, values, categories_dict, data_by_equipment, "%", plant_average=plant_average)
+        else:
+            custom_text = [f"{v:.2f}%" for v in values]
+
+    # Preparar cores de texto (branco para centro "Planta", padrão para o resto)
+    text_colors = ['#ffffff']  # Branco para o centro (Planta)
+    text_colors.extend(['#000000'] * (len(labels) - 1))  # Preto para o resto
 
     # Criar sunburst com cores de performance
     fig = go.Figure(go.Sunburst(
@@ -559,6 +640,9 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
         marker=dict(
             colors=colors,  # Cores customizadas baseadas em performance
             line=dict(color='#fff', width=2)
+        ),
+        textfont=dict(
+            color=text_colors  # Cores personalizadas por setor
         ),
         textinfo=text_display,
         hovertemplate='<b>%{label}</b><br>%{value:.1f} ' + unit + '<extra></extra>'
@@ -681,10 +765,10 @@ def create_kpi_summary_table(data_by_equipment: Dict[str, Dict[str, float]],
 
 def create_kpi_line_chart(months_list: List[int],
                           values: List[float],
-                          avg_values: List[float],
-                          kpi_name: str,
-                          equipment_name: str,
-                          target_value: float,
+                          avg_values: List[float] = None,
+                          kpi_name: str = "",
+                          equipment_name: str = "",
+                          target_value: float = 0,
                           template: str = 'minty',
                           margin_percent: float = 3.0) -> go.Figure:
     """
@@ -692,7 +776,7 @@ def create_kpi_line_chart(months_list: List[int],
 
     Exibe:
     - Barras do equipamento com cores condicionais baseadas em performance
-    - Linha da média geral (laranja tracejada)
+    - Linha da média geral (laranja tracejada) - OPCIONAL
     - Linha da meta (vermelha pontilhada)
 
     Lógica de Cores:
@@ -710,7 +794,7 @@ def create_kpi_line_chart(months_list: List[int],
     Args:
         months_list: Lista de meses [1, 2, 3, ..., 12]
         values: Valores do equipamento por mês
-        avg_values: Média geral por mês (para comparação)
+        avg_values: Média geral por mês (para comparação) - opcional, se None não exibe linha
         kpi_name: "MTBF", "MTTR" ou "Taxa de Avaria"
         equipment_name: Nome do equipamento
         target_value: Meta do KPI
@@ -722,7 +806,8 @@ def create_kpi_line_chart(months_list: List[int],
     # Converter MTTR de horas para minutos
     if kpi_name == "MTTR":
         values = [v * 60 for v in values]
-        avg_values = [v * 60 for v in avg_values]
+        if avg_values is not None:
+            avg_values = [v * 60 for v in avg_values]
         target_value = target_value * 60
 
     month_names = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
@@ -767,14 +852,15 @@ def create_kpi_line_chart(months_list: List[int],
         hovertemplate=hover_format
     ))
 
-    # Linha da média geral (laranja tracejada)
-    fig.add_trace(go.Scatter(
-        x=x_labels,
-        y=avg_values,
-        mode='lines',
-        name='Média Geral',
-        line=dict(color='#fd7e14', width=2, dash='dash')
-    ))
+    # Linha da média geral (laranja tracejada) - apenas se fornecida
+    if avg_values is not None:
+        fig.add_trace(go.Scatter(
+            x=x_labels,
+            y=avg_values,
+            mode='lines',
+            name='Média Geral',
+            line=dict(color='#fd7e14', width=2, dash='dash')
+        ))
 
     # Linha da meta (vermelha pontilhada)
     fig.add_trace(go.Scatter(
@@ -1413,8 +1499,38 @@ def create_top_breakdowns_chart(breakdowns_data: List[Dict],
     # Limitar ao top 5 após agregação
     aggregated_data = aggregated_data[:5]
 
-    # Criar labels para o eixo Y (data + descrição)
+    # Criar labels para o eixo Y com quebra de linha
+    def wrap_text(text: str, max_chars_per_line: int = 30) -> str:
+        """Quebra texto em múltiplas linhas"""
+        words = text.split()
+        lines = []
+        current_line = []
+        current_length = 0
+
+        for word in words:
+            word_length = len(word) + (1 if current_line else 0)  # +1 para espaço
+
+            if current_length + word_length <= max_chars_per_line:
+                current_line.append(word)
+                current_length += word_length
+            else:
+                if current_line:
+                    lines.append(' '.join(current_line))
+                current_line = [word]
+                current_length = len(word)
+
+        if current_line:
+            lines.append(' '.join(current_line))
+
+        return '<br>'.join(lines)
+
     y_labels = [
+        f"{bd['date'].strftime('%d/%m')}<br>{wrap_text(bd['descricao'])}"
+        for bd in aggregated_data
+    ]
+
+    # Labels completos para hover (sem quebra)
+    y_labels_full = [
         f"{bd['date'].strftime('%d/%m')} - {bd['descricao']}"
         for bd in aggregated_data
     ]
@@ -1472,9 +1588,9 @@ def create_top_breakdowns_chart(breakdowns_data: List[Dict],
         ),
         text=text_values,
         textposition='outside',
-        customdata=[[bd['count']] for bd in aggregated_data],
+        customdata=[[bd['count'], y_labels_full[i]] for i, bd in enumerate(aggregated_data)],
         hovertemplate=(
-            '<b>%{y}</b><br>' +
+            '<b>%{customdata[1]}</b><br>' +  # Descrição completa
             'Duração Total: %{x:.2f}h<br>' +
             'Paradas Agrupadas: %{customdata[0]}<br>' +
             '<extra></extra>'
@@ -1497,11 +1613,14 @@ def create_top_breakdowns_chart(breakdowns_data: List[Dict],
         yaxis=dict(
             title="",
             autorange='reversed',  # Inverter para maior ficar no topo
-            tickfont=dict(size=10)
+            tickfont=dict(size=11),
+            tickmode='linear',
+            side='left',
+            automargin=True  # Ajusta margem automaticamente
         ),
         showlegend=False,
-        height=max(400, len(breakdowns_data) * 40),  # Altura dinâmica baseada no número de barras
-        margin=dict(t=60, b=60, l=250, r=80),  # Margem esquerda maior para labels
+        height=max(500, len(breakdowns_data) * 80),  # Altura maior para acomodar quebras de linha
+        margin=dict(t=30, b=30, l=10, r=20),  # Margens mínimas - máximo espaço para barras
         hoverlabel=dict(
             bgcolor="white",
             font_size=12,

@@ -253,6 +253,18 @@ def register_maintenance_kpi_callbacks(app):
         equipment_targets = get_all_equipment_targets()
         general_target = get_kpi_targets("GENERAL")
 
+        # OTIMIZAÇÃO: Calcular monthly_aggregates UMA VEZ e cachear no store
+        # Isso evita múltiplas chamadas ao MongoDB nos callbacks seguintes
+        monthly_aggregates = None
+        if has_data:
+            from src.utils.maintenance_demo_data import calculate_general_avg_by_month
+            try:
+                monthly_aggregates = calculate_general_avg_by_month(data, all_equipment, months, year=year)
+                print(f"[CACHE] monthly_aggregates calculado e armazenado no store")
+            except Exception as e:
+                print(f"[ERRO] Falha ao calcular monthly_aggregates: {e}")
+                monthly_aggregates = None
+
         return {
             "period_type": period_type,
             "year": year,
@@ -263,7 +275,8 @@ def register_maintenance_kpi_callbacks(app):
             "equipment_targets": equipment_targets,  # Metas por equipamento
             "names": names,
             "categories": categories,
-            "has_data": has_data  # Indicador se há dados disponíveis
+            "has_data": has_data,  # Indicador se há dados disponíveis
+            "monthly_aggregates": monthly_aggregates  # Cache de agregações mensais
         }
 
     # ============================================================
@@ -299,9 +312,11 @@ def register_maintenance_kpi_callbacks(app):
         equipment_targets = stored_data["equipment_targets"]  # ALTERADO
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
+        year = stored_data.get("year", 2025)
+        monthly_aggregates = stored_data.get("monthly_aggregates")
 
-        # Calcular médias
-        averages = calculate_kpi_averages(data, equipment_ids, months)
+        # Calcular médias (usando cache de monthly_aggregates do store)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
 
         # Se não houver médias válidas após o cálculo
         if not averages.get("by_equipment"):
@@ -422,6 +437,8 @@ def register_maintenance_kpi_callbacks(app):
         names = stored_data["names"]
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
+        year = stored_data.get("year", 2025)
+        monthly_aggregates = stored_data.get("monthly_aggregates")
 
         print(f"[DEBUG] Equipamentos: {len(equipment_ids)} -> {equipment_ids}")
         print(f"[DEBUG] Meses recebidos: {months}")
@@ -430,8 +447,8 @@ def register_maintenance_kpi_callbacks(app):
             eq_data = data.get(eq_id, [])
             print(f"  {eq_id}: {len(eq_data)} meses -> meses={[m['month'] for m in eq_data]}")
 
-        # Calcular médias por equipamento
-        averages = calculate_kpi_averages(data, equipment_ids, months)
+        # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
         print(f"[DEBUG] Médias calculadas para {len(averages['by_equipment'])} equipamentos")
         print("="*80 + "\n")
 
@@ -527,9 +544,11 @@ def register_maintenance_kpi_callbacks(app):
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
         equipment_targets = stored_data.get("equipment_targets", {})
+        year = stored_data.get("year", 2025)
+        monthly_aggregates = stored_data.get("monthly_aggregates")
 
-        # Calcular médias por equipamento
-        averages = calculate_kpi_averages(data, equipment_ids, months)
+        # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
 
         if not averages.get("by_equipment"):
             return [
@@ -556,24 +575,106 @@ def register_maintenance_kpi_callbacks(app):
                             for eq_id in equipment_ids}
 
         # Criar sunbursts com cores baseadas na META GERAL DA PLANTA
+        # Passar plant_average para que o centro mostre média dos valores mensais
         fig_mtbf = create_kpi_sunburst_chart(
             mtbf_by_eq, "MTBF", categories, names, template,
             target_values=mtbf_targets,
             plant_target=general_target["mtbf"],
-            margin_percent=alert_range
+            margin_percent=alert_range,
+            plant_average=averages["mtbf"]  # Média dos valores mensais
         )
 
         fig_mttr = create_kpi_sunburst_chart(
             mttr_by_eq, "MTTR", categories, names, template,
             target_values=mttr_targets,
             plant_target=general_target["mttr"],
-            margin_percent=alert_range
+            margin_percent=alert_range,
+            plant_average=averages["mttr"]  # Média dos valores mensais (em horas)
         )
 
         fig_breakdown = create_kpi_sunburst_chart(
             breakdown_by_eq, "Taxa de Avaria", categories, names, template,
             target_values=breakdown_targets,
             plant_target=general_target["breakdown_rate"],
+            margin_percent=alert_range,
+            plant_average=averages["breakdown_rate"]  # Média dos valores mensais
+        )
+
+        return [fig_mtbf, fig_mttr, fig_breakdown]
+
+    # ============================================================
+    # CALLBACK 5B: Atualizar Gráficos de Linha Gerais (Evolução Temporal da Planta)
+    # ============================================================
+    @app.callback(
+        [
+            Output("line-chart-mtbf-general", "figure"),
+            Output("line-chart-mttr-general", "figure"),
+            Output("line-chart-breakdown-general", "figure")
+        ],
+        [
+            Input("store-indicator-filters", "data")
+        ]
+    )
+    def update_general_line_charts(stored_data):
+        """
+        Atualiza os 3 gráficos de linha mostrando a evolução mensal da planta toda.
+        """
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
+
+        if not stored_data or not stored_data.get("has_data", False):
+            return [
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template)
+            ]
+
+        data = stored_data["data"]
+        equipment_ids = stored_data["equipment_ids"]
+        months = stored_data["months"]
+        equipment_targets = stored_data.get("equipment_targets", {})
+        year = stored_data.get("year", 2025)
+
+        # Calcular médias gerais por mês (AGREGANDO dados brutos)
+        general_avg_by_month = calculate_general_avg_by_month(data, equipment_ids, months, year=year)
+
+        if not general_avg_by_month:
+            return [
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template)
+            ]
+
+        # Extrair valores por mês
+        mtbf_values = [general_avg_by_month[m]["mtbf"] for m in months if m in general_avg_by_month]
+        mttr_values = [general_avg_by_month[m]["mttr"] for m in months if m in general_avg_by_month]
+        breakdown_values = [general_avg_by_month[m]["breakdown_rate"] for m in months if m in general_avg_by_month]
+
+        # Obter meta geral da planta
+        general_target = equipment_targets.get("GENERAL", {"mtbf": 0, "mttr": 999, "breakdown_rate": 100, "alert_range": 3.0})
+        alert_range = general_target.get("alert_range", 3.0)
+
+        # Criar gráficos de linha (sem linha de média, pois JÁ É a média da planta)
+        fig_mtbf = create_kpi_line_chart(
+            months, mtbf_values, None,  # None = não mostrar linha de comparação
+            "MTBF", "Média da Planta",
+            general_target.get("mtbf", 0),
+            template,
+            margin_percent=alert_range
+        )
+
+        fig_mttr = create_kpi_line_chart(
+            months, mttr_values, None,
+            "MTTR", "Média da Planta",
+            general_target.get("mttr", 999),
+            template,
+            margin_percent=alert_range
+        )
+
+        fig_breakdown = create_kpi_line_chart(
+            months, breakdown_values, None,
+            "Taxa de Avaria", "Média da Planta",
+            general_target.get("breakdown_rate", 100),
+            template,
             margin_percent=alert_range
         )
 
@@ -608,9 +709,11 @@ def register_maintenance_kpi_callbacks(app):
         names = stored_data["names"]
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
+        year = stored_data.get("year", 2025)
+        monthly_aggregates = stored_data.get("monthly_aggregates")
 
-        # Calcular médias por equipamento
-        averages = calculate_kpi_averages(data, equipment_ids, months)
+        # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
 
         if not averages.get("by_equipment"):
             return html.Div([
@@ -992,9 +1095,11 @@ def register_maintenance_kpi_callbacks(app):
         data = stored_data["data"]
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
+        year = stored_data.get("year", 2025)
+        monthly_aggregates = stored_data.get("monthly_aggregates")
 
-        # Calcular médias por equipamento
-        averages = calculate_kpi_averages(data, equipment_ids, months)
+        # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
 
         if not averages.get("by_equipment") or equipment_id not in averages["by_equipment"]:
             return ["--", "--", "--"]
@@ -1043,9 +1148,11 @@ def register_maintenance_kpi_callbacks(app):
         equipment_targets = stored_data["equipment_targets"]  # ALTERADO: Usar metas por equipamento
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
+        year = stored_data.get("year", 2025)
+        monthly_aggregates = stored_data.get("monthly_aggregates")
 
-        # Calcular médias por equipamento
-        averages = calculate_kpi_averages(data, equipment_ids, months)
+        # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
 
         if not averages.get("by_equipment") or equipment_id not in averages["by_equipment"]:
             return [
@@ -1151,9 +1258,10 @@ def register_maintenance_kpi_callbacks(app):
         names = stored_data["names"]
         months = stored_data["months"]
         all_equipment = stored_data["equipment_ids"]
+        year = stored_data.get("year", 2025)
 
-        # Calcular médias gerais por mês
-        general_avg_by_month = calculate_general_avg_by_month(data, all_equipment, months)
+        # Calcular médias gerais por mês (AGREGANDO dados brutos)
+        general_avg_by_month = calculate_general_avg_by_month(data, all_equipment, months, year=year)
 
         # Dados do equipamento selecionado
         eq_data_by_month = data.get(equipment_id, [])
