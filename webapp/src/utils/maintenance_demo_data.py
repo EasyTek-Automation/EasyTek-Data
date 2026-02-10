@@ -15,7 +15,6 @@ try:
     )
     ZPP_AVAILABLE = True
 except ImportError as e:
-    print(f"[AVISO] Módulo ZPP não disponível: {e}")
     ZPP_AVAILABLE = False
 
 # ============================================
@@ -170,10 +169,8 @@ def get_kpi_targets(equipment_id: str = None) -> Dict[str, float]:
                         "alert_range": alert_range
                     }
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar metas do MongoDB: {e}")
 
     # Se não encontrou configuração, retornar valores padrão
-    print(f"[AVISO] Nenhuma configuração encontrada para {equipment_id or 'GENERAL'}. Configure as metas em /maintenance/config")
     return {
         "mtbf": 10.0,
         "mttr": 0.5,
@@ -237,10 +234,8 @@ def get_all_equipment_targets() -> Dict[str, Dict[str, float]]:
 
                 return all_targets
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar metas do MongoDB: {e}")
 
     # Se não encontrou configuração, retornar valores padrão para todos equipamentos
-    print(f"[AVISO] Nenhuma configuração de metas encontrada. Configure as metas em /maintenance/config")
     all_targets = {}
     equipment_list = get_equipment_names()
 
@@ -272,11 +267,8 @@ def get_equipment_names() -> Dict[str, str]:
             # Tentar buscar equipamentos reais do ZPP
             zpp_names = get_zpp_equipment_names()
             if zpp_names:
-                print(f"[INFO] Usando {len(zpp_names)} equipamentos reais do ZPP")
                 return zpp_names
         except Exception as e:
-            print(f"[AVISO] Erro ao buscar equipamentos ZPP: {e}")
-            print("[INFO] Usando equipamentos demo como fallback")
 
     # Fallback para dados demo
     return EQUIPMENT_NAMES.copy()
@@ -295,11 +287,8 @@ def get_equipment_categories() -> Dict[str, List[str]]:
             # Tentar buscar categorias reais do ZPP
             zpp_categories = get_zpp_equipment_categories()
             if zpp_categories:
-                print(f"[INFO] Usando {len(zpp_categories)} categorias reais do ZPP")
                 return zpp_categories
         except Exception as e:
-            print(f"[AVISO] Erro ao buscar categorias ZPP: {e}")
-            print("[INFO] Usando categorias demo como fallback")
 
     # Fallback para dados demo
     return EQUIPMENT_CATEGORIES.copy()
@@ -582,7 +571,6 @@ def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
         breakdown_df = fetch_zpp_breakdown_data(year, months)
 
         if production_df.empty:
-            print("[AVISO] calculate_general_avg_by_month: Sem dados de produção")
             return result
 
         # Calcular KPIs por mês agregando TODOS os equipamentos
@@ -624,7 +612,6 @@ def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
             }
 
     except Exception as e:
-        print(f"[ERRO] calculate_general_avg_by_month: Falha ao agregar dados brutos: {e}")
         import traceback
         traceback.print_exc()
 

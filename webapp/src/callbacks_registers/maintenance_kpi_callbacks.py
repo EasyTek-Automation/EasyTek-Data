@@ -32,7 +32,6 @@ try:
     ZPP_KPI_AVAILABLE = True
 except ImportError:
     ZPP_KPI_AVAILABLE = False
-    print("[AVISO] Módulo ZPP KPI não disponível - nenhum dado será exibido")
 
 from src.components.maintenance_kpi_graphs import (
     create_kpi_bar_chart,
@@ -119,7 +118,6 @@ def register_maintenance_kpi_callbacks(app):
         # ⚠️ VERIFICAÇÃO CRÍTICA: MongoDB disponível?
         db_status = get_connection_status()
         if not db_status["available"]:
-            print(f"❌ [CALLBACK KPI] MongoDB offline - retornando erro")
             return {
                 "has_data": False,
                 "db_error": True,
@@ -137,7 +135,6 @@ def register_maintenance_kpi_callbacks(app):
 
         if trigger_id == "interval-initial-load" and current_data and current_data.get("data"):
             # Interval disparou mas já temos dados - apenas atualizar metas sem recarregar ZPP
-            print("[INFO] Interval: Atualizando apenas metas (dados já carregados)")
             current_data["equipment_targets"] = get_all_equipment_targets()
             current_data["targets"] = get_kpi_targets("GENERAL")
             return current_data
@@ -146,8 +143,6 @@ def register_maintenance_kpi_callbacks(app):
         if not period_type:
             period_type = "last12"  # Padrão
 
-        print(f"[FILTROS] Tipo selecionado: {period_type}")
-        print(f"[FILTROS] Ano ref: {ref_year}, Start: {start_date}, End: {end_date}")
 
         if period_type in ["year", "last12"]:
             if not ref_year:
@@ -157,20 +152,17 @@ def register_maintenance_kpi_callbacks(app):
                 # Todos os meses do ano
                 months = list(range(1, 13))
                 year = ref_year
-                print(f"[FILTROS] Modo 'Ano': {year}, meses {months}")
             else:  # last12
                 # Últimos 12 meses a partir do ano
                 # Assumir que estamos em dez/2025, então últimos 12 = jan-dez 2025
                 months = list(range(1, 13))
                 year = ref_year
-                print(f"[FILTROS] Modo 'Últimos 12': {year}, meses {months}")
 
         else:  # custom
             if not start_date or not end_date:
                 # Usar padrão se não informado
                 year = 2026  # Ano padrão
                 months = list(range(1, 13))
-                print(f"[FILTROS] Modo 'Custom' SEM DATAS: usando padrão {year}, todos meses")
             else:
                 # IMPLEMENTAR: Extrair ano/meses do date range
                 from datetime import datetime
@@ -191,22 +183,14 @@ def register_maintenance_kpi_callbacks(app):
                         current = current.replace(month=current.month + 1)
 
                 months = sorted(months)
-                print(f"[FILTROS] Modo 'Custom' COM DATAS: {start_date} a {end_date}")
-                print(f"[FILTROS] Resultado: {year}, meses {months}")
 
         # Buscar dados reais - INTEGRAÇÃO ZPP
-        print("\n" + "="*80)
-        print(">>> CALLBACK 2: CARREGANDO DADOS DE KPI")
-        print("="*80)
-        print(f"Ano: {year}, Meses: {months}")
-        print(f"ZPP_KPI_AVAILABLE: {ZPP_KPI_AVAILABLE}")
 
         data = {}
         all_equipment = []
         has_data = False
 
         if ZPP_KPI_AVAILABLE:
-            print("[TENTANDO] Buscar dados reais do ZPP...")
             try:
                 # Tentar buscar dados reais do ZPP
                 data = fetch_zpp_kpi_data(year, months)
@@ -214,25 +198,14 @@ def register_maintenance_kpi_callbacks(app):
                 has_data = len(data) > 0
 
                 if has_data:
-                    print(f"[SUCESSO] Dados ZPP carregados!")
-                    print(f"  - Equipamentos: {all_equipment}")
-                    print(f"  - Total: {len(all_equipment)} equipamentos")
                 else:
-                    print("[AVISO] Nenhum dado disponível no banco para o período selecionado")
-                print("="*80 + "\n")
             except Exception as e:
                 # Sem fallback - apenas informar erro
-                print(f"[ERRO] Falha ao carregar dados ZPP: {e}")
-                print("[INFO] Nenhum dado será exibido")
-                print("="*80 + "\n")
                 import traceback
                 traceback.print_exc()
                 has_data = False
         else:
             # Módulo ZPP não disponível - não mostrar nada
-            print("[AVISO] Módulo ZPP não disponível")
-            print("[INFO] Nenhum dado será exibido")
-            print("="*80 + "\n")
             has_data = False
 
         # Buscar nomes e categorias de equipamentos
@@ -241,7 +214,6 @@ def register_maintenance_kpi_callbacks(app):
                 names = get_zpp_equipment_names()
                 categories = get_zpp_equipment_categories()
             except Exception as e:
-                print(f"[AVISO] Erro ao buscar nomes/categorias: {e}")
                 names = {eq: eq for eq in all_equipment}  # Fallback: usar IDs como nomes
                 categories = {}
         else:
@@ -260,9 +232,7 @@ def register_maintenance_kpi_callbacks(app):
             from src.utils.maintenance_demo_data import calculate_general_avg_by_month
             try:
                 monthly_aggregates = calculate_general_avg_by_month(data, all_equipment, months, year=year)
-                print(f"[CACHE] monthly_aggregates calculado e armazenado no store")
             except Exception as e:
-                print(f"[ERRO] Falha ao calcular monthly_aggregates: {e}")
                 monthly_aggregates = None
 
         return {
@@ -407,14 +377,10 @@ def register_maintenance_kpi_callbacks(app):
         """
         Atualiza os 3 gráficos de barras com médias e metas individualizadas.
         """
-        print("\n" + "="*80)
-        print(">>> CALLBACK: update_bar_charts()")
-        print("="*80)
 
         template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
         if not stored_data:
-            print("[DEBUG] stored_data is None/empty - retornando gráficos vazios")
             return [
                 create_empty_kpi_figure("MTBF", template),
                 create_empty_kpi_figure("MTTR", template),
@@ -423,7 +389,6 @@ def register_maintenance_kpi_callbacks(app):
 
         # ⚠️ Verificar se há erro de banco de dados
         if stored_data.get("db_error"):
-            print("❌ [DEBUG] MongoDB offline - retornando gráficos de erro")
             from src.components.maintenance_kpi_graphs import create_database_error_figure
             error_msg = stored_data.get("error_message", "Banco de dados offline")
             return [
@@ -440,21 +405,14 @@ def register_maintenance_kpi_callbacks(app):
         year = stored_data.get("year", 2026)
         monthly_aggregates = stored_data.get("monthly_aggregates")
 
-        print(f"[DEBUG] Equipamentos: {len(equipment_ids)} -> {equipment_ids}")
-        print(f"[DEBUG] Meses recebidos: {months}")
-        print(f"[DEBUG] Dados por equipamento (primeiros 2):")
         for idx, eq_id in enumerate(equipment_ids[:2]):
             eq_data = data.get(eq_id, [])
-            print(f"  {eq_id}: {len(eq_data)} meses -> meses={[m['month'] for m in eq_data]}")
 
         # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
         averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
-        print(f"[DEBUG] Médias calculadas para {len(averages['by_equipment'])} equipamentos")
-        print("="*80 + "\n")
 
         # Verificar se há dados válidos
         if not averages.get("by_equipment"):
-            print("[DEBUG] Sem dados após cálculo - retornando gráficos de 'sem dados'")
             return [
                 create_no_data_figure("barra", template),
                 create_no_data_figure("barra", template),
@@ -473,7 +431,6 @@ def register_maintenance_kpi_callbacks(app):
         ]
 
         if not valid_equipment:
-            print("[DEBUG] Nenhum equipamento com dados válidos - retornando gráficos de 'sem dados'")
             return [
                 create_no_data_figure("barra", template),
                 create_no_data_figure("barra", template),
@@ -825,20 +782,13 @@ def register_maintenance_kpi_callbacks(app):
         if not current_data:
             raise PreventUpdate
 
-        print("\n" + "="*80)
-        print(">>> REFRESH: Forçando atualização completa de dados e metas")
-        print("="*80)
 
         year = current_data.get("year", 2026)
         months = current_data.get("months", list(range(1, 13)))
 
         # PASSO 1: Atualizar metas do MongoDB (SEMPRE)
-        print("[1/2] Atualizando metas do MongoDB...")
         equipment_targets = get_all_equipment_targets()
         general_targets = get_kpi_targets("GENERAL")
-        print(f"  - Meta geral MTBF: {general_targets['mtbf']:.1f}h")
-        print(f"  - Meta geral MTTR: {general_targets['mttr']*60:.0f}min")
-        print(f"  - Metas específicas: {len([k for k in equipment_targets.keys() if k != 'GENERAL'])} equipamentos")
 
         # PASSO 2: Re-buscar dados do ZPP
         new_data = {}
@@ -846,19 +796,14 @@ def register_maintenance_kpi_callbacks(app):
 
         if ZPP_KPI_AVAILABLE:
             try:
-                print(f"[2/2] Atualizando dados ZPP para {year}, meses {months}...")
                 new_data = fetch_zpp_kpi_data(year, months)
                 has_data = len(new_data) > 0
 
                 if has_data:
-                    print(f"  - ✓ Dados carregados: {len(new_data)} equipamentos")
                 else:
-                    print("  - ⚠ Nenhum dado disponível no banco")
             except Exception as e:
-                print(f"  - ✗ ERRO ao atualizar dados ZPP: {e}")
                 has_data = False
         else:
-            print("[2/2] Módulo ZPP não disponível")
             has_data = False
 
         # Atualizar nomes e categorias se houver dados
@@ -868,7 +813,6 @@ def register_maintenance_kpi_callbacks(app):
                 current_data["categories"] = get_zpp_equipment_categories()
                 current_data["equipment_ids"] = list(new_data.keys())
             except Exception as e:
-                print(f"[AVISO] Erro ao atualizar nomes/categorias: {e}")
 
         # Atualizar store com novos dados e metas
         current_data["data"] = new_data
@@ -876,7 +820,6 @@ def register_maintenance_kpi_callbacks(app):
         current_data["equipment_targets"] = equipment_targets
         current_data["targets"] = general_targets
 
-        print("="*80 + "\n")
         return current_data
 
     # ============================================================
@@ -901,7 +844,6 @@ def register_maintenance_kpi_callbacks(app):
         if not current_data or not current_data.get("data"):
             raise PreventUpdate
 
-        print("[INFO] Navegação detectada - Atualizando metas do MongoDB...")
 
         # Atualizar apenas as metas (não recarregar dados pesados do ZPP)
         current_data["equipment_targets"] = get_all_equipment_targets()
@@ -1520,7 +1462,6 @@ def register_maintenance_kpi_callbacks(app):
                 return fig
 
             except Exception as e:
-                print(f"[ERRO] Falha ao buscar top paradas: {e}")
                 import traceback
                 traceback.print_exc()
 

@@ -74,11 +74,9 @@ def fetch_zpp_equipment_list(year: int = 2026) -> List[str]:
         # Remover valores vazios ou None
         equipment_list = [eq for eq in equipment_list if eq]
 
-        print(f"[ZPP] {len(equipment_list)} equipamentos encontrados: {equipment_list}")
         return equipment_list
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar lista de equipamentos: {e}")
         return []
 
 
@@ -132,7 +130,6 @@ def fetch_zpp_production_data(year: int, months: List[int]) -> pd.DataFrame:
         records = list(cursor)
 
         if not records:
-            print(f"[AVISO] Nenhum dado de producao encontrado para {year}")
             return pd.DataFrame(columns=["linea", "date", "month", "horasact", "boundary_case"])
 
         # Processar dados com filtro INCLUSIVO
@@ -239,15 +236,11 @@ def fetch_zpp_production_data(year: int, months: List[int]) -> pd.DataFrame:
         df = pd.DataFrame(processed_records)
 
         if boundary_count > 0:
-            print(f"[ZPP] Producao: {len(df)} registros carregados ({boundary_count} cruzam virada de mes)")
-            print(f"      Regra aplicada: MONTH_BOUNDARY_RULE = '{MONTH_BOUNDARY_RULE}'")
         else:
-            print(f"[ZPP] Producao: {len(df)} registros carregados para {year}, meses {months}")
 
         return df
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar dados de producao: {e}")
         import traceback
         traceback.print_exc()
         return pd.DataFrame(columns=["linea", "date", "month", "horasact", "boundary_case"])
@@ -304,7 +297,6 @@ def fetch_zpp_breakdown_data(year: int, months: List[int]) -> pd.DataFrame:
         records = list(cursor)
 
         if not records:
-            print(f"[AVISO] Nenhuma parada (avaria) encontrada para {year}")
             return pd.DataFrame(columns=["linea", "date", "month", "motivo", "duracao_min", "boundary_case"])
 
         # Processar dados com filtro INCLUSIVO
@@ -395,15 +387,11 @@ def fetch_zpp_breakdown_data(year: int, months: List[int]) -> pd.DataFrame:
         df = pd.DataFrame(processed_records)
 
         if boundary_count > 0:
-            print(f"[ZPP] Paradas: {len(df)} registros carregados ({boundary_count} cruzam virada de mes)")
-            print(f"      Regra aplicada: MONTH_BOUNDARY_RULE = '{MONTH_BOUNDARY_RULE}'")
         else:
-            print(f"[ZPP] Paradas: {len(df)} registros de avarias carregados para {year}, meses {months}")
 
         return df
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar dados de paradas: {e}")
         import traceback
         traceback.print_exc()
         return pd.DataFrame(columns=["linea", "date", "month", "motivo", "duracao_min", "boundary_case"])
@@ -437,14 +425,12 @@ def calculate_monthly_kpis(production_df: pd.DataFrame, breakdown_df: pd.DataFra
 
     # Verificar se há dados
     if production_df.empty:
-        print("[AVISO] Sem dados de produção para calcular KPIs")
         return result
 
     # Obter lista de equipamentos e meses únicos
     equipment_list = production_df['linea'].unique()
     months = sorted(production_df['month'].unique())
 
-    print(f"[ZPP] Calculando KPIs para {len(equipment_list)} equipamentos, {len(months)} meses")
 
     for linea in equipment_list:
         monthly_data = []
@@ -504,7 +490,6 @@ def calculate_monthly_kpis(production_df: pd.DataFrame, breakdown_df: pd.DataFra
 
         result[linea] = monthly_data
 
-    print(f"[ZPP] KPIs calculados com sucesso para {len(result)} equipamentos")
     return result
 
 
@@ -524,11 +509,6 @@ def fetch_zpp_kpi_data(year: int, months: List[int]) -> Dict:
     Raises:
         Exception: Se houver erro ao buscar ou processar dados
     """
-    print("\n" + "-"*60)
-    print(f">>> ZPP: Iniciando fetch_zpp_kpi_data")
-    print(f"    Ano: {year}")
-    print(f"    Meses: {months}")
-    print("-"*60)
 
     try:
         # 1. Buscar dados de produção
@@ -543,11 +523,9 @@ def fetch_zpp_kpi_data(year: int, months: List[int]) -> Dict:
         if not kpi_data:
             raise Exception("Nenhum dado de KPI foi calculado (sem dados de produção)")
 
-        print(f"[ZPP] ✓ Dados carregados com sucesso: {len(kpi_data)} equipamentos")
         return kpi_data
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar dados ZPP: {e}")
         raise
 
 
@@ -588,7 +566,6 @@ def get_zpp_equipment_categories() -> Dict[str, List[str]]:
         return categories
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar categorias: {e}")
         return {}
 
 
@@ -615,8 +592,6 @@ def get_zpp_equipment_names() -> Dict[str, str]:
     try:
         equipment_list = fetch_zpp_equipment_list()
 
-        print(f"[DEBUG] get_zpp_equipment_names: {len(equipment_list)} equipamentos encontrados")
-        print(f"[DEBUG] CUSTOM_NAMES definidos: {list(CUSTOM_NAMES.keys())}")
 
         # Criar nomes amigáveis
         names = {}
@@ -624,7 +599,6 @@ def get_zpp_equipment_names() -> Dict[str, str]:
             # Verificar se há nome customizado
             if eq_id in CUSTOM_NAMES:
                 names[eq_id] = CUSTOM_NAMES[eq_id]
-                print(f"[DEBUG] Usando nome customizado: {eq_id} -> {CUSTOM_NAMES[eq_id]}")
             else:
                 # Gerar nome automaticamente baseado no prefixo
                 if eq_id.startswith("LONGI"):
@@ -645,7 +619,6 @@ def get_zpp_equipment_names() -> Dict[str, str]:
         return names
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar nomes de equipamentos: {e}")
         return {}
 
 
@@ -768,46 +741,31 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
         return result
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar top paradas: {e}")
         return []
 
 
 if __name__ == "__main__":
     """Script de teste para validar cálculos"""
-    print("\n" + "="*80)
-    print("TESTE: Módulo ZPP KPI Calculator")
-    print("="*80 + "\n")
 
     # Testar busca de equipamentos
-    print("1. Buscando lista de equipamentos...")
     equipments = fetch_zpp_equipment_list()
-    print(f"   → Encontrados: {equipments}\n")
 
     # Testar busca de categorias
-    print("2. Buscando categorias...")
     categories = get_zpp_equipment_categories()
     for cat, eqs in categories.items():
-        print(f"   → {cat}: {eqs}")
-    print()
 
     # Testar busca de dados e cálculo de KPIs
-    print("3. Testando cálculo de KPIs para Jan-Mar 2025...")
     try:
         kpi_data = fetch_zpp_kpi_data(year=2025, months=[1, 2, 3])
 
         # Mostrar exemplo de resultado
         if kpi_data:
             first_equipment = list(kpi_data.keys())[0]
-            print(f"\n   Exemplo: {first_equipment}")
             for month_data in kpi_data[first_equipment]:
-                print(f"   → Mês {month_data['month']}: "
                       f"MTBF={month_data['mtbf']}h, "
                       f"MTTR={month_data['mttr']}h, "
                       f"Taxa={month_data['breakdown_rate']}%")
 
-        print(f"\n   ✓ Teste concluído com sucesso!")
 
     except Exception as e:
-        print(f"\n   ✗ Erro no teste: {e}")
 
-    print("\n" + "="*80)

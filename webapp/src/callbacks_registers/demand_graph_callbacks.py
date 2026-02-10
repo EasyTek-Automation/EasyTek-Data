@@ -126,9 +126,6 @@ def register_demand_callbacks(app, collection_energia):
 
             result = list(collection_energia.aggregate(pipeline))
 
-            print(f"[DEBUG TRANSVERSAIS] Período: {start_datetime} a {end_datetime}")
-            print(f"[DEBUG TRANSVERSAIS] Equipamentos: {selected_machines}")
-            print(f"[DEBUG TRANSVERSAIS] Documentos retornados: {len(result)}")
 
             if not result:
                 return create_error_demand_figure(
@@ -149,16 +146,11 @@ def register_demand_callbacks(app, collection_energia):
             kw_values = df['kW'].tolist()
             kva_values = df['kVA'].tolist()
 
-            print(f"[DEBUG TRANSVERSAIS] Timestamps: {len(timestamps)}, kW: {len(kw_values)}, kVA: {len(kva_values)}")
             if len(timestamps) > 0:
-                print(f"[DEBUG TRANSVERSAIS] Primeiro resultado raw: {result[0]}")
-                print(f"[DEBUG TRANSVERSAIS] Valor kW[0]: {kw_values[0]}, tipo: {type(kw_values[0])}")
-                print(f"[DEBUG TRANSVERSAIS] Valor kVA[0]: {kva_values[0]}, tipo: {type(kva_values[0])}")
 
                 # Verificar se há valores None
                 none_kw = sum(1 for v in kw_values if v is None)
                 none_kva = sum(1 for v in kva_values if v is None)
-                print(f"[DEBUG TRANSVERSAIS] Valores None - kW: {none_kw}, kVA: {none_kva}")
 
                 if none_kw > 0 or none_kva > 0:
                     return create_error_demand_figure(
@@ -173,7 +165,6 @@ def register_demand_callbacks(app, collection_energia):
             return fig
 
         except Exception as e:
-            print(f"Erro ao calcular demanda transversais: {e}")
             import traceback
             traceback.print_exc()
             # Template padrão em caso de erro antes de definir
@@ -286,9 +277,6 @@ def register_demand_callbacks(app, collection_energia):
 
             result = list(collection_energia.aggregate(pipeline))
 
-            print(f"[DEBUG LONGITUDINAIS] Período: {start_datetime} a {end_datetime}")
-            print(f"[DEBUG LONGITUDINAIS] Equipamentos: {selected_machines}")
-            print(f"[DEBUG LONGITUDINAIS] Documentos retornados: {len(result)}")
 
             if not result:
                 return create_error_demand_figure(
@@ -309,16 +297,11 @@ def register_demand_callbacks(app, collection_energia):
             kw_values = df['kW'].tolist()
             kva_values = df['kVA'].tolist()
 
-            print(f"[DEBUG LONGITUDINAIS] Timestamps: {len(timestamps)}, kW: {len(kw_values)}, kVA: {len(kva_values)}")
             if len(timestamps) > 0:
-                print(f"[DEBUG LONGITUDINAIS] Primeiro resultado raw: {result[0]}")
-                print(f"[DEBUG LONGITUDINAIS] Valor kW[0]: {kw_values[0]}, tipo: {type(kw_values[0])}")
-                print(f"[DEBUG LONGITUDINAIS] Valor kVA[0]: {kva_values[0]}, tipo: {type(kva_values[0])}")
 
                 # Verificar se há valores None
                 none_kw = sum(1 for v in kw_values if v is None)
                 none_kva = sum(1 for v in kva_values if v is None)
-                print(f"[DEBUG LONGITUDINAIS] Valores None - kW: {none_kw}, kVA: {none_kva}")
 
                 if none_kw > 0 or none_kva > 0:
                     return create_error_demand_figure(
@@ -333,7 +316,6 @@ def register_demand_callbacks(app, collection_energia):
             return fig
 
         except Exception as e:
-            print(f"Erro ao calcular demanda longitudinais: {e}")
             import traceback
             traceback.print_exc()
             # Template padrão em caso de erro antes de definir

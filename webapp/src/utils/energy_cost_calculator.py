@@ -409,7 +409,6 @@ def calculate_costs_by_groups(consumption_df, demand_df, config, group1_equipmen
     # Validar que não há equipamentos duplicados entre os grupos
     overlap = set(group1_equipment) & set(group2_equipment)
     if overlap:
-        print(f"AVISO: Equipamentos duplicados entre grupos: {overlap}")
         # Remover duplicatas do grupo2
         group2_equipment = [eq for eq in group2_equipment if eq not in overlap]
 

@@ -58,14 +58,12 @@ def get_mongo_connection(collection_name=None, silent=False):
         if not mongo_uri or not db_name:
             error_msg = "As variáveis de ambiente MONGO_URI e DB_NAME devem ser definidas."
             if not silent:
-                print(f"[AVISO] Erro de configuracao: {error_msg}")
             MONGO_AVAILABLE = False
             LAST_ERROR = error_msg
             return None
 
         try:
             if not silent:
-                print(f"[INFO] Tentando conectar ao MongoDB (URI: {mongo_uri}, DB: {db_name})...")
 
             client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000)
             client.admin.command('ping')
@@ -75,12 +73,10 @@ def get_mongo_connection(collection_name=None, silent=False):
             LAST_ERROR = None
 
             if not silent:
-                print(f"[OK] Conexao com o MongoDB (DB: '{db_name}') estabelecida com sucesso!")
 
         except (ConnectionFailure, ServerSelectionTimeoutError) as e:
             error_msg = f"Falha na conexão: {e}"
             if not silent:
-                print(f"[ERRO] {error_msg}")
             client = None
             db = None
             MONGO_AVAILABLE = False
@@ -90,7 +86,6 @@ def get_mongo_connection(collection_name=None, silent=False):
         except Exception as e:
             error_msg = f"Erro inesperado: {e}"
             if not silent:
-                print(f"[ERRO] {error_msg}")
             client = None
             db = None
             MONGO_AVAILABLE = False
@@ -100,7 +95,6 @@ def get_mongo_connection(collection_name=None, silent=False):
     # Verifica se a conexão ainda está válida
     if not check_mongo_health():
         if not silent:
-            print("[AVISO] Conexao MongoDB perdida, tentando reconectar...")
         client = None
         db = None
         return get_mongo_connection(collection_name, silent)
@@ -194,13 +188,11 @@ def get_user_by_id(user_id):
 
         # ⚠️ Verificar se conexão está disponível
         if user_collection is None:
-            print(f"[AVISO] [get_user_by_id] MongoDB offline - nao foi possivel carregar usuario {user_id}")
             return None
 
         user_data = user_collection.find_one({"_id": ObjectId(user_id)})
         return User(user_data) if user_data else None
     except Exception as e:
-        print(f"[ERRO] [get_user_by_id] Erro ao buscar usuario: {e}")
         return None
 
 
@@ -216,13 +208,11 @@ def get_user_by_username(username):
 
         # ⚠️ Verificar se conexão está disponível
         if user_collection is None:
-            print(f"[AVISO] [get_user_by_username] MongoDB offline - nao foi possivel carregar usuario {username}")
             return None
 
         user_data = user_collection.find_one({"username": username})
         return User(user_data) if user_data else None
     except Exception as e:
-        print(f"[ERRO] [get_user_by_username] Erro ao buscar usuario: {e}")
         return None
 
 
@@ -238,13 +228,11 @@ def get_user_by_email(email):
 
         # ⚠️ Verificar se conexão está disponível
         if user_collection is None:
-            print(f"[AVISO] [get_user_by_email] MongoDB offline - nao foi possivel carregar usuario {email}")
             return None
 
         user_data = user_collection.find_one({"email": email})
         return User(user_data) if user_data else None
     except Exception as e:
-        print(f"[ERRO] [get_user_by_email] Erro ao buscar usuario: {e}")
         return None
 
 
@@ -267,7 +255,6 @@ def save_user(username, email, password, level, perfil="manutencao"):
 
         # ⚠️ Verificar se conexão está disponível
         if user_collection is None:
-            print(f"[ERRO] [save_user] MongoDB offline - nao foi possivel salvar usuario {username}")
             return False
 
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
@@ -280,5 +267,4 @@ def save_user(username, email, password, level, perfil="manutencao"):
         })
         return True
     except Exception as e:
-        print(f"[ERRO] [save_user] Erro ao salvar usuario: {e}")
         return False

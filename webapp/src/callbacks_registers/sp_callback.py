@@ -66,11 +66,9 @@ def register_sp_callback(app):
             toast_icon = "success"
 
         except requests.exceptions.RequestException as e:
-            print(f"Erro de comunicação com o Gateway: {e}")
             toast_message = "Erro: Falha ao conectar com o serviço de gateway."
             toast_icon = "danger"
         except Exception as e:
-            print(f"Erro inesperado: {e}")
             toast_message = f"Ocorreu um erro inesperado: {e}"
             toast_icon = "danger"
 

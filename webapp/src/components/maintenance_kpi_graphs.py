@@ -1087,10 +1087,6 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
         from datetime import datetime, timedelta
         import calendar as cal
 
-        print(f"\n[DEBUG HEATMAP] Iniciando calendar heatmap")
-        print(f"  - Equipment: {equipment_id}")
-        print(f"  - Year: {year}")
-        print(f"  - Months: {months}")
 
         is_dark = (template == 'darkly')
         bg_color = '#2c2c2c' if is_dark else '#ffffff'
@@ -1098,7 +1094,6 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
 
         # Validar parâmetros
         if not months or len(months) == 0:
-            print(f"[DEBUG HEATMAP] ❌ Sem meses para filtrar")
             return create_no_data_figure("heatmap", template)
 
         # Gerar todos os dias do período
@@ -1106,7 +1101,6 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
         end_month = max(months)
         end_date = datetime(year, end_month, cal.monthrange(year, end_month)[1])
 
-        print(f"[DEBUG HEATMAP] Período: {start_date.strftime('%Y-%m-%d')} até {end_date.strftime('%Y-%m-%d')}")
 
         # ✅ OTIMIZAÇÃO: Agregação única ao invés de loop de consultas
         import random
@@ -1120,9 +1114,6 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
                 producao_collection = get_mongo_connection(f"ZPP_Producao_{year}")
                 paradas_collection = get_mongo_connection(f"ZPP_Paradas_{year}")
 
-                print(f"[DEBUG HEATMAP] Collections:")
-                print(f"  - Produção: ZPP_Producao_{year}")
-                print(f"  - Paradas: ZPP_Paradas_{year}")
 
                 # Pipeline de agregação para produção (1 consulta para todo período)
                 prod_pipeline = [
@@ -1169,15 +1160,10 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
                 prod_results = {doc["_id"]: doc["count"] for doc in producao_collection.aggregate(prod_pipeline)}
                 paradas_results = {doc["_id"]: doc["count"] for doc in paradas_collection.aggregate(paradas_pipeline)}
 
-                print(f"[DEBUG HEATMAP] Resultados:")
-                print(f"  - Dias com produção: {len(prod_results)}")
-                print(f"  - Dias com paradas: {len(paradas_results)}")
                 if prod_results:
                     first_date = list(prod_results.keys())[0]
-                    print(f"  - Primeira data com produção: {first_date}")
                 if paradas_results:
                     first_date = list(paradas_results.keys())[0]
-                    print(f"  - Primeira data com parada: {first_date}")
 
                 # Gerar datas e popular contadores
                 current_date = start_date
@@ -1196,7 +1182,6 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
                     current_date += timedelta(days=1)
 
             except Exception as e:
-                print(f"[AVISO] Erro ao buscar dados agregados: {e}")
                 # Fallback: simular dados
                 current_date = start_date
                 while current_date <= end_date:
@@ -1427,7 +1412,6 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
 
     except Exception as e:
         # Se qualquer erro ocorrer, retornar figura de erro
-        print(f"[ERRO] create_breakdown_calendar_heatmap: {type(e).__name__}: {e}")
         import traceback
         traceback.print_exc()
 

@@ -204,7 +204,6 @@ def route_and_prepare_content(pathname, sidebar_state):
     
     if not has_access:
         # Log de acesso negado
-        print(f"[ACCESS DENIED] User: {current_user.username}, Path: {pathname}, Reason: {denial_reason}")
         
         # Mostrar página de acesso negado
         page_content = access_denied.layout(
