@@ -37,10 +37,10 @@ def carregar_dados_csv():
         df_pendencias = pd.read_csv(caminho_pendencias)
         df_historico = pd.read_csv(caminho_historico)
 
-        # Converter datas
-        df_pendencias['data_criacao'] = pd.to_datetime(df_pendencias['data_criacao'])
-        df_pendencias['ultima_atualizacao'] = pd.to_datetime(df_pendencias['ultima_atualizacao'])
-        df_historico['data'] = pd.to_datetime(df_historico['data'])
+        # Converter datas (usar format='mixed' para suportar timestamps com microsegundos)
+        df_pendencias['data_criacao'] = pd.to_datetime(df_pendencias['data_criacao'], format='mixed')
+        df_pendencias['ultima_atualizacao'] = pd.to_datetime(df_pendencias['ultima_atualizacao'], format='mixed')
+        df_historico['data'] = pd.to_datetime(df_historico['data'], format='mixed')
 
         return df_pendencias, df_historico
 
@@ -427,6 +427,9 @@ def layout():
                 ], className="w-100")
             ], width=12, md=6, className="text-end")
         ], className="mb-4 align-items-center"),
+
+        # Container de Alertas (mensagens de sucesso/erro)
+        html.Div(id="alert-container-workflow", className="mb-3"),
 
         # Cards KPI
         criar_cards_kpi(df_pendencias),

@@ -19,10 +19,10 @@ def carregar_pendencias():
         ])
 
     df = pd.read_csv(PENDENCIAS_CSV)
-    df['data_criacao'] = pd.to_datetime(df['data_criacao'])
-    df['ultima_atualizacao'] = pd.to_datetime(df['ultima_atualizacao'])
+    df['data_criacao'] = pd.to_datetime(df['data_criacao'], format='mixed')
+    df['ultima_atualizacao'] = pd.to_datetime(df['ultima_atualizacao'], format='mixed')
     if 'ultima_edicao_data' in df.columns:
-        df['ultima_edicao_data'] = pd.to_datetime(df['ultima_edicao_data'])
+        df['ultima_edicao_data'] = pd.to_datetime(df['ultima_edicao_data'], format='mixed')
     return df
 
 
@@ -35,7 +35,7 @@ def carregar_historico():
         ])
 
     df = pd.read_csv(HISTORICO_CSV)
-    df['data'] = pd.to_datetime(df['data'])
+    df['data'] = pd.to_datetime(df['data'], format='mixed')
     return df
 
 
@@ -120,7 +120,7 @@ def criar_pendencia(descricao, responsavel, status, criado_por, criado_por_perfi
 
 def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
                      descricao_original, responsavel_original, status_original,
-                     editado_por):
+                     editado_por, observacoes=None):
     """
     Edita pendência existente e adiciona entradas no histórico.
 
@@ -133,6 +133,7 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
         responsavel_original: Responsável antes da edição
         status_original: Status antes da edição
         editado_por: Username de quem está editando
+        observacoes: Observações/justificativa das mudanças (opcional)
 
     Returns:
         tuple: (sucesso: bool, mensagem: str)
@@ -151,11 +152,14 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
         mudancas = []
 
         # Verificar mudanças e criar entradas de histórico
+        # Sufixo de observações (se fornecido)
+        obs_suffix = f": {observacoes}" if observacoes else ""
+
         if nova_descricao and nova_descricao != descricao_original:
             df_pend.at[idx, 'descricao'] = nova_descricao
             mudancas.append({
                 'pendencia_id': pend_id,
-                'descricao': f'Descrição editada por {editado_por}',
+                'descricao': f'Descrição editada por {editado_por}{obs_suffix}',
                 'data': agora,
                 'responsavel': novo_responsavel or responsavel_original,
                 'tipo_evento': 'edicao_descricao',
@@ -166,7 +170,7 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
             df_pend.at[idx, 'responsavel'] = novo_responsavel
             mudancas.append({
                 'pendencia_id': pend_id,
-                'descricao': f"Responsável alterado de '{responsavel_original}' para '{novo_responsavel}' por {editado_por}",
+                'descricao': f"Responsável alterado de '{responsavel_original}' para '{novo_responsavel}' por {editado_por}{obs_suffix}",
                 'data': agora,
                 'responsavel': novo_responsavel,
                 'tipo_evento': 'responsavel_mudanca',
@@ -177,7 +181,7 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
             df_pend.at[idx, 'status'] = novo_status
             mudancas.append({
                 'pendencia_id': pend_id,
-                'descricao': f"Status alterado de '{status_original}' para '{novo_status}' por {editado_por}",
+                'descricao': f"Status alterado de '{status_original}' para '{novo_status}' por {editado_por}{obs_suffix}",
                 'data': agora,
                 'responsavel': novo_responsavel or responsavel_original,
                 'tipo_evento': 'status_mudanca',

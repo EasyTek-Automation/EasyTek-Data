@@ -143,9 +143,9 @@ def register_workflow_callbacks(app):
         df_pendencias = pd.DataFrame(pendencias_data)
         df_historico = pd.DataFrame(historico_data)
 
-        # Converter datas
+        # Converter datas (usar format='mixed' para suportar timestamps com microsegundos)
         if not df_historico.empty:
-            df_historico['data'] = pd.to_datetime(df_historico['data'])
+            df_historico['data'] = pd.to_datetime(df_historico['data'], format='mixed')
 
         # Obter o índice da linha clicada (extraído do callback context)
         from dash import callback_context

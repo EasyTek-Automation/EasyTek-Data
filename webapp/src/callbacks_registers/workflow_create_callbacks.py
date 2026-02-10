@@ -75,9 +75,12 @@ def register_create_callbacks(app):
     # CALLBACK 3: Criar Pendência (Submit)
     @app.callback(
         [
+            Output("create-pend-modal", "is_open", allow_duplicate=True),
             Output("create-pend-alert", "children", allow_duplicate=True),
+            Output("alert-container-workflow", "children", allow_duplicate=True),
             Output("container-tabela", "children", allow_duplicate=True),
-            Output("store-pendencias", "data", allow_duplicate=True)
+            Output("store-pendencias", "data", allow_duplicate=True),
+            Output("store-historico", "data", allow_duplicate=True)
         ],
         Input("create-pend-submit-btn", "n_clicks"),
         [
@@ -94,21 +97,29 @@ def register_create_callbacks(app):
                              user_level, user_perfil, username):
         """Valida e cria nova pendência."""
         if not n_clicks:
-            return no_update, no_update, no_update
+            return no_update, no_update, no_update, no_update, no_update
 
         # VALIDAÇÃO 1: Nível 3
         if user_level != 3:
-            return dbc.Alert([
-                html.I(className="fas fa-shield-x me-2"),
-                "PERMISSÃO NEGADA: Apenas usuários nível 3 podem criar pendências"
-            ], color="danger", dismissable=True), no_update, no_update
+            return (
+                True,  # Modal continua aberto
+                dbc.Alert([
+                    html.I(className="fas fa-shield-x me-2"),
+                    "PERMISSÃO NEGADA: Apenas usuários nível 3 podem criar pendências"
+                ], color="danger", dismissable=True),
+                no_update, no_update, no_update, no_update
+            )
 
         # VALIDAÇÃO 2: Campos obrigatórios
         if not all([descricao, responsavel]):
-            return dbc.Alert([
-                html.I(className="fas fa-exclamation-triangle me-2"),
-                "Descrição e Responsável são obrigatórios"
-            ], color="warning", dismissable=True), no_update, no_update
+            return (
+                True,  # Modal continua aberto
+                dbc.Alert([
+                    html.I(className="fas fa-exclamation-triangle me-2"),
+                    "Descrição e Responsável são obrigatórios"
+                ], color="warning", dismissable=True),
+                no_update, no_update, no_update, no_update
+            )
 
         # VALIDAÇÃO 3: Departamento (responsável deve ser do mesmo dept)
         from src.database.connection import get_mongo_connection
@@ -116,16 +127,24 @@ def register_create_callbacks(app):
         resp_user = usuarios.find_one({"username": responsavel})
 
         if not resp_user:
-            return dbc.Alert([
-                html.I(className="fas fa-user-slash me-2"),
-                f"Usuário '{responsavel}' não encontrado"
-            ], color="danger", dismissable=True), no_update, no_update
+            return (
+                True,  # Modal continua aberto
+                dbc.Alert([
+                    html.I(className="fas fa-user-slash me-2"),
+                    f"Usuário '{responsavel}' não encontrado"
+                ], color="danger", dismissable=True),
+                no_update, no_update, no_update, no_update
+            )
 
         if user_perfil != "admin" and resp_user.get("perfil") != user_perfil:
-            return dbc.Alert([
-                html.I(className="fas fa-shield-x me-2"),
-                "PERMISSÃO NEGADA: Você só pode atribuir para usuários do seu departamento"
-            ], color="danger", dismissable=True), no_update, no_update
+            return (
+                True,  # Modal continua aberto
+                dbc.Alert([
+                    html.I(className="fas fa-shield-x me-2"),
+                    "PERMISSÃO NEGADA: Você só pode atribuir para usuários do seu departamento"
+                ], color="danger", dismissable=True),
+                no_update, no_update, no_update, no_update
+            )
 
         # CRIAR PENDÊNCIA
         sucesso, resultado = criar_pendencia(
@@ -137,21 +156,28 @@ def register_create_callbacks(app):
         )
 
         if sucesso:
-            # Recarregar tabela
+            # Recarregar tabela E histórico
             from src.pages.workflow.dashboard import carregar_dados_csv, criar_tabela_pendencias
-            df_pend, _ = carregar_dados_csv()
+            df_pend, df_hist = carregar_dados_csv()
             nova_tabela = criar_tabela_pendencias(df_pend)
 
             return (
-                dbc.Alert([
+                False,  # Fechar modal
+                "",     # Limpar alerta do modal
+                dbc.Alert([  # Mostrar alerta no topo da página
                     html.I(className="fas fa-check-circle me-2"),
                     f"Pendência {resultado} criada com sucesso!"
-                ], color="success", dismissable=True, duration=4000),
+                ], color="success", dismissable=True, duration=7000),
                 nova_tabela,
-                df_pend.to_dict('records')
+                df_pend.to_dict('records'),
+                df_hist.to_dict('records')  # Atualizar histórico também
             )
         else:
-            return dbc.Alert([
-                html.I(className="fas fa-times-circle me-2"),
-                f"Erro ao criar pendência: {resultado}"
-            ], color="danger", dismissable=True), no_update, no_update
+            return (
+                True,  # Modal continua aberto
+                dbc.Alert([
+                    html.I(className="fas fa-times-circle me-2"),
+                    f"Erro ao criar pendência: {resultado}"
+                ], color="danger", dismissable=True),
+                no_update, no_update, no_update, no_update
+            )

@@ -58,6 +58,17 @@ def edit_pendencia_modal():
                 className="mb-3"
             ),
 
+            # Campo: Observações (opcional)
+            html.Label("Observações (opcional):", className="fw-bold mb-1"),
+            dbc.Textarea(
+                id="edit-pend-observacoes",
+                placeholder="Justifique as mudanças realizadas (ex: 'Aguardando peça do fornecedor', 'Concluído teste inicial')...",
+                className="mb-2",
+                rows=3
+            ),
+            html.Small("Use este campo para explicar o motivo das alterações. Aparecerá no histórico.",
+                      className="text-muted d-block mb-3"),
+
             # Área de alerta
             html.Div(id="edit-pend-alert"),
 
