@@ -166,49 +166,48 @@ def register_maintenance_kpi_callbacks(app):
             # Continua para o fluxo normal de recarga abaixo
 
         # Validar inputs baseado no tipo
+        # Padrão: sempre usar modo "year" (ano completo)
         if not period_type:
-            period_type = "last12"  # Padrão
+            period_type = "year"
 
+        if not ref_year:
+            ref_year = 2026  # Ano padrão onde os dados ZPP estão disponíveis
 
-        if period_type in ["year", "last12"]:
-            if not ref_year:
-                ref_year = 2026  # Ano onde os dados ZPP estão disponíveis
+        if period_type == "year":
+            # Todos os meses do ano selecionado
+            months = list(range(1, 13))
+            year = ref_year
 
-            if period_type == "year":
-                # Todos os meses do ano
-                months = list(range(1, 13))
-                year = ref_year
-            else:  # last12
-                # Últimos 12 meses a partir do ano
-                # Assumir que estamos em dez/2025, então últimos 12 = jan-dez 2025
-                months = list(range(1, 13))
-                year = ref_year
-
-        else:  # custom
+        elif period_type == "custom":
+            # Período personalizado via date range
             if not start_date or not end_date:
-                # Usar padrão se não informado
-                year = 2026  # Ano padrão
+                # Fallback: usar ano completo
+                year = ref_year
                 months = list(range(1, 13))
             else:
-                # IMPLEMENTAR: Extrair ano/meses do date range
                 from datetime import datetime
                 start = datetime.fromisoformat(start_date) if isinstance(start_date, str) else start_date
                 end = datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
 
                 year = start.year
                 # Gerar lista de meses entre start e end
+                # LIMITAÇÃO: Apenas meses do mesmo ano (start.year)
                 months = []
                 current = start
-                while current <= end:
+                while current <= end and current.year == start.year:
                     if current.month not in months:
                         months.append(current.month)
                     # Avançar para próximo mês
                     if current.month == 12:
-                        current = current.replace(year=current.year + 1, month=1)
-                    else:
-                        current = current.replace(month=current.month + 1)
+                        break
+                    current = current.replace(month=current.month + 1)
 
-                months = sorted(months)
+                months = sorted(months) if months else [start.month]
+
+        else:
+            # Fallback: ano completo
+            year = ref_year
+            months = list(range(1, 13))
 
         # Buscar dados reais - INTEGRAÇÃO ZPP
 
