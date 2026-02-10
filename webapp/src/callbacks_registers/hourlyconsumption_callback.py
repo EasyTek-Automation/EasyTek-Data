@@ -38,13 +38,6 @@ def series_utc_to_sp_naive(s: pd.Series):
     dt_sp  = dt_utc.dt.tz_convert("America/Sao_Paulo").dt.tz_localize(None)
     return dt_sp
 
-LOG_LEVEL = os.getenv("LOG_LEVEL", "DEBUG").upper()
-logging.basicConfig(
-    level=getattr(logging, LOG_LEVEL, logging.DEBUG),
-    format="%(asctime)s [%(levelname)s] %(name)s - %(message)s",
-    datefmt="%d/%m/%Y %H:%M:%S",
-    force=True,
-)
 logger = logging.getLogger("consumptiongraph")
 
 def _mongo_meta_info(collection):

@@ -76,7 +76,6 @@ def register_energy_config_callbacks(app):
                 return [None, None, None, None, None, None, None, None, "18:00", "21:00"]
 
         except Exception as e:
-            print(f"Erro ao carregar configuração: {e}")
             # Retornar valores padrão em caso de erro
             return [None, None, None, None, None, None, None, None, "18:00", "21:00"]
 
@@ -305,7 +304,6 @@ def register_energy_config_callbacks(app):
             ], color="success", dismissable=True, duration=5000)
 
         except Exception as e:
-            print(f"Erro ao salvar configuração: {e}")
             return dbc.Alert([
                 html.I(className="bi bi-x-circle-fill me-2"),
                 f"Erro ao salvar configuração: {str(e)}"

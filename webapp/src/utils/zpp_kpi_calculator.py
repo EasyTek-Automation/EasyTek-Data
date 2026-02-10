@@ -3,9 +3,13 @@ Módulo para cálculo de KPIs de Manutenção baseado nas collections ZPP
 Implementa indicadores M01 (MTBF), M02 (MTTR) e M03 (Taxa de Avaria)
 conforme documento PRO017 - KPI Calculation Procedures
 
-Collections utilizadas:
-- ZPP_Producao_2025: Dados de produção (horas de atividade)
-- ZPP_Paradas_2025: Dados de paradas (avarias)
+Collections utilizadas (FIXAS - não mudar dinamicamente):
+- ZPP_Producao_2025: Dados de produção (horas de atividade) - contém dados de múltiplos anos
+- ZPP_Paradas_2025: Dados de paradas (avarias) - contém dados de múltiplos anos
+
+IMPORTANTE: Os nomes das collections são FIXOS (sempre 2025) mesmo contendo dados de outros anos.
+O filtro por ano é feito nos DADOS, não no nome da collection.
+NÃO modificar para usar nomes dinâmicos (ZPP_*_{year}).
 
 Códigos de avaria considerados: 201, S201, 202, S202, 203, S203
 """
@@ -13,10 +17,20 @@ Códigos de avaria considerados: 201, S201, 202, S202, 203, S203
 import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Optional
+import logging
 from src.database.connection import get_mongo_connection
+
+logger = logging.getLogger(__name__)
 
 
 # ==================== CONFIGURAÇÕES ====================
+
+# NOMES FIXOS DAS COLLECTIONS ZPP
+# IMPORTANTE: Não alterar para usar ano dinâmico!
+# Estas collections contêm dados de MÚLTIPLOS anos.
+# O filtro por ano é feito nos documentos, não no nome da collection.
+ZPP_PRODUCAO_COLLECTION = "ZPP_Producao_2025"
+ZPP_PARADAS_COLLECTION = "ZPP_Paradas_2025"
 
 # Códigos de motivo que representam AVARIAS
 BREAKDOWN_CODES = ['201', 'S201', '202', 'S202', '203', 'S203']
@@ -28,216 +42,406 @@ EQUIPMENT_CATEGORY_PREFIXES = {
     "Transversais": ["TRANS"]
 }
 
+# ==================== FILTRO DE VIRADA DE MÊS ====================
+# IMPORTANTE: Define como tratar registros que cruzam a virada do mês
+#
+# Problema: Registros com início em um mês e fim em outro
+# Exemplo: Início 30/09 23:59 → Fim 01/10 00:50
+#
+# MONTH_BOUNDARY_RULE = "fim"     → Conta no mês onde FINALIZOU (padrão)
+#                                    Exemplo acima = OUTUBRO
+#
+# MONTH_BOUNDARY_RULE = "inicio"  → Conta no mês onde COMEÇOU
+#                                    Exemplo acima = SETEMBRO
+#
+# RECOMENDAÇÃO: Usar "fim" para produção e "inicio" para paradas
+# ================================================================
+MONTH_BOUNDARY_RULE = "fim"  # Opções: "fim" ou "inicio"
+
 
 # ==================== FUNÇÕES DE BUSCA DE DADOS ====================
 
-def fetch_zpp_equipment_list() -> List[str]:
+def fetch_zpp_equipment_list(year: int = 2026) -> List[str]:
     """
     Busca lista única de equipamentos (linhas) das collections ZPP
+
+    Args:
+        year: Ano para buscar dados (padrão: 2026)
+              NOTA: O parâmetro year é mantido para compatibilidade futura,
+              mas atualmente as collections são FIXAS (ZPP_*_2025)
 
     Returns:
         List[str]: Lista de equipamentos únicos (ex: ["LONGI001", "LONGI002", ...])
     """
     try:
-        # Buscar de ambas as collections para garantir lista completa
-        paradas_collection = get_mongo_connection("ZPP_Paradas_2025")
-        producao_collection = get_mongo_connection("ZPP_Producao_2025")
+        logger.debug("Buscando lista de equipamentos (collections fixas: %s, %s)",
+                    ZPP_PARADAS_COLLECTION, ZPP_PRODUCAO_COLLECTION)
 
-        # Buscar valores únicos do campo 'linea' (paradas)
-        equipment_from_paradas = set(paradas_collection.distinct("linea"))
+        # IMPORTANTE: Usar constantes FIXAS, não f"ZPP_Paradas_{year}"
+        # As collections sempre se chamam *_2025 mesmo contendo dados de outros anos
+        paradas_collection = get_mongo_connection(ZPP_PARADAS_COLLECTION)
+        producao_collection = get_mongo_connection(ZPP_PRODUCAO_COLLECTION)
+
+        logger.debug("Collections conectadas com sucesso")
+
+        # Buscar valores únicos do campo 'centro_de_trabalho' (paradas)
+        equipment_from_paradas = set(paradas_collection.distinct("centro_de_trabalho"))
+        logger.debug("Equipamentos em %s (campo 'centro_de_trabalho'): %d",
+                    ZPP_PARADAS_COLLECTION, len(equipment_from_paradas))
 
         # Buscar valores únicos do campo 'pto_trab' (produção)
         equipment_from_producao = set(producao_collection.distinct("pto_trab"))
+        logger.debug("Equipamentos em %s (campo 'pto_trab'): %d",
+                    ZPP_PRODUCAO_COLLECTION, len(equipment_from_producao))
 
         # Combinar ambas as listas
         equipment_list = sorted(equipment_from_paradas | equipment_from_producao)
+        logger.debug("Total combinado (antes de limpar): %d equipamentos", len(equipment_list))
 
         # Remover valores vazios ou None
         equipment_list = [eq for eq in equipment_list if eq]
+        logger.debug("Lista final: %d equipamentos", len(equipment_list))
 
-        print(f"[ZPP] {len(equipment_list)} equipamentos encontrados: {equipment_list}")
+        if equipment_list:
+            logger.debug("Equipamentos: %s", equipment_list)
+        else:
+            logger.warning(
+                "Nenhum equipamento nas collections %s e %s",
+                ZPP_PARADAS_COLLECTION, ZPP_PRODUCAO_COLLECTION
+            )
+
         return equipment_list
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar lista de equipamentos: {e}")
+        logger.error(
+            "Erro ao buscar lista de equipamentos: %s",
+            str(e),
+            exc_info=True
+        )
         return []
 
 
 def fetch_zpp_production_data(year: int, months: List[int]) -> pd.DataFrame:
     """
-    Busca dados de produção da collection ZPP_Producao_2025
+    Busca dados de produção da collection ZPP (nome fixo: ZPP_Producao_2025)
+
+    IMPORTANTE: Usa filtro INCLUSIVO para capturar registros que cruzam virada de mês
+    - Busca registros onde INÍCIO ou FIM estejam no mês
+    - Aplica regra de desempate conforme MONTH_BOUNDARY_RULE
 
     Args:
-        year: Ano de referência (ex: 2025)
+        year: Ano de referência para FILTRAR os dados (ex: 2025, 2026)
         months: Lista de meses (ex: [1, 2, 3] para Jan-Mar)
 
     Returns:
-        DataFrame com colunas: [linea, date, month, horasact]
+        DataFrame com colunas: [linea, date, month, horasact, boundary_case]
     """
     try:
-        collection = get_mongo_connection("ZPP_Producao_2025")
+        from calendar import monthrange
 
-        # Construir query MongoDB
+        # IMPORTANTE: Usar constante fixa, não nome dinâmico
+        collection = get_mongo_connection(ZPP_PRODUCAO_COLLECTION)
+
+        # Filtrar por DATA REAL (fininotif)
+        # Criar range de datas para o ano solicitado
+        start_date = datetime(year, 1, 1)
+        end_date = datetime(year, 12, 31, 23, 59, 59)
+
+        # Buscar TODOS os registros processados do ano baseado em DATA REAL
+        # Vamos filtrar por mês depois (para aplicar regra inclusiva)
         query = {
-            "_year": year,
-            "_processed": True
+            "_processed": True,
+            "fininotif": {
+                "$gte": start_date,
+                "$lte": end_date
+            }
         }
 
-        # Buscar documentos
+        # Buscar documentos com AMBAS as datas
         cursor = collection.find(
             query,
             {
-                "pto_trab": 1,  # Campo de linha (pode ser pto_trab ou linea)
-                "fininotif": 1,  # Data de início
-                "horasact": 1,   # Horas de atividade
+                "pto_trab": 1,
+                "fininotif": 1,  # Data de INÍCIO
+                "ffinnotif": 1,  # Data de FIM
+                "horasact": 1,
                 "_id": 0
             }
         )
 
-        # Converter para lista
         records = list(cursor)
 
         if not records:
-            print(f"[AVISO] Nenhum dado de produção encontrado para {year}")
-            return pd.DataFrame(columns=["linea", "date", "month", "horasact"])
+            return pd.DataFrame(columns=["linea", "date", "month", "horasact", "boundary_case"])
 
-        # Processar dados
+        # Processar dados com filtro INCLUSIVO
         processed_records = []
+        boundary_count = 0  # Contador de registros na virada
+
         for record in records:
-            # Extrair data
-            date_obj = record.get("fininotif")
-            if date_obj is None:
-                continue  # Pular registros sem data
+            # Extrair datas (IMPORTANTE: fininotif = INÍCIO, ffinnotif = FIM)
+            inicio_obj = record.get("fininotif")  # Data de INÍCIO
+            fim_obj = record.get("ffinnotif")     # Data de FIM
 
-            # Converter para datetime se necessário
-            if isinstance(date_obj, dict) and "$date" in date_obj:
-                # Formato JSON do MongoDB
-                date_str = date_obj["$date"]
-                date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-            elif isinstance(date_obj, datetime):
-                # Já é um objeto datetime (retorno do PyMongo)
-                date = date_obj
-            else:
-                continue  # Pular registros com formato inválido
-
-            # Filtrar por mês
-            if date.month not in months:
+            # Precisamos de pelo menos uma data válida
+            if not fim_obj and not inicio_obj:
                 continue
 
-            # Extrair linha (priorizar pto_trab, fallback para linea)
+            # Converter datas
+            def parse_date(date_obj):
+                if date_obj is None:
+                    return None
+                if isinstance(date_obj, dict) and "$date" in date_obj:
+                    return datetime.fromisoformat(date_obj["$date"].replace('Z', '+00:00'))
+                elif isinstance(date_obj, datetime):
+                    return date_obj
+                return None
+
+            inicio = parse_date(inicio_obj)
+            fim = parse_date(fim_obj)
+
+            # Se não temos fim, usar início como fallback
+            if not fim and inicio:
+                fim = inicio
+            elif not inicio and fim:
+                inicio = fim
+            elif not inicio and not fim:
+                continue
+
+            # Extrair equipamento
             linea = record.get("pto_trab")
             if not linea:
                 linea = record.get("linea")
             if not linea:
                 continue
 
-            # Extrair horas de atividade
+            # Extrair horas
             horasact = record.get("horasact", 0)
 
-            processed_records.append({
-                "linea": linea,
-                "date": date.date(),
-                "month": date.month,
-                "horasact": float(horasact)
-            })
+            # FILTRO INCLUSIVO: Verificar se registro afeta algum dos meses solicitados
+            for target_month in months:
+                # Calcular início e fim do mês alvo
+                first_day = datetime(year, target_month, 1)
+                last_day = datetime(year, target_month, monthrange(year, target_month)[1], 23, 59, 59)
+
+                # Verificar se registro intersecta com o mês
+                # Casos:
+                # 1. Completamente dentro do mês
+                # 2. Começa antes e termina dentro
+                # 3. Começa dentro e termina depois
+                # 4. Começa antes e termina depois (atravessa o mês todo)
+
+                intersects = False
+                boundary_case = False
+
+                # Registro intersecta se:
+                # - início está no mês OU
+                # - fim está no mês OU
+                # - início antes e fim depois (atravessa o mês)
+                if (first_day <= inicio <= last_day) or \
+                   (first_day <= fim <= last_day) or \
+                   (inicio < first_day and fim > last_day):
+                    intersects = True
+
+                if not intersects:
+                    continue
+
+                # Detectar se é caso de virada de mês
+                if inicio.month != fim.month:
+                    boundary_case = True
+                    boundary_count += 1
+
+                    # APLICAR REGRA DE DESEMPATE
+                    if MONTH_BOUNDARY_RULE == "fim":
+                        # Conta no mês onde FINALIZOU
+                        if fim.month != target_month:
+                            continue  # Pula este mês, será contado no mês do fim
+                    elif MONTH_BOUNDARY_RULE == "inicio":
+                        # Conta no mês onde COMEÇOU
+                        if inicio.month != target_month:
+                            continue  # Pula este mês, será contado no mês do início
+                    else:
+                        # Fallback: usar fim (padrão)
+                        if fim.month != target_month:
+                            continue
+
+                # Adicionar registro
+                processed_records.append({
+                    "linea": linea,
+                    "date": fim.date(),
+                    "month": target_month,
+                    "horasact": float(horasact),
+                    "boundary_case": boundary_case
+                })
+                break  # Não contar o mesmo registro em múltiplos meses
 
         df = pd.DataFrame(processed_records)
-        print(f"[ZPP] Produção: {len(df)} registros carregados para {year}, meses {months}")
+
+        if boundary_count > 0:
+            pass
+        else:
+            pass
 
         return df
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar dados de produção: {e}")
-        return pd.DataFrame(columns=["linea", "date", "month", "horasact"])
+        import traceback
+        traceback.print_exc()
+        return pd.DataFrame(columns=["linea", "date", "month", "horasact", "boundary_case"])
 
 
 def fetch_zpp_breakdown_data(year: int, months: List[int]) -> pd.DataFrame:
     """
-    Busca dados de paradas (avarias) da collection ZPP_Paradas_2025
+    Busca dados de paradas (avarias) da collection ZPP (nome fixo: ZPP_Paradas_2025)
+
+    IMPORTANTE: Usa filtro INCLUSIVO para capturar registros que cruzam virada de mês
+    - Busca registros onde INÍCIO ou FIM estejam no mês
+    - Aplica regra de desempate conforme MONTH_BOUNDARY_RULE
 
     Args:
-        year: Ano de referência (ex: 2025)
+        year: Ano de referência para FILTRAR os dados (ex: 2025, 2026)
         months: Lista de meses (ex: [1, 2, 3])
 
     Returns:
-        DataFrame com colunas: [linea, date, month, motivo, duracao_min]
+        DataFrame com colunas: [linea, date, month, motivo, duracao_min, boundary_case]
     """
     try:
-        collection = get_mongo_connection("ZPP_Paradas_2025")
+        from calendar import monthrange
 
-        # Construir query MongoDB
+        # IMPORTANTE: Usar constante fixa, não nome dinâmico
+        collection = get_mongo_connection(ZPP_PARADAS_COLLECTION)
+
+        # Filtrar por DATA REAL (data_inicio)
+        # Criar range de datas para o ano solicitado
+        start_date = datetime(year, 1, 1)
+        end_date = datetime(year, 12, 31, 23, 59, 59)
+
+        # Buscar TODOS os registros processados do ano baseado em DATA REAL
         query = {
-            "_year": year,
             "_processed": True,
-            "motivo": {"$in": BREAKDOWN_CODES}  # Filtrar apenas avarias
+            "causa_do_desvio": {"$in": BREAKDOWN_CODES},
+            "inicio_execucao": {
+                "$gte": start_date,
+                "$lte": end_date
+            }
         }
 
-        # Buscar documentos
+        # Buscar documentos com AMBAS as datas
         cursor = collection.find(
             query,
             {
-                "linea": 1,
-                "data_inicio": 1,
-                "motivo": 1,
-                "duracao_min": 1,
+                "centro_de_trabalho": 1,
+                "inicio_execucao": 1,  # Início da parada
+                "fim_execucao": 1,     # Fim da parada
+                "causa_do_desvio": 1,
+                "duration_min": 1,
                 "_id": 0
             }
         )
 
-        # Converter para lista
         records = list(cursor)
 
         if not records:
-            print(f"[AVISO] Nenhuma parada (avaria) encontrada para {year}")
-            return pd.DataFrame(columns=["linea", "date", "month", "motivo", "duracao_min"])
+            return pd.DataFrame(columns=["linea", "date", "month", "motivo", "duracao_min", "boundary_case"])
 
-        # Processar dados
+        # Processar dados com filtro INCLUSIVO
         processed_records = []
+        boundary_count = 0
+
         for record in records:
-            # Extrair data
-            date_obj = record.get("data_inicio")
-            if date_obj is None:
-                continue  # Pular registros sem data
+            # Extrair datas
+            inicio_obj = record.get("inicio_execucao")
+            fim_obj = record.get("fim_execucao")
 
-            # Converter para datetime se necessário
-            if isinstance(date_obj, dict) and "$date" in date_obj:
-                # Formato JSON do MongoDB
-                date_str = date_obj["$date"]
-                date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
-            elif isinstance(date_obj, datetime):
-                # Já é um objeto datetime (retorno do PyMongo)
-                date = date_obj
-            else:
-                continue  # Pular registros com formato inválido
+            if not inicio_obj and not fim_obj:
+                continue
 
-            # Filtrar por mês
-            if date.month not in months:
+            # Converter datas
+            def parse_date(date_obj):
+                if date_obj is None:
+                    return None
+                if isinstance(date_obj, dict) and "$date" in date_obj:
+                    return datetime.fromisoformat(date_obj["$date"].replace('Z', '+00:00'))
+                elif isinstance(date_obj, datetime):
+                    return date_obj
+                return None
+
+            inicio = parse_date(inicio_obj)
+            fim = parse_date(fim_obj)
+
+            # Se não temos fim, usar início
+            if not fim and inicio:
+                fim = inicio
+            elif not inicio and fim:
+                inicio = fim
+            elif not inicio and not fim:
                 continue
 
             # Extrair campos
-            linea = record.get("linea")
-            motivo = record.get("motivo")
-            duracao_min = record.get("duracao_min", 0)
+            linea = record.get("centro_de_trabalho")
+            motivo = record.get("causa_do_desvio")
+            duracao_min = record.get("duration_min", 0)
 
             if not linea:
                 continue
 
-            processed_records.append({
-                "linea": linea,
-                "date": date.date(),
-                "month": date.month,
-                "motivo": motivo,
-                "duracao_min": float(duracao_min)
-            })
+            # FILTRO INCLUSIVO por mês
+            for target_month in months:
+                first_day = datetime(year, target_month, 1)
+                last_day = datetime(year, target_month, monthrange(year, target_month)[1], 23, 59, 59)
+
+                # Verificar interseção
+                intersects = False
+                boundary_case = False
+
+                if (first_day <= inicio <= last_day) or \
+                   (first_day <= fim <= last_day) or \
+                   (inicio < first_day and fim > last_day):
+                    intersects = True
+
+                if not intersects:
+                    continue
+
+                # Detectar virada de mês
+                if inicio.month != fim.month:
+                    boundary_case = True
+                    boundary_count += 1
+
+                    # APLICAR REGRA DE DESEMPATE
+                    if MONTH_BOUNDARY_RULE == "fim":
+                        if fim.month != target_month:
+                            continue
+                    elif MONTH_BOUNDARY_RULE == "inicio":
+                        if inicio.month != target_month:
+                            continue
+                    else:
+                        if fim.month != target_month:
+                            continue
+
+                # Adicionar registro
+                processed_records.append({
+                    "linea": linea,
+                    "date": inicio.date(),
+                    "month": target_month,
+                    "motivo": motivo,
+                    "duracao_min": float(duracao_min),
+                    "boundary_case": boundary_case
+                })
+                break
 
         df = pd.DataFrame(processed_records)
-        print(f"[ZPP] Paradas: {len(df)} registros de avarias carregados para {year}, meses {months}")
+
+        if boundary_count > 0:
+            pass
+        else:
+            pass
 
         return df
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar dados de paradas: {e}")
-        return pd.DataFrame(columns=["linea", "date", "month", "motivo", "duracao_min"])
+        import traceback
+        traceback.print_exc()
+        return pd.DataFrame(columns=["linea", "date", "month", "motivo", "duracao_min", "boundary_case"])
 
 
 # ==================== FUNÇÕES DE CÁLCULO DE KPIs ====================
@@ -268,14 +472,12 @@ def calculate_monthly_kpis(production_df: pd.DataFrame, breakdown_df: pd.DataFra
 
     # Verificar se há dados
     if production_df.empty:
-        print("[AVISO] Sem dados de produção para calcular KPIs")
         return result
 
     # Obter lista de equipamentos e meses únicos
     equipment_list = production_df['linea'].unique()
     months = sorted(production_df['month'].unique())
 
-    print(f"[ZPP] Calculando KPIs para {len(equipment_list)} equipamentos, {len(months)} meses")
 
     for linea in equipment_list:
         monthly_data = []
@@ -308,8 +510,9 @@ def calculate_monthly_kpis(production_df: pd.DataFrame, breakdown_df: pd.DataFra
                 if num_failures > 0:
                     mtbf = (total_active_hours - total_breakdown_hours) / num_failures
                 else:
-                    # Sem falhas = MTBF infinito (usar valor alto)
-                    mtbf = 999.0
+                    # Sem falhas = usar tempo total de produção como MTBF
+                    # Lógica: se produziu X horas sem falhar, o tempo entre falhas é X
+                    mtbf = total_active_hours
 
                 # M02 - MTTR (horas)
                 if num_failures > 0:
@@ -320,7 +523,7 @@ def calculate_monthly_kpis(production_df: pd.DataFrame, breakdown_df: pd.DataFra
                 # M03 - Taxa de Avaria (%)
                 breakdown_rate = (total_breakdown_hours / total_active_hours) * 100
             else:
-                # Sem horas de atividade
+                # Sem horas de atividade = não calcular KPIs
                 mtbf = None
                 mttr = None
                 breakdown_rate = None
@@ -334,7 +537,6 @@ def calculate_monthly_kpis(production_df: pd.DataFrame, breakdown_df: pd.DataFra
 
         result[linea] = monthly_data
 
-    print(f"[ZPP] KPIs calculados com sucesso para {len(result)} equipamentos")
     return result
 
 
@@ -354,11 +556,6 @@ def fetch_zpp_kpi_data(year: int, months: List[int]) -> Dict:
     Raises:
         Exception: Se houver erro ao buscar ou processar dados
     """
-    print("\n" + "-"*60)
-    print(f">>> ZPP: Iniciando fetch_zpp_kpi_data")
-    print(f"    Ano: {year}")
-    print(f"    Meses: {months}")
-    print("-"*60)
 
     try:
         # 1. Buscar dados de produção
@@ -373,11 +570,9 @@ def fetch_zpp_kpi_data(year: int, months: List[int]) -> Dict:
         if not kpi_data:
             raise Exception("Nenhum dado de KPI foi calculado (sem dados de produção)")
 
-        print(f"[ZPP] ✓ Dados carregados com sucesso: {len(kpi_data)} equipamentos")
         return kpi_data
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar dados ZPP: {e}")
         raise
 
 
@@ -395,9 +590,16 @@ def get_zpp_equipment_categories() -> Dict[str, List[str]]:
         }
     """
     try:
+        logger.debug("Iniciando categorização de equipamentos")
+
         equipment_list = fetch_zpp_equipment_list()
+        logger.debug("Equipamentos encontrados: %d total", len(equipment_list))
+        logger.debug("Lista: %s", equipment_list)
 
         categories = {}
+
+        # Log dos prefixos configurados
+        logger.debug("Prefixos configurados: %s", EQUIPMENT_CATEGORY_PREFIXES)
 
         for category_name, prefixes in EQUIPMENT_CATEGORY_PREFIXES.items():
             # Filtrar equipamentos que começam com algum dos prefixos
@@ -408,17 +610,46 @@ def get_zpp_equipment_categories() -> Dict[str, List[str]]:
 
             if category_equipment:
                 categories[category_name] = category_equipment
+                logger.debug(
+                    "Categoria '%s': %d equipamentos (%s)",
+                    category_name,
+                    len(category_equipment),
+                    ", ".join(category_equipment)
+                )
+            else:
+                logger.debug(
+                    "Categoria '%s' (prefixos %s): nenhum equipamento",
+                    category_name, prefixes
+                )
 
         # Adicionar categoria "Outros" para equipamentos não categorizados
         categorized = [eq for cat_list in categories.values() for eq in cat_list]
         others = [eq for eq in equipment_list if eq not in categorized]
         if others:
             categories["Outros"] = others
+            logger.debug(
+                "Categoria 'Outros': %d não categorizados (%s)",
+                len(others), ", ".join(others)
+            )
+
+        # Log do resultado final
+        total_categorized = sum(len(eqs) for eqs in categories.values())
+        logger.info(
+            "Categorização concluída: %d categorias, %d equipamentos",
+            len(categories), total_categorized
+        )
+
+        if not categories:
+            logger.warning("Nenhuma categoria criada - lista de equipamentos vazia")
 
         return categories
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar categorias: {e}")
+        logger.error(
+            "Erro ao categorizar equipamentos: %s",
+            str(e),
+            exc_info=True
+        )
         return {}
 
 
@@ -445,8 +676,6 @@ def get_zpp_equipment_names() -> Dict[str, str]:
     try:
         equipment_list = fetch_zpp_equipment_list()
 
-        print(f"[DEBUG] get_zpp_equipment_names: {len(equipment_list)} equipamentos encontrados")
-        print(f"[DEBUG] CUSTOM_NAMES definidos: {list(CUSTOM_NAMES.keys())}")
 
         # Criar nomes amigáveis
         names = {}
@@ -454,7 +683,6 @@ def get_zpp_equipment_names() -> Dict[str, str]:
             # Verificar se há nome customizado
             if eq_id in CUSTOM_NAMES:
                 names[eq_id] = CUSTOM_NAMES[eq_id]
-                print(f"[DEBUG] Usando nome customizado: {eq_id} -> {CUSTOM_NAMES[eq_id]}")
             else:
                 # Gerar nome automaticamente baseado no prefixo
                 if eq_id.startswith("LONGI"):
@@ -475,7 +703,6 @@ def get_zpp_equipment_names() -> Dict[str, str]:
         return names
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar nomes de equipamentos: {e}")
         return {}
 
 
@@ -487,7 +714,7 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
 
     Args:
         equipment_id: ID do equipamento (ex: "LONGI001")
-        year: Ano de referência (ex: 2025)
+        year: Ano de referência para FILTRAR os dados (ex: 2025, 2026)
         months: Lista de meses (ex: [1, 2, 3])
         top_n: Número de paradas a retornar (padrão: 10)
 
@@ -499,39 +726,77 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
                 "motivo": "201",
                 "duracao_min": 120.5,
                 "duracao_horas": 2.01,
-                "descricao": "Avaria Elétrica"  # Descrição do campo 'descripcao_do_motivo'
+                "descricao": "Observação da notificação"  # Campo 'observacao_de_notificacao'
             },
             ...
         ]
     """
     try:
-        collection = get_mongo_connection("ZPP_Paradas_2025")
+        # IMPORTANTE: Usar constante fixa, não nome dinâmico
+        collection = get_mongo_connection(ZPP_PARADAS_COLLECTION)
 
-        # Query MongoDB
-        query = {
-            "_year": year,
-            "_processed": True,
-            "linea": equipment_id,
-            "motivo": {"$in": BREAKDOWN_CODES}
-        }
+        # Filtrar por DATA REAL (data_inicio)
+        # Criar range de datas para o ano solicitado
+        start_date = datetime(year, 1, 1)
+        end_date = datetime(year, 12, 31, 23, 59, 59)
 
-        # Buscar documentos - AGORA INCLUINDO descripcao_do_motivo
-        cursor = collection.find(
-            query,
+        # Construir pipeline de agregação para filtrar por mês primeiro
+        # Usar $expr para comparar mês extraído de inicio_execucao
+        pipeline = [
+            # Stage 1: Filtrar por equipamento, ano (via data real), códigos de parada
             {
-                "data_inicio": 1,
-                "motivo": 1,
-                "duracao_min": 1,
-                "descripcao_do_motivo": 1,  # ✅ BUSCAR DESCRIÇÃO REAL DO BANCO
-                "_id": 0
+                "$match": {
+                    "_processed": True,
+                    "centro_de_trabalho": equipment_id,
+                    "causa_do_desvio": {"$in": BREAKDOWN_CODES},
+                    "inicio_execucao": {
+                        "$gte": start_date,
+                        "$lte": end_date,
+                        "$exists": True
+                    }
+                }
+            },
+            # Stage 2: Adicionar campo calculado com o mês extraído
+            {
+                "$addFields": {
+                    "_month": {"$month": "$inicio_execucao"}
+                }
+            },
+            # Stage 3: Filtrar pelos meses desejados
+            {
+                "$match": {
+                    "_month": {"$in": months}
+                }
+            },
+            # Stage 4: Ordenar por duração (maior para menor)
+            {
+                "$sort": {"duration_min": -1}
+            },
+            # Stage 5: Limitar ao top_n
+            {
+                "$limit": top_n
+            },
+            # Stage 6: Projetar apenas os campos necessários
+            {
+                "$project": {
+                    "inicio_execucao": 1,
+                    "causa_do_desvio": 1,
+                    "duration_min": 1,
+                    "descricao": 1,
+                    "texto_de_confirmacao": 1,
+                    "_id": 0
+                }
             }
-        ).sort("duracao_min", -1).limit(top_n)  # Ordenar por duração DESC e limitar
+        ]
+
+        # Executar pipeline
+        cursor = collection.aggregate(pipeline)
 
         # Processar dados
         result = []
         for record in cursor:
             # Extrair data
-            date_obj = record.get("data_inicio")
+            date_obj = record.get("inicio_execucao")
             if date_obj is None:
                 continue
 
@@ -544,74 +809,47 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
             else:
                 continue
 
-            # Filtrar por mês
-            if date.month not in months:
-                continue
+            motivo = record.get("causa_do_desvio", "")
+            duracao_min = record.get("duration_min", 0)
 
-            motivo = record.get("motivo", "")
-            duracao_min = record.get("duracao_min", 0)
-
-            # ✅ USAR DESCRIÇÃO REAL DO BANCO DE DADOS
-            descricao = record.get("descripcao_do_motivo", f"Motivo {motivo}")
+            # ✅ USAR DESCRIÇÃO E TEXTO DE CONFIRMAÇÃO DO BANCO DE DADOS
+            descricao = record.get("descricao", record.get("texto_de_confirmacao", f"Motivo {motivo}"))
 
             result.append({
                 "date": date.date(),
                 "motivo": motivo,
                 "duracao_min": float(duracao_min),
                 "duracao_horas": round(duracao_min / 60.0, 2),
-                "descricao": descricao  # ✅ DESCRIÇÃO DINÂMICA DO BANCO
+                "descricao": descricao  # ✅ DESCRIÇÃO DA PARADA
             })
 
-        # Ordenar por duração (maior para menor) - garantir ordem mesmo após filtro
-        result.sort(key=lambda x: x["duracao_min"], reverse=True)
-
-        # Limitar ao top_n após filtro de meses
-        result = result[:top_n]
-
-        print(f"[ZPP] Top {len(result)} paradas encontradas para {equipment_id}")
         return result
 
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar top paradas: {e}")
         return []
 
 
 if __name__ == "__main__":
     """Script de teste para validar cálculos"""
-    print("\n" + "="*80)
-    print("TESTE: Módulo ZPP KPI Calculator")
-    print("="*80 + "\n")
 
     # Testar busca de equipamentos
-    print("1. Buscando lista de equipamentos...")
     equipments = fetch_zpp_equipment_list()
-    print(f"   → Encontrados: {equipments}\n")
 
     # Testar busca de categorias
-    print("2. Buscando categorias...")
     categories = get_zpp_equipment_categories()
     for cat, eqs in categories.items():
-        print(f"   → {cat}: {eqs}")
-    print()
+        pass
 
     # Testar busca de dados e cálculo de KPIs
-    print("3. Testando cálculo de KPIs para Jan-Mar 2025...")
     try:
         kpi_data = fetch_zpp_kpi_data(year=2025, months=[1, 2, 3])
 
         # Mostrar exemplo de resultado
         if kpi_data:
             first_equipment = list(kpi_data.keys())[0]
-            print(f"\n   Exemplo: {first_equipment}")
             for month_data in kpi_data[first_equipment]:
-                print(f"   → Mês {month_data['month']}: "
-                      f"MTBF={month_data['mtbf']}h, "
-                      f"MTTR={month_data['mttr']}h, "
-                      f"Taxa={month_data['breakdown_rate']}%")
-
-        print(f"\n   ✓ Teste concluído com sucesso!")
+                pass
 
     except Exception as e:
-        print(f"\n   ✗ Erro no teste: {e}")
+        pass
 
-    print("\n" + "="*80)

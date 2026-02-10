@@ -57,7 +57,6 @@ def can_access_route(user, pathname):
     min_level = config.get("min_level", 1)
     
     if user_level < min_level:
-        print(f"[ACESSO NEGADO] Usuário {user.username}: nível {user_level} < mínimo {min_level} para {pathname}")
         return False
     
     # Se é shared, só precisava verificar o nível (já passou)
@@ -69,7 +68,6 @@ def can_access_route(user, pathname):
     allowed_perfis = config.get("perfis", [])
     
     if user_perfil not in allowed_perfis:
-        print(f"[ACESSO NEGADO] Usuário {user.username}: perfil '{user_perfil}' não está em {allowed_perfis} para {pathname}")
         return False
     
     return True

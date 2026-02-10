@@ -212,6 +212,5 @@ def successful_register(n_clicks, username, password, email, departamento, level
         # Fallback: salve sem departamento (função antiga)
         # TODO: Atualizar save_user() para incluir departamento
         save_user(username, email, password, level)
-        print(f"AVISO: Departamento '{departamento}' não foi salvo. Atualize a função save_user().")
     
     return '/login', "Registro bem-sucedido! Faça o login."

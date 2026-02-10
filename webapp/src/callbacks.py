@@ -50,7 +50,6 @@ def register_callbacks(app):
     """
 
     # Tentar configurar conexões (modo não-fatal)
-    print("\n🔌 Configurando conexões MongoDB...")
 
     collection_graph = get_mongo_connection(collection_name='DecapadoPerformance', silent=False)
     collection_table = get_mongo_connection(collection_name='DecapadoFalhas', silent=True)
@@ -61,11 +60,9 @@ def register_callbacks(app):
     # Verificar status
     status = get_connection_status()
     if not status["available"]:
-        print(f"\n⚠️  MongoDB OFFLINE - Aplicação iniciará em modo degradado")
-        print(f"   Erro: {status['error']}")
-        print(f"   ℹ️  Os usuários verão mensagens amigáveis ao acessar páginas que precisam do banco.\n")
+        pass  # MongoDB offline - modo degradado
     else:
-        print("✅ MongoDB conectado com sucesso!\n")
+        pass  # MongoDB conectado
 
     # Registra os callbacks existentes (sem alterações aqui)
     register_input_bridge_callbacks(app)

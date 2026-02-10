@@ -111,8 +111,11 @@ def layout():
                             dbc.Col([
                                 dbc.Card([
                                     dbc.CardHeader([
-                                        html.I(className="bi bi-clock-history me-2"),
-                                        html.Strong("Hierarquia MTBF")
+                                        html.Div([
+                                            html.Strong("M01 - MTBF - Tempo Médio Entre Falhas", style={"fontSize": "0.95rem"}),
+                                            html.Br(),
+                                            html.Small("Mean Time Between Failures", style={"fontSize": "0.75rem", "opacity": "0.8"})
+                                        ])
                                     ]),
                                     dbc.CardBody([
                                         dcc.Loading(
@@ -132,8 +135,11 @@ def layout():
                             dbc.Col([
                                 dbc.Card([
                                     dbc.CardHeader([
-                                        html.I(className="bi bi-tools me-2"),
-                                        html.Strong("Hierarquia MTTR")
+                                        html.Div([
+                                            html.Strong("M02 - MTTR - Tempo Médio de Reparo", style={"fontSize": "0.95rem"}),
+                                            html.Br(),
+                                            html.Small("Mean Time To Recovery/Repair", style={"fontSize": "0.75rem", "opacity": "0.8"})
+                                        ])
                                     ]),
                                     dbc.CardBody([
                                         dcc.Loading(
@@ -153,8 +159,11 @@ def layout():
                             dbc.Col([
                                 dbc.Card([
                                     dbc.CardHeader([
-                                        html.I(className="bi bi-exclamation-triangle me-2"),
-                                        html.Strong("Hierarquia Avarias")
+                                        html.Div([
+                                            html.Strong("M03 - Taxa de Avaria", style={"fontSize": "0.95rem"}),
+                                            html.Br(),
+                                            html.Small("Breakdown Rate", style={"fontSize": "0.75rem", "opacity": "0.8"})
+                                        ])
                                     ]),
                                     dbc.CardBody([
                                         dcc.Loading(
@@ -171,6 +180,82 @@ def layout():
                             ], xs=12, md=4)
                         ], className="mb-4"),
 
+                        # Seção: Evolução Temporal Geral (NOVO)
+                        html.H5([
+                            html.I(className="bi bi-graph-up me-2"),
+                            "Evolução Temporal da Planta"
+                        ], className="mt-4 mb-3"),
+                        dbc.Row([
+                            # Gráfico MTBF - Evolução Mensal
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader([
+                                        html.Div([
+                                            html.Strong("M01 - MTBF - Tempo Médio Entre Falhas", style={"fontSize": "0.95rem"}),
+                                            html.Br(),
+                                            html.Small("Mean Time Between Failures", style={"fontSize": "0.75rem", "opacity": "0.8"})
+                                        ])
+                                    ]),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            type="circle",
+                                            color="#198754",
+                                            children=dcc.Graph(
+                                                id="line-chart-mtbf-general",
+                                                config=PLOTLY_CONFIG
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], md=4),
+
+                            # Gráfico MTTR - Evolução Mensal
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader([
+                                        html.Div([
+                                            html.Strong("M02 - MTTR - Tempo Médio de Reparo", style={"fontSize": "0.95rem"}),
+                                            html.Br(),
+                                            html.Small("Mean Time To Recovery/Repair", style={"fontSize": "0.75rem", "opacity": "0.8"})
+                                        ])
+                                    ]),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            type="circle",
+                                            color="#0d6efd",
+                                            children=dcc.Graph(
+                                                id="line-chart-mttr-general",
+                                                config=PLOTLY_CONFIG
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], md=4),
+
+                            # Gráfico Taxa Avaria - Evolução Mensal
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader([
+                                        html.Div([
+                                            html.Strong("M03 - Taxa de Avaria", style={"fontSize": "0.95rem"}),
+                                            html.Br(),
+                                            html.Small("Breakdown Rate", style={"fontSize": "0.75rem", "opacity": "0.8"})
+                                        ])
+                                    ]),
+                                    dbc.CardBody([
+                                        dcc.Loading(
+                                            type="circle",
+                                            color="#ffc107",
+                                            children=dcc.Graph(
+                                                id="line-chart-breakdown-general",
+                                                config=PLOTLY_CONFIG
+                                            )
+                                        )
+                                    ])
+                                ], className="shadow-sm")
+                            ], md=4)
+                        ], className="mb-4"),
+
                         # Seção: Gráficos de Barras (MOVIDA PARA BAIXO)
                         html.H5([
                             html.I(className="bi bi-bar-chart-fill me-2"),
@@ -181,8 +266,11 @@ def layout():
                             dbc.Col([
                                 dbc.Card([
                                     dbc.CardHeader([
-                                        html.I(className="bi bi-clock-history me-2"),
-                                        html.Strong("MTBF (Mean Time Between Failures)")
+                                        html.Div([
+                                            html.Strong("M01 - MTBF - Tempo Médio Entre Falhas", style={"fontSize": "0.95rem"}),
+                                            html.Br(),
+                                            html.Small("Mean Time Between Failures", style={"fontSize": "0.75rem", "opacity": "0.8"})
+                                        ])
                                     ]),
                                     dbc.CardBody([
                                         dcc.Loading(
@@ -202,8 +290,11 @@ def layout():
                             dbc.Col([
                                 dbc.Card([
                                     dbc.CardHeader([
-                                        html.I(className="bi bi-tools me-2"),
-                                        html.Strong("MTTR (Mean Time To Repair)")
+                                        html.Div([
+                                            html.Strong("M02 - MTTR - Tempo Médio de Reparo", style={"fontSize": "0.95rem"}),
+                                            html.Br(),
+                                            html.Small("Mean Time To Recovery/Repair", style={"fontSize": "0.75rem", "opacity": "0.8"})
+                                        ])
                                     ]),
                                     dbc.CardBody([
                                         dcc.Loading(
@@ -223,8 +314,11 @@ def layout():
                             dbc.Col([
                                 dbc.Card([
                                     dbc.CardHeader([
-                                        html.I(className="bi bi-exclamation-triangle me-2"),
-                                        html.Strong("Taxa de Avaria")
+                                        html.Div([
+                                            html.Strong("M03 - Taxa de Avaria", style={"fontSize": "0.95rem"}),
+                                            html.Br(),
+                                            html.Small("Breakdown Rate", style={"fontSize": "0.75rem", "opacity": "0.8"})
+                                        ])
                                     ]),
                                     dbc.CardBody([
                                         dcc.Loading(
@@ -283,79 +377,88 @@ def layout():
                             ], md=6)
                         ], className="mb-4"),
 
-                        # Paradas Críticas + Gauges de Indicadores
+                        # Cards lado a lado: Top 5 Paradas + Indicadores
                         dbc.Row([
+                            # Card 1: Top 5 Paradas (50%)
                             dbc.Col([
                                 dbc.Card([
                                     dbc.CardHeader([
-                                        html.I(className="bi bi-graph-up-arrow me-2"),
-                                        html.Strong("Paradas Críticas e Indicadores")
+                                        html.I(className="bi bi-exclamation-triangle me-2"),
+                                        html.Strong("Top 5 Paradas")
                                     ]),
                                     dbc.CardBody([
-                                        dbc.Row([
-                                            # Coluna 1: Gráfico de barras horizontais (Top Paradas) - 42% do espaço
-                                            dbc.Col([
-                                                html.H6("Top 5 Paradas com Maior Tempo", className="text-center mb-3"),
-                                                dcc.Loading(
-                                                    type="circle",
-                                                    color="#dc3545",
-                                                    children=dcc.Graph(
-                                                        id="top-breakdowns-chart-individual",
-                                                        config=PLOTLY_CONFIG
-                                                    )
+                                        html.Div([
+                                            dcc.Loading(
+                                                type="circle",
+                                                color="#dc3545",
+                                                children=dcc.Graph(
+                                                    id="top-breakdowns-chart-individual",
+                                                    config=PLOTLY_CONFIG
                                                 )
-                                            ], md=5, className="d-flex flex-column justify-content-center"),
+                                            )
+                                        ], style={"width": "85%", "margin": "0 auto"})
+                                    ], style={"padding": "0.25rem"})
+                                ], className="shadow-sm h-100")
+                            ], md=6),
 
-                                            # Coluna 2: 3 Gauges lado a lado com Metas - 58% do espaço
-                                            dbc.Col([
-                                                # Metas do Equipamento
-                                                html.Div(
-                                                    id="equipment-targets-info",
-                                                    className="mb-3"
-                                                ),
-                                                # Gauges
-                                                dbc.Row([
-                                                    # Gauge MTBF
-                                                    dbc.Col([
-                                                        dcc.Loading(
-                                                            type="circle",
-                                                            color="#198754",
-                                                            children=dcc.Graph(
-                                                                id="gauge-mtbf-individual",
-                                                                config=PLOTLY_CONFIG
-                                                            )
+                            # Card 2: Indicadores e Metas (50%)
+                            dbc.Col([
+                                dbc.Card([
+                                    dbc.CardHeader([
+                                        html.I(className="bi bi-speedometer2 me-2"),
+                                        html.Strong("Indicadores e Metas")
+                                    ]),
+                                    dbc.CardBody([
+                                        # Metas do Equipamento
+                                        html.Div(
+                                            id="equipment-targets-info",
+                                            className="mb-2",
+                                            style={"fontSize": "0.85rem"}
+                                        ),
+                                        # Container para centralizar gauges verticalmente
+                                        html.Div([
+                                            # Gauges em layout horizontal
+                                            dbc.Row([
+                                                # Gauge MTBF
+                                                dbc.Col([
+                                                    dcc.Loading(
+                                                        type="circle",
+                                                        color="#198754",
+                                                        children=dcc.Graph(
+                                                            id="gauge-mtbf-individual",
+                                                            config=PLOTLY_CONFIG
                                                         )
-                                                    ], md=4),
+                                                    )
+                                                ], xs=12, md=4),
 
-                                                    # Gauge MTTR
-                                                    dbc.Col([
-                                                        dcc.Loading(
-                                                            type="circle",
-                                                            color="#0d6efd",
-                                                            children=dcc.Graph(
-                                                                id="gauge-mttr-individual",
-                                                                config=PLOTLY_CONFIG
-                                                            )
+                                                # Gauge MTTR
+                                                dbc.Col([
+                                                    dcc.Loading(
+                                                        type="circle",
+                                                        color="#0d6efd",
+                                                        children=dcc.Graph(
+                                                            id="gauge-mttr-individual",
+                                                            config=PLOTLY_CONFIG
                                                         )
-                                                    ], md=4),
+                                                    )
+                                                ], xs=12, md=4),
 
-                                                    # Gauge Taxa de Avaria
-                                                    dbc.Col([
-                                                        dcc.Loading(
-                                                            type="circle",
-                                                            color="#ffc107",
-                                                            children=dcc.Graph(
-                                                                id="gauge-breakdown-individual",
-                                                                config=PLOTLY_CONFIG
-                                                            )
+                                                # Gauge Taxa de Avaria
+                                                dbc.Col([
+                                                    dcc.Loading(
+                                                        type="circle",
+                                                        color="#ffc107",
+                                                        children=dcc.Graph(
+                                                            id="gauge-breakdown-individual",
+                                                            config=PLOTLY_CONFIG
                                                         )
-                                                    ], md=4)
-                                                ], className="align-items-center")
-                                            ], md=7, className="d-flex flex-column")
-                                        ], className="align-items-center")
-                                    ], className="p-3")
-                                ], className="shadow-sm")
-                            ])
+                                                    )
+                                                ], xs=12, md=4)
+                                            ])
+                                        ], style={"display": "flex", "alignItems": "center", "flex": "1"})
+                                    ], style={"display": "flex", "flexDirection": "column", "height": "100%"})
+                                ], className="shadow-sm h-100")
+                            ], md=6)
                         ], className="mb-4"),
 
                         # Gráficos de Linha (Evolução Temporal)
@@ -366,7 +469,13 @@ def layout():
                         dbc.Row([
                             dbc.Col([
                                 dbc.Card([
-                                    dbc.CardHeader("MTBF - Evolução Mensal"),
+                                    dbc.CardHeader([
+                                        html.Div([
+                                            html.Strong("M01 - MTBF - Tempo Médio Entre Falhas", style={"fontSize": "0.95rem"}),
+                                            html.Br(),
+                                            html.Small("Mean Time Between Failures", style={"fontSize": "0.75rem", "opacity": "0.8"})
+                                        ])
+                                    ]),
                                     dbc.CardBody([
                                         dcc.Loading(
                                             type="circle",
@@ -381,7 +490,13 @@ def layout():
                             ], md=4),
                             dbc.Col([
                                 dbc.Card([
-                                    dbc.CardHeader("MTTR - Evolução Mensal"),
+                                    dbc.CardHeader([
+                                        html.Div([
+                                            html.Strong("M02 - MTTR - Tempo Médio de Reparo", style={"fontSize": "0.95rem"}),
+                                            html.Br(),
+                                            html.Small("Mean Time To Recovery/Repair", style={"fontSize": "0.75rem", "opacity": "0.8"})
+                                        ])
+                                    ]),
                                     dbc.CardBody([
                                         dcc.Loading(
                                             type="circle",
@@ -396,7 +511,13 @@ def layout():
                             ], md=4),
                             dbc.Col([
                                 dbc.Card([
-                                    dbc.CardHeader("Taxa Avaria - Evolução Mensal"),
+                                    dbc.CardHeader([
+                                        html.Div([
+                                            html.Strong("M03 - Taxa de Avaria", style={"fontSize": "0.95rem"}),
+                                            html.Br(),
+                                            html.Small("Breakdown Rate", style={"fontSize": "0.75rem", "opacity": "0.8"})
+                                        ])
+                                    ]),
                                     dbc.CardBody([
                                         dcc.Loading(
                                             type="circle",

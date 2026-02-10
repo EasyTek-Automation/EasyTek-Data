@@ -14,9 +14,9 @@
 | Módulo | Total | 🔴 Alta | 🟡 Média | 🟢 Baixa | ✅ Concluído |
 |--------|-------|---------|----------|----------|--------------|
 | **ZPP Processing** | 9 | 3 | 3 | 3 | 0 |
-| Webapp | - | - | - | - | - |
+| **Webapp (KPI)** | 1 | 0 | 1 | 0 | 0 |
 | Event Gateway | - | - | - | - | - |
-| **TOTAL** | **9** | **3** | **3** | **3** | **0** |
+| **TOTAL** | **10** | **3** | **4** | **3** | **0** |
 
 ---
 
@@ -60,6 +60,13 @@ Melhorias de código e performance.
    Tornar `process_zpp_quick.py` configurável via argumentos
    `process_zpp_quick.py:16-18`
 
+#### Webapp (KPI)
+
+7. **[Filtro Inclusivo Month Boundary](./filtro-inclusivo-month-boundary.md)**
+   Otimizar filtro de virada de mês usando agregação MongoDB
+   `webapp/src/utils/zpp_kpi_calculator.py:81-420`
+   **Mitigação atual**: Cache em store (Opção A) - performance aceitável
+
 ---
 
 ### 🟢 Baixa Prioridade
@@ -96,7 +103,7 @@ Nice-to-have, funcionalidades extras.
 
 **Progresso**:
 - 🔴 Alta: 0/3 concluído (0%)
-- 🟡 Média: 0/3 concluído (0%)
+- 🟡 Média: 0/4 concluído (0%)
 - 🟢 Baixa: 0/3 concluído (0%)
 
 ---
@@ -126,8 +133,10 @@ Nice-to-have, funcionalidades extras.
 ## 📚 Arquivos Detalhados
 
 - **[zpp-processing-improvements.md](./zpp-processing-improvements.md)** - Melhorias ZPP detalhadas
-- *(adicionar mais conforme necessário)*
+- **[filtro-inclusivo-month-boundary.md](./filtro-inclusivo-month-boundary.md)** - Otimização filtro de virada de mês
+- **[performance-indicators-kpi.md](./performance-indicators-kpi.md)** - Performance página indicadores
+- **[refatoracao-arquivos.md](./refatoracao-arquivos.md)** - Refatorações arquiteturais
 
 ---
 
-**Última atualização**: 2026-01-28
+**Última atualização**: 2026-02-05

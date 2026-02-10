@@ -77,7 +77,6 @@ def register_kpi_callbacks(app, collection_energia, collection_consumo):
                 return "--", "Sem dados", "secondary", period_label
 
         except Exception as e:
-            print(f"Erro ao calcular FP médio: {e}")
             return "--", "Erro", "danger", f"Últimas {period_hours} horas"
 
     @app.callback(
@@ -226,7 +225,6 @@ def register_kpi_callbacks(app, collection_energia, collection_consumo):
             return result_elements if result_elements else [html.Small("Sem dados", className="text-muted")]
 
         except Exception as e:
-            print(f"Erro ao calcular desbalanceamento: {e}")
             return [html.Small("Erro ao calcular", className="text-danger")]
 
     @app.callback(
@@ -319,7 +317,6 @@ def register_kpi_callbacks(app, collection_energia, collection_consumo):
             ]
 
         except Exception as e:
-            print(f"Erro ao calcular consumo médio: {e}")
             return _empty_consumo_content()
 
     @app.callback(
@@ -423,7 +420,6 @@ def register_kpi_callbacks(app, collection_energia, collection_consumo):
             return fig
 
         except Exception as e:
-            print(f"Erro ao criar donut chart: {e}")
             return _empty_donut_figure()
 
 

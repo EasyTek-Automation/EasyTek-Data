@@ -171,6 +171,7 @@ webapp/src/
 │   ├── hourlyconsumption_callback.py
 │   ├── states_callbacks.py
 │   ├── alarms_callbacks.py
+│   ├── maintenance_kpi_callbacks.py  # Maintenance KPI indicators
 │   ├── procedures_collapse_callbacks.py
 │   ├── energy_config_callbacks.py
 │   ├── create_user_callbacks.py
@@ -183,6 +184,8 @@ webapp/src/
 │   ├── stores.py       # Application dcc.Store components
 │   ├── dropdown_footer.py  # Reusable dropdown footer
 │   ├── demo_badge.py   # Demo data badge component
+│   ├── maintenance_kpi_graphs.py  # KPI graphs (bar, sunburst, line, radar, heatmap, gauges)
+│   ├── maintenance_kpi_cards.py   # KPI summary cards
 │   ├── headers/        # Page-specific header filter modules
 │   │   ├── energy_filters.py
 │   │   ├── states_filters.py
@@ -210,7 +213,11 @@ webapp/src/
 │   ├── dashboards/     # Home, production OEE
 │   ├── energy/         # Energy monitoring pages (overview, config)
 │   ├── production/     # Production state tracking
-│   ├── maintenance/    # Alarms and procedures (markdown-based documentation)
+│   ├── maintenance/    # Maintenance module
+│   │   ├── alarms.py        # Alarm monitoring and history
+│   │   ├── indicators.py    # KPI dashboard (MTBF, MTTR, Breakdown Rate)
+│   │   ├── config.py        # KPI target configuration (admin only)
+│   │   └── procedures.py    # Markdown-based documentation
 │   ├── supervision/    # Supervisory control (SCADA-like)
 │   ├── reports/        # Reporting pages
 │   └── common/         # Shared pages (access_denied, under_development)
@@ -222,7 +229,9 @@ webapp/src/
     ├── permissions.py  # Access control logic
     ├── helpers.py      # Utility functions
     ├── empty_state.py  # Empty state components
-    └── demo_helpers.py # Demo data helpers
+    ├── demo_helpers.py # Demo data helpers
+    ├── zpp_kpi_calculator.py        # ZPP data integration and KPI calculations
+    └── maintenance_demo_data.py     # Demo data generation and targets for maintenance KPIs
 ```
 
 ### Key Architectural Patterns
@@ -244,6 +253,15 @@ ROUTE_ALIASES = {
     '/alarms': '/maintenance/alarms',
 }
 ```
+
+**Maintenance Routes Structure**:
+- `/maintenance/alarms`: Alarm monitoring and history
+- `/maintenance/indicators`: KPI dashboard (MTBF, MTTR, Breakdown Rate)
+- `/maintenance/config`: KPI target configuration (admin only, level 3)
+- `/maintenance/procedures`: Markdown-based documentation system
+- `/maintenance/work-orders`: Work orders management (in development)
+- `/maintenance/schedule`: Maintenance planning (in development)
+- `/maintenance/history`: Intervention history (in development)
 
 **Utilities Routes Structure**:
 - `/utilities/energy`: Energy overview (alias: `/energy`)
@@ -356,6 +374,9 @@ Key collections referenced in codebase:
 - `DecapadoTemp`: Temperature sensor data
 - `AMG_EnergyData`: Energy consumption data
 - `AMG_Consumo`: Hourly consumption aggregates
+- `ZPP_Producao_2025`: Production data from ZPP system (activity hours by equipment)
+- `ZPP_Paradas_2025`: Breakdown/stop data from ZPP system (failure events with duration and cause)
+- `maintenance_kpi_targets`: Maintenance KPI targets (MTBF, MTTR, breakdown rate) per equipment
 
 #### 8. Documentation System (`config/docs_config.py`)
 
@@ -413,6 +434,83 @@ if should_show_demo_badge(page_path="/production/oee"):
 2. Check page-specific or component-specific setting
 3. Render badge if both conditions are true
 
+#### 10. Maintenance KPI System (`pages/maintenance/indicators.py`)
+
+**Comprehensive maintenance indicators system** for tracking equipment reliability:
+
+- **Route**: `/maintenance/indicators`
+- **Permission**: Maintenance profile, level 1+
+- **Admin Configuration**: `/maintenance/config` (level 3 only)
+
+**Key Performance Indicators** (based on PRO017 standard):
+- **M01 - MTBF** (Mean Time Between Failures): `(∑Active Hours - ∑Breakdown Hours) / Number of Failures`
+- **M02 - MTTR** (Mean Time To Repair): `Total Breakdown Minutes / Number of Breakdowns` (converted to hours)
+- **M03 - Breakdown Rate**: `(Breakdown Hours / Active Hours) × 100%`
+
+**Data Integration** (`utils/zpp_kpi_calculator.py`):
+- Integrates with ZPP system collections (`ZPP_Producao_YYYY`, `ZPP_Paradas_YYYY`)
+- Automatic equipment categorization (Longitudinais, Prensas, Transversais)
+- Month-boundary filtering with configurable rules (início vs fim)
+- Custom equipment naming support
+- Breakdown codes filtering (201, S201, 202, S202, 203, S203)
+
+**Target Management** (`utils/maintenance_demo_data.py`):
+- Individual targets per equipment stored in MongoDB (`maintenance_kpi_targets`)
+- General plant target (GENERAL) as fallback
+- Configurable alert range (default ±3%)
+- Three-color system: Green (meets target), Yellow (within margin), Red (fails target)
+
+**Visualization Components** (`components/maintenance_kpi_graphs.py`):
+- **Bar charts** with polynomial trend lines and individual targets
+- **Sunburst charts** (hierarchical view by equipment category with performance colors)
+- **Line charts** (monthly evolution with target reference lines)
+- **Radar chart** (multi-dimensional performance comparison normalized to 0-100%)
+- **Gauges** (speedometer-style indicators with target markers)
+- **Calendar heatmap** (daily breakdown patterns with weekday statistics)
+- **Top breakdowns chart** (horizontal bars showing longest stops)
+
+**Page Features**:
+- **Tab 1 - General**: Plant-wide view with all equipment
+  - 4 summary cards (MTBF, MTTR, Breakdown Rate, Equipment Count)
+  - Sunburst hierarchies by category (MTBF, MTTR, Breakdown Rate)
+  - Monthly evolution charts for the plant
+  - Bar charts comparing all equipment
+  - Summary table with pass/fail indicators
+- **Tab 2 - Individual**: Single equipment analysis
+  - Equipment selector dropdown with target badges
+  - Top 5 longest breakdowns (with aggregation by date+cause)
+  - 3 gauges showing current performance vs targets
+  - Monthly evolution charts (equipment vs plant average)
+  - Calendar heatmap with comprehensive statistics:
+    * Best/worst weekdays (by average failures)
+    * Critical days count (2+ failures)
+    * Trend analysis (first half vs second half)
+    * Weekday ranking
+  - Performance radar comparing equipment, plant average, and target
+
+**Filter System**:
+- **Period Types**: Year, Last 12 months, Custom date range
+- **Auto-load**: Data loads automatically on page entry via `dcc.Interval`
+- **Refresh button**: Manual reload of data and targets from MongoDB
+- **Export button**: Download indicators to Excel
+
+**Data Caching** (`callbacks_registers/maintenance_kpi_callbacks.py`):
+- Monthly aggregates cached in `dcc.Store` to prevent redundant MongoDB queries
+- Separate caching for production days vs breakdown data
+- Optimized calendar heatmap using single aggregation pipeline instead of daily loops
+
+**Error Handling**:
+- Graceful database offline state detection
+- Empty state graphics when no data available
+- Differentiation between "no connection" vs "no data" states
+- User-friendly error messages with suggestions
+
+**Configuration Page** (`/maintenance/config`):
+- Admin-only access (level 3)
+- Set targets per equipment or use general plant target
+- Alert range configuration (tolerance percentage)
+- Real-time preview of color coding impact
+
 ### Application Initialization Flow
 
 1. **app.py**: Initialize Flask server, Dash app, Flask-Login
@@ -452,6 +550,59 @@ When user navigates:
 - Always use `get_mongo_connection(collection_name)` to get collections
 - Connection is singleton - first call establishes connection, subsequent calls reuse
 - Handle `ConnectionError` exceptions for database failures
+
+### Working with Maintenance KPIs
+
+**Data Sources**:
+- Production data: `ZPP_Producao_YYYY` collection (activity hours by equipment)
+- Breakdown data: `ZPP_Paradas_YYYY` collection (stop events with duration and cause)
+- Targets: `maintenance_kpi_targets` collection (per-equipment and general targets)
+
+**Adding New Equipment**:
+1. Equipment is auto-detected from ZPP collections (`centro_de_trabalho` or `pto_trab` fields)
+2. Add custom name in `zpp_kpi_calculator.py` → `CUSTOM_NAMES` dict (optional)
+3. Equipment auto-categorized by prefix (LONGI→Longitudinais, PRENS→Prensas, TRANS→Transversais)
+
+**Configuring Targets**:
+1. Access `/maintenance/config` (admin only, level 3)
+2. Set individual targets per equipment OR use general plant target
+3. Configure alert range (default ±3%) for yellow zone
+4. Targets stored in MongoDB and auto-reload when page navigates back to `/maintenance/indicators`
+
+**KPI Calculation Logic** (based on PRO017 standard):
+```python
+# M01 - MTBF (hours)
+mtbf = (total_active_hours - total_breakdown_hours) / num_failures
+
+# M02 - MTTR (hours)
+mttr = total_breakdown_hours / num_failures
+
+# M03 - Breakdown Rate (%)
+breakdown_rate = (total_breakdown_hours / total_active_hours) * 100
+```
+
+**Month-Boundary Filtering**:
+- Configurable rule in `zpp_kpi_calculator.py` → `MONTH_BOUNDARY_RULE`
+- `"fim"` (default): Counts record in month where it ENDED
+- `"inicio"`: Counts record in month where it STARTED
+- Applied to records that cross midnight at month boundary (e.g., 30/Sep 23:59 → 01/Oct 00:50)
+
+**Breakdown Codes**:
+- Only considers codes: `201`, `S201`, `202`, `S202`, `203`, `S203`
+- These represent actual equipment failures (avarias)
+- Other stop codes (planned maintenance, material shortage, etc.) are excluded
+
+**Performance Optimization**:
+- Monthly aggregates cached in `store-indicator-filters` to avoid redundant MongoDB queries
+- Calendar heatmap uses single aggregation pipeline instead of daily loops
+- Auto-load on page entry via `dcc.Interval` (executes once)
+- Manual refresh available via "Atualizar" button
+
+**Troubleshooting**:
+- Check MongoDB connection status in callback logs
+- Verify `_processed: True` flag in ZPP collections
+- Ensure date fields (`fininotif`, `ffinnotif`, `inicio_execucao`, `fim_execucao`) are valid
+- Run `python -m src.utils.zpp_kpi_calculator` to test data fetching independently
 
 ### Theme and Styling
 
@@ -496,6 +647,19 @@ When user navigates:
 - Centralized SVG icon components
 - Used throughout header menus and UI elements
 - Consistent styling across the application
+
+**Maintenance KPI Graphs** (`components/maintenance_kpi_graphs.py`):
+- **Bar Charts**: Horizontal bars with polynomial trend lines, individual targets, and 3-color performance coding
+- **Sunburst Charts**: Hierarchical view (Plant → Category → Equipment) with performance-based colors
+- **Line Charts**: Monthly evolution with target and average reference lines, colored bars based on target comparison
+- **Radar Charts**: Multi-dimensional performance comparison normalized to 0-100% scale
+- **Gauges**: Speedometer-style indicators with target markers and delta display
+- **Calendar Heatmap**: Daily breakdown pattern visualization with production day filtering
+- **Top Breakdowns**: Horizontal bars showing longest stops, aggregated by date+cause
+- **Empty States**: User-friendly placeholders for loading, no data, and database offline scenarios
+- **Color System**: Simplified 3-color scheme (Green=excellent, Yellow=within margin, Red=needs improvement)
+  - Uses configurable margin percentage (default ±3%)
+  - Applied consistently across all visualization types
 
 ### MQTT Command Publishing
 
@@ -572,11 +736,10 @@ def layout():
 - Compressed air system (compressors, efficiency analysis)
 - Integrated utilities dashboard (consolidated view of all utilities)
 
-**Maintenance Module**:
+**Maintenance Module** (in development):
 - Work orders management system
 - Maintenance schedule/calendar
 - Maintenance history and analytics
-- Maintenance indicators/KPIs
 
 **Configuration Module**:
 - User preferences management
@@ -586,6 +749,13 @@ def layout():
 
 - User authentication and authorization
 - OEE dashboard with production metrics
+- **Maintenance KPI Dashboard** (fully functional):
+  - MTBF, MTTR, and Breakdown Rate indicators
+  - Integration with ZPP system (production and breakdown data)
+  - Individual and plant-wide views with multiple visualization types
+  - Calendar heatmap with statistical analysis
+  - Target management with configurable alerts
+  - Excel export functionality
 - Energy monitoring for SE03 (with cost calculations)
 - Energy tariff configuration (admin only)
 - Alarm monitoring and history

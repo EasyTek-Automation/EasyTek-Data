@@ -15,6 +15,10 @@ sys.path.insert(0, str(Path(__file__).parent))
 env_path = Path(__file__).parent / '.env'
 load_dotenv(dotenv_path=env_path)
 
+# Configura logging ANTES de qualquer importação da aplicação
+from src.config.logging_config import setup_logging
+setup_logging()
+
 # Verifica variáveis obrigatórias
 required_vars = ['MONGO_URI', 'DB_NAME', 'SECRET_KEY']
 missing_vars = [var for var in required_vars if not os.getenv(var)]

@@ -163,7 +163,6 @@ def register_maintenance_config_callbacks(app):
             return general_mtbf, general_mttr, general_breakdown, alert_range, mtbf_values, mttr_values, breakdown_values
 
         except Exception as e:
-            print(f"[ERRO] Falha ao carregar configuração: {e}")
             return None, None, None, 3.0, [None] * len(equipment_list), [None] * len(equipment_list), [None] * len(equipment_list)
 
     # ========================================

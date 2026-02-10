@@ -105,7 +105,7 @@ class ZPPProcessor:
             if file_type == 'zppprd':
                 date_col = 'FIniNotif'
             else:
-                date_col = 'DATA INICIO'
+                date_col = 'Início execução'
 
             first_date = df[date_col].dropna().iloc[0]
             if isinstance(first_date, pd.Timestamp):
@@ -194,16 +194,16 @@ class ZPPProcessor:
         """Cria índices otimizados para Paradas"""
         logger.info("  Criando índices para Paradas...")
 
-        # Nomes normalizados: LINEA → linea, DATA INICIO → data_inicio, etc
+        # Nomes normalizados: Centro de trabalho → centro_de_trabalho, Início execução → inicio_execucao, etc
         indexes = [
-            ([('linea', ASCENDING), ('data_inicio', DESCENDING)], 'idx_linha_data', {}),
+            ([('centro_de_trabalho', ASCENDING), ('inicio_execucao', DESCENDING)], 'idx_linha_data', {}),
             ([('ordem', ASCENDING)], 'idx_ordem', {'sparse': True}),  # sparse=True permite múltiplos null
-            ([('linea', ASCENDING), ('data_inicio', ASCENDING), ('hora_inicio', ASCENDING), ('ordem', ASCENDING)],
+            ([('centro_de_trabalho', ASCENDING), ('inicio_execucao', ASCENDING), ('inicio_real_hora', ASCENDING), ('ordem', ASCENDING)],
              'idx_parada_unique', {'unique': True, 'sparse': True}),  # Impede duplicatas
-            ([('motivo', ASCENDING)], 'idx_motivo', {}),
-            ([('data_inicio', ASCENDING), ('data_fim', ASCENDING)], 'idx_range_datas', {}),
+            ([('causa_do_desvio', ASCENDING)], 'idx_motivo', {}),
+            ([('inicio_execucao', ASCENDING), ('fim_execucao', ASCENDING)], 'idx_range_datas', {}),
             ([('_year', ASCENDING)], 'idx_year', {}),
-            ([('duracao_min', DESCENDING)], 'idx_duracao', {})
+            ([('duration_min', DESCENDING)], 'idx_duracao', {})
         ]
 
         for keys, name, options in indexes:
@@ -304,13 +304,37 @@ class ZPPProcessor:
         year = self.extract_year_from_data(df_clean, file_type)
         df_prepared = self.prepare_dataframe(df_clean, file_type, year, file_name)
 
+        # Determinar collection baseado no ano detectado
         if file_type == 'zppprd':
             collection_name = f'ZPP_Producao_{year}'
         else:
             collection_name = f'ZPP_Paradas_{year}'
 
-        logger.info(f"  [OK] Ano detectado: {year}")
-        logger.info(f"  [OK] Collection: {collection_name}\n")
+        logger.info(f"  [OK] Ano detectado nos dados: {year}")
+        logger.info(f"  [OK] Collection dinâmica: {collection_name}\n")
+
+        # FILTRAR EQUIPAMENTOS INDESEJADOS (EMBAL*, EMBBOBCP)
+        logger.info("Etapa 3.5/5: Filtrando equipamentos indesejados...")
+        records_before = len(df_prepared)
+
+        # Determinar coluna de equipamento baseado no tipo
+        equipment_col = 'pto_trab' if file_type == 'zppprd' else 'centro_de_trabalho'
+
+        # Lista de prefixos e nomes exatos a ignorar (DECAP deve aparecer!)
+        ignore_prefixes = ['EMBAL', 'EMBBOBCP']
+
+        # Filtrar usando máscaras booleanas
+        mask = ~df_prepared[equipment_col].astype(str).str.upper().str.startswith(tuple(ignore_prefixes))
+        df_prepared = df_prepared[mask]
+
+        records_after = len(df_prepared)
+        records_removed = records_before - records_after
+
+        if records_removed > 0:
+            logger.info(f"  [OK] Removidos {records_removed:,} registros de equipamentos EMBAL")
+            logger.info(f"  [OK] Restam {records_after:,} registros para upload\n")
+        else:
+            logger.info(f"  [OK] Nenhum registro removido (todos os equipamentos são válidos)\n")
 
         # 4. Upload ao MongoDB
         logger.info("Etapa 4/5: Fazendo upload ao MongoDB...")
@@ -346,30 +370,30 @@ class ZPPProcessor:
                     if skipped > 0:
                         failed_inserts += skipped
             else:
-                # Para Paradas: verificar por combinação linea + data_inicio + hora_inicio + ordem
+                # Para Paradas: verificar por combinação centro_de_trabalho + inicio_execucao + inicio_real_hora + ordem
                 keys_to_check = []
                 for r in batch:
-                    if all(k in r for k in ['linea', 'data_inicio', 'hora_inicio', 'ordem']):
+                    if all(k in r for k in ['centro_de_trabalho', 'inicio_execucao', 'inicio_real_hora', 'ordem']):
                         keys_to_check.append({
-                            'linea': r['linea'],
-                            'data_inicio': r['data_inicio'],
-                            'hora_inicio': r['hora_inicio'],
+                            'centro_de_trabalho': r['centro_de_trabalho'],
+                            'inicio_execucao': r['inicio_execucao'],
+                            'inicio_real_hora': r['inicio_real_hora'],
                             'ordem': r['ordem']
                         })
 
                 if keys_to_check:
                     existing_keys = set()
                     existing_docs = collection.find({'$or': keys_to_check}, {
-                        'linea': 1, 'data_inicio': 1, 'hora_inicio': 1, 'ordem': 1
+                        'centro_de_trabalho': 1, 'inicio_execucao': 1, 'inicio_real_hora': 1, 'ordem': 1
                     })
                     for doc in existing_docs:
-                        key = f"{doc.get('linea')}|{doc.get('data_inicio')}|{doc.get('hora_inicio')}|{doc.get('ordem')}"
+                        key = f"{doc.get('centro_de_trabalho')}|{doc.get('inicio_execucao')}|{doc.get('inicio_real_hora')}|{doc.get('ordem')}"
                         existing_keys.add(key)
 
                     # Filtrar batch
                     original_len = len(batch)
                     batch = [r for r in batch if
-                             f"{r.get('linea')}|{r.get('data_inicio')}|{r.get('hora_inicio')}|{r.get('ordem')}" not in existing_keys]
+                             f"{r.get('centro_de_trabalho')}|{r.get('inicio_execucao')}|{r.get('inicio_real_hora')}|{r.get('ordem')}" not in existing_keys]
                     skipped = original_len - len(batch)
                     if skipped > 0:
                         failed_inserts += skipped

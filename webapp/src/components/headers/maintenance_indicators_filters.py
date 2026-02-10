@@ -16,7 +16,7 @@ def create_maintenance_indicators_filters():
     Cria os filtros para a página de Indicadores de Manutenção.
 
     Filtros disponíveis:
-    - Tipo de Período (Radio): Ano | Últimos 12 Meses | Período
+    - Tipo de Período (Radio): Ano | Período
     - Ano de Referência (Dropdown): 2024, 2025, 2026
     - Date Picker Range: Para período customizado
 
@@ -46,10 +46,9 @@ def create_maintenance_indicators_filters():
                         id="filter-period-type",
                         options=[
                             {"label": " Ano", "value": "year"},
-                            {"label": " Últimos 12 Meses", "value": "last12"},
                             {"label": " Período", "value": "custom"}
                         ],
-                        value="last12",
+                        value="year",  # Padrão: Ano completo
                         inline=False,  # Vertical para ocupar menos espaço
                         className="mb-3",
                         input_class_name="me-2",
@@ -69,13 +68,36 @@ def create_maintenance_indicators_filters():
                         options=[
                             {"label": "2024", "value": 2024},
                             {"label": "2025", "value": 2025},
-                            {"label": "2026", "value": 2026}
+                            {"label": "2026", "value": 2026},
+                            {"label": "2027", "value": 2027}
                         ],
-                        value=2025,  # Ano onde os dados ZPP estão disponíveis
+                        value=2026,  # Ano padrão
                         clearable=False,
                         style={"fontSize": "0.85rem"}
                     )
                 ], id="div-reference-year", style={"display": "block"}, className="mb-3"),
+
+                # Seletor de Equipamentos
+                html.Div([
+                    html.Label(
+                        "Equipamentos",
+                        className="form-label fw-bold mb-2",
+                        style={"fontSize": "0.85rem", "color": "#495057"}
+                    ),
+                    dcc.Dropdown(
+                        id="filter-equipment-selection",
+                        options=[],  # Será populado dinamicamente
+                        value=[],    # Será definido dinamicamente (todos exceto DECAP001)
+                        multi=True,
+                        placeholder="Selecione equipamentos...",
+                        style={"fontSize": "0.85rem"}
+                    ),
+                    html.Small(
+                        "Padrão: Todos exceto Decapado",
+                        className="text-muted",
+                        style={"fontSize": "0.7rem"}
+                    )
+                ], className="mb-3"),
 
                 # Date Picker Range
                 html.Div([

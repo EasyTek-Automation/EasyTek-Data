@@ -3,12 +3,15 @@ Maintenance KPI Callbacks
 Callbacks para a página de indicadores de manutenção
 """
 
+import logging
 from dash import Output, Input, State, dcc, html, no_update
 from dash.exceptions import PreventUpdate
 import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
 from src.config.theme_config import TEMPLATE_THEME_MINTY
+
+logger = logging.getLogger(__name__)
 
 # Verificação de saúde do MongoDB
 from src.database.connection import get_connection_status, reconnect_mongodb
@@ -32,7 +35,6 @@ try:
     ZPP_KPI_AVAILABLE = True
 except ImportError:
     ZPP_KPI_AVAILABLE = False
-    print("[AVISO] Módulo ZPP KPI não disponível - nenhum dado será exibido")
 
 from src.components.maintenance_kpi_graphs import (
     create_kpi_bar_chart,
@@ -46,6 +48,16 @@ from src.components.maintenance_kpi_graphs import (
     create_top_breakdowns_chart,
     create_kpi_gauge
 )
+
+
+# ==================== CONFIGURAÇÃO DE EQUIPAMENTOS ====================
+
+# Equipamentos excluídos dos GRÁFICOS por padrão (mas incluídos nos cards gerais da planta)
+# NOTA: Para reincluir um equipamento, basta removê-lo desta lista
+# Exemplo: Para incluir DECAP001, mude para: EQUIPMENT_EXCLUDED_BY_DEFAULT = []
+EQUIPMENT_EXCLUDED_BY_DEFAULT = ["DECAP001"]
+
+# =====================================================================
 
 
 def register_maintenance_kpi_callbacks(app):
@@ -79,6 +91,41 @@ def register_maintenance_kpi_callbacks(app):
             return {"display": "none"}, {"display": "block"}
 
     # ============================================================
+    # CALLBACK 1B: Popular Dropdown de Equipamentos
+    # ============================================================
+    @app.callback(
+        [
+            Output("filter-equipment-selection", "options"),
+            Output("filter-equipment-selection", "value")
+        ],
+        Input("store-indicator-filters", "data")
+    )
+    def populate_equipment_filter(stored_data):
+        """
+        Popula dropdown de equipamentos com lista dinâmica.
+        Por padrão, seleciona todos EXCETO os equipamentos em EQUIPMENT_EXCLUDED_BY_DEFAULT.
+        """
+        if not stored_data or not stored_data.get("has_data"):
+            return [], []
+
+        equipment_ids = stored_data.get("equipment_ids", [])
+        names = stored_data.get("names", {})
+
+        # Criar options com nomes amigáveis
+        options = [
+            {"label": names.get(eq_id, eq_id), "value": eq_id}
+            for eq_id in equipment_ids
+        ]
+
+        # Valor padrão: todos EXCETO os excluídos por padrão
+        default_value = [
+            eq_id for eq_id in equipment_ids
+            if eq_id not in EQUIPMENT_EXCLUDED_BY_DEFAULT
+        ]
+
+        return options, default_value
+
+    # ============================================================
     # CALLBACK 2: Processar Filtros e Gerar Dados
     # ============================================================
     @app.callback(
@@ -92,12 +139,14 @@ def register_maintenance_kpi_callbacks(app):
             State("filter-reference-year", "value"),
             State("filter-date-range", "start_date"),
             State("filter-date-range", "end_date"),
+            State("filter-equipment-selection", "value"),
             State("store-indicator-filters", "data")
         ]
     )
     def process_filters_and_load_data(n_clicks, n_intervals,
                                       period_type, ref_year,
                                       start_date, end_date,
+                                      selected_equipment,
                                       current_data):
         """
         Processa filtros e gera dados baseado no tipo de período.
@@ -107,25 +156,31 @@ def register_maintenance_kpi_callbacks(app):
         - last12: Gera dados dos últimos 12 meses a partir do ano ref
         - custom: Gera dados do período start_date até end_date
         """
+        logger.debug("Callback iniciado (n_clicks=%s, n_intervals=%s)", n_clicks, n_intervals)
+
         ctx = dash.callback_context
 
         if not ctx.triggered:
+            logger.debug("PreventUpdate (ctx not triggered)")
             raise PreventUpdate
 
         trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
+        logger.debug("Disparado por '%s'", trigger_id)
 
         # Se interval disparou e NÃO há dados ainda, carregar dados iniciais
         # Se botão apply foi clicado, sempre recarregar
         # ⚠️ VERIFICAÇÃO CRÍTICA: MongoDB disponível?
         db_status = get_connection_status()
+        logger.debug("MongoDB status = %s", db_status["available"])
+
         if not db_status["available"]:
-            print(f"❌ [CALLBACK KPI] MongoDB offline - retornando erro")
+            logger.warning("MongoDB indisponível - retornando dados vazios")
             return {
                 "has_data": False,
                 "db_error": True,
                 "error_message": db_status.get("error", "MongoDB indisponível"),
                 "period_type": period_type or "last12",
-                "year": ref_year or 2025,
+                "year": ref_year or 2026,
                 "months": list(range(1, 13)),
                 "equipment_ids": [],
                 "data": {},
@@ -135,104 +190,102 @@ def register_maintenance_kpi_callbacks(app):
                 "categories": {}
             }
 
-        if trigger_id == "interval-initial-load" and current_data and current_data.get("data"):
-            # Interval disparou mas já temos dados - apenas atualizar metas sem recarregar ZPP
-            print("[INFO] Interval: Atualizando apenas metas (dados já carregados)")
+        # IMPORTANTE: Verificar se dados estão COMPLETOS (incluindo categorias)
+        # Se store tem dados MAS não tem categorias, precisa recarregar tudo
+        has_complete_data = (
+            current_data and
+            current_data.get("data") and
+            current_data.get("categories")  # ← CRÍTICO: Verificar categorias também!
+        )
+
+        if trigger_id == "interval-initial-load" and has_complete_data:
+            # Interval disparou e temos dados COMPLETOS - apenas atualizar metas sem recarregar ZPP
+            logger.debug("Interval: dados completos no store, apenas atualizando metas")
+            logger.debug("Store: %d equipamentos, %d categorias",
+                        len(current_data.get("equipment_ids", [])),
+                        len(current_data.get("categories", {})))
             current_data["equipment_targets"] = get_all_equipment_targets()
             current_data["targets"] = get_kpi_targets("GENERAL")
             return current_data
+        elif trigger_id == "interval-initial-load" and current_data and current_data.get("data"):
+            # Store tem dados mas SEM categorias - forçar recarga completa
+            logger.warning("Store sem categorias - forçando recarga completa")
+            # Continua para o fluxo normal de recarga abaixo
 
         # Validar inputs baseado no tipo
+        # Padrão: sempre usar modo "year" (ano completo)
         if not period_type:
-            period_type = "last12"  # Padrão
+            period_type = "year"
 
-        print(f"[FILTROS] Tipo selecionado: {period_type}")
-        print(f"[FILTROS] Ano ref: {ref_year}, Start: {start_date}, End: {end_date}")
+        if not ref_year:
+            ref_year = 2026  # Ano padrão onde os dados ZPP estão disponíveis
 
-        if period_type in ["year", "last12"]:
-            if not ref_year:
-                ref_year = 2025  # Ano onde os dados ZPP estão disponíveis
+        if period_type == "year":
+            # Todos os meses do ano selecionado
+            months = list(range(1, 13))
+            year = ref_year
 
-            if period_type == "year":
-                # Todos os meses do ano
-                months = list(range(1, 13))
-                year = ref_year
-                print(f"[FILTROS] Modo 'Ano': {year}, meses {months}")
-            else:  # last12
-                # Últimos 12 meses a partir do ano
-                # Assumir que estamos em dez/2025, então últimos 12 = jan-dez 2025
-                months = list(range(1, 13))
-                year = ref_year
-                print(f"[FILTROS] Modo 'Últimos 12': {year}, meses {months}")
-
-        else:  # custom
+        elif period_type == "custom":
+            # Período personalizado via date range
             if not start_date or not end_date:
-                # Usar padrão se não informado
-                year = 2025  # Ano onde os dados ZPP estão disponíveis
+                # Fallback: usar ano completo
+                year = ref_year
                 months = list(range(1, 13))
-                print(f"[FILTROS] Modo 'Custom' SEM DATAS: usando padrão {year}, todos meses")
             else:
-                # IMPLEMENTAR: Extrair ano/meses do date range
                 from datetime import datetime
                 start = datetime.fromisoformat(start_date) if isinstance(start_date, str) else start_date
                 end = datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
 
                 year = start.year
                 # Gerar lista de meses entre start e end
+                # LIMITAÇÃO: Apenas meses do mesmo ano (start.year)
                 months = []
                 current = start
-                while current <= end:
+                while current <= end and current.year == start.year:
                     if current.month not in months:
                         months.append(current.month)
                     # Avançar para próximo mês
                     if current.month == 12:
-                        current = current.replace(year=current.year + 1, month=1)
-                    else:
-                        current = current.replace(month=current.month + 1)
+                        break
+                    current = current.replace(month=current.month + 1)
 
-                months = sorted(months)
-                print(f"[FILTROS] Modo 'Custom' COM DATAS: {start_date} a {end_date}")
-                print(f"[FILTROS] Resultado: {year}, meses {months}")
+                months = sorted(months) if months else [start.month]
+
+        else:
+            # Fallback: ano completo
+            year = ref_year
+            months = list(range(1, 13))
 
         # Buscar dados reais - INTEGRAÇÃO ZPP
-        print("\n" + "="*80)
-        print(">>> CALLBACK 2: CARREGANDO DADOS DE KPI")
-        print("="*80)
-        print(f"Ano: {year}, Meses: {months}")
-        print(f"ZPP_KPI_AVAILABLE: {ZPP_KPI_AVAILABLE}")
 
         data = {}
         all_equipment = []
         has_data = False
 
+        logger.debug("ZPP_KPI_AVAILABLE=%s, buscando dados year=%d months=%s",
+                    ZPP_KPI_AVAILABLE, year, months)
+
         if ZPP_KPI_AVAILABLE:
-            print("[TENTANDO] Buscar dados reais do ZPP...")
             try:
                 # Tentar buscar dados reais do ZPP
                 data = fetch_zpp_kpi_data(year, months)
                 all_equipment = list(data.keys())
                 has_data = len(data) > 0
 
+                logger.info("Dados ZPP carregados: %d equipamentos", len(all_equipment))
+
                 if has_data:
-                    print(f"[SUCESSO] Dados ZPP carregados!")
-                    print(f"  - Equipamentos: {all_equipment}")
-                    print(f"  - Total: {len(all_equipment)} equipamentos")
+                    logger.debug("Equipamentos: %s", all_equipment)
                 else:
-                    print("[AVISO] Nenhum dado disponível no banco para o período selecionado")
-                print("="*80 + "\n")
+                    logger.warning("fetch_zpp_kpi_data retornou vazio")
             except Exception as e:
                 # Sem fallback - apenas informar erro
-                print(f"[ERRO] Falha ao carregar dados ZPP: {e}")
-                print("[INFO] Nenhum dado será exibido")
-                print("="*80 + "\n")
+                logger.error("Erro ao buscar dados ZPP: %s", str(e), exc_info=True)
                 import traceback
                 traceback.print_exc()
                 has_data = False
         else:
-            # Módulo ZPP não disponível - não mostrar nada
-            print("[AVISO] Módulo ZPP não disponível")
-            print("[INFO] Nenhum dado será exibido")
-            print("="*80 + "\n")
+            logger.warning("ZPP_KPI_AVAILABLE=False, sem integração ZPP")
             has_data = False
 
         # Buscar nomes e categorias de equipamentos
@@ -240,11 +293,31 @@ def register_maintenance_kpi_callbacks(app):
             try:
                 names = get_zpp_equipment_names()
                 categories = get_zpp_equipment_categories()
+
+                # Log diagnóstico: verificar se categorias foram carregadas
+                logger.debug("Nomes carregados: %d equipamentos", len(names))
+                logger.info("Categorias carregadas: %d categorias", len(categories))
+
+                if categories:
+                    for cat_name, cat_equipments in categories.items():
+                        logger.debug(
+                            "  Categoria '%s': %d equipamentos",
+                            cat_name, len(cat_equipments)
+                        )
+                else:
+                    logger.warning("get_zpp_equipment_categories() retornou vazio")
+
             except Exception as e:
-                print(f"[AVISO] Erro ao buscar nomes/categorias: {e}")
+                logger.error(
+                    "Erro ao carregar nomes/categorias: %s",
+                    str(e),
+                    exc_info=True
+                )
                 names = {eq: eq for eq in all_equipment}  # Fallback: usar IDs como nomes
                 categories = {}
         else:
+            logger.debug("Usando nomes/categorias vazias (has_data=%s, ZPP_AVAILABLE=%s)",
+                        has_data, ZPP_KPI_AVAILABLE)
             names = {}
             categories = {}
 
@@ -253,17 +326,53 @@ def register_maintenance_kpi_callbacks(app):
         equipment_targets = get_all_equipment_targets()
         general_target = get_kpi_targets("GENERAL")
 
+        # OTIMIZAÇÃO: Calcular monthly_aggregates UMA VEZ e cachear no store
+        # Isso evita múltiplas chamadas ao MongoDB nos callbacks seguintes
+        monthly_aggregates = None
+        if has_data:
+            from src.utils.maintenance_demo_data import calculate_general_avg_by_month
+            try:
+                monthly_aggregates = calculate_general_avg_by_month(data, all_equipment, months, year=year)
+            except Exception as e:
+                monthly_aggregates = None
+
+        # Processar seleção de equipamentos para gráficos
+        # all_equipment = TODOS (usado para cards gerais da planta)
+        # selected_equipment_ids = FILTRADOS (usado para gráficos)
+        if not selected_equipment or len(selected_equipment) == 0:
+            # Se nenhum selecionado, usar todos EXCETO os excluídos por padrão
+            selected_equipment_ids = [
+                eq for eq in all_equipment
+                if eq not in EQUIPMENT_EXCLUDED_BY_DEFAULT
+            ]
+        else:
+            # Usar seleção do usuário
+            selected_equipment_ids = [eq for eq in selected_equipment if eq in all_equipment]
+
+        # Log diagnóstico: verificar o que está sendo armazenado no store
+        logger.debug(
+            "Armazenando no store: %d equipamentos total, %d selecionados para gráficos, %d categorias",
+            len(all_equipment), len(selected_equipment_ids), len(categories)
+        )
+
+        if categories:
+            logger.debug("Categorias: %s", list(categories.keys()))
+        else:
+            logger.warning("Store será salvo SEM categorias")
+
         return {
             "period_type": period_type,
             "year": year,
             "months": months,
-            "equipment_ids": all_equipment,
+            "equipment_ids": all_equipment,  # TODOS os equipamentos (para cards gerais)
+            "selected_equipment_ids": selected_equipment_ids,  # Filtrados (para gráficos)
             "data": data,
             "targets": general_target,  # Meta geral (para compatibilidade)
             "equipment_targets": equipment_targets,  # Metas por equipamento
             "names": names,
             "categories": categories,
-            "has_data": has_data  # Indicador se há dados disponíveis
+            "has_data": has_data,  # Indicador se há dados disponíveis
+            "monthly_aggregates": monthly_aggregates  # Cache de agregações mensais
         }
 
     # ============================================================
@@ -299,9 +408,11 @@ def register_maintenance_kpi_callbacks(app):
         equipment_targets = stored_data["equipment_targets"]  # ALTERADO
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
+        year = stored_data.get("year", 2026)
+        monthly_aggregates = stored_data.get("monthly_aggregates")
 
-        # Calcular médias
-        averages = calculate_kpi_averages(data, equipment_ids, months)
+        # Calcular médias (usando cache de monthly_aggregates do store)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
 
         # Se não houver médias válidas após o cálculo
         if not averages.get("by_equipment"):
@@ -392,14 +503,10 @@ def register_maintenance_kpi_callbacks(app):
         """
         Atualiza os 3 gráficos de barras com médias e metas individualizadas.
         """
-        print("\n" + "="*80)
-        print(">>> CALLBACK: update_bar_charts()")
-        print("="*80)
 
         template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
 
         if not stored_data:
-            print("[DEBUG] stored_data is None/empty - retornando gráficos vazios")
             return [
                 create_empty_kpi_figure("MTBF", template),
                 create_empty_kpi_figure("MTTR", template),
@@ -408,7 +515,6 @@ def register_maintenance_kpi_callbacks(app):
 
         # ⚠️ Verificar se há erro de banco de dados
         if stored_data.get("db_error"):
-            print("❌ [DEBUG] MongoDB offline - retornando gráficos de erro")
             from src.components.maintenance_kpi_graphs import create_database_error_figure
             error_msg = stored_data.get("error_message", "Banco de dados offline")
             return [
@@ -420,31 +526,46 @@ def register_maintenance_kpi_callbacks(app):
         data = stored_data["data"]
         equipment_targets = stored_data["equipment_targets"]  # ALTERADO: Usar metas por equipamento
         names = stored_data["names"]
-        equipment_ids = stored_data["equipment_ids"]
+        # IMPORTANTE: Usar equipamentos SELECIONADOS para gráficos (exclui DECAP001 por padrão)
+        equipment_ids = stored_data.get("selected_equipment_ids", stored_data["equipment_ids"])
         months = stored_data["months"]
+        year = stored_data.get("year", 2026)
+        monthly_aggregates = stored_data.get("monthly_aggregates")
 
-        print(f"[DEBUG] Equipamentos: {len(equipment_ids)} -> {equipment_ids}")
-        print(f"[DEBUG] Meses recebidos: {months}")
-        print(f"[DEBUG] Dados por equipamento (primeiros 2):")
         for idx, eq_id in enumerate(equipment_ids[:2]):
             eq_data = data.get(eq_id, [])
-            print(f"  {eq_id}: {len(eq_data)} meses -> meses={[m['month'] for m in eq_data]}")
 
-        # Calcular médias por equipamento
-        averages = calculate_kpi_averages(data, equipment_ids, months)
-        print(f"[DEBUG] Médias calculadas para {len(averages['by_equipment'])} equipamentos")
-        print("="*80 + "\n")
+        # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
 
         # Verificar se há dados válidos
         if not averages.get("by_equipment"):
-            print("[DEBUG] Sem dados após cálculo - retornando gráficos de 'sem dados'")
             return [
                 create_no_data_figure("barra", template),
                 create_no_data_figure("barra", template),
                 create_no_data_figure("barra", template)
             ]
 
-        # Preparar dados para gráficos
+        # Preparar dados para gráficos (filtrar equipamentos sem dados válidos)
+        # Só incluir equipamentos que têm pelo menos um KPI válido (não None)
+        valid_equipment = [
+            eq for eq in equipment_ids
+            if eq in averages["by_equipment"] and (
+                averages["by_equipment"][eq]["mtbf"] is not None or
+                averages["by_equipment"][eq]["mttr"] is not None or
+                averages["by_equipment"][eq]["breakdown_rate"] is not None
+            )
+        ]
+
+        if not valid_equipment:
+            return [
+                create_no_data_figure("barra", template),
+                create_no_data_figure("barra", template),
+                create_no_data_figure("barra", template)
+            ]
+
+        # Usar apenas equipamentos válidos
+        equipment_ids = valid_equipment
         mtbf_values = [averages["by_equipment"][eq]["mtbf"] for eq in equipment_ids]
         mttr_values = [averages["by_equipment"][eq]["mttr"] for eq in equipment_ids]
         breakdown_values = [averages["by_equipment"][eq]["breakdown_rate"] for eq in equipment_ids]
@@ -524,12 +645,28 @@ def register_maintenance_kpi_callbacks(app):
         data = stored_data["data"]
         names = stored_data["names"]
         categories = stored_data["categories"]
-        equipment_ids = stored_data["equipment_ids"]
+        # IMPORTANTE: Usar equipamentos SELECIONADOS para gráficos (exclui DECAP001 por padrão)
+        equipment_ids = stored_data.get("selected_equipment_ids", stored_data["equipment_ids"])
         months = stored_data["months"]
         equipment_targets = stored_data.get("equipment_targets", {})
+        year = stored_data.get("year", 2026)
+        monthly_aggregates = stored_data.get("monthly_aggregates")
 
-        # Calcular médias por equipamento
-        averages = calculate_kpi_averages(data, equipment_ids, months)
+        # Log diagnóstico: verificar o que foi recuperado do store
+        logger.debug(
+            "Sunburst recebeu: %d equipamentos selecionados, %d categorias",
+            len(equipment_ids), len(categories)
+        )
+
+        if categories:
+            logger.debug("Categorias: %s", list(categories.keys()))
+            for cat_name, cat_equipments in categories.items():
+                logger.debug("  '%s': %d equipamentos", cat_name, len(cat_equipments))
+        else:
+            logger.warning("Sunburst recebeu categorias VAZIO do store")
+
+        # Calcular médias por equipamento SELECIONADO (usando cache de monthly_aggregates do store)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
 
         if not averages.get("by_equipment"):
             return [
@@ -538,10 +675,22 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("sunburst", template)
             ]
 
-        # Preparar dados para sunbursts (apenas valores por equipamento)
-        mtbf_by_eq = {eq: averages["by_equipment"][eq]["mtbf"] for eq in equipment_ids}
-        mttr_by_eq = {eq: averages["by_equipment"][eq]["mttr"] for eq in equipment_ids}
-        breakdown_by_eq = {eq: averages["by_equipment"][eq]["breakdown_rate"] for eq in equipment_ids}
+        # Preparar dados para sunbursts (apenas equipamentos que existem em by_equipment)
+        mtbf_by_eq = {
+            eq: averages["by_equipment"][eq]["mtbf"]
+            for eq in equipment_ids
+            if eq in averages["by_equipment"]
+        }
+        mttr_by_eq = {
+            eq: averages["by_equipment"][eq]["mttr"]
+            for eq in equipment_ids
+            if eq in averages["by_equipment"]
+        }
+        breakdown_by_eq = {
+            eq: averages["by_equipment"][eq]["breakdown_rate"]
+            for eq in equipment_ids
+            if eq in averages["by_equipment"]
+        }
 
         # Obter meta geral da planta
         general_target = equipment_targets.get("GENERAL", {"mtbf": 0, "mttr": 999, "breakdown_rate": 100, "alert_range": 3.0})
@@ -556,24 +705,106 @@ def register_maintenance_kpi_callbacks(app):
                             for eq_id in equipment_ids}
 
         # Criar sunbursts com cores baseadas na META GERAL DA PLANTA
+        # Passar plant_average para que o centro mostre média dos valores mensais
         fig_mtbf = create_kpi_sunburst_chart(
             mtbf_by_eq, "MTBF", categories, names, template,
             target_values=mtbf_targets,
             plant_target=general_target["mtbf"],
-            margin_percent=alert_range
+            margin_percent=alert_range,
+            plant_average=averages["mtbf"]  # Média dos valores mensais
         )
 
         fig_mttr = create_kpi_sunburst_chart(
             mttr_by_eq, "MTTR", categories, names, template,
             target_values=mttr_targets,
             plant_target=general_target["mttr"],
-            margin_percent=alert_range
+            margin_percent=alert_range,
+            plant_average=averages["mttr"]  # Média dos valores mensais (em horas)
         )
 
         fig_breakdown = create_kpi_sunburst_chart(
             breakdown_by_eq, "Taxa de Avaria", categories, names, template,
             target_values=breakdown_targets,
             plant_target=general_target["breakdown_rate"],
+            margin_percent=alert_range,
+            plant_average=averages["breakdown_rate"]  # Média dos valores mensais
+        )
+
+        return [fig_mtbf, fig_mttr, fig_breakdown]
+
+    # ============================================================
+    # CALLBACK 5B: Atualizar Gráficos de Linha Gerais (Evolução Temporal da Planta)
+    # ============================================================
+    @app.callback(
+        [
+            Output("line-chart-mtbf-general", "figure"),
+            Output("line-chart-mttr-general", "figure"),
+            Output("line-chart-breakdown-general", "figure")
+        ],
+        [
+            Input("store-indicator-filters", "data")
+        ]
+    )
+    def update_general_line_charts(stored_data):
+        """
+        Atualiza os 3 gráficos de linha mostrando a evolução mensal da planta toda.
+        """
+        template = TEMPLATE_THEME_MINTY  # Tema fixo em Minty (claro)
+
+        if not stored_data or not stored_data.get("has_data", False):
+            return [
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template)
+            ]
+
+        data = stored_data["data"]
+        equipment_ids = stored_data["equipment_ids"]
+        months = stored_data["months"]
+        equipment_targets = stored_data.get("equipment_targets", {})
+        year = stored_data.get("year", 2026)
+
+        # Calcular médias gerais por mês (AGREGANDO dados brutos)
+        general_avg_by_month = calculate_general_avg_by_month(data, equipment_ids, months, year=year)
+
+        if not general_avg_by_month:
+            return [
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template),
+                create_no_data_figure("linha", template)
+            ]
+
+        # Extrair valores por mês
+        mtbf_values = [general_avg_by_month[m]["mtbf"] for m in months if m in general_avg_by_month]
+        mttr_values = [general_avg_by_month[m]["mttr"] for m in months if m in general_avg_by_month]
+        breakdown_values = [general_avg_by_month[m]["breakdown_rate"] for m in months if m in general_avg_by_month]
+
+        # Obter meta geral da planta
+        general_target = equipment_targets.get("GENERAL", {"mtbf": 0, "mttr": 999, "breakdown_rate": 100, "alert_range": 3.0})
+        alert_range = general_target.get("alert_range", 3.0)
+
+        # Criar gráficos de linha (sem linha de média, pois JÁ É a média da planta)
+        fig_mtbf = create_kpi_line_chart(
+            months, mtbf_values, None,  # None = não mostrar linha de comparação
+            "MTBF", "Média da Planta",
+            general_target.get("mtbf", 0),
+            template,
+            margin_percent=alert_range
+        )
+
+        fig_mttr = create_kpi_line_chart(
+            months, mttr_values, None,
+            "MTTR", "Média da Planta",
+            general_target.get("mttr", 999),
+            template,
+            margin_percent=alert_range
+        )
+
+        fig_breakdown = create_kpi_line_chart(
+            months, breakdown_values, None,
+            "Taxa de Avaria", "Média da Planta",
+            general_target.get("breakdown_rate", 100),
+            template,
             margin_percent=alert_range
         )
 
@@ -606,11 +837,14 @@ def register_maintenance_kpi_callbacks(app):
         data = stored_data["data"]
         equipment_targets = stored_data["equipment_targets"]  # ALTERADO: Usar metas por equipamento
         names = stored_data["names"]
-        equipment_ids = stored_data["equipment_ids"]
+        # IMPORTANTE: Usar equipamentos SELECIONADOS para tabela (exclui DECAP001 por padrão)
+        equipment_ids = stored_data.get("selected_equipment_ids", stored_data["equipment_ids"])
         months = stored_data["months"]
+        year = stored_data.get("year", 2026)
+        monthly_aggregates = stored_data.get("monthly_aggregates")
 
-        # Calcular médias por equipamento
-        averages = calculate_kpi_averages(data, equipment_ids, months)
+        # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
 
         if not averages.get("by_equipment"):
             return html.Div([
@@ -690,20 +924,13 @@ def register_maintenance_kpi_callbacks(app):
         if not current_data:
             raise PreventUpdate
 
-        print("\n" + "="*80)
-        print(">>> REFRESH: Forçando atualização completa de dados e metas")
-        print("="*80)
 
-        year = current_data.get("year", 2025)
+        year = current_data.get("year", 2026)
         months = current_data.get("months", list(range(1, 13)))
 
         # PASSO 1: Atualizar metas do MongoDB (SEMPRE)
-        print("[1/2] Atualizando metas do MongoDB...")
         equipment_targets = get_all_equipment_targets()
         general_targets = get_kpi_targets("GENERAL")
-        print(f"  - Meta geral MTBF: {general_targets['mtbf']:.1f}h")
-        print(f"  - Meta geral MTTR: {general_targets['mttr']*60:.0f}min")
-        print(f"  - Metas específicas: {len([k for k in equipment_targets.keys() if k != 'GENERAL'])} equipamentos")
 
         # PASSO 2: Re-buscar dados do ZPP
         new_data = {}
@@ -711,19 +938,16 @@ def register_maintenance_kpi_callbacks(app):
 
         if ZPP_KPI_AVAILABLE:
             try:
-                print(f"[2/2] Atualizando dados ZPP para {year}, meses {months}...")
                 new_data = fetch_zpp_kpi_data(year, months)
                 has_data = len(new_data) > 0
 
                 if has_data:
-                    print(f"  - ✓ Dados carregados: {len(new_data)} equipamentos")
+                    pass
                 else:
-                    print("  - ⚠ Nenhum dado disponível no banco")
+                    pass
             except Exception as e:
-                print(f"  - ✗ ERRO ao atualizar dados ZPP: {e}")
                 has_data = False
         else:
-            print("[2/2] Módulo ZPP não disponível")
             has_data = False
 
         # Atualizar nomes e categorias se houver dados
@@ -733,7 +957,7 @@ def register_maintenance_kpi_callbacks(app):
                 current_data["categories"] = get_zpp_equipment_categories()
                 current_data["equipment_ids"] = list(new_data.keys())
             except Exception as e:
-                print(f"[AVISO] Erro ao atualizar nomes/categorias: {e}")
+                pass
 
         # Atualizar store com novos dados e metas
         current_data["data"] = new_data
@@ -741,7 +965,6 @@ def register_maintenance_kpi_callbacks(app):
         current_data["equipment_targets"] = equipment_targets
         current_data["targets"] = general_targets
 
-        print("="*80 + "\n")
         return current_data
 
     # ============================================================
@@ -766,7 +989,6 @@ def register_maintenance_kpi_callbacks(app):
         if not current_data or not current_data.get("data"):
             raise PreventUpdate
 
-        print("[INFO] Navegação detectada - Atualizando metas do MongoDB...")
 
         # Atualizar apenas as metas (não recarregar dados pesados do ZPP)
         current_data["equipment_targets"] = get_all_equipment_targets()
@@ -787,11 +1009,13 @@ def register_maintenance_kpi_callbacks(app):
     def populate_equipment_dropdown(stored_data):
         """
         Popula o dropdown de equipamentos com os dados carregados.
+        IMPORTANTE: Usa equipamentos SELECIONADOS (exclui DECAP001 por padrão).
         """
         if not stored_data or not stored_data.get("has_data", False):
             return [], None
 
-        equipment_ids = stored_data["equipment_ids"]
+        # IMPORTANTE: Usar equipamentos SELECIONADOS para dropdown (exclui DECAP001 por padrão)
+        equipment_ids = stored_data.get("selected_equipment_ids", stored_data["equipment_ids"])
         names = stored_data["names"]
 
         options = [
@@ -992,9 +1216,11 @@ def register_maintenance_kpi_callbacks(app):
         data = stored_data["data"]
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
+        year = stored_data.get("year", 2026)
+        monthly_aggregates = stored_data.get("monthly_aggregates")
 
-        # Calcular médias por equipamento
-        averages = calculate_kpi_averages(data, equipment_ids, months)
+        # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
 
         if not averages.get("by_equipment") or equipment_id not in averages["by_equipment"]:
             return ["--", "--", "--"]
@@ -1043,9 +1269,11 @@ def register_maintenance_kpi_callbacks(app):
         equipment_targets = stored_data["equipment_targets"]  # ALTERADO: Usar metas por equipamento
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
+        year = stored_data.get("year", 2026)
+        monthly_aggregates = stored_data.get("monthly_aggregates")
 
-        # Calcular médias por equipamento
-        averages = calculate_kpi_averages(data, equipment_ids, months)
+        # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
 
         if not averages.get("by_equipment") or equipment_id not in averages["by_equipment"]:
             return [
@@ -1151,9 +1379,10 @@ def register_maintenance_kpi_callbacks(app):
         names = stored_data["names"]
         months = stored_data["months"]
         all_equipment = stored_data["equipment_ids"]
+        year = stored_data.get("year", 2026)
 
-        # Calcular médias gerais por mês
-        general_avg_by_month = calculate_general_avg_by_month(data, all_equipment, months)
+        # Calcular médias gerais por mês (AGREGANDO dados brutos)
+        general_avg_by_month = calculate_general_avg_by_month(data, all_equipment, months, year=year)
 
         # Dados do equipamento selecionado
         eq_data_by_month = data.get(equipment_id, [])
@@ -1167,17 +1396,42 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("heatmap", template)
             ]
 
-        # Extrair valores por mês
-        mtbf_values = [m["mtbf"] for m in eq_data_by_month if m["month"] in months]
-        mttr_values = [m["mttr"] for m in eq_data_by_month if m["month"] in months]
-        breakdown_values = [m["breakdown_rate"] for m in eq_data_by_month if m["month"] in months]
+        # Extrair valores por mês (mantendo None para meses sem dados)
+        # Garantir que temos um valor para cada mês solicitado
+        mtbf_values = []
+        mttr_values = []
+        breakdown_values = []
 
-        mtbf_avg = [general_avg_by_month[m]["mtbf"] for m in months if m in general_avg_by_month]
-        mttr_avg = [general_avg_by_month[m]["mttr"] for m in months if m in general_avg_by_month]
-        breakdown_avg = [general_avg_by_month[m]["breakdown_rate"] for m in months if m in general_avg_by_month]
+        # Criar dicionário de dados por mês para lookup rápido
+        eq_data_dict = {m["month"]: m for m in eq_data_by_month}
 
-        # Verificar se há valores extraídos após filtragem
-        if not mtbf_values or not mttr_values or not breakdown_values or not mtbf_avg or not mttr_avg or not breakdown_avg:
+        for month in months:
+            if month in eq_data_dict:
+                mtbf_values.append(eq_data_dict[month]["mtbf"])
+                mttr_values.append(eq_data_dict[month]["mttr"])
+                breakdown_values.append(eq_data_dict[month]["breakdown_rate"])
+            else:
+                # Mês sem dados - usar None
+                mtbf_values.append(None)
+                mttr_values.append(None)
+                breakdown_values.append(None)
+
+        # Médias gerais por mês
+        mtbf_avg = [general_avg_by_month.get(m, {}).get("mtbf") for m in months]
+        mttr_avg = [general_avg_by_month.get(m, {}).get("mttr") for m in months]
+        breakdown_avg = [general_avg_by_month.get(m, {}).get("breakdown_rate") for m in months]
+
+        # Verificar se há pelo menos UM valor não-None em cada lista
+        has_valid_data = (
+            any(v is not None for v in mtbf_values) and
+            any(v is not None for v in mttr_values) and
+            any(v is not None for v in breakdown_values) and
+            any(v is not None for v in mtbf_avg) and
+            any(v is not None for v in mttr_avg) and
+            any(v is not None for v in breakdown_avg)
+        )
+
+        if not has_valid_data:
             return [
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
@@ -1216,16 +1470,25 @@ def register_maintenance_kpi_callbacks(app):
         )
 
         # Gráfico de comparação
+        # Filtra None antes de calcular médias
+        mtbf_values_clean = [v for v in mtbf_values if v is not None]
+        mttr_values_clean = [v for v in mttr_values if v is not None]
+        breakdown_values_clean = [v for v in breakdown_values if v is not None]
+
         eq_summary = {
-            "mtbf": sum(mtbf_values) / len(mtbf_values) if mtbf_values else 0,
-            "mttr": sum(mttr_values) / len(mttr_values) if mttr_values else 0,
-            "breakdown_rate": sum(breakdown_values) / len(breakdown_values) if breakdown_values else 0
+            "mtbf": sum(mtbf_values_clean) / len(mtbf_values_clean) if mtbf_values_clean else 0,
+            "mttr": sum(mttr_values_clean) / len(mttr_values_clean) if mttr_values_clean else 0,
+            "breakdown_rate": sum(breakdown_values_clean) / len(breakdown_values_clean) if breakdown_values_clean else 0
         }
 
+        mtbf_avg_clean = [v for v in mtbf_avg if v is not None]
+        mttr_avg_clean = [v for v in mttr_avg if v is not None]
+        breakdown_avg_clean = [v for v in breakdown_avg if v is not None]
+
         general_summary = {
-            "mtbf": sum(mtbf_avg) / len(mtbf_avg) if mtbf_avg else 0,
-            "mttr": sum(mttr_avg) / len(mttr_avg) if mttr_avg else 0,
-            "breakdown_rate": sum(breakdown_avg) / len(breakdown_avg) if breakdown_avg else 0
+            "mtbf": sum(mtbf_avg_clean) / len(mtbf_avg_clean) if mtbf_avg_clean else 0,
+            "mttr": sum(mttr_avg_clean) / len(mttr_avg_clean) if mttr_avg_clean else 0,
+            "breakdown_rate": sum(breakdown_avg_clean) / len(breakdown_avg_clean) if breakdown_avg_clean else 0
         }
 
         fig_comparison = create_performance_radar_chart(
@@ -1234,7 +1497,7 @@ def register_maintenance_kpi_callbacks(app):
         )
 
         # Calendar heatmap (✅ OTIMIZADO: usa agregação ao invés de loop)
-        year = stored_data.get("year", 2025)
+        year = stored_data.get("year", 2026)
         fig_calendar, stats = create_breakdown_calendar_heatmap(
             equipment_id, year, months, template
         )
@@ -1338,18 +1601,12 @@ def register_maintenance_kpi_callbacks(app):
         # Buscar top 5 paradas do equipamento
         if ZPP_KPI_AVAILABLE:
             try:
-                print(f"[INFO] Buscando top 5 paradas para {equipment_id}")
                 breakdowns_data = fetch_top_breakdowns_by_equipment(
                     equipment_id=equipment_id,
                     year=year,
                     months=months,
                     top_n=5
                 )
-
-                if breakdowns_data:
-                    print(f"[SUCESSO] {len(breakdowns_data)} paradas encontradas")
-                else:
-                    print(f"[AVISO] Nenhuma parada encontrada para {equipment_id}")
 
                 # Criar gráfico
                 fig = create_top_breakdowns_chart(
@@ -1361,7 +1618,6 @@ def register_maintenance_kpi_callbacks(app):
                 return fig
 
             except Exception as e:
-                print(f"[ERRO] Falha ao buscar top paradas: {e}")
                 import traceback
                 traceback.print_exc()
 

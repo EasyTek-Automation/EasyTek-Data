@@ -78,7 +78,6 @@ def register_energy_sidebar_callbacks(app):
                 config_collection = get_mongo_connection("AMG_EnergyConfig")
                 config = config_collection.find_one()
             except Exception as e:
-                print(f"Erro ao verificar configuração de energia: {e}")
                 config = None
 
             # Determinar conteúdo baseado na tab ativa
@@ -351,7 +350,6 @@ def register_energy_sidebar_callbacks(app):
 
         except Exception as e:
             # Log de erro detalhado
-            print(f"Erro ao calcular custos por grupo da SE03: {e}")
             import traceback
             traceback.print_exc()
 

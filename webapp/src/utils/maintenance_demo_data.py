@@ -15,7 +15,6 @@ try:
     )
     ZPP_AVAILABLE = True
 except ImportError as e:
-    print(f"[AVISO] Módulo ZPP não disponível: {e}")
     ZPP_AVAILABLE = False
 
 # ============================================
@@ -170,10 +169,9 @@ def get_kpi_targets(equipment_id: str = None) -> Dict[str, float]:
                         "alert_range": alert_range
                     }
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar metas do MongoDB: {e}")
+        pass
 
     # Se não encontrou configuração, retornar valores padrão
-    print(f"[AVISO] Nenhuma configuração encontrada para {equipment_id or 'GENERAL'}. Configure as metas em /maintenance/config")
     return {
         "mtbf": 10.0,
         "mttr": 0.5,
@@ -237,10 +235,9 @@ def get_all_equipment_targets() -> Dict[str, Dict[str, float]]:
 
                 return all_targets
     except Exception as e:
-        print(f"[ERRO] Falha ao buscar metas do MongoDB: {e}")
+        pass
 
     # Se não encontrou configuração, retornar valores padrão para todos equipamentos
-    print(f"[AVISO] Nenhuma configuração de metas encontrada. Configure as metas em /maintenance/config")
     all_targets = {}
     equipment_list = get_equipment_names()
 
@@ -272,11 +269,9 @@ def get_equipment_names() -> Dict[str, str]:
             # Tentar buscar equipamentos reais do ZPP
             zpp_names = get_zpp_equipment_names()
             if zpp_names:
-                print(f"[INFO] Usando {len(zpp_names)} equipamentos reais do ZPP")
                 return zpp_names
         except Exception as e:
-            print(f"[AVISO] Erro ao buscar equipamentos ZPP: {e}")
-            print("[INFO] Usando equipamentos demo como fallback")
+            pass
 
     # Fallback para dados demo
     return EQUIPMENT_NAMES.copy()
@@ -295,11 +290,9 @@ def get_equipment_categories() -> Dict[str, List[str]]:
             # Tentar buscar categorias reais do ZPP
             zpp_categories = get_zpp_equipment_categories()
             if zpp_categories:
-                print(f"[INFO] Usando {len(zpp_categories)} categorias reais do ZPP")
                 return zpp_categories
         except Exception as e:
-            print(f"[AVISO] Erro ao buscar categorias ZPP: {e}")
-            print("[INFO] Usando categorias demo como fallback")
+            pass
 
     # Fallback para dados demo
     return EQUIPMENT_CATEGORIES.copy()
@@ -382,14 +375,21 @@ def generate_monthly_kpi_data(year: int,
 
 def calculate_kpi_averages(data: Dict[str, List[Dict]],
                            equipment_filter: List[str],
-                           month_filter: List[int]) -> Dict:
+                           month_filter: List[int],
+                           year: int = None,
+                           monthly_aggregates: Dict[int, Dict] = None) -> Dict:
     """
     Calcula médias dos KPIs considerando filtros.
+
+    Média geral agora calculada como: (Jan + Fev + ... + Dez) / número_de_meses
+    ao invés de média das médias dos equipamentos.
 
     Args:
         data: Dados gerados por generate_monthly_kpi_data()
         equipment_filter: Lista de equipment IDs a considerar
         month_filter: Lista de meses a considerar
+        year: Ano para buscar dados brutos (se None, usa método antigo)
+        monthly_aggregates: Valores mensais já calculados (otimização de performance)
 
     Returns:
         Dict com estrutura:
@@ -428,22 +428,52 @@ def calculate_kpi_averages(data: Dict[str, List[Dict]],
         if not filtered_months:
             continue
 
-        # Calcular média de cada KPI para este equipamento
-        mtbf_avg = sum(m["mtbf"] for m in filtered_months) / len(filtered_months)
-        mttr_avg = sum(m["mttr"] for m in filtered_months) / len(filtered_months)
-        breakdown_avg = sum(m["breakdown_rate"] for m in filtered_months) / len(filtered_months)
+        # Calcular média de cada KPI para este equipamento (filtrando valores None)
+        mtbf_values = [m["mtbf"] for m in filtered_months if m["mtbf"] is not None]
+        mttr_values = [m["mttr"] for m in filtered_months if m["mttr"] is not None]
+        breakdown_values = [m["breakdown_rate"] for m in filtered_months if m["breakdown_rate"] is not None]
+
+        mtbf_avg = sum(mtbf_values) / len(mtbf_values) if mtbf_values else None
+        mttr_avg = sum(mttr_values) / len(mttr_values) if mttr_values else None
+        breakdown_avg = sum(breakdown_values) / len(breakdown_values) if breakdown_values else None
 
         by_equipment[eq_id] = {
-            "mtbf": round(mtbf_avg, 1),
-            "mttr": round(mttr_avg, 1),
-            "breakdown_rate": round(breakdown_avg, 1)
+            "mtbf": round(mtbf_avg, 1) if mtbf_avg is not None else None,
+            "mttr": round(mttr_avg, 1) if mttr_avg is not None else None,
+            "breakdown_rate": round(breakdown_avg, 1) if breakdown_avg is not None else None
         }
 
-    # Calcular médias gerais (média das médias dos equipamentos)
-    if by_equipment:
-        mtbf_general = sum(eq["mtbf"] for eq in by_equipment.values()) / len(by_equipment)
-        mttr_general = sum(eq["mttr"] for eq in by_equipment.values()) / len(by_equipment)
-        breakdown_general = sum(eq["breakdown_rate"] for eq in by_equipment.values()) / len(by_equipment)
+    # Calcular médias gerais usando VALORES MENSAIS
+    # Método: (Jan + Fev + ... + Dez) / número_de_meses
+
+    # OTIMIZAÇÃO: Usar dados já calculados se fornecidos
+    if monthly_aggregates is not None:
+        # Usar valores mensais já calculados (evita re-buscar MongoDB)
+        monthly_values = monthly_aggregates
+    elif year is not None:
+        # Buscar valores mensais do MongoDB
+        monthly_values = calculate_general_avg_by_month(data, equipment_filter, month_filter, year=year)
+    else:
+        monthly_values = None
+
+    # Calcular médias gerais
+    if monthly_values:
+        mtbf_vals = [m["mtbf"] for m in monthly_values.values() if m["mtbf"] is not None]
+        mttr_vals = [m["mttr"] for m in monthly_values.values() if m["mttr"] is not None]
+        breakdown_vals = [m["breakdown_rate"] for m in monthly_values.values() if m["breakdown_rate"] is not None]
+
+        mtbf_general = sum(mtbf_vals) / len(mtbf_vals) if mtbf_vals else 0.0
+        mttr_general = sum(mttr_vals) / len(mttr_vals) if mttr_vals else 0.0
+        breakdown_general = sum(breakdown_vals) / len(breakdown_vals) if breakdown_vals else 0.0
+    elif by_equipment:
+        # Fallback: Média das médias dos equipamentos
+        mtbf_vals = [eq["mtbf"] for eq in by_equipment.values() if eq["mtbf"] is not None]
+        mttr_vals = [eq["mttr"] for eq in by_equipment.values() if eq["mttr"] is not None]
+        breakdown_vals = [eq["breakdown_rate"] for eq in by_equipment.values() if eq["breakdown_rate"] is not None]
+
+        mtbf_general = sum(mtbf_vals) / len(mtbf_vals) if mtbf_vals else 0.0
+        mttr_general = sum(mttr_vals) / len(mttr_vals) if mttr_vals else 0.0
+        breakdown_general = sum(breakdown_vals) / len(breakdown_vals) if breakdown_vals else 0.0
     else:
         mtbf_general = 0.0
         mttr_general = 0.0
@@ -451,8 +481,8 @@ def calculate_kpi_averages(data: Dict[str, List[Dict]],
 
     return {
         "mtbf": round(mtbf_general, 1),
-        "mttr": round(mttr_general, 1),
-        "breakdown_rate": round(breakdown_general, 1),
+        "mttr": round(mttr_general, 4),  # MTTR em horas
+        "breakdown_rate": round(breakdown_general, 2),
         "by_equipment": by_equipment
     }
 
@@ -481,19 +511,27 @@ def check_equipment_meets_targets(mtbf: float, mttr: float,
 
 def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
                                    equipment_ids: List[str],
-                                   months: List[int]) -> Dict[int, Dict]:
+                                   months: List[int],
+                                   year: int = None) -> Dict[int, Dict]:
     """
-    Calcula média geral por mês (para todos equipamentos).
+    Calcula KPI geral por mês agregando dados BRUTOS de todos os equipamentos.
 
-    Útil para comparar equipamento individual com a média geral.
+    IMPORTANTE: Agora usa agregação de dados brutos (igual aos debug cards)
+    ao invés de média aritmética dos KPIs individuais.
+
+    Método:
+    1. Busca dados brutos de produção e paradas do MongoDB
+    2. Agrega por mês (soma horas, conta falhas)
+    3. Calcula KPI da PLANTA (não média dos equipamentos)
 
     Args:
-        data: Dados gerados por generate_monthly_kpi_data()
+        data: Dados gerados (usado apenas como fallback se year=None)
         equipment_ids: Lista de IDs dos equipamentos
         months: Lista de meses a considerar
+        year: Ano para buscar dados brutos (se None, usa método antigo)
 
     Returns:
-        Dicionário com médias por mês:
+        Dicionário com KPIs por mês:
         {
             1: {"mtbf": X, "mttr": Y, "breakdown_rate": Z},
             2: {...},
@@ -502,26 +540,83 @@ def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
     """
     result = {}
 
-    for month in months:
-        mtbf_sum = 0
-        mttr_sum = 0
-        breakdown_sum = 0
-        count = 0
+    # Se year não foi passado, usar método antigo (média aritmética) para compatibilidade
+    if year is None:
+        for month in months:
+            mtbf_sum = 0
+            mttr_sum = 0
+            breakdown_sum = 0
+            count = 0
 
-        for eq_id in equipment_ids:
-            for month_data in data[eq_id]:
-                if month_data["month"] == month:
-                    mtbf_sum += month_data["mtbf"]
-                    mttr_sum += month_data["mttr"]
-                    breakdown_sum += month_data["breakdown_rate"]
-                    count += 1
-                    break
+            for eq_id in equipment_ids:
+                for month_data in data[eq_id]:
+                    if month_data["month"] == month:
+                        mtbf_sum += month_data["mtbf"]
+                        mttr_sum += month_data["mttr"]
+                        breakdown_sum += month_data["breakdown_rate"]
+                        count += 1
+                        break
 
-        if count > 0:
+            if count > 0:
+                result[month] = {
+                    "mtbf": round(mtbf_sum / count, 1),
+                    "mttr": round(mttr_sum / count, 1),
+                    "breakdown_rate": round(breakdown_sum / count, 1)
+                }
+
+        return result
+
+    # NOVO MÉTODO: Agregação de dados brutos (igual debug cards)
+    try:
+        from src.utils.zpp_kpi_calculator import fetch_zpp_production_data, fetch_zpp_breakdown_data
+
+        # Buscar dados brutos do MongoDB
+        production_df = fetch_zpp_production_data(year, months)
+        breakdown_df = fetch_zpp_breakdown_data(year, months)
+
+        if production_df.empty:
+            return result
+
+        # Calcular KPIs por mês agregando TODOS os equipamentos
+        for month in months:
+            # Filtrar dados do mês
+            prod_month = production_df[production_df['month'] == month]
+            breakdown_month = breakdown_df[breakdown_df['month'] == month]
+
+            # Calcular agregações
+            total_active_hours = prod_month['horasact'].sum()
+
+            if breakdown_month.empty:
+                num_failures = 0
+                total_breakdown_minutes = 0
+            else:
+                num_failures = len(breakdown_month)
+                total_breakdown_minutes = breakdown_month['duracao_min'].sum()
+
+            total_breakdown_hours = total_breakdown_minutes / 60.0
+
+            # Calcular KPIs (mesma lógica dos debug cards)
+            if num_failures > 0 and total_active_hours > 0:
+                mtbf = (total_active_hours - total_breakdown_hours) / num_failures
+                mttr = total_breakdown_hours / num_failures
+                breakdown_rate = (total_breakdown_hours / total_active_hours) * 100
+            elif total_active_hours > 0:
+                # Sem falhas
+                mtbf = 999.0
+                mttr = 0.0
+                breakdown_rate = 0.0
+            else:
+                # Sem dados
+                continue
+
             result[month] = {
-                "mtbf": round(mtbf_sum / count, 1),
-                "mttr": round(mttr_sum / count, 1),
-                "breakdown_rate": round(breakdown_sum / count, 1)
+                "mtbf": round(mtbf, 1),
+                "mttr": round(mttr, 4),  # MTTR em horas (será convertido para minutos na exibição)
+                "breakdown_rate": round(breakdown_rate, 2)
             }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
 
     return result
