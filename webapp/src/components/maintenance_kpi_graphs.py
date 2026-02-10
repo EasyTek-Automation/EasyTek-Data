@@ -1124,8 +1124,8 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
                 prod_pipeline = [
                     {
                         "$match": {
-                            "_year": year,
                             "_processed": True,
+                            "pto_trab": equipment_id,  # Filtrar por equipamento
                             "fininotif": {"$gte": start_date, "$lte": end_date}
                         }
                     },
@@ -1144,7 +1144,6 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
                 paradas_pipeline = [
                     {
                         "$match": {
-                            "_year": year,
                             "_processed": True,
                             "centro_de_trabalho": equipment_id,
                             "inicio_execucao": {"$gte": start_date, "$lte": end_date},
