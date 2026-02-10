@@ -77,6 +77,28 @@ def create_maintenance_indicators_filters():
                     )
                 ], id="div-reference-year", style={"display": "block"}, className="mb-3"),
 
+                # Seletor de Equipamentos
+                html.Div([
+                    html.Label(
+                        "Equipamentos",
+                        className="form-label fw-bold mb-2",
+                        style={"fontSize": "0.85rem", "color": "#495057"}
+                    ),
+                    dcc.Dropdown(
+                        id="filter-equipment-selection",
+                        options=[],  # Será populado dinamicamente
+                        value=[],    # Será definido dinamicamente (todos exceto DECAP001)
+                        multi=True,
+                        placeholder="Selecione equipamentos...",
+                        style={"fontSize": "0.85rem"}
+                    ),
+                    html.Small(
+                        "Padrão: Todos exceto Decapado",
+                        className="text-muted",
+                        style={"fontSize": "0.7rem"}
+                    )
+                ], className="mb-3"),
+
                 # Date Picker Range
                 html.Div([
                     html.Label(

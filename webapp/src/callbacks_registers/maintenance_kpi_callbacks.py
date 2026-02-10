@@ -50,6 +50,16 @@ from src.components.maintenance_kpi_graphs import (
 )
 
 
+# ==================== CONFIGURAÇÃO DE EQUIPAMENTOS ====================
+
+# Equipamentos excluídos dos GRÁFICOS por padrão (mas incluídos nos cards gerais da planta)
+# NOTA: Para reincluir um equipamento, basta removê-lo desta lista
+# Exemplo: Para incluir DECAP001, mude para: EQUIPMENT_EXCLUDED_BY_DEFAULT = []
+EQUIPMENT_EXCLUDED_BY_DEFAULT = ["DECAP001"]
+
+# =====================================================================
+
+
 def register_maintenance_kpi_callbacks(app):
     """
     Registra todos os callbacks da página de indicadores de manutenção.
@@ -81,6 +91,41 @@ def register_maintenance_kpi_callbacks(app):
             return {"display": "none"}, {"display": "block"}
 
     # ============================================================
+    # CALLBACK 1B: Popular Dropdown de Equipamentos
+    # ============================================================
+    @app.callback(
+        [
+            Output("filter-equipment-selection", "options"),
+            Output("filter-equipment-selection", "value")
+        ],
+        Input("store-indicator-filters", "data")
+    )
+    def populate_equipment_filter(stored_data):
+        """
+        Popula dropdown de equipamentos com lista dinâmica.
+        Por padrão, seleciona todos EXCETO os equipamentos em EQUIPMENT_EXCLUDED_BY_DEFAULT.
+        """
+        if not stored_data or not stored_data.get("has_data"):
+            return [], []
+
+        equipment_ids = stored_data.get("equipment_ids", [])
+        names = stored_data.get("names", {})
+
+        # Criar options com nomes amigáveis
+        options = [
+            {"label": names.get(eq_id, eq_id), "value": eq_id}
+            for eq_id in equipment_ids
+        ]
+
+        # Valor padrão: todos EXCETO os excluídos por padrão
+        default_value = [
+            eq_id for eq_id in equipment_ids
+            if eq_id not in EQUIPMENT_EXCLUDED_BY_DEFAULT
+        ]
+
+        return options, default_value
+
+    # ============================================================
     # CALLBACK 2: Processar Filtros e Gerar Dados
     # ============================================================
     @app.callback(
@@ -94,12 +139,14 @@ def register_maintenance_kpi_callbacks(app):
             State("filter-reference-year", "value"),
             State("filter-date-range", "start_date"),
             State("filter-date-range", "end_date"),
+            State("filter-equipment-selection", "value"),
             State("store-indicator-filters", "data")
         ]
     )
     def process_filters_and_load_data(n_clicks, n_intervals,
                                       period_type, ref_year,
                                       start_date, end_date,
+                                      selected_equipment,
                                       current_data):
         """
         Processa filtros e gera dados baseado no tipo de período.
@@ -289,10 +336,23 @@ def register_maintenance_kpi_callbacks(app):
             except Exception as e:
                 monthly_aggregates = None
 
+        # Processar seleção de equipamentos para gráficos
+        # all_equipment = TODOS (usado para cards gerais da planta)
+        # selected_equipment_ids = FILTRADOS (usado para gráficos)
+        if not selected_equipment or len(selected_equipment) == 0:
+            # Se nenhum selecionado, usar todos EXCETO os excluídos por padrão
+            selected_equipment_ids = [
+                eq for eq in all_equipment
+                if eq not in EQUIPMENT_EXCLUDED_BY_DEFAULT
+            ]
+        else:
+            # Usar seleção do usuário
+            selected_equipment_ids = [eq for eq in selected_equipment if eq in all_equipment]
+
         # Log diagnóstico: verificar o que está sendo armazenado no store
         logger.debug(
-            "Armazenando no store: %d equipamentos, %d categorias",
-            len(all_equipment), len(categories)
+            "Armazenando no store: %d equipamentos total, %d selecionados para gráficos, %d categorias",
+            len(all_equipment), len(selected_equipment_ids), len(categories)
         )
 
         if categories:
@@ -304,7 +364,8 @@ def register_maintenance_kpi_callbacks(app):
             "period_type": period_type,
             "year": year,
             "months": months,
-            "equipment_ids": all_equipment,
+            "equipment_ids": all_equipment,  # TODOS os equipamentos (para cards gerais)
+            "selected_equipment_ids": selected_equipment_ids,  # Filtrados (para gráficos)
             "data": data,
             "targets": general_target,  # Meta geral (para compatibilidade)
             "equipment_targets": equipment_targets,  # Metas por equipamento
@@ -465,7 +526,8 @@ def register_maintenance_kpi_callbacks(app):
         data = stored_data["data"]
         equipment_targets = stored_data["equipment_targets"]  # ALTERADO: Usar metas por equipamento
         names = stored_data["names"]
-        equipment_ids = stored_data["equipment_ids"]
+        # IMPORTANTE: Usar equipamentos SELECIONADOS para gráficos (exclui DECAP001 por padrão)
+        equipment_ids = stored_data.get("selected_equipment_ids", stored_data["equipment_ids"])
         months = stored_data["months"]
         year = stored_data.get("year", 2026)
         monthly_aggregates = stored_data.get("monthly_aggregates")
@@ -583,7 +645,8 @@ def register_maintenance_kpi_callbacks(app):
         data = stored_data["data"]
         names = stored_data["names"]
         categories = stored_data["categories"]
-        equipment_ids = stored_data["equipment_ids"]
+        # IMPORTANTE: Usar equipamentos SELECIONADOS para gráficos (exclui DECAP001 por padrão)
+        equipment_ids = stored_data.get("selected_equipment_ids", stored_data["equipment_ids"])
         months = stored_data["months"]
         equipment_targets = stored_data.get("equipment_targets", {})
         year = stored_data.get("year", 2026)
@@ -591,7 +654,7 @@ def register_maintenance_kpi_callbacks(app):
 
         # Log diagnóstico: verificar o que foi recuperado do store
         logger.debug(
-            "Sunburst recebeu: %d equipamentos, %d categorias",
+            "Sunburst recebeu: %d equipamentos selecionados, %d categorias",
             len(equipment_ids), len(categories)
         )
 
@@ -602,7 +665,7 @@ def register_maintenance_kpi_callbacks(app):
         else:
             logger.warning("Sunburst recebeu categorias VAZIO do store")
 
-        # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
+        # Calcular médias por equipamento SELECIONADO (usando cache de monthly_aggregates do store)
         averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
 
         if not averages.get("by_equipment"):
@@ -774,7 +837,8 @@ def register_maintenance_kpi_callbacks(app):
         data = stored_data["data"]
         equipment_targets = stored_data["equipment_targets"]  # ALTERADO: Usar metas por equipamento
         names = stored_data["names"]
-        equipment_ids = stored_data["equipment_ids"]
+        # IMPORTANTE: Usar equipamentos SELECIONADOS para tabela (exclui DECAP001 por padrão)
+        equipment_ids = stored_data.get("selected_equipment_ids", stored_data["equipment_ids"])
         months = stored_data["months"]
         year = stored_data.get("year", 2026)
         monthly_aggregates = stored_data.get("monthly_aggregates")
@@ -945,11 +1009,13 @@ def register_maintenance_kpi_callbacks(app):
     def populate_equipment_dropdown(stored_data):
         """
         Popula o dropdown de equipamentos com os dados carregados.
+        IMPORTANTE: Usa equipamentos SELECIONADOS (exclui DECAP001 por padrão).
         """
         if not stored_data or not stored_data.get("has_data", False):
             return [], None
 
-        equipment_ids = stored_data["equipment_ids"]
+        # IMPORTANTE: Usar equipamentos SELECIONADOS para dropdown (exclui DECAP001 por padrão)
+        equipment_ids = stored_data.get("selected_equipment_ids", stored_data["equipment_ids"])
         names = stored_data["names"]
 
         options = [
