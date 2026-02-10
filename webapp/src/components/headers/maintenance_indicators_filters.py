@@ -69,9 +69,10 @@ def create_maintenance_indicators_filters():
                         options=[
                             {"label": "2024", "value": 2024},
                             {"label": "2025", "value": 2025},
-                            {"label": "2026", "value": 2026}
+                            {"label": "2026", "value": 2026},
+                            {"label": "2027", "value": 2027}
                         ],
-                        value=2025,  # Ano onde os dados ZPP estão disponíveis
+                        value=2026,  # Ano padrão
                         clearable=False,
                         style={"fontSize": "0.85rem"}
                     )

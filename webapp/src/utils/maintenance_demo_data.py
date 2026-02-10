@@ -435,15 +435,19 @@ def calculate_kpi_averages(data: Dict[str, List[Dict]],
         if not filtered_months:
             continue
 
-        # Calcular média de cada KPI para este equipamento
-        mtbf_avg = sum(m["mtbf"] for m in filtered_months) / len(filtered_months)
-        mttr_avg = sum(m["mttr"] for m in filtered_months) / len(filtered_months)
-        breakdown_avg = sum(m["breakdown_rate"] for m in filtered_months) / len(filtered_months)
+        # Calcular média de cada KPI para este equipamento (filtrando valores None)
+        mtbf_values = [m["mtbf"] for m in filtered_months if m["mtbf"] is not None]
+        mttr_values = [m["mttr"] for m in filtered_months if m["mttr"] is not None]
+        breakdown_values = [m["breakdown_rate"] for m in filtered_months if m["breakdown_rate"] is not None]
+
+        mtbf_avg = sum(mtbf_values) / len(mtbf_values) if mtbf_values else None
+        mttr_avg = sum(mttr_values) / len(mttr_values) if mttr_values else None
+        breakdown_avg = sum(breakdown_values) / len(breakdown_values) if breakdown_values else None
 
         by_equipment[eq_id] = {
-            "mtbf": round(mtbf_avg, 1),
-            "mttr": round(mttr_avg, 1),
-            "breakdown_rate": round(breakdown_avg, 1)
+            "mtbf": round(mtbf_avg, 1) if mtbf_avg is not None else None,
+            "mttr": round(mttr_avg, 1) if mttr_avg is not None else None,
+            "breakdown_rate": round(breakdown_avg, 1) if breakdown_avg is not None else None
         }
 
     # Calcular médias gerais usando VALORES MENSAIS
@@ -461,14 +465,22 @@ def calculate_kpi_averages(data: Dict[str, List[Dict]],
 
     # Calcular médias gerais
     if monthly_values:
-        mtbf_general = sum(m["mtbf"] for m in monthly_values.values()) / len(monthly_values)
-        mttr_general = sum(m["mttr"] for m in monthly_values.values()) / len(monthly_values)
-        breakdown_general = sum(m["breakdown_rate"] for m in monthly_values.values()) / len(monthly_values)
+        mtbf_vals = [m["mtbf"] for m in monthly_values.values() if m["mtbf"] is not None]
+        mttr_vals = [m["mttr"] for m in monthly_values.values() if m["mttr"] is not None]
+        breakdown_vals = [m["breakdown_rate"] for m in monthly_values.values() if m["breakdown_rate"] is not None]
+
+        mtbf_general = sum(mtbf_vals) / len(mtbf_vals) if mtbf_vals else 0.0
+        mttr_general = sum(mttr_vals) / len(mttr_vals) if mttr_vals else 0.0
+        breakdown_general = sum(breakdown_vals) / len(breakdown_vals) if breakdown_vals else 0.0
     elif by_equipment:
         # Fallback: Média das médias dos equipamentos
-        mtbf_general = sum(eq["mtbf"] for eq in by_equipment.values()) / len(by_equipment)
-        mttr_general = sum(eq["mttr"] for eq in by_equipment.values()) / len(by_equipment)
-        breakdown_general = sum(eq["breakdown_rate"] for eq in by_equipment.values()) / len(by_equipment)
+        mtbf_vals = [eq["mtbf"] for eq in by_equipment.values() if eq["mtbf"] is not None]
+        mttr_vals = [eq["mttr"] for eq in by_equipment.values() if eq["mttr"] is not None]
+        breakdown_vals = [eq["breakdown_rate"] for eq in by_equipment.values() if eq["breakdown_rate"] is not None]
+
+        mtbf_general = sum(mtbf_vals) / len(mtbf_vals) if mtbf_vals else 0.0
+        mttr_general = sum(mttr_vals) / len(mttr_vals) if mttr_vals else 0.0
+        breakdown_general = sum(breakdown_vals) / len(breakdown_vals) if breakdown_vals else 0.0
     else:
         mtbf_general = 0.0
         mttr_general = 0.0

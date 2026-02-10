@@ -125,7 +125,7 @@ def register_maintenance_kpi_callbacks(app):
                 "db_error": True,
                 "error_message": db_status.get("error", "MongoDB indisponível"),
                 "period_type": period_type or "last12",
-                "year": ref_year or 2025,
+                "year": ref_year or 2026,
                 "months": list(range(1, 13)),
                 "equipment_ids": [],
                 "data": {},
@@ -151,7 +151,7 @@ def register_maintenance_kpi_callbacks(app):
 
         if period_type in ["year", "last12"]:
             if not ref_year:
-                ref_year = 2025  # Ano onde os dados ZPP estão disponíveis
+                ref_year = 2026  # Ano onde os dados ZPP estão disponíveis
 
             if period_type == "year":
                 # Todos os meses do ano
@@ -168,7 +168,7 @@ def register_maintenance_kpi_callbacks(app):
         else:  # custom
             if not start_date or not end_date:
                 # Usar padrão se não informado
-                year = 2025  # Ano onde os dados ZPP estão disponíveis
+                year = 2026  # Ano padrão
                 months = list(range(1, 13))
                 print(f"[FILTROS] Modo 'Custom' SEM DATAS: usando padrão {year}, todos meses")
             else:
@@ -312,7 +312,7 @@ def register_maintenance_kpi_callbacks(app):
         equipment_targets = stored_data["equipment_targets"]  # ALTERADO
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
-        year = stored_data.get("year", 2025)
+        year = stored_data.get("year", 2026)
         monthly_aggregates = stored_data.get("monthly_aggregates")
 
         # Calcular médias (usando cache de monthly_aggregates do store)
@@ -437,7 +437,7 @@ def register_maintenance_kpi_callbacks(app):
         names = stored_data["names"]
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
-        year = stored_data.get("year", 2025)
+        year = stored_data.get("year", 2026)
         monthly_aggregates = stored_data.get("monthly_aggregates")
 
         print(f"[DEBUG] Equipamentos: {len(equipment_ids)} -> {equipment_ids}")
@@ -461,7 +461,27 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("barra", template)
             ]
 
-        # Preparar dados para gráficos
+        # Preparar dados para gráficos (filtrar equipamentos sem dados válidos)
+        # Só incluir equipamentos que têm pelo menos um KPI válido (não None)
+        valid_equipment = [
+            eq for eq in equipment_ids
+            if eq in averages["by_equipment"] and (
+                averages["by_equipment"][eq]["mtbf"] is not None or
+                averages["by_equipment"][eq]["mttr"] is not None or
+                averages["by_equipment"][eq]["breakdown_rate"] is not None
+            )
+        ]
+
+        if not valid_equipment:
+            print("[DEBUG] Nenhum equipamento com dados válidos - retornando gráficos de 'sem dados'")
+            return [
+                create_no_data_figure("barra", template),
+                create_no_data_figure("barra", template),
+                create_no_data_figure("barra", template)
+            ]
+
+        # Usar apenas equipamentos válidos
+        equipment_ids = valid_equipment
         mtbf_values = [averages["by_equipment"][eq]["mtbf"] for eq in equipment_ids]
         mttr_values = [averages["by_equipment"][eq]["mttr"] for eq in equipment_ids]
         breakdown_values = [averages["by_equipment"][eq]["breakdown_rate"] for eq in equipment_ids]
@@ -544,7 +564,7 @@ def register_maintenance_kpi_callbacks(app):
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
         equipment_targets = stored_data.get("equipment_targets", {})
-        year = stored_data.get("year", 2025)
+        year = stored_data.get("year", 2026)
         monthly_aggregates = stored_data.get("monthly_aggregates")
 
         # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
@@ -557,10 +577,22 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("sunburst", template)
             ]
 
-        # Preparar dados para sunbursts (apenas valores por equipamento)
-        mtbf_by_eq = {eq: averages["by_equipment"][eq]["mtbf"] for eq in equipment_ids}
-        mttr_by_eq = {eq: averages["by_equipment"][eq]["mttr"] for eq in equipment_ids}
-        breakdown_by_eq = {eq: averages["by_equipment"][eq]["breakdown_rate"] for eq in equipment_ids}
+        # Preparar dados para sunbursts (apenas equipamentos que existem em by_equipment)
+        mtbf_by_eq = {
+            eq: averages["by_equipment"][eq]["mtbf"]
+            for eq in equipment_ids
+            if eq in averages["by_equipment"]
+        }
+        mttr_by_eq = {
+            eq: averages["by_equipment"][eq]["mttr"]
+            for eq in equipment_ids
+            if eq in averages["by_equipment"]
+        }
+        breakdown_by_eq = {
+            eq: averages["by_equipment"][eq]["breakdown_rate"]
+            for eq in equipment_ids
+            if eq in averages["by_equipment"]
+        }
 
         # Obter meta geral da planta
         general_target = equipment_targets.get("GENERAL", {"mtbf": 0, "mttr": 999, "breakdown_rate": 100, "alert_range": 3.0})
@@ -632,7 +664,7 @@ def register_maintenance_kpi_callbacks(app):
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
         equipment_targets = stored_data.get("equipment_targets", {})
-        year = stored_data.get("year", 2025)
+        year = stored_data.get("year", 2026)
 
         # Calcular médias gerais por mês (AGREGANDO dados brutos)
         general_avg_by_month = calculate_general_avg_by_month(data, equipment_ids, months, year=year)
@@ -709,7 +741,7 @@ def register_maintenance_kpi_callbacks(app):
         names = stored_data["names"]
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
-        year = stored_data.get("year", 2025)
+        year = stored_data.get("year", 2026)
         monthly_aggregates = stored_data.get("monthly_aggregates")
 
         # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
@@ -797,7 +829,7 @@ def register_maintenance_kpi_callbacks(app):
         print(">>> REFRESH: Forçando atualização completa de dados e metas")
         print("="*80)
 
-        year = current_data.get("year", 2025)
+        year = current_data.get("year", 2026)
         months = current_data.get("months", list(range(1, 13)))
 
         # PASSO 1: Atualizar metas do MongoDB (SEMPRE)
@@ -1095,7 +1127,7 @@ def register_maintenance_kpi_callbacks(app):
         data = stored_data["data"]
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
-        year = stored_data.get("year", 2025)
+        year = stored_data.get("year", 2026)
         monthly_aggregates = stored_data.get("monthly_aggregates")
 
         # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
@@ -1148,7 +1180,7 @@ def register_maintenance_kpi_callbacks(app):
         equipment_targets = stored_data["equipment_targets"]  # ALTERADO: Usar metas por equipamento
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
-        year = stored_data.get("year", 2025)
+        year = stored_data.get("year", 2026)
         monthly_aggregates = stored_data.get("monthly_aggregates")
 
         # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
@@ -1258,7 +1290,7 @@ def register_maintenance_kpi_callbacks(app):
         names = stored_data["names"]
         months = stored_data["months"]
         all_equipment = stored_data["equipment_ids"]
-        year = stored_data.get("year", 2025)
+        year = stored_data.get("year", 2026)
 
         # Calcular médias gerais por mês (AGREGANDO dados brutos)
         general_avg_by_month = calculate_general_avg_by_month(data, all_equipment, months, year=year)
@@ -1275,17 +1307,42 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("heatmap", template)
             ]
 
-        # Extrair valores por mês
-        mtbf_values = [m["mtbf"] for m in eq_data_by_month if m["month"] in months]
-        mttr_values = [m["mttr"] for m in eq_data_by_month if m["month"] in months]
-        breakdown_values = [m["breakdown_rate"] for m in eq_data_by_month if m["month"] in months]
+        # Extrair valores por mês (mantendo None para meses sem dados)
+        # Garantir que temos um valor para cada mês solicitado
+        mtbf_values = []
+        mttr_values = []
+        breakdown_values = []
 
-        mtbf_avg = [general_avg_by_month[m]["mtbf"] for m in months if m in general_avg_by_month]
-        mttr_avg = [general_avg_by_month[m]["mttr"] for m in months if m in general_avg_by_month]
-        breakdown_avg = [general_avg_by_month[m]["breakdown_rate"] for m in months if m in general_avg_by_month]
+        # Criar dicionário de dados por mês para lookup rápido
+        eq_data_dict = {m["month"]: m for m in eq_data_by_month}
 
-        # Verificar se há valores extraídos após filtragem
-        if not mtbf_values or not mttr_values or not breakdown_values or not mtbf_avg or not mttr_avg or not breakdown_avg:
+        for month in months:
+            if month in eq_data_dict:
+                mtbf_values.append(eq_data_dict[month]["mtbf"])
+                mttr_values.append(eq_data_dict[month]["mttr"])
+                breakdown_values.append(eq_data_dict[month]["breakdown_rate"])
+            else:
+                # Mês sem dados - usar None
+                mtbf_values.append(None)
+                mttr_values.append(None)
+                breakdown_values.append(None)
+
+        # Médias gerais por mês
+        mtbf_avg = [general_avg_by_month.get(m, {}).get("mtbf") for m in months]
+        mttr_avg = [general_avg_by_month.get(m, {}).get("mttr") for m in months]
+        breakdown_avg = [general_avg_by_month.get(m, {}).get("breakdown_rate") for m in months]
+
+        # Verificar se há pelo menos UM valor não-None em cada lista
+        has_valid_data = (
+            any(v is not None for v in mtbf_values) and
+            any(v is not None for v in mttr_values) and
+            any(v is not None for v in breakdown_values) and
+            any(v is not None for v in mtbf_avg) and
+            any(v is not None for v in mttr_avg) and
+            any(v is not None for v in breakdown_avg)
+        )
+
+        if not has_valid_data:
             return [
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
@@ -1342,7 +1399,7 @@ def register_maintenance_kpi_callbacks(app):
         )
 
         # Calendar heatmap (✅ OTIMIZADO: usa agregação ao invés de loop)
-        year = stored_data.get("year", 2025)
+        year = stored_data.get("year", 2026)
         fig_calendar, stats = create_breakdown_calendar_heatmap(
             equipment_id, year, months, template
         )

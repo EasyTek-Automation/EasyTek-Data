@@ -1,115 +1,93 @@
 """
-Script para corrigir índices após mudança de normalização de colunas
-Remove índices antigos (com nomes em maiúsculas) e recria com nomes normalizados
+Script para corrigir índices desatualizados das collections ZPP
+Remove índices antigos e permite que sejam recriados corretamente
 """
-
-from pymongo import MongoClient, ASCENDING, DESCENDING
 import os
+from pymongo import MongoClient
 from dotenv import load_dotenv
-import logging
 
+# Carregar variáveis de ambiente
 load_dotenv()
 
-logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+MONGO_URI = os.getenv('MONGO_URI')
+DB_NAME = os.getenv('DB_NAME')
 
-def fix_indexes():
-    """Remove índices antigos e recria com nomes normalizados"""
+if not MONGO_URI or not DB_NAME:
+    print("[ERRO] Variáveis MONGO_URI e/ou DB_NAME não configuradas no .env")
+    exit(1)
 
-    # Conectar ao MongoDB
-    MONGO_URI = os.getenv('MONGO_URI')
-    DB_NAME = os.getenv('DB_NAME')
+print("="*80)
+print("CORREÇÃO DE ÍNDICES ZPP")
+print("="*80)
+print(f"\nDatabase: {DB_NAME}")
+print(f"Collections: ZPP_Producao_2025, ZPP_Paradas_2025\n")
 
-    if not MONGO_URI or not DB_NAME:
-        logger.error("MONGO_URI e DB_NAME devem estar configurados no .env")
-        return
-
-    client = MongoClient(MONGO_URI)
+# Conectar ao MongoDB
+try:
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000)
+    client.server_info()
     db = client[DB_NAME]
+    print("[OK] Conectado ao MongoDB\n")
+except Exception as e:
+    print(f"[ERRO] Falha ao conectar: {e}")
+    exit(1)
 
-    # Collections a corrigir (adicione mais se necessário)
-    collections_to_fix = [
-        'ZPP_Producao_2025',
-        'ZPP_Producao_2024',
-        'ZPP_Paradas_2025',
-        'ZPP_Paradas_2024'
-    ]
+# Collections a processar
+collections_to_fix = ['ZPP_Producao_2025', 'ZPP_Paradas_2025']
 
-    for coll_name in collections_to_fix:
-        if coll_name not in db.list_collection_names():
-            logger.info(f"Collection {coll_name} não existe, pulando...")
-            continue
+for coll_name in collections_to_fix:
+    print("="*80)
+    print(f"COLLECTION: {coll_name}")
+    print("="*80)
 
-        logger.info(f"\n{'='*60}")
-        logger.info(f"Corrigindo: {coll_name}")
-        logger.info(f"{'='*60}")
+    collection = db[coll_name]
 
-        collection = db[coll_name]
+    # Listar índices existentes
+    print("\n[1] Índices atuais:")
+    indexes = collection.list_indexes()
+    index_names = []
+    for idx in indexes:
+        index_names.append(idx['name'])
+        print(f"  - {idx['name']}: {idx.get('key', {})}")
 
-        # Listar índices atuais
-        logger.info("\nÍndices atuais:")
-        indexes = collection.list_indexes()
-        for idx in indexes:
-            logger.info(f"  - {idx['name']}: {idx['key']}")
-
-        # Remover índice antigo de Ordem (maiúsculo)
-        logger.info("\nRemovendo índice antigo...")
-        try:
-            collection.drop_index('idx_ordem_unique')
-            logger.info("  [OK] idx_ordem_unique removido")
-        except Exception as e:
-            logger.warning(f"  [!] Não foi possível remover idx_ordem_unique: {e}")
-
-        # Recriar índices com nomes normalizados
-        logger.info("\nRecriando índices com nomes normalizados...")
-
-        if 'Producao' in coll_name:
-            # Índices para Produção
-            indexes_to_create = [
-                ([('pto_trab', ASCENDING), ('fininotif', DESCENDING)], 'idx_equipamento_data', {}),
-                ([('ordem', ASCENDING)], 'idx_ordem_unique', {'unique': True, 'sparse': True}),  # sparse=True permite múltiplos null
-                ([('fininotif', ASCENDING), ('ffinnotif', ASCENDING)], 'idx_range_datas', {}),
-                ([('_year', ASCENDING)], 'idx_year', {}),
-                ([('pto_trab', ASCENDING), ('kg_proc', DESCENDING)], 'idx_equipamento_producao', {})
-            ]
-        else:
-            # Índices para Paradas
-            indexes_to_create = [
-                ([('linea', ASCENDING), ('data_inicio', DESCENDING)], 'idx_linha_data', {}),
-                ([('ordem', ASCENDING)], 'idx_ordem', {'sparse': True}),
-                ([('linea', ASCENDING), ('data_inicio', ASCENDING), ('hora_inicio', ASCENDING), ('ordem', ASCENDING)],
-                 'idx_parada_unique', {'unique': True, 'sparse': True}),  # Impede duplicatas
-                ([('motivo', ASCENDING)], 'idx_motivo', {}),
-                ([('data_inicio', ASCENDING), ('data_fim', ASCENDING)], 'idx_range_datas', {}),
-                ([('_year', ASCENDING)], 'idx_year', {}),
-                ([('duracao_min', DESCENDING)], 'idx_duracao', {})
-            ]
-
-        for keys, name, options in indexes_to_create:
+    # Remover índices (exceto _id_ que é obrigatório)
+    print("\n[2] Removendo índices antigos...")
+    removed_count = 0
+    for idx_name in index_names:
+        if idx_name != '_id_':  # Não pode remover índice do _id
             try:
-                # Remover índice se já existir
-                try:
-                    collection.drop_index(name)
-                except:
-                    pass
-
-                # Criar índice
-                collection.create_index(keys, name=name, **options)
-                logger.info(f"  [OK] {name} criado")
+                collection.drop_index(idx_name)
+                print(f"  [OK] Removido: {idx_name}")
+                removed_count += 1
             except Exception as e:
-                logger.error(f"  [X] Erro ao criar {name}: {e}")
+                print(f"  [AVISO] Não foi possível remover {idx_name}: {e}")
 
-        logger.info(f"\n[OK] {coll_name} corrigido!")
+    if removed_count == 0:
+        print("  Nenhum índice personalizado para remover")
+    else:
+        print(f"\n  Total removido: {removed_count} índice(s)")
 
-    client.close()
-    logger.info(f"\n{'='*60}")
-    logger.info("Correção de índices concluída!")
-    logger.info(f"{'='*60}\n")
+    print("\n[3] Status final:")
+    remaining = list(collection.list_indexes())
+    print(f"  Índices restantes: {len(remaining)}")
+    for idx in remaining:
+        print(f"  - {idx['name']}")
 
-if __name__ == "__main__":
-    print("\n" + "="*60)
-    print("CORREÇÃO DE ÍNDICES ZPP")
-    print("Remove índices antigos e recria com nomes normalizados")
-    print("="*60 + "\n")
+    print()
 
-    fix_indexes()
+print("="*80)
+print("CONCLUSÃO")
+print("="*80)
+print("""
+Os índices antigos foram removidos com sucesso.
+
+PRÓXIMO PASSO:
+Execute novamente o processamento com:
+  python process_zpp_quick.py
+
+O script irá criar automaticamente os índices corretos com os
+nomes de campos normalizados.
+""")
+print("="*80)
+
+client.close()

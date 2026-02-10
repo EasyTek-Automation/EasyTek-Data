@@ -43,7 +43,7 @@ def detect_file_type(file_path: str) -> Optional[str]:
         # Assinaturas de colunas por tipo
         signatures = {
             'zppprd': {'Pto.Trab.', 'Kg.Proc.', 'HorasAct.', 'FIniNotif', 'FFinNotif'},
-            'zppparadas': {'LINEA', 'DATA INICIO', 'DATA FIM', 'MOTIVO', 'DURAÇÃO(min)'}
+            'zppparadas': {'Centro de trabalho', 'Início execução', 'Fim execução', 'Causa do desvio', 'Duration (min)'}
         }
 
         # Verificar qual assinatura corresponde melhor
@@ -197,8 +197,8 @@ class ZPPCleaner:
             'description': 'ZPP PRD - Produção'
         },
         'zppparadas': {
-            'identifier': 'LINEA',  # Coluna identificadora principal
-            'required': ['LINEA', 'Ordem', 'DATA INICIO', 'DATA FIM'],  # Colunas que NÃO podem ser todas nulas
+            'identifier': 'Centro de trabalho',  # Coluna identificadora principal
+            'required': ['Centro de trabalho', 'Ordem', 'Início execução', 'Fim execução'],  # Colunas que NÃO podem ser todas nulas
             'description': 'ZPP PARADAS - Paradas de Linha'
         }
     }
