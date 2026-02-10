@@ -1,0 +1,51 @@
+id,descricao,responsavel,status,data_criacao,ultima_atualizacao
+PEND-001,Verificação de alinhamento de eixos,Pedro Costa,Em Andamento,2025-08-26 18:30:37,2025-11-03 18:30:37
+PEND-002,Inspeção de dispositivos de proteção,Ana Oliveira,Bloqueado,2025-10-07 18:30:37,2025-11-12 18:30:37
+PEND-003,Manutenção de inversores de frequência,Carlos Souza,Em Andamento,2026-01-02 18:30:37,2026-01-28 18:30:37
+PEND-004,Troca de lâmpadas de sinalização,Pedro Costa,Pendente,2025-12-25 18:30:37,2026-01-21 18:30:37
+PEND-005,Substituição de correia transportadora Linha 2,Carlos Souza,Pendente,2025-12-30 18:30:37,2026-02-08 18:30:37
+PEND-006,Troca de óleo lubrificante redutor MM05,Carlos Souza,Em Andamento,2026-01-28 18:30:37,2026-02-01 18:30:37
+PEND-007,Calibração de instrumentos de medição,João Silva,Pendente,2025-11-19 18:30:37,2025-12-03 18:30:37
+PEND-008,Troca de baterias de backup,João Silva,Concluído,2025-10-31 18:30:37,2026-02-01 18:30:37
+PEND-009,Troca de baterias de backup,Ana Oliveira,Bloqueado,2025-11-20 18:30:37,2026-01-01 18:30:37
+PEND-010,Inspeção de cabos de alimentação,Maria Santos,Concluído,2025-12-21 18:30:37,2026-01-19 18:30:37
+PEND-011,Troca de vedações e retentores,Pedro Costa,Em Andamento,2025-09-17 18:30:37,2025-11-18 18:30:37
+PEND-012,Manutenção preventiva motor elétrico SE03,Maria Santos,Concluído,2025-12-10 18:30:37,2026-01-10 18:30:37
+PEND-013,Reparo de esteira transportadora,Pedro Costa,Bloqueado,2025-10-03 18:30:37,2025-11-09 18:30:37
+PEND-014,Troca de baterias de backup,Carlos Souza,Concluído,2025-09-01 18:30:37,2025-10-16 18:30:37
+PEND-015,Verificação elétrica do painel de controle,Pedro Costa,Concluído,2025-11-23 18:30:37,2025-11-28 18:30:37
+PEND-016,Troca de baterias de backup,Ana Oliveira,Concluído,2025-12-14 18:30:37,2026-01-08 18:30:37
+PEND-017,Verificação de alinhamento de eixos,Ana Oliveira,Pendente,2025-12-29 18:30:37,2026-01-05 18:30:37
+PEND-018,Inspeção de mangueiras hidráulicas,João Silva,Concluído,2025-12-16 18:30:37,2026-01-20 18:30:37
+PEND-019,Calibração do sensor de temperatura MM03,Pedro Costa,Concluído,2025-08-20 18:30:37,2026-01-28 18:30:37
+PEND-020,Limpeza e ajuste de sensores de proximidade,Carlos Souza,Em Andamento,2025-11-17 18:30:37,2026-01-28 18:30:37
+PEND-021,Troca de fusíveis e disjuntores,Pedro Costa,Concluído,2025-12-01 18:30:37,2025-12-27 18:30:37
+PEND-022,Limpeza de trocadores de calor,Maria Santos,Bloqueado,2025-08-17 18:30:37,2025-10-20 18:30:37
+PEND-023,Troca de vedações e retentores,Maria Santos,Concluído,2025-12-19 18:30:37,2026-01-02 18:30:37
+PEND-024,Reparo de vazamento de ar comprimido,Maria Santos,Pendente,2025-12-26 18:30:37,2026-01-26 18:30:37
+PEND-025,Ajuste de tensão de correntes de transmissão,Pedro Costa,Concluído,2025-08-30 18:30:37,2025-12-31 18:30:37
+PEND-026,Inspeção de mangueiras hidráulicas,Carlos Souza,Bloqueado,2025-08-21 18:30:37,2025-11-25 18:30:37
+PEND-027,Substituição de rolamentos desgastados,João Silva,Pendente,2025-11-04 18:30:37,2025-12-27 18:30:37
+PEND-028,Reparo de cilindro pneumático,Pedro Costa,Em Andamento,2025-10-07 18:30:37,2026-01-05 18:30:37
+PEND-029,Manutenção do sistema de refrigeração,Maria Santos,Em Andamento,2025-10-25 18:30:37,2025-12-15 18:30:37
+PEND-030,Ajuste de parâmetros do CLP,Carlos Souza,Em Andamento,2025-10-14 18:30:37,2025-11-24 18:30:37
+PEND-031,Reparo de esteira transportadora,Maria Santos,Bloqueado,2025-11-19 18:30:37,2026-02-05 18:30:37
+PEND-032,Verificação de nível de óleo em redutores,João Silva,Bloqueado,2025-11-30 18:30:37,2026-01-31 18:30:37
+PEND-033,Verificação de alinhamento de eixos,Ana Oliveira,Pendente,2025-09-07 18:30:37,2025-11-27 18:30:37
+PEND-034,Verificação de sistemas de ventilação,Carlos Souza,Bloqueado,2025-09-15 18:30:37,2025-09-30 18:30:37
+PEND-035,Troca de filtros de ar comprimido,Pedro Costa,Pendente,2025-09-14 18:30:37,2025-09-20 18:30:37
+PEND-036,Limpeza de painéis elétricos,João Silva,Pendente,2025-12-13 18:30:37,2026-02-03 18:30:37
+PEND-037,Revisão do sistema hidráulico da prensa P01,Maria Santos,Bloqueado,2025-12-07 18:30:37,2026-01-24 18:30:37
+PEND-038,Ajuste de proteções térmicas,Ana Oliveira,Pendente,2026-01-21 18:30:37,2026-02-04 18:30:37
+PEND-039,Manutenção de sistema de exaustão,Carlos Souza,Pendente,2025-12-13 18:30:37,2025-12-21 18:30:37
+PEND-040,Ajuste de fins de curso,João Silva,Concluído,2025-10-10 18:30:37,2025-11-06 18:30:37
+PEND-041,Inspeção de cabos de alimentação,João Silva,Em Andamento,2025-10-21 18:30:37,2025-10-21 18:30:37
+PEND-042,Inspeção de estruturas metálicas,Pedro Costa,Bloqueado,2026-01-26 18:30:37,2026-02-02 18:30:37
+PEND-043,Verificação de folgas em acoplamentos,Maria Santos,Em Andamento,2025-08-30 18:30:37,2025-11-14 18:30:37
+PEND-044,Inspeção de estruturas metálicas,Pedro Costa,Pendente,2025-09-22 18:30:37,2025-11-20 18:30:37
+PEND-045,Verificação de aterramento elétrico,Carlos Souza,Pendente,2025-08-23 18:30:37,2025-11-25 18:30:37
+PEND-046,Calibração do sensor de temperatura MM03,Carlos Souza,Em Andamento,2025-09-15 18:30:37,2025-11-29 18:30:37
+PEND-047,Ajuste de tensão de correntes de transmissão,João Silva,Bloqueado,2025-09-09 18:30:37,2026-01-25 18:30:37
+PEND-048,Ajuste de fins de curso,Pedro Costa,Pendente,2026-01-20 18:30:37,2026-01-27 18:30:37
+PEND-049,Ajuste de proteções térmicas,Pedro Costa,Pendente,2025-10-01 18:30:37,2026-01-16 18:30:37
+PEND-050,Inspeção de mangueiras hidráulicas,Pedro Costa,Pendente,2025-11-27 18:30:37,2025-12-16 18:30:37

@@ -36,6 +36,9 @@ from src.pages.production import states
 # Manutenção
 from src.pages.maintenance import alarms, procedures, indicators, config as maintenance_config
 
+# Workflow
+from src.pages.workflow import dashboard as workflow_dashboard
+
 # Supervisório
 from src.pages.supervision import control as supervision_control
 
@@ -71,6 +74,9 @@ ROUTES = {
     # Manutenção
     "/maintenance/alarms": alarms.layout,
     "/maintenance/procedures": procedures.layout,
+
+    # Workflow
+    "/workflow/dashboard": workflow_dashboard.layout,
 
     # Supervisório
     "/supervision": supervision_control.layout,    

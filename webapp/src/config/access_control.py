@@ -304,7 +304,16 @@ ROUTE_ACCESS = {
         "min_level": 2,  # Requer nível 2 ou 3
         "description": "Supervisório - Controle de Temperatura"
     },
-    
+
+    # ========================================
+    # WORKFLOW
+    # ========================================
+    "/workflow/dashboard": {
+        "shared": True,
+        "min_level": 1,
+        "description": "Dashboard de Pendências"
+    },
+
     # ========================================
     # RELATÓRIOS
     # ========================================
@@ -390,7 +399,14 @@ MENU_ACCESS = {
         "min_level": 2,
         "description": "Menu Supervisório"
     },
-    
+
+    # Menu Workflow
+    "workflow": {
+        "shared": True,
+        "min_level": 1,
+        "description": "Menu Workflow"
+    },
+
     # Menu Configurações
     "configuracoes": {
         "shared": True,  # Todos os perfis de nível 3 podem acessar
