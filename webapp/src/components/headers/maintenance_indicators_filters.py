@@ -16,7 +16,7 @@ def create_maintenance_indicators_filters():
     Cria os filtros para a página de Indicadores de Manutenção.
 
     Filtros disponíveis:
-    - Tipo de Período (Radio): Ano | Últimos 12 Meses | Período
+    - Tipo de Período (Radio): Ano | Período
     - Ano de Referência (Dropdown): 2024, 2025, 2026
     - Date Picker Range: Para período customizado
 
@@ -46,10 +46,9 @@ def create_maintenance_indicators_filters():
                         id="filter-period-type",
                         options=[
                             {"label": " Ano", "value": "year"},
-                            {"label": " Últimos 12 Meses", "value": "last12"},
                             {"label": " Período", "value": "custom"}
                         ],
-                        value="last12",
+                        value="year",  # Padrão: Ano completo
                         inline=False,  # Vertical para ocupar menos espaço
                         className="mb-3",
                         input_class_name="me-2",
