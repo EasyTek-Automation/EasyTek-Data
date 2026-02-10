@@ -58,13 +58,14 @@ def get_mongo_connection(collection_name=None, silent=False):
         if not mongo_uri or not db_name:
             error_msg = "As variáveis de ambiente MONGO_URI e DB_NAME devem ser definidas."
             if not silent:
+                pass
             MONGO_AVAILABLE = False
             LAST_ERROR = error_msg
             return None
 
         try:
             if not silent:
-
+                pass
             client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000)
             client.admin.command('ping')
             db = client[db_name]
@@ -73,10 +74,12 @@ def get_mongo_connection(collection_name=None, silent=False):
             LAST_ERROR = None
 
             if not silent:
+                pass
 
         except (ConnectionFailure, ServerSelectionTimeoutError) as e:
             error_msg = f"Falha na conexão: {e}"
             if not silent:
+                pass
             client = None
             db = None
             MONGO_AVAILABLE = False
@@ -86,6 +89,7 @@ def get_mongo_connection(collection_name=None, silent=False):
         except Exception as e:
             error_msg = f"Erro inesperado: {e}"
             if not silent:
+                pass
             client = None
             db = None
             MONGO_AVAILABLE = False
@@ -95,6 +99,7 @@ def get_mongo_connection(collection_name=None, silent=False):
     # Verifica se a conexão ainda está válida
     if not check_mongo_health():
         if not silent:
+            pass
         client = None
         db = None
         return get_mongo_connection(collection_name, silent)

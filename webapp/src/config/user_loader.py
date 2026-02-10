@@ -6,8 +6,5 @@ from src.database.connection import get_user_by_id
 def load_user(user_id):
     if user_id is None:
         return None
-    # Adicionando prints para depuração
     user = get_user_by_id(user_id)
-    if user:
-    else:
     return user

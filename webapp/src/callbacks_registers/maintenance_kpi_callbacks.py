@@ -3,12 +3,15 @@ Maintenance KPI Callbacks
 Callbacks para a página de indicadores de manutenção
 """
 
+import logging
 from dash import Output, Input, State, dcc, html, no_update
 from dash.exceptions import PreventUpdate
 import dash
 import dash_bootstrap_components as dbc
 import pandas as pd
 from src.config.theme_config import TEMPLATE_THEME_MINTY
+
+logger = logging.getLogger(__name__)
 
 # Verificação de saúde do MongoDB
 from src.database.connection import get_connection_status, reconnect_mongodb
@@ -106,18 +109,25 @@ def register_maintenance_kpi_callbacks(app):
         - last12: Gera dados dos últimos 12 meses a partir do ano ref
         - custom: Gera dados do período start_date até end_date
         """
+        logger.debug("Callback iniciado (n_clicks=%s, n_intervals=%s)", n_clicks, n_intervals)
+
         ctx = dash.callback_context
 
         if not ctx.triggered:
+            logger.debug("PreventUpdate (ctx not triggered)")
             raise PreventUpdate
 
         trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
+        logger.debug("Disparado por '%s'", trigger_id)
 
         # Se interval disparou e NÃO há dados ainda, carregar dados iniciais
         # Se botão apply foi clicado, sempre recarregar
         # ⚠️ VERIFICAÇÃO CRÍTICA: MongoDB disponível?
         db_status = get_connection_status()
+        logger.debug("MongoDB status = %s", db_status["available"])
+
         if not db_status["available"]:
+            logger.warning("MongoDB indisponível - retornando dados vazios")
             return {
                 "has_data": False,
                 "db_error": True,
@@ -133,11 +143,27 @@ def register_maintenance_kpi_callbacks(app):
                 "categories": {}
             }
 
-        if trigger_id == "interval-initial-load" and current_data and current_data.get("data"):
-            # Interval disparou mas já temos dados - apenas atualizar metas sem recarregar ZPP
+        # IMPORTANTE: Verificar se dados estão COMPLETOS (incluindo categorias)
+        # Se store tem dados MAS não tem categorias, precisa recarregar tudo
+        has_complete_data = (
+            current_data and
+            current_data.get("data") and
+            current_data.get("categories")  # ← CRÍTICO: Verificar categorias também!
+        )
+
+        if trigger_id == "interval-initial-load" and has_complete_data:
+            # Interval disparou e temos dados COMPLETOS - apenas atualizar metas sem recarregar ZPP
+            logger.debug("Interval: dados completos no store, apenas atualizando metas")
+            logger.debug("Store: %d equipamentos, %d categorias",
+                        len(current_data.get("equipment_ids", [])),
+                        len(current_data.get("categories", {})))
             current_data["equipment_targets"] = get_all_equipment_targets()
             current_data["targets"] = get_kpi_targets("GENERAL")
             return current_data
+        elif trigger_id == "interval-initial-load" and current_data and current_data.get("data"):
+            # Store tem dados mas SEM categorias - forçar recarga completa
+            logger.warning("Store sem categorias - forçando recarga completa")
+            # Continua para o fluxo normal de recarga abaixo
 
         # Validar inputs baseado no tipo
         if not period_type:
@@ -190,6 +216,9 @@ def register_maintenance_kpi_callbacks(app):
         all_equipment = []
         has_data = False
 
+        logger.debug("ZPP_KPI_AVAILABLE=%s, buscando dados year=%d months=%s",
+                    ZPP_KPI_AVAILABLE, year, months)
+
         if ZPP_KPI_AVAILABLE:
             try:
                 # Tentar buscar dados reais do ZPP
@@ -197,15 +226,20 @@ def register_maintenance_kpi_callbacks(app):
                 all_equipment = list(data.keys())
                 has_data = len(data) > 0
 
+                logger.info("Dados ZPP carregados: %d equipamentos", len(all_equipment))
+
                 if has_data:
+                    logger.debug("Equipamentos: %s", all_equipment)
                 else:
+                    logger.warning("fetch_zpp_kpi_data retornou vazio")
             except Exception as e:
                 # Sem fallback - apenas informar erro
+                logger.error("Erro ao buscar dados ZPP: %s", str(e), exc_info=True)
                 import traceback
                 traceback.print_exc()
                 has_data = False
         else:
-            # Módulo ZPP não disponível - não mostrar nada
+            logger.warning("ZPP_KPI_AVAILABLE=False, sem integração ZPP")
             has_data = False
 
         # Buscar nomes e categorias de equipamentos
@@ -213,10 +247,31 @@ def register_maintenance_kpi_callbacks(app):
             try:
                 names = get_zpp_equipment_names()
                 categories = get_zpp_equipment_categories()
+
+                # Log diagnóstico: verificar se categorias foram carregadas
+                logger.debug("Nomes carregados: %d equipamentos", len(names))
+                logger.info("Categorias carregadas: %d categorias", len(categories))
+
+                if categories:
+                    for cat_name, cat_equipments in categories.items():
+                        logger.debug(
+                            "  Categoria '%s': %d equipamentos",
+                            cat_name, len(cat_equipments)
+                        )
+                else:
+                    logger.warning("get_zpp_equipment_categories() retornou vazio")
+
             except Exception as e:
+                logger.error(
+                    "Erro ao carregar nomes/categorias: %s",
+                    str(e),
+                    exc_info=True
+                )
                 names = {eq: eq for eq in all_equipment}  # Fallback: usar IDs como nomes
                 categories = {}
         else:
+            logger.debug("Usando nomes/categorias vazias (has_data=%s, ZPP_AVAILABLE=%s)",
+                        has_data, ZPP_KPI_AVAILABLE)
             names = {}
             categories = {}
 
@@ -234,6 +289,17 @@ def register_maintenance_kpi_callbacks(app):
                 monthly_aggregates = calculate_general_avg_by_month(data, all_equipment, months, year=year)
             except Exception as e:
                 monthly_aggregates = None
+
+        # Log diagnóstico: verificar o que está sendo armazenado no store
+        logger.debug(
+            "Armazenando no store: %d equipamentos, %d categorias",
+            len(all_equipment), len(categories)
+        )
+
+        if categories:
+            logger.debug("Categorias: %s", list(categories.keys()))
+        else:
+            logger.warning("Store será salvo SEM categorias")
 
         return {
             "period_type": period_type,
@@ -524,6 +590,19 @@ def register_maintenance_kpi_callbacks(app):
         year = stored_data.get("year", 2026)
         monthly_aggregates = stored_data.get("monthly_aggregates")
 
+        # Log diagnóstico: verificar o que foi recuperado do store
+        logger.debug(
+            "Sunburst recebeu: %d equipamentos, %d categorias",
+            len(equipment_ids), len(categories)
+        )
+
+        if categories:
+            logger.debug("Categorias: %s", list(categories.keys()))
+            for cat_name, cat_equipments in categories.items():
+                logger.debug("  '%s': %d equipamentos", cat_name, len(cat_equipments))
+        else:
+            logger.warning("Sunburst recebeu categorias VAZIO do store")
+
         # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
         averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
 
@@ -800,7 +879,9 @@ def register_maintenance_kpi_callbacks(app):
                 has_data = len(new_data) > 0
 
                 if has_data:
+                    pass
                 else:
+                    pass
             except Exception as e:
                 has_data = False
         else:
@@ -813,6 +894,7 @@ def register_maintenance_kpi_callbacks(app):
                 current_data["categories"] = get_zpp_equipment_categories()
                 current_data["equipment_ids"] = list(new_data.keys())
             except Exception as e:
+                pass
 
         # Atualizar store com novos dados e metas
         current_data["data"] = new_data
@@ -1323,16 +1405,25 @@ def register_maintenance_kpi_callbacks(app):
         )
 
         # Gráfico de comparação
+        # Filtra None antes de calcular médias
+        mtbf_values_clean = [v for v in mtbf_values if v is not None]
+        mttr_values_clean = [v for v in mttr_values if v is not None]
+        breakdown_values_clean = [v for v in breakdown_values if v is not None]
+
         eq_summary = {
-            "mtbf": sum(mtbf_values) / len(mtbf_values) if mtbf_values else 0,
-            "mttr": sum(mttr_values) / len(mttr_values) if mttr_values else 0,
-            "breakdown_rate": sum(breakdown_values) / len(breakdown_values) if breakdown_values else 0
+            "mtbf": sum(mtbf_values_clean) / len(mtbf_values_clean) if mtbf_values_clean else 0,
+            "mttr": sum(mttr_values_clean) / len(mttr_values_clean) if mttr_values_clean else 0,
+            "breakdown_rate": sum(breakdown_values_clean) / len(breakdown_values_clean) if breakdown_values_clean else 0
         }
 
+        mtbf_avg_clean = [v for v in mtbf_avg if v is not None]
+        mttr_avg_clean = [v for v in mttr_avg if v is not None]
+        breakdown_avg_clean = [v for v in breakdown_avg if v is not None]
+
         general_summary = {
-            "mtbf": sum(mtbf_avg) / len(mtbf_avg) if mtbf_avg else 0,
-            "mttr": sum(mttr_avg) / len(mttr_avg) if mttr_avg else 0,
-            "breakdown_rate": sum(breakdown_avg) / len(breakdown_avg) if breakdown_avg else 0
+            "mtbf": sum(mtbf_avg_clean) / len(mtbf_avg_clean) if mtbf_avg_clean else 0,
+            "mttr": sum(mttr_avg_clean) / len(mttr_avg_clean) if mttr_avg_clean else 0,
+            "breakdown_rate": sum(breakdown_avg_clean) / len(breakdown_avg_clean) if breakdown_avg_clean else 0
         }
 
         fig_comparison = create_performance_radar_chart(

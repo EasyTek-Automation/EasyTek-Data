@@ -169,6 +169,7 @@ def get_kpi_targets(equipment_id: str = None) -> Dict[str, float]:
                         "alert_range": alert_range
                     }
     except Exception as e:
+        pass
 
     # Se não encontrou configuração, retornar valores padrão
     return {
@@ -234,6 +235,7 @@ def get_all_equipment_targets() -> Dict[str, Dict[str, float]]:
 
                 return all_targets
     except Exception as e:
+        pass
 
     # Se não encontrou configuração, retornar valores padrão para todos equipamentos
     all_targets = {}
@@ -269,6 +271,7 @@ def get_equipment_names() -> Dict[str, str]:
             if zpp_names:
                 return zpp_names
         except Exception as e:
+            pass
 
     # Fallback para dados demo
     return EQUIPMENT_NAMES.copy()
@@ -289,6 +292,7 @@ def get_equipment_categories() -> Dict[str, List[str]]:
             if zpp_categories:
                 return zpp_categories
         except Exception as e:
+            pass
 
     # Fallback para dados demo
     return EQUIPMENT_CATEGORIES.copy()

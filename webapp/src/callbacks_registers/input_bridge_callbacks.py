@@ -4,11 +4,6 @@ from dash.dependencies import Input, Output
 import logging
 from datetime import datetime, timedelta
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s",
-    datefmt="%d/%m/%Y %H:%M:%S"
-)
 logger = logging.getLogger(__name__)
 
 def register_input_bridge_callbacks(app):

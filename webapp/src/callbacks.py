@@ -60,7 +60,9 @@ def register_callbacks(app):
     # Verificar status
     status = get_connection_status()
     if not status["available"]:
+        pass  # MongoDB offline - modo degradado
     else:
+        pass  # MongoDB conectado
 
     # Registra os callbacks existentes (sem alterações aqui)
     register_input_bridge_callbacks(app)

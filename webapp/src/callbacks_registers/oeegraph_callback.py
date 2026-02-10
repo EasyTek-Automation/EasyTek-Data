@@ -12,11 +12,6 @@ from src.config.theme_config import TEMPLATE_THEME_MINTY
 # import time
 # from src.metrics import filtrar_dados_mongo
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s",
-    datefmt="%d/%m/%Y %H:%M:%S"
-)
 logger = logging.getLogger(__name__)
 
 def register_oeegraph_callbacks(app, collection_graph):

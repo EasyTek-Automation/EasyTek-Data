@@ -4,7 +4,11 @@
 from dash_bootstrap_templates import load_figure_template
 load_figure_template("darkly")
 
-# PASSO 2: IMPORTAÇÕES PADRÃO
+# PASSO 2: CONFIGURAÇÃO DE LOGGING (antes de importar app)
+from src.config.logging_config import setup_logging
+setup_logging()
+
+# PASSO 3: IMPORTAÇÕES PADRÃO
 import os
 from src.app import app, server
 from src import index # Esta importação dispara o registro dos callbacks

@@ -10,11 +10,6 @@ import time # Importe o time para simular o carregamento
 from src.metrics import filtrar_dados_mongo
 from src.metrics import calcular_metricas
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(message)s",
-    datefmt="%d/%m/%Y %H:%M:%S"
-)
 logger = logging.getLogger(__name__)
 
 def register_kpicards_callbacks(app, collection_graph):

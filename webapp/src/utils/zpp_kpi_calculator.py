@@ -3,9 +3,13 @@ Módulo para cálculo de KPIs de Manutenção baseado nas collections ZPP
 Implementa indicadores M01 (MTBF), M02 (MTTR) e M03 (Taxa de Avaria)
 conforme documento PRO017 - KPI Calculation Procedures
 
-Collections utilizadas (dinâmicas por ano):
-- ZPP_Producao_{year}: Dados de produção (horas de atividade)
-- ZPP_Paradas_{year}: Dados de paradas (avarias)
+Collections utilizadas (FIXAS - não mudar dinamicamente):
+- ZPP_Producao_2025: Dados de produção (horas de atividade) - contém dados de múltiplos anos
+- ZPP_Paradas_2025: Dados de paradas (avarias) - contém dados de múltiplos anos
+
+IMPORTANTE: Os nomes das collections são FIXOS (sempre 2025) mesmo contendo dados de outros anos.
+O filtro por ano é feito nos DADOS, não no nome da collection.
+NÃO modificar para usar nomes dinâmicos (ZPP_*_{year}).
 
 Códigos de avaria considerados: 201, S201, 202, S202, 203, S203
 """
@@ -13,10 +17,20 @@ Códigos de avaria considerados: 201, S201, 202, S202, 203, S203
 import pandas as pd
 from datetime import datetime
 from typing import List, Dict, Optional
+import logging
 from src.database.connection import get_mongo_connection
+
+logger = logging.getLogger(__name__)
 
 
 # ==================== CONFIGURAÇÕES ====================
+
+# NOMES FIXOS DAS COLLECTIONS ZPP
+# IMPORTANTE: Não alterar para usar ano dinâmico!
+# Estas collections contêm dados de MÚLTIPLOS anos.
+# O filtro por ano é feito nos documentos, não no nome da collection.
+ZPP_PRODUCAO_COLLECTION = "ZPP_Producao_2025"
+ZPP_PARADAS_COLLECTION = "ZPP_Paradas_2025"
 
 # Códigos de motivo que representam AVARIAS
 BREAKDOWN_CODES = ['201', 'S201', '202', 'S202', '203', 'S203']
@@ -53,43 +67,70 @@ def fetch_zpp_equipment_list(year: int = 2026) -> List[str]:
 
     Args:
         year: Ano para buscar dados (padrão: 2026)
+              NOTA: O parâmetro year é mantido para compatibilidade futura,
+              mas atualmente as collections são FIXAS (ZPP_*_2025)
 
     Returns:
         List[str]: Lista de equipamentos únicos (ex: ["LONGI001", "LONGI002", ...])
     """
     try:
-        # Buscar de ambas as collections para garantir lista completa
-        paradas_collection = get_mongo_connection(f"ZPP_Paradas_{year}")
-        producao_collection = get_mongo_connection(f"ZPP_Producao_{year}")
+        logger.debug("Buscando lista de equipamentos (collections fixas: %s, %s)",
+                    ZPP_PARADAS_COLLECTION, ZPP_PRODUCAO_COLLECTION)
+
+        # IMPORTANTE: Usar constantes FIXAS, não f"ZPP_Paradas_{year}"
+        # As collections sempre se chamam *_2025 mesmo contendo dados de outros anos
+        paradas_collection = get_mongo_connection(ZPP_PARADAS_COLLECTION)
+        producao_collection = get_mongo_connection(ZPP_PRODUCAO_COLLECTION)
+
+        logger.debug("Collections conectadas com sucesso")
 
         # Buscar valores únicos do campo 'centro_de_trabalho' (paradas)
         equipment_from_paradas = set(paradas_collection.distinct("centro_de_trabalho"))
+        logger.debug("Equipamentos em %s (campo 'centro_de_trabalho'): %d",
+                    ZPP_PARADAS_COLLECTION, len(equipment_from_paradas))
 
         # Buscar valores únicos do campo 'pto_trab' (produção)
         equipment_from_producao = set(producao_collection.distinct("pto_trab"))
+        logger.debug("Equipamentos em %s (campo 'pto_trab'): %d",
+                    ZPP_PRODUCAO_COLLECTION, len(equipment_from_producao))
 
         # Combinar ambas as listas
         equipment_list = sorted(equipment_from_paradas | equipment_from_producao)
+        logger.debug("Total combinado (antes de limpar): %d equipamentos", len(equipment_list))
 
         # Remover valores vazios ou None
         equipment_list = [eq for eq in equipment_list if eq]
+        logger.debug("Lista final: %d equipamentos", len(equipment_list))
+
+        if equipment_list:
+            logger.debug("Equipamentos: %s", equipment_list)
+        else:
+            logger.warning(
+                "Nenhum equipamento nas collections %s e %s",
+                ZPP_PARADAS_COLLECTION, ZPP_PRODUCAO_COLLECTION
+            )
 
         return equipment_list
 
     except Exception as e:
+        logger.error(
+            "Erro ao buscar lista de equipamentos: %s",
+            str(e),
+            exc_info=True
+        )
         return []
 
 
 def fetch_zpp_production_data(year: int, months: List[int]) -> pd.DataFrame:
     """
-    Busca dados de produção da collection ZPP_Producao_{year}
+    Busca dados de produção da collection ZPP (nome fixo: ZPP_Producao_2025)
 
     IMPORTANTE: Usa filtro INCLUSIVO para capturar registros que cruzam virada de mês
     - Busca registros onde INÍCIO ou FIM estejam no mês
     - Aplica regra de desempate conforme MONTH_BOUNDARY_RULE
 
     Args:
-        year: Ano de referência (ex: 2025)
+        year: Ano de referência para FILTRAR os dados (ex: 2025, 2026)
         months: Lista de meses (ex: [1, 2, 3] para Jan-Mar)
 
     Returns:
@@ -98,7 +139,8 @@ def fetch_zpp_production_data(year: int, months: List[int]) -> pd.DataFrame:
     try:
         from calendar import monthrange
 
-        collection = get_mongo_connection(f"ZPP_Producao_{year}")
+        # IMPORTANTE: Usar constante fixa, não nome dinâmico
+        collection = get_mongo_connection(ZPP_PRODUCAO_COLLECTION)
 
         # Filtrar por DATA REAL (fininotif)
         # Criar range de datas para o ano solicitado
@@ -236,7 +278,9 @@ def fetch_zpp_production_data(year: int, months: List[int]) -> pd.DataFrame:
         df = pd.DataFrame(processed_records)
 
         if boundary_count > 0:
+            pass
         else:
+            pass
 
         return df
 
@@ -248,14 +292,14 @@ def fetch_zpp_production_data(year: int, months: List[int]) -> pd.DataFrame:
 
 def fetch_zpp_breakdown_data(year: int, months: List[int]) -> pd.DataFrame:
     """
-    Busca dados de paradas (avarias) da collection ZPP_Paradas_{year}
+    Busca dados de paradas (avarias) da collection ZPP (nome fixo: ZPP_Paradas_2025)
 
     IMPORTANTE: Usa filtro INCLUSIVO para capturar registros que cruzam virada de mês
     - Busca registros onde INÍCIO ou FIM estejam no mês
     - Aplica regra de desempate conforme MONTH_BOUNDARY_RULE
 
     Args:
-        year: Ano de referência (ex: 2025)
+        year: Ano de referência para FILTRAR os dados (ex: 2025, 2026)
         months: Lista de meses (ex: [1, 2, 3])
 
     Returns:
@@ -264,7 +308,8 @@ def fetch_zpp_breakdown_data(year: int, months: List[int]) -> pd.DataFrame:
     try:
         from calendar import monthrange
 
-        collection = get_mongo_connection(f"ZPP_Paradas_{year}")
+        # IMPORTANTE: Usar constante fixa, não nome dinâmico
+        collection = get_mongo_connection(ZPP_PARADAS_COLLECTION)
 
         # Filtrar por DATA REAL (data_inicio)
         # Criar range de datas para o ano solicitado
@@ -387,7 +432,9 @@ def fetch_zpp_breakdown_data(year: int, months: List[int]) -> pd.DataFrame:
         df = pd.DataFrame(processed_records)
 
         if boundary_count > 0:
+            pass
         else:
+            pass
 
         return df
 
@@ -543,9 +590,16 @@ def get_zpp_equipment_categories() -> Dict[str, List[str]]:
         }
     """
     try:
+        logger.debug("Iniciando categorização de equipamentos")
+
         equipment_list = fetch_zpp_equipment_list()
+        logger.debug("Equipamentos encontrados: %d total", len(equipment_list))
+        logger.debug("Lista: %s", equipment_list)
 
         categories = {}
+
+        # Log dos prefixos configurados
+        logger.debug("Prefixos configurados: %s", EQUIPMENT_CATEGORY_PREFIXES)
 
         for category_name, prefixes in EQUIPMENT_CATEGORY_PREFIXES.items():
             # Filtrar equipamentos que começam com algum dos prefixos
@@ -556,16 +610,46 @@ def get_zpp_equipment_categories() -> Dict[str, List[str]]:
 
             if category_equipment:
                 categories[category_name] = category_equipment
+                logger.debug(
+                    "Categoria '%s': %d equipamentos (%s)",
+                    category_name,
+                    len(category_equipment),
+                    ", ".join(category_equipment)
+                )
+            else:
+                logger.debug(
+                    "Categoria '%s' (prefixos %s): nenhum equipamento",
+                    category_name, prefixes
+                )
 
         # Adicionar categoria "Outros" para equipamentos não categorizados
         categorized = [eq for cat_list in categories.values() for eq in cat_list]
         others = [eq for eq in equipment_list if eq not in categorized]
         if others:
             categories["Outros"] = others
+            logger.debug(
+                "Categoria 'Outros': %d não categorizados (%s)",
+                len(others), ", ".join(others)
+            )
+
+        # Log do resultado final
+        total_categorized = sum(len(eqs) for eqs in categories.values())
+        logger.info(
+            "Categorização concluída: %d categorias, %d equipamentos",
+            len(categories), total_categorized
+        )
+
+        if not categories:
+            logger.warning("Nenhuma categoria criada - lista de equipamentos vazia")
 
         return categories
 
     except Exception as e:
+        logger.error(
+            "Erro ao categorizar equipamentos: %s",
+            str(e),
+            exc_info=True
+        )
         return {}
 
 
@@ -630,7 +714,7 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
 
     Args:
         equipment_id: ID do equipamento (ex: "LONGI001")
-        year: Ano de referência (ex: 2025)
+        year: Ano de referência para FILTRAR os dados (ex: 2025, 2026)
         months: Lista de meses (ex: [1, 2, 3])
         top_n: Número de paradas a retornar (padrão: 10)
 
@@ -648,7 +732,8 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
         ]
     """
     try:
-        collection = get_mongo_connection(f"ZPP_Paradas_{year}")
+        # IMPORTANTE: Usar constante fixa, não nome dinâmico
+        collection = get_mongo_connection(ZPP_PARADAS_COLLECTION)
 
         # Filtrar por DATA REAL (data_inicio)
         # Criar range de datas para o ano solicitado
@@ -753,6 +838,7 @@ if __name__ == "__main__":
     # Testar busca de categorias
     categories = get_zpp_equipment_categories()
     for cat, eqs in categories.items():
+        pass
 
     # Testar busca de dados e cálculo de KPIs
     try:
@@ -762,10 +848,8 @@ if __name__ == "__main__":
         if kpi_data:
             first_equipment = list(kpi_data.keys())[0]
             for month_data in kpi_data[first_equipment]:
-                      f"MTBF={month_data['mtbf']}h, "
-                      f"MTTR={month_data['mttr']}h, "
-                      f"Taxa={month_data['breakdown_rate']}%")
-
+                pass
 
     except Exception as e:
+        pass
 

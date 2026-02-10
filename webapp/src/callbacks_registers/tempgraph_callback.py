@@ -11,7 +11,6 @@ from dash.dependencies import Input, Output, State # Adicione State
 from dash import dcc # Adicione dcc para usar dcc.send_data_frame
 
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(message)s", datefmt="%d/%m/%Y %H:%M:%S")
 logger = logging.getLogger(__name__)
 
 def register_tempgraph_callbacks(app, collection_temp):
