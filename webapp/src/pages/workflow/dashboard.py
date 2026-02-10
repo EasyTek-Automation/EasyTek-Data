@@ -10,6 +10,10 @@ import pandas as pd
 from dash import html, dcc
 import dash_bootstrap_components as dbc
 from datetime import datetime
+from flask_login import current_user
+
+from src.components.workflow.create_modal import create_pendencia_modal
+from src.components.workflow.edit_modal import edit_pendencia_modal
 
 
 # ======================================================================================
@@ -281,7 +285,16 @@ def criar_linha_pendencia(pendencia, index):
         html.Td(pendencia['responsavel']),
         html.Td(criar_badge_status(pendencia['status'])),
         html.Td(data_criacao),
-        html.Td(ultima_atualizacao)
+        html.Td(ultima_atualizacao),
+        html.Td([
+            dbc.Button(
+                html.I(className="fas fa-edit"),
+                id={"type": "btn-edit-pend", "index": pendencia['id']},
+                color="info",
+                size="sm",
+                outline=True
+            )
+        ], style={"width": "60px", "textAlign": "center"})
     ])
 
     # Linha de histórico (colapsável)
@@ -295,7 +308,7 @@ def criar_linha_pendencia(pendencia, index):
                 id={"type": "collapse-historico", "index": index},
                 is_open=False
             ),
-            colSpan=7,
+            colSpan=8,
             className="p-0"
         )
     ])
@@ -328,7 +341,8 @@ def criar_tabela_pendencias(df_pendencias):
             html.Th("Responsável", style={"width": "150px"}),
             html.Th("Status", style={"width": "150px"}),
             html.Th("Criação", style={"width": "120px"}),
-            html.Th("Atualização", style={"width": "120px"})
+            html.Th("Atualização", style={"width": "120px"}),
+            html.Th("Ações", style={"width": "60px"})
         ])
     ])
 
@@ -365,9 +379,18 @@ def layout():
     df_pendencias, df_historico = carregar_dados_csv()
 
     return dbc.Container([
-        # Store para cachear histórico
+        # Stores para cachear dados
         dcc.Store(id="store-historico", data=df_historico.to_dict('records') if df_historico is not None else []),
         dcc.Store(id="store-pendencias", data=df_pendencias.to_dict('records') if df_pendencias is not None else []),
+
+        # Stores para contexto do usuário (RBAC)
+        dcc.Store(id="user-level-store", data=current_user.level if current_user.is_authenticated else 1),
+        dcc.Store(id="user-perfil-store", data=current_user.perfil if current_user.is_authenticated else ""),
+        dcc.Store(id="user-username-store", data=current_user.username if current_user.is_authenticated else ""),
+
+        # Modais
+        create_pendencia_modal(),
+        edit_pendencia_modal(),
 
         # Header
         dbc.Row([
@@ -380,6 +403,13 @@ def layout():
 
             dbc.Col([
                 dbc.ButtonGroup([
+                    # Botão Nova Pendência (só nível 3)
+                    dbc.Button([
+                        html.I(className="fas fa-plus-circle me-2"),
+                        "Nova Pendência"
+                    ], id="btn-nova-pendencia", color="success", outline=True,
+                       style={"display": "inline-block" if current_user.is_authenticated and current_user.level == 3 else "none"}),
+
                     dbc.Button([
                         html.I(className="fas fa-sync-alt me-2"),
                         "Atualizar"

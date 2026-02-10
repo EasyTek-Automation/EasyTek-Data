@@ -36,6 +36,8 @@ from src.callbacks_registers.maintenance_kpi_callbacks import register_maintenan
 from src.callbacks_registers.maintenance_config_callbacks import register_maintenance_config_callbacks
 from src.callbacks_registers.database_error_callbacks import register_database_error_callbacks
 from src.callbacks_registers.workflow_callbacks import register_workflow_callbacks
+from src.callbacks_registers.workflow_create_callbacks import register_create_callbacks
+from src.callbacks_registers.workflow_edit_callbacks import register_edit_callbacks
 
 from src.pages.energy import callbacks as energy_callbacks
 
@@ -111,6 +113,8 @@ def register_callbacks(app):
 
     # Workflow callbacks
     register_workflow_callbacks(app)
+    register_create_callbacks(app)  # Workflow CRUD - Criação
+    register_edit_callbacks(app)    # Workflow CRUD - Edição
 
     # Database error handling callbacks
     register_database_error_callbacks(app)
