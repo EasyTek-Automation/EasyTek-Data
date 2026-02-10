@@ -4,8 +4,9 @@ Script para baixar recursos externos e tornar a aplicação AMG_Data completamen
 Baixa:
 - Bootstrap Minty e Darkly (temas Bootswatch 5.3.6)
 - Font Awesome 5.10.2 (CSS + webfonts)
+- Bootstrap Icons 1.11.3 (CSS + webfonts)
 
-Ajusta URLs dentro do CSS do Font Awesome para caminhos locais.
+Ajusta URLs dentro do CSS para caminhos locais.
 """
 
 import requests
@@ -38,6 +39,14 @@ RESOURCES = {
     'fontawesome_solid': {
         'url': 'https://use.fontawesome.com/releases/v5.10.2/webfonts/fa-solid-900.woff2',
         'path': 'assets/vendor/fontawesome/webfonts/fa-solid-900.woff2'
+    },
+    'bootstrap_icons_css': {
+        'url': 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css',
+        'path': 'assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css'
+    },
+    'bootstrap_icons_font': {
+        'url': 'https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/fonts/bootstrap-icons.woff2',
+        'path': 'assets/vendor/bootstrap-icons/font/fonts/bootstrap-icons.woff2'
     }
 }
 
@@ -88,6 +97,17 @@ def download_resource(name, config):
             content_str = re.sub(
                 r'\.\./webfonts/fa-',
                 '../webfonts/fa-',
+                content_str
+            )
+
+            # Ajustar URLs do Bootstrap Icons
+            # De: ./fonts/bootstrap-icons.woff2
+            # Para: ./fonts/bootstrap-icons.woff2 (já está correto, mas garantir)
+            # De: ../fonts/bootstrap-icons.woff2
+            # Para: ./fonts/bootstrap-icons.woff2
+            content_str = re.sub(
+                r'\.\./fonts/bootstrap-icons',
+                './fonts/bootstrap-icons',
                 content_str
             )
 

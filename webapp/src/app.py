@@ -11,6 +11,7 @@ from dash_bootstrap_templates import load_figure_template
 # --- Constantes ---
 # Recursos locais para modo offline
 FONT_AWESOME = ["/assets/vendor/fontawesome/css/all.min.css"]
+BOOTSTRAP_ICONS = ["/assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css"]
 
 # Define a folha de estilos que você já usa (agora local)
 external_stylesheets = ["/assets/vendor/bootstrap/minty/bootstrap.min.css"]
@@ -34,15 +35,20 @@ server.config.update(SECRET_KEY=SECRET_KEY)
 app = dash.Dash(
     __name__,
     server=server,
-        external_stylesheets=[external_stylesheets, FONT_AWESOME],
+    external_stylesheets=[
+        "/assets/vendor/bootstrap/minty/bootstrap.min.css",
+        "/assets/vendor/fontawesome/css/all.min.css",
+        "/assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css"
+    ],
     suppress_callback_exceptions=True,
-        title="EasyTek-Data",
+    title="EasyTek-Data",
     meta_tags=[
         {"name": "viewport", "content": "width=device-width, initial-scale=1"},
-        # Preload Font Awesome local para otimização
-        {"rel": "preload", "href": "/assets/vendor/fontawesome/css/all.min.css", "as": "style"}
+        # Preload Font Awesome e Bootstrap Icons local para otimização
+        {"rel": "preload", "href": "/assets/vendor/fontawesome/css/all.min.css", "as": "style"},
+        {"rel": "preload", "href": "/assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css", "as": "style"}
     ]
-  )
+)
 
 # --- Configuração do Favicon Customizado ---
 app.index_string = '''
@@ -52,6 +58,7 @@ app.index_string = '''
         {%metas%}
         <title>{%title%}</title>
         <link rel="icon" type="image/x-icon" href="/assets/favicon.ico">
+        <link rel="stylesheet" href="/assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css">
         {%css%}
     </head>
     <body>

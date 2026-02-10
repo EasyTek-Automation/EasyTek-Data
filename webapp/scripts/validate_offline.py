@@ -21,6 +21,8 @@ REQUIRED_FILES = [
     'src/assets/vendor/fontawesome/webfonts/fa-brands-400.woff2',
     'src/assets/vendor/fontawesome/webfonts/fa-regular-400.woff2',
     'src/assets/vendor/fontawesome/webfonts/fa-solid-900.woff2',
+    'src/assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css',
+    'src/assets/vendor/bootstrap-icons/font/fonts/bootstrap-icons.woff2',
 ]
 
 # URLs que NÃO devem estar no código (CDNs)
@@ -130,6 +132,7 @@ def check_configuration():
     checks = [
         ('Font Awesome local', r'/assets/vendor/fontawesome/css/all\.min\.css'),
         ('Bootstrap Minty local', r'/assets/vendor/bootstrap/minty/bootstrap\.min\.css'),
+        ('Bootstrap Icons local', r'/assets/vendor/bootstrap-icons/font/bootstrap-icons\.min\.css'),
     ]
 
     all_good = True

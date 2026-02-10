@@ -8,7 +8,7 @@ Esta pasta contém scripts utilitários para manutenção da aplicação AMG_Dat
 
 ### download_offline_resources.py
 
-**Propósito**: Baixa recursos externos (Bootstrap themes e Font Awesome) e os armazena localmente para permitir operação offline completa.
+**Propósito**: Baixa recursos externos (Bootstrap themes, Font Awesome e Bootstrap Icons) e os armazena localmente para permitir operação offline completa.
 
 **Uso**:
 ```bash
@@ -19,20 +19,23 @@ python scripts/download_offline_resources.py
 **O que faz**:
 1. Baixa 2 temas Bootstrap (Minty e Darkly) do Bootswatch 5.3.6
 2. Baixa Font Awesome 5.10.2 (CSS + 3 webfonts)
-3. **Ajusta automaticamente** URLs dentro do CSS do Font Awesome para caminhos relativos locais
-4. Cria estrutura de diretórios em `src/assets/vendor/`
+3. Baixa Bootstrap Icons 1.11.3 (CSS + webfont)
+4. **Ajusta automaticamente** URLs dentro dos CSS para caminhos relativos locais
+5. Cria estrutura de diretórios em `src/assets/vendor/`
 
-**Recursos baixados** (~670 KB total):
+**Recursos baixados** (~880 KB total):
 - `assets/vendor/bootstrap/minty/bootstrap.min.css` (229 KB)
 - `assets/vendor/bootstrap/darkly/bootstrap.min.css` (227 KB)
 - `assets/vendor/fontawesome/css/all.min.css` (55 KB)
 - `assets/vendor/fontawesome/webfonts/fa-brands-400.woff2` (73 KB)
 - `assets/vendor/fontawesome/webfonts/fa-regular-400.woff2` (13 KB)
 - `assets/vendor/fontawesome/webfonts/fa-solid-900.woff2` (74 KB)
+- `assets/vendor/bootstrap-icons/font/bootstrap-icons.min.css` (84 KB)
+- `assets/vendor/bootstrap-icons/font/fonts/bootstrap-icons.woff2` (127 KB)
 
 **Quando usar**:
 - Primeira configuração da aplicação
-- Atualização de versões de Bootstrap ou Font Awesome
+- Atualização de versões de Bootstrap, Font Awesome ou Bootstrap Icons
 - Reinstalação após limpeza do repositório
 
 ---
@@ -48,9 +51,9 @@ python scripts/validate_offline.py
 ```
 
 **O que verifica**:
-1. **Recursos Locais**: Confirma que todos os 6 arquivos foram baixados
+1. **Recursos Locais**: Confirma que todos os 8 arquivos foram baixados (Bootstrap themes, Font Awesome, Bootstrap Icons)
 2. **URLs Externas**: Escaneia código em busca de referências a CDNs (Font Awesome, jsDelivr)
-3. **Configuração App**: Verifica `app.py` para caminhos locais
+3. **Configuração App**: Verifica `app.py` para caminhos locais (Font Awesome, Bootstrap, Bootstrap Icons)
 4. **Configuração Temas**: Verifica `theme_config.py` para temas locais
 
 **Saída esperada**:
@@ -247,6 +250,11 @@ results = {
 ---
 
 ## Histórico de Versões
+
+- **v1.1** (2026-02-10): Adição Bootstrap Icons
+  - Download de Bootstrap Icons 1.11.3
+  - Validação atualizada para 8 recursos
+  - Ajuste automático de URLs no CSS do Bootstrap Icons
 
 - **v1.0** (2026-01-30): Versão inicial
   - Download de Bootstrap 5.3.6 (Minty/Darkly)
