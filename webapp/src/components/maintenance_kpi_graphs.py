@@ -13,8 +13,11 @@ from typing import Dict, List
 # Imports condicionais para evitar circular imports
 try:
     from src.database.connection import get_mongo_connection
+    from src.utils.zpp_kpi_calculator import ZPP_PRODUCAO_COLLECTION, ZPP_PARADAS_COLLECTION
 except ImportError:
     get_mongo_connection = None
+    ZPP_PRODUCAO_COLLECTION = "ZPP_Producao_2025"  # Fallback
+    ZPP_PARADAS_COLLECTION = "ZPP_Paradas_2025"
 
 
 # ==================== SISTEMA DE CORES SIMPLIFICADO ====================
@@ -1111,8 +1114,10 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
 
         if get_mongo_connection:
             try:
-                producao_collection = get_mongo_connection(f"ZPP_Producao_{year}")
-                paradas_collection = get_mongo_connection(f"ZPP_Paradas_{year}")
+                # IMPORTANTE: Usar collections FIXAS, não dinâmicas por ano
+                # As collections sempre se chamam *_2025 mesmo contendo dados de múltiplos anos
+                producao_collection = get_mongo_connection(ZPP_PRODUCAO_COLLECTION)
+                paradas_collection = get_mongo_connection(ZPP_PARADAS_COLLECTION)
 
 
                 # Pipeline de agregação para produção (1 consulta para todo período)
