@@ -726,7 +726,7 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
                 "motivo": "201",
                 "duracao_min": 120.5,
                 "duracao_horas": 2.01,
-                "descricao": "Observação da notificação"  # Campo 'observacao_de_notificacao'
+                "descricao": "Troca de referência e bobina"  # Campo 'texto_de_confirmacao' (prioridade) ou 'descricao' (fallback)
             },
             ...
         ]
@@ -812,8 +812,8 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
             motivo = record.get("causa_do_desvio", "")
             duracao_min = record.get("duration_min", 0)
 
-            # ✅ USAR DESCRIÇÃO E TEXTO DE CONFIRMAÇÃO DO BANCO DE DADOS
-            descricao = record.get("descricao", record.get("texto_de_confirmacao", f"Motivo {motivo}"))
+            # ✅ USAR TEXTO DE CONFIRMAÇÃO COMO PRIORIDADE
+            descricao = record.get("texto_de_confirmacao", record.get("descricao", f"Motivo {motivo}"))
 
             result.append({
                 "date": date.date(),

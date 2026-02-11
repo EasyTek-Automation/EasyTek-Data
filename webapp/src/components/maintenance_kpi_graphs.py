@@ -1462,6 +1462,8 @@ def create_top_breakdowns_chart(breakdowns_data: List[Dict],
     """
     Cria gráfico de barras horizontais mostrando as top paradas por duração.
 
+    Agrupa paradas pelo mesmo dia + mesmo texto de confirmação (soma durações).
+
     Args:
         breakdowns_data: Lista de dicionários com dados das paradas:
             [
@@ -1470,7 +1472,7 @@ def create_top_breakdowns_chart(breakdowns_data: List[Dict],
                     "motivo": "201",
                     "duracao_min": 120.5,
                     "duracao_horas": 2.01,
-                    "descricao": "Avaria Elétrica"
+                    "descricao": "Troca de referência e bobina"  # texto_de_confirmacao
                 },
                 ...
             ]
