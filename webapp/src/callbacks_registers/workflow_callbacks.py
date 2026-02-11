@@ -102,19 +102,10 @@ def register_workflow_callbacks(app):
     """
 
     # ==================================================================================
-    # CALLBACK 1: Toggle do painel de filtros
+    # CALLBACK 1: Toggle do painel de filtros (REMOVIDO - Painel agora sempre visível)
     # ==================================================================================
-    @app.callback(
-        Output("collapse-filtros", "is_open"),
-        Input("btn-toggle-filtros", "n_clicks"),
-        State("collapse-filtros", "is_open"),
-        prevent_initial_call=True
-    )
-    def toggle_filtros(n_clicks, is_open):
-        """Toggle do painel de filtros."""
-        if n_clicks:
-            return not is_open
-        return is_open
+    # Callback removido pois o painel de filtros agora está sempre visível
+    # O botão "Filtros" foi removido da interface
 
 
     # ==================================================================================
@@ -186,7 +177,6 @@ def register_workflow_callbacks(app):
     @app.callback(
         Output("container-tabela", "children"),
         Output("store-pendencias", "data"),
-        Output("collapse-filtros", "is_open", allow_duplicate=True),
         Input("btn-aplicar-filtros", "n_clicks"),
         State("filtro-responsavel", "value"),
         State("filtro-status", "value"),
@@ -204,7 +194,7 @@ def register_workflow_callbacks(app):
         df_pendencias, _ = carregar_dados_csv()
 
         if df_pendencias is None or df_pendencias.empty:
-            return html.Div("Erro ao carregar dados.", className="text-danger"), [], False
+            return html.Div("Erro ao carregar dados.", className="text-danger"), []
 
         # Aplicar filtros
         df_filtrado = aplicar_filtros_dataframe(df_pendencias, responsavel, status_list, busca)
@@ -212,8 +202,7 @@ def register_workflow_callbacks(app):
         # Reconstruir tabela
         nova_tabela = criar_tabela_pendencias(df_filtrado)
 
-        # Fechar painel de filtros após aplicar
-        return nova_tabela, df_filtrado.to_dict('records'), False
+        return nova_tabela, df_filtrado.to_dict('records')
 
 
     # ==================================================================================

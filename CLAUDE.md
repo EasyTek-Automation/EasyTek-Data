@@ -259,6 +259,7 @@ ROUTE_ALIASES = {
 - `/maintenance/indicators`: KPI dashboard (MTBF, MTTR, Breakdown Rate)
 - `/maintenance/config`: KPI target configuration (admin only, level 3)
 - `/maintenance/procedures`: Markdown-based documentation system
+- `/workflow/dashboard`: Workflow management - Pending tasks dashboard (integrated in Maintenance menu)
 - `/maintenance/work-orders`: Work orders management (in development)
 - `/maintenance/schedule`: Maintenance planning (in development)
 - `/maintenance/history`: Intervention history (in development)

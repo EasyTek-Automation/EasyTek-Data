@@ -1,7 +1,8 @@
 id,descricao,responsavel,status,data_criacao,ultima_atualizacao,criado_por,criado_por_perfil,ultima_edicao_por,ultima_edicao_data
 PEND-001,Solicitação de memorial de cálculoae,Rodolfo J. Silva,Em Andamento,2025-08-26 18:30:37.000000,2026-02-10 20:37:41.776007,admin.sistema,admin,Rodolfo J. Silva,2026-02-10 20:37:41.776007
 PEND-002,Inspeção de dispositivos de proteção,Márcio Pires,Pendente,2025-10-07 18:30:37.000000,2026-02-10 20:49:51.275180,admin.sistema,admin,Rodolfo J. Silva,2026-02-10 20:49:51.275180
-PEND-003,Manutenção de inversores de frequência,Carlos Souza,Em Andamento,2026-01-02 18:30:37.000000,2026-01-28 18:30:37.000000,admin.sistema,admin,admin.sistema,2026-01-28 18:30:37.000000
+PEND-003,"Manutenção de inversores de frequênciaa
+",Rodolfo J. Silva,Em Andamento,2026-01-02 18:30:37.000000,2026-02-10 21:21:10.716607,admin.sistema,admin,Rodolfo J. Silva,2026-02-10 21:21:10.716607
 PEND-004,Troca de lâmpadas de sinalização,Pedro Costa,Pendente,2025-12-25 18:30:37.000000,2026-01-21 18:30:37.000000,admin.sistema,admin,admin.sistema,2026-01-21 18:30:37.000000
 PEND-005,Substituição de correia transportadora Linha 2,Carlos Souza,Pendente,2025-12-30 18:30:37.000000,2026-02-08 18:30:37.000000,admin.sistema,admin,admin.sistema,2026-02-08 18:30:37.000000
 PEND-006,Troca de óleo lubrificante redutor MM05,Carlos Souza,Em Andamento,2026-01-28 18:30:37.000000,2026-02-01 18:30:37.000000,admin.sistema,admin,admin.sistema,2026-02-01 18:30:37.000000

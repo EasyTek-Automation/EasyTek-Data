@@ -306,12 +306,13 @@ ROUTE_ACCESS = {
     },
 
     # ========================================
-    # WORKFLOW
+    # WORKFLOW - Gestão de Pendências (dentro de Manutenção)
     # ========================================
     "/workflow/dashboard": {
-        "shared": True,
+        "shared": False,
+        "perfis": ["manutencao"],
         "min_level": 1,
-        "description": "Dashboard de Pendências"
+        "description": "Dashboard de Pendências - Gestão de Workflow"
     },
 
     # ========================================
@@ -398,13 +399,6 @@ MENU_ACCESS = {
         "perfis": ["manutencao"],
         "min_level": 2,
         "description": "Menu Supervisório"
-    },
-
-    # Menu Workflow
-    "workflow": {
-        "shared": True,
-        "min_level": 1,
-        "description": "Menu Workflow"
     },
 
     # Menu Configurações

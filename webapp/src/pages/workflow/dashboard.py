@@ -138,76 +138,72 @@ def criar_cards_kpi(df_pendencias):
 
 def criar_painel_filtros():
     """
-    Cria o painel de filtros colapsável.
+    Cria o painel de filtros sempre visível.
 
     Returns:
-        dbc.Collapse: Painel de filtros
+        dbc.Card: Painel de filtros
     """
-    painel = dbc.Collapse([
-        dbc.Card([
-            dbc.CardBody([
-                dbc.Row([
-                    # Filtro por responsável
-                    dbc.Col([
-                        html.Label("Responsável:", className="fw-bold mb-2"),
-                        dcc.Dropdown(
-                            id="filtro-responsavel",
-                            options=[
-                                {"label": "Todos", "value": "todos"},
-                                {"label": "João Silva", "value": "João Silva"},
-                                {"label": "Maria Santos", "value": "Maria Santos"},
-                                {"label": "Pedro Costa", "value": "Pedro Costa"},
-                                {"label": "Ana Oliveira", "value": "Ana Oliveira"},
-                                {"label": "Carlos Souza", "value": "Carlos Souza"}
-                            ],
-                            value="todos",
-                            clearable=False
-                        )
-                    ], width=12, md=4, className="mb-3"),
+    return dbc.Card([
+        dbc.CardBody([
+            dbc.Row([
+                # Filtro por responsável
+                dbc.Col([
+                    html.Label("Responsável:", className="fw-bold mb-2"),
+                    dcc.Dropdown(
+                        id="filtro-responsavel",
+                        options=[
+                            {"label": "Todos", "value": "todos"},
+                            {"label": "João Silva", "value": "João Silva"},
+                            {"label": "Maria Santos", "value": "Maria Santos"},
+                            {"label": "Pedro Costa", "value": "Pedro Costa"},
+                            {"label": "Ana Oliveira", "value": "Ana Oliveira"},
+                            {"label": "Carlos Souza", "value": "Carlos Souza"}
+                        ],
+                        value="todos",
+                        clearable=False
+                    )
+                ], width=12, md=4, className="mb-3"),
 
-                    # Filtro por status (multi-select)
-                    dbc.Col([
-                        html.Label("Status:", className="fw-bold mb-2"),
-                        dcc.Dropdown(
-                            id="filtro-status",
-                            options=[
-                                {"label": "Pendente", "value": "Pendente"},
-                                {"label": "Em Andamento", "value": "Em Andamento"},
-                                {"label": "Bloqueado", "value": "Bloqueado"},
-                                {"label": "Concluído", "value": "Concluído"}
-                            ],
-                            multi=True,
-                            placeholder="Todos os status"
-                        )
-                    ], width=12, md=4, className="mb-3"),
+                # Filtro por status (multi-select)
+                dbc.Col([
+                    html.Label("Status:", className="fw-bold mb-2"),
+                    dcc.Dropdown(
+                        id="filtro-status",
+                        options=[
+                            {"label": "Pendente", "value": "Pendente"},
+                            {"label": "Em Andamento", "value": "Em Andamento"},
+                            {"label": "Bloqueado", "value": "Bloqueado"},
+                            {"label": "Concluído", "value": "Concluído"}
+                        ],
+                        multi=True,
+                        placeholder="Todos os status"
+                    )
+                ], width=12, md=4, className="mb-3"),
 
-                    # Busca por texto
-                    dbc.Col([
-                        html.Label("Buscar:", className="fw-bold mb-2"),
-                        dbc.Input(
-                            id="filtro-busca",
-                            type="text",
-                            placeholder="ID ou descrição..."
-                        )
-                    ], width=12, md=4, className="mb-3"),
-                ]),
+                # Busca por texto
+                dbc.Col([
+                    html.Label("Buscar:", className="fw-bold mb-2"),
+                    dbc.Input(
+                        id="filtro-busca",
+                        type="text",
+                        placeholder="ID ou descrição..."
+                    )
+                ], width=12, md=4, className="mb-3"),
+            ]),
 
-                # Botão Aplicar Filtros
-                dbc.Row([
-                    dbc.Col([
-                        dbc.Button(
-                            "Aplicar Filtros",
-                            id="btn-aplicar-filtros",
-                            color="primary",
-                            className="w-100"
-                        )
-                    ], width=12, md=3)
-                ])
+            # Botão Aplicar Filtros
+            dbc.Row([
+                dbc.Col([
+                    dbc.Button(
+                        "Aplicar Filtros",
+                        id="btn-aplicar-filtros",
+                        color="primary",
+                        className="w-100"
+                    )
+                ], width=12, md=3)
             ])
-        ], className="shadow-sm mb-4")
-    ], id="collapse-filtros", is_open=False)
-
-    return painel
+        ])
+    ], className="shadow-sm mb-4")
 
 
 def criar_timeline_historico(historico_items):
@@ -418,12 +414,7 @@ def layout():
                     dbc.Button([
                         html.I(className="fas fa-download me-2"),
                         "Exportar"
-                    ], id="btn-export", color="secondary", outline=True, disabled=True),
-
-                    dbc.Button([
-                        html.I(className="fas fa-filter me-2"),
-                        "Filtros"
-                    ], id="btn-toggle-filtros", color="primary", outline=True)
+                    ], id="btn-export", color="secondary", outline=True, disabled=True)
                 ], className="w-100")
             ], width=12, md=6, className="text-end")
         ], className="mb-4 align-items-center"),

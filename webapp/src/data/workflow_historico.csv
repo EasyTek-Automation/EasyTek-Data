@@ -262,3 +262,5 @@ PEND-002,Responsável alterado de 'Ana Oliveira' para 'Márcio Pires' por Rodolf
 PEND-002,Status alterado de 'Bloqueado' para 'Em Andamento' por Rodolfo J. Silva,2026-02-10 20:38:14.387193,Márcio Pires,status_mudanca,Rodolfo J. Silva
 PEND-002,Status alterado de 'Em Andamento' para 'Pendente' por Rodolfo J. Silva: Necessario Aprovação para início do processo,2026-02-10 20:49:51.275180,Márcio Pires,status_mudanca,Rodolfo J. Silva
 PEND-051,Pendência criada,2026-02-10 20:51:37.825573,Rodolfo J. Silva,criacao,Rodolfo J. Silva
+PEND-003,Descrição editada por Rodolfo J. Silva,2026-02-10 21:21:10.716607,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva
+PEND-003,Responsável alterado de 'Carlos Souza' para 'Rodolfo J. Silva' por Rodolfo J. Silva,2026-02-10 21:21:10.716607,Rodolfo J. Silva,responsavel_mudanca,Rodolfo J. Silva

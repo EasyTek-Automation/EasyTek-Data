@@ -152,6 +152,18 @@ def create_header(pathname, user):
                     active=(pathname == "/maintenance/config")
                 ),
 
+                dbc.DropdownMenuItem(divider=True),
+
+                # Workflow - Gestão de Pendências
+                dbc.DropdownMenuItem(
+                    html.Div([
+                        html.Span(workflow_icon(), style={"marginRight": "8px"}),
+                        "Gestão de Pendências"
+                    ], className="d-flex align-items-center"),
+                    href="/workflow/dashboard",
+                    active=(pathname == "/workflow/dashboard")
+                ),
+
                 # Footer "Powered By"
                 create_dropdown_footer()
             ], className="simple-dropdown-menu dropdown-menu-with-footer")
@@ -371,43 +383,6 @@ def create_header(pathname, user):
         toggle_style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "fontWeight": "600"}
     )
 
-    # 📋 WORKFLOW
-    workflow_dropdown = dbc.DropdownMenu(
-        label=html.Div([
-            html.Span(workflow_icon(), style={"marginRight": "8px"}),
-            html.Span("Workflow", style={"fontWeight": "600"})
-        ], className="d-flex align-items-center"),
-        children=[
-            html.Div([
-                dbc.DropdownMenuItem(
-                    html.Div([
-                        html.Span(checklist_icon(), style={"marginRight": "8px"}),
-                        "Dashboard de Pendências"
-                    ], className="d-flex align-items-center"),
-                    href="/workflow/dashboard",
-                    active=(pathname == "/workflow/dashboard")
-                ),
-
-                dbc.DropdownMenuItem(divider=True),
-
-                # Funcionalidades futuras (disabled)
-                dbc.DropdownMenuItem(
-                    html.Div([
-                        html.Span(html.I(className="bi bi-plus-circle me-2")),
-                        "Criar Nova Pendência"
-                    ], className="d-flex align-items-center"),
-                    href="/workflow/create",
-                    disabled=True,
-                    style={"opacity": "0.5"}
-                ),
-
-                create_dropdown_footer()
-            ], className="simple-dropdown-menu dropdown-menu-with-footer")
-        ],
-        nav=True, in_navbar=True,
-        toggle_style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "fontWeight": "600"}
-    )
-
     # ⚙️ CONFIGURAÇÕES
     config_dropdown = dbc.DropdownMenu(
         label=html.Div([
@@ -460,8 +435,6 @@ def create_header(pathname, user):
         nav_items.append(utilities_dropdown)
     if can_see_menu(user, "supervisorio"):
         nav_items.append(supervision_dropdown)
-    if can_see_menu(user, "workflow"):
-        nav_items.append(workflow_dropdown)
     if can_see_menu(user, "configuracoes"):
         nav_items.append(config_dropdown)
     
