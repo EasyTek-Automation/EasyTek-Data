@@ -31,7 +31,7 @@ def carregar_historico():
     if not HISTORICO_CSV.exists():
         return pd.DataFrame(columns=[
             'pendencia_id', 'descricao', 'data', 'responsavel',
-            'tipo_evento', 'editado_por', 'observacoes'
+            'tipo_evento', 'editado_por', 'observacoes', 'alteracoes'
         ])
 
     df = pd.read_csv(HISTORICO_CSV)
@@ -107,7 +107,8 @@ def criar_pendencia(descricao, responsavel, status, criado_por, criado_por_perfi
             'responsavel': responsavel,
             'tipo_evento': 'criacao',
             'editado_por': criado_por,
-            'observacoes': f'Pendência criada e atribuída a {responsavel}'
+            'observacoes': f'Pendência criada e atribuída a {responsavel}',
+            'alteracoes': ''  # Sem alterações na criação
         }
 
         df_hist = pd.concat([df_hist, pd.DataFrame([nova_hist])], ignore_index=True)
@@ -151,20 +152,21 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
             return False, "Pendência não encontrada"
 
         idx = idx[0]
-        houve_mudanca = False
 
-        # Aplicar mudanças nos campos (se houver)
+        # Construir log de alterações (campos modificados)
+        alteracoes_log = []
+
         if nova_descricao and nova_descricao != descricao_original:
             df_pend.at[idx, 'descricao'] = nova_descricao
-            houve_mudanca = True
+            alteracoes_log.append("Descrição alterada")
 
         if novo_responsavel and novo_responsavel != responsavel_original:
             df_pend.at[idx, 'responsavel'] = novo_responsavel
-            houve_mudanca = True
+            alteracoes_log.append(f"Responsável: {responsavel_original} → {novo_responsavel}")
 
         if novo_status and novo_status != status_original:
             df_pend.at[idx, 'status'] = novo_status
-            houve_mudanca = True
+            alteracoes_log.append(f"Status: {status_original} → {novo_status}")
 
         # Atualizar metadata
         df_pend.at[idx, 'ultima_atualizacao'] = agora
@@ -182,13 +184,14 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
             'responsavel': novo_responsavel or responsavel_original,
             'tipo_evento': 'atualizacao_workflow',
             'editado_por': editado_por,
-            'observacoes': observacoes  # Detalhes da atualização
+            'observacoes': observacoes,  # Detalhes da atualização
+            'alteracoes': ' | '.join(alteracoes_log) if alteracoes_log else ''  # Log de campos alterados
         }
 
         df_hist = pd.concat([df_hist, pd.DataFrame([nova_entrada_historico])], ignore_index=True)
         df_hist.to_csv(HISTORICO_CSV, index=False)
 
-        msg_mudanca = " (com alterações nos campos)" if houve_mudanca else ""
+        msg_mudanca = " (com alterações nos campos)" if alteracoes_log else ""
         return True, f"Atualização registrada com sucesso{msg_mudanca}"
 
     except Exception as e:

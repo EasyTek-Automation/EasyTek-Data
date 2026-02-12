@@ -212,7 +212,7 @@ def criar_timeline_historico(historico_items):
 
     Args:
         historico_items: Lista de dicts com o histórico
-            Cada item deve conter: descricao (título), observacoes, responsavel, data
+            Cada item deve conter: descricao (título), observacoes, alteracoes, editado_por, data
 
     Returns:
         html.Div: Timeline do histórico
@@ -244,6 +244,14 @@ def criar_timeline_historico(historico_items):
                 "borderRadius": "8px"
             })
 
+        # Log de alterações (se existir)
+        alteracoes_content = None
+        if item.get('alteracoes') and item['alteracoes'].strip():
+            alteracoes_content = html.Div([
+                html.I(className="fas fa-edit me-2 text-info", style={"fontSize": "0.85rem"}),
+                html.Span(item['alteracoes'], className="text-muted", style={"fontSize": "0.9rem"})
+            ], className="mb-2")
+
         timeline_items.append(
             html.Div([
                 # Coluna esquerda: bolinha + linha
@@ -263,9 +271,12 @@ def criar_timeline_historico(historico_items):
                     # Card com observações (balão de chat)
                     observacoes_content if observacoes_content else html.Div(),
 
-                    # Nome do responsável e data
+                    # Log de alterações (campos modificados)
+                    alteracoes_content if alteracoes_content else html.Div(),
+
+                    # Nome de quem editou e data
                     html.Small([
-                        html.Span(item['responsavel'], className="text-muted me-3"),
+                        html.Span(item.get('editado_por', item['responsavel']), className="text-muted me-3"),
                         html.Span(item['data'], className="text-muted")
                     ])
                 ], style={"flex": "1", "paddingBottom": "25px"})

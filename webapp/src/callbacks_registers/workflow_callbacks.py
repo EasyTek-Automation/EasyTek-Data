@@ -48,7 +48,9 @@ def criar_conteudo_historico(pendencia_id, df_historico):
         historico_items.append({
             'descricao': row['descricao'],
             'observacoes': row.get('observacoes', ''),  # Observações (pode não existir em registros antigos)
-            'responsavel': row['responsavel'],
+            'alteracoes': row.get('alteracoes', ''),  # Log de campos alterados
+            'editado_por': row.get('editado_por', row['responsavel']),  # Quem editou (fallback: responsável)
+            'responsavel': row['responsavel'],  # Mantém para referência
             'data': row['data'].strftime("%d/%m/%Y %H:%M")
         })
 
