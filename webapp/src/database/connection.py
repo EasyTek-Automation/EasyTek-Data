@@ -263,12 +263,17 @@ def save_user(username, email, password, level, perfil="manutencao"):
             return False
 
         hashed_password = generate_password_hash(password, method='pbkdf2:sha256')
+
+        # Determinar se senha foi definida (não está em branco)
+        password_set = bool(password and password.strip())
+
         user_collection.insert_one({
             "username": username,
             "email": email,
             "password": hashed_password,
             "level": int(level),
-            "perfil": perfil  # NOVO: Campo perfil
+            "perfil": perfil,
+            "password_set": password_set  # NOVO: Rastreia se senha foi definida
         })
         return True
     except Exception as e:

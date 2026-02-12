@@ -129,11 +129,9 @@ def register_manage_users_callbacks(app):
                 "utilidades": "Utilidades", "admin": "Administrador"
             }
 
-            from werkzeug.security import check_password_hash
-
             for user in users_cursor:
-                # Check if user has blank password
-                is_blank_password = check_password_hash(user.get("password", ""), "")
+                # Usar campo password_set (RÁPIDO!) em vez de check_password_hash (LENTO!)
+                password_set = user.get("password_set", True)  # Default True para usuários antigos
 
                 users_list.append({
                     "id": str(user["_id"]),
@@ -142,7 +140,7 @@ def register_manage_users_callbacks(app):
                     "perfil": perfil_labels.get(user.get("perfil", ""), user.get("perfil", "N/A")),
                     "perfil_raw": user.get("perfil", ""),
                     "level": user.get("level", 1),
-                    "status": "🔓 Senha Temporária" if is_blank_password else "✅ Ativo",
+                    "status": "🔓 Senha Temporária" if not password_set else "✅ Ativo",
                     "actions": user.get("username", "")  # For action buttons
                 })
 
@@ -282,7 +280,10 @@ def register_manage_users_callbacks(app):
 
             result = usuarios.update_one(
                 {"_id": ObjectId(user_id)},
-                {"$set": {"password": blank_password_hash}}
+                {"$set": {
+                    "password": blank_password_hash,
+                    "password_set": False  # Senha resetada - aguardando redefinição
+                }}
             )
 
             if result.modified_count == 1:

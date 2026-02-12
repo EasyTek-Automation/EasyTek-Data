@@ -107,7 +107,10 @@ def register_change_password_callbacks(app):
 
                 result = usuarios.update_one(
                     {"_id": ObjectId(user_id)},
-                    {"$set": {"password": new_password_hash}}
+                    {"$set": {
+                        "password": new_password_hash,
+                        "password_set": True  # Senha foi definida
+                    }}
                 )
 
                 if result.modified_count == 1:
