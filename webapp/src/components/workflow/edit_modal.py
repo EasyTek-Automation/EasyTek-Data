@@ -102,6 +102,15 @@ def edit_pendencia_modal():
         ]),
 
         dbc.ModalFooter([
+            # Botão Deletar (apenas nível 3)
+            dbc.Button(
+                [html.I(className="fas fa-trash-alt me-2"), "Deletar"],
+                id="edit-pend-delete-btn",
+                color="danger",
+                outline=True,
+                className="me-auto"
+            ),
+
             dbc.Button(
                 "Cancelar",
                 id="edit-pend-cancel-btn",
@@ -116,3 +125,50 @@ def edit_pendencia_modal():
             )
         ])
     ], id="edit-pend-modal", is_open=False, size="lg", centered=True)
+
+
+def delete_confirm_modal():
+    """
+    Modal de confirmação para deletar pendência.
+
+    Returns:
+        dbc.Modal: Modal de confirmação
+    """
+    return dbc.Modal([
+        dbc.ModalHeader(dbc.ModalTitle([
+            html.I(className="fas fa-exclamation-triangle me-2 text-danger"),
+            "Confirmar Exclusão"
+        ])),
+
+        dbc.ModalBody([
+            html.H5("Tem certeza que deseja deletar esta pendência?", className="mb-3"),
+            html.P([
+                "Esta ação é ",
+                html.Strong("irreversível", className="text-danger"),
+                " e irá remover:"
+            ]),
+            html.Ul([
+                html.Li("A pendência e todos os seus dados"),
+                html.Li("Todo o histórico de atualizações"),
+            ]),
+            html.Div([
+                html.Strong("ID: "),
+                html.Span(id="delete-confirm-id", className="text-danger fw-bold")
+            ], className="mt-3 p-2", style={"backgroundColor": "#fff3cd", "borderRadius": "4px"})
+        ]),
+
+        dbc.ModalFooter([
+            dbc.Button(
+                "Cancelar",
+                id="delete-confirm-cancel-btn",
+                color="secondary",
+                outline=True,
+                className="me-2"
+            ),
+            dbc.Button(
+                [html.I(className="fas fa-trash-alt me-2"), "Sim, Deletar"],
+                id="delete-confirm-submit-btn",
+                color="danger"
+            )
+        ])
+    ], id="delete-confirm-modal", is_open=False, centered=True)

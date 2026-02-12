@@ -198,6 +198,38 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
         return False, str(e)
 
 
+def deletar_pendencia(pend_id):
+    """
+    Deleta pendência e todo seu histórico.
+
+    Args:
+        pend_id: ID da pendência
+
+    Returns:
+        tuple: (sucesso: bool, mensagem: str)
+    """
+    try:
+        df_pend = carregar_pendencias()
+        df_hist = carregar_historico()
+
+        # Verificar se pendência existe
+        if pend_id not in df_pend['id'].values:
+            return False, "Pendência não encontrada"
+
+        # Remover pendência
+        df_pend = df_pend[df_pend['id'] != pend_id]
+        df_pend.to_csv(PENDENCIAS_CSV, index=False)
+
+        # Remover histórico
+        df_hist = df_hist[df_hist['pendencia_id'] != pend_id]
+        df_hist.to_csv(HISTORICO_CSV, index=False)
+
+        return True, f"Pendência {pend_id} deletada com sucesso"
+
+    except Exception as e:
+        return False, str(e)
+
+
 def get_usuarios_por_perfil(perfil):
     """
     Retorna lista de usuários de um determinado perfil para dropdown.

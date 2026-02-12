@@ -1,5 +1,4 @@
 id,descricao,responsavel,status,data_criacao,ultima_atualizacao,criado_por,criado_por_perfil,ultima_edicao_por,ultima_edicao_data
-PEND-001,Solicitação de memorial de cálculoae,Márcio Pires,Pendente,2025-08-26 18:30:37.000000,2026-02-11 21:31:27.512540,admin.sistema,admin,Rodolfo J. Silva,2026-02-11 21:31:27.512540
 PEND-002,Inspeção de dispositivos de proteção,Márcio Pires,Pendente,2025-10-07 18:30:37.000000,2026-02-11 21:25:56.054978,admin.sistema,admin,Rodolfo J. Silva,2026-02-11 21:25:56.054978
 PEND-003,"Manutenção de inversores de frequênciaa
 ",Renata Costa,Bloqueado,2026-01-02 18:30:37.000000,2026-02-11 21:26:52.897924,admin.sistema,admin,Rodolfo J. Silva,2026-02-11 21:26:52.897924

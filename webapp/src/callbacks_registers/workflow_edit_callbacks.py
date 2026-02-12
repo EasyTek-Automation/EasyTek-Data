@@ -8,7 +8,8 @@ import json
 from src.utils.workflow_csv import (
     editar_pendencia,
     get_usuarios_por_perfil,
-    carregar_pendencias
+    carregar_pendencias,
+    deletar_pendencia
 )
 
 
@@ -35,12 +36,13 @@ def register_edit_callbacks(app):
         ],
         [
             State("user-level-store", "data"),
-            State("user-username-store", "data")
+            State("user-username-store", "data"),
+            State("store-historico", "data")
         ],
         prevent_initial_call=True
     )
     def toggle_edit_modal(edit_clicks, cancel_clicks, submit_clicks,
-                         user_level, username):
+                         user_level, username, historico_data):
         """Abre/fecha modal de edição."""
         ctx = callback_context
 
@@ -88,13 +90,26 @@ def register_edit_callbacks(app):
                 "status": pend['status']
             }
 
+            # Buscar último tipo de evento do histórico (precarregar dropdown)
+            ultimo_tipo_evento = None
+            if historico_data:
+                import pandas as pd
+                df_hist = pd.DataFrame(historico_data)
+                hist_pend = df_hist[df_hist['pendencia_id'] == pend_id]
+                if not hist_pend.empty:
+                    # Ordenar por data e pegar o último (exceto criação)
+                    hist_pend = hist_pend.sort_values('data', ascending=False)
+                    hist_pend = hist_pend[hist_pend['tipo_evento'] != 'criacao']
+                    if not hist_pend.empty:
+                        ultimo_tipo_evento = hist_pend.iloc[0]['descricao']
+
             return (
                 True,  # Modal abre
                 pend['id'],
                 pend['descricao'],
                 pend['responsavel'],
                 pend['status'],
-                None,  # Tipo evento sempre vazio ao abrir
+                ultimo_tipo_evento,  # Precarregar último tipo de evento
                 "",    # Observações sempre vazio ao abrir
                 original_data,
                 ""
@@ -248,4 +263,108 @@ def register_edit_callbacks(app):
                     f"Erro: {mensagem}"
                 ], color="danger", dismissable=True),
                 no_update, no_update, no_update, no_update
+            )
+
+
+    # ==================================================================================
+    # CALLBACK 4: Controlar visibilidade do botão deletar (apenas nível 3)
+    # ==================================================================================
+    @app.callback(
+        Output("edit-pend-delete-btn", "style"),
+        Input("edit-pend-modal", "is_open"),
+        State("user-level-store", "data")
+    )
+    def toggle_delete_button_visibility(is_open, user_level):
+        """Mostra botão deletar apenas para nível 3."""
+        if user_level == 3:
+            return {"display": "inline-block"}
+        else:
+            return {"display": "none"}
+
+
+    # ==================================================================================
+    # CALLBACK 5: Abrir modal de confirmação de exclusão
+    # ==================================================================================
+    @app.callback(
+        [
+            Output("delete-confirm-modal", "is_open"),
+            Output("delete-confirm-id", "children")
+        ],
+        [
+            Input("edit-pend-delete-btn", "n_clicks"),
+            Input("delete-confirm-cancel-btn", "n_clicks"),
+            Input("delete-confirm-submit-btn", "n_clicks")
+        ],
+        State("edit-pend-id-display", "children"),
+        prevent_initial_call=True
+    )
+    def toggle_delete_confirm_modal(delete_clicks, cancel_clicks, submit_clicks, pend_id):
+        """Abre/fecha modal de confirmação de exclusão."""
+        ctx = callback_context
+        if not ctx.triggered:
+            raise PreventUpdate
+
+        trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
+
+        # Abrir modal de confirmação
+        if "delete-btn" in trigger_id:
+            return True, pend_id
+
+        # Fechar modal
+        if "cancel" in trigger_id or "submit" in trigger_id:
+            return False, ""
+
+        return no_update, no_update
+
+
+    # ==================================================================================
+    # CALLBACK 6: Deletar pendência (após confirmação)
+    # ==================================================================================
+    @app.callback(
+        [
+            Output("edit-pend-modal", "is_open", allow_duplicate=True),
+            Output("delete-confirm-modal", "is_open", allow_duplicate=True),
+            Output("alert-container-workflow", "children", allow_duplicate=True),
+            Output("container-tabela", "children", allow_duplicate=True),
+            Output("store-pendencias", "data", allow_duplicate=True),
+            Output("store-historico", "data", allow_duplicate=True)
+        ],
+        Input("delete-confirm-submit-btn", "n_clicks"),
+        State("edit-pend-id-display", "children"),
+        prevent_initial_call=True
+    )
+    def deletar_pendencia_callback(n_clicks, pend_id):
+        """Deleta a pendência após confirmação."""
+        if not n_clicks:
+            return no_update, no_update, no_update, no_update, no_update, no_update
+
+        # Deletar pendência
+        sucesso, mensagem = deletar_pendencia(pend_id)
+
+        if sucesso:
+            # Recarregar tabela e histórico
+            from src.pages.workflow.dashboard import carregar_dados_csv, criar_tabela_pendencias
+            df_pend, df_hist = carregar_dados_csv()
+            nova_tabela = criar_tabela_pendencias(df_pend)
+
+            return (
+                False,  # Fechar modal de edição
+                False,  # Fechar modal de confirmação
+                dbc.Alert([
+                    html.I(className="fas fa-check-circle me-2"),
+                    mensagem
+                ], color="success", dismissable=True, duration=7000),
+                nova_tabela,
+                df_pend.to_dict('records') if df_pend is not None else [],
+                df_hist.to_dict('records') if df_hist is not None else []
+            )
+        else:
+            return (
+                no_update,
+                False,  # Fechar modal de confirmação
+                dbc.Alert([
+                    html.I(className="fas fa-times-circle me-2"),
+                    f"Erro ao deletar: {mensagem}"
+                ], color="danger", dismissable=True, duration=7000),
+                no_update, no_update, no_update
             )

@@ -13,7 +13,7 @@ from datetime import datetime
 from flask_login import current_user
 
 from src.components.workflow.create_modal import create_pendencia_modal
-from src.components.workflow.edit_modal import edit_pendencia_modal
+from src.components.workflow.edit_modal import edit_pendencia_modal, delete_confirm_modal
 
 
 # ======================================================================================
@@ -248,20 +248,20 @@ def criar_timeline_historico(historico_items):
         alteracoes_content = None
         if item.get('alteracoes') and item['alteracoes'].strip():
             alteracoes_content = html.Div([
-                html.I(className="fas fa-edit me-2 text-info", style={"fontSize": "0.85rem"}),
-                html.Span(item['alteracoes'], className="text-muted", style={"fontSize": "0.9rem"})
+                html.I(className="fas fa-edit me-2 text-info", style={"fontSize": "0.98rem"}),
+                html.Span(item['alteracoes'], className="text-muted", style={"fontSize": "1.035rem"})
             ], className="mb-2")
 
         timeline_items.append(
             html.Div([
-                # Coluna esquerda: bolinha + linha
+                # Coluna esquerda: bolinha + linha (centralizada)
                 html.Div([
                     html.Div(className="rounded-circle bg-primary",
-                             style={"width": "12px", "height": "12px"}),
+                             style={"width": "12px", "height": "12px", "flexShrink": "0"}),
                     html.Div(className="bg-secondary" if not is_last else "",
-                             style={"width": "2px", "height": "100%", "marginLeft": "5px"} if not is_last else {})
+                             style={"width": "2px", "height": "100%", "marginLeft": "0", "marginRight": "0"} if not is_last else {})
                 ], style={"display": "flex", "flexDirection": "column", "alignItems": "center",
-                         "marginRight": "15px", "minHeight": "80px"}),
+                         "marginRight": "15px", "minHeight": "80px", "width": "12px"}),
 
                 # Coluna direita: conteúdo
                 html.Div([
@@ -423,6 +423,7 @@ def layout():
         # Modais
         create_pendencia_modal(),
         edit_pendencia_modal(),
+        delete_confirm_modal(),
 
         # Header
         dbc.Row([

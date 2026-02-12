@@ -1,9 +1,4 @@
 pendencia_id,descricao,data,responsavel,tipo_evento,editado_por,observacoes,alteracoes
-PEND-001,Pendência criada,2025-08-31 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,,
-PEND-001,Primeira inspeção concluída,2025-09-02 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,,
-PEND-001,Primeira inspeção concluída,2025-09-10 18:30:37.000000,João Silva,atualizacao_manual,João Silva,,
-PEND-001,Teste realizado com sucesso,2025-10-01 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,,
-PEND-001,Identificado problema adicional,2025-10-05 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,,
 PEND-002,Pendência criada,2025-10-11 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,,
 PEND-002,Ajustes finais em andamento,2025-10-14 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,,
 PEND-002,Documentação atualizada,2025-10-18 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,,
@@ -251,20 +246,12 @@ PEND-050,Pendência criada,2025-12-05 18:30:37.000000,Pedro Costa,atualizacao_ma
 PEND-050,"Peça recebida, retomando trabalho",2025-12-13 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,,
 PEND-050,Equipamento liberado para operação,2025-12-14 18:30:37.000000,João Silva,atualizacao_manual,João Silva,,
 PEND-050,Ajustes finais em andamento,2025-12-14 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,,
-PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:19:05.666533,BBB,edicao_descricao,Rodolfo J. Silva,,
-PEND-001,Responsável alterado de 'Rodolfo J. Silva' para 'BBB' por Rodolfo J. Silva,2026-02-10 20:19:05.666533,BBB,responsavel_mudanca,Rodolfo J. Silva,,
-PEND-001,Responsável alterado de 'BBB' para 'Rodolfo J. Silva' por Rodolfo J. Silva,2026-02-10 20:20:04.252398,Rodolfo J. Silva,responsavel_mudanca,Rodolfo J. Silva,,
-PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:22:23.836466,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva,,
-PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:27:38.864881,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva,,
-PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:32:39.475789,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva,,
-PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:37:41.776007,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva,,
 PEND-002,Responsável alterado de 'Ana Oliveira' para 'Márcio Pires' por Rodolfo J. Silva,2026-02-10 20:38:14.387193,Márcio Pires,responsavel_mudanca,Rodolfo J. Silva,,
 PEND-002,Status alterado de 'Bloqueado' para 'Em Andamento' por Rodolfo J. Silva,2026-02-10 20:38:14.387193,Márcio Pires,status_mudanca,Rodolfo J. Silva,,
 PEND-002,Status alterado de 'Em Andamento' para 'Pendente' por Rodolfo J. Silva: Necessario Aprovação para início do processo,2026-02-10 20:49:51.275180,Márcio Pires,status_mudanca,Rodolfo J. Silva,,
 PEND-051,Pendência criada,2026-02-10 20:51:37.825573,Rodolfo J. Silva,criacao,Rodolfo J. Silva,,
 PEND-003,Descrição editada por Rodolfo J. Silva,2026-02-10 21:21:10.716607,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva,,
 PEND-003,Responsável alterado de 'Carlos Souza' para 'Rodolfo J. Silva' por Rodolfo J. Silva,2026-02-10 21:21:10.716607,Rodolfo J. Silva,responsavel_mudanca,Rodolfo J. Silva,,
-PEND-001,Revisão técnica concluída,2026-02-11 21:05:37.483427,Rodolfo J. Silva,atualizacao_workflow,Rodolfo J. Silva,Observação Teste,
 PEND-002,Aguardando peça do fornecedor,2026-02-11 21:07:06.420449,Renata Costa,atualizacao_workflow,Rodolfo J. Silva,"Alterado para Renata para aprovação
 Aprovação necessária pelo item a
 Item b necessita laudo
@@ -275,12 +262,6 @@ Completo",Responsável: Renata Costa → Márcio Pires
 PEND-003,Teste realizado com sucesso,2026-02-11 21:26:52.897924,Renata Costa,atualizacao_workflow,Rodolfo J. Silva,"Feito 
 Teste
 Completo",Responsável: Rodolfo J. Silva → Renata Costa | Status: Em Andamento → Bloqueado
-PEND-001,Primeira inspeção concluída,2026-02-11 21:30:37.034609,Márcio Pires,atualizacao_workflow,Rodolfo J. Silva,"Tste
-Completo
-Realizado",Responsável: Rodolfo J. Silva → Márcio Pires | Status: Em Andamento → Pendente
-PEND-001,Teste realizado com sucesso,2026-02-11 21:31:27.512540,Márcio Pires,atualizacao_workflow,Rodolfo J. Silva,"Teste
-Realizado
-Completoooo",
 PEND-004,Primeira inspeção concluída,2026-02-11 21:35:32.815002,BBB,atualizacao_workflow,Rodolfo J. Silva,"Primeiro teste, responsavel e tipo de evento",Responsável: Pedro Costa → BBB
 PEND-004,Primeira inspeção concluída,2026-02-11 21:37:00.849333,BBB,atualizacao_workflow,Rodolfo J. Silva,"SEgundo teste
 Tipo de evento e obs",
