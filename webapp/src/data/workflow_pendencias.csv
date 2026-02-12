@@ -1,7 +1,7 @@
 id,descricao,responsavel,status,data_criacao,ultima_atualizacao,criado_por,criado_por_perfil,ultima_edicao_por,ultima_edicao_data
-PEND-002,Inspeção de dispositivos de proteção,Márcio Pires,Pendente,2025-10-07 18:30:37.000000,2026-02-11 21:25:56.054978,admin.sistema,admin,Rodolfo J. Silva,2026-02-11 21:25:56.054978
+PEND-002,Inspeção de dispositivos de proteção,Usuario nv 02,Pendente,2025-10-07 18:30:37.000000,2026-02-11 22:04:37.236225,admin.sistema,admin,Rodolfo J. Silva,2026-02-11 22:04:37.236225
 PEND-003,"Manutenção de inversores de frequênciaa
-",Renata Costa,Bloqueado,2026-01-02 18:30:37.000000,2026-02-11 21:26:52.897924,admin.sistema,admin,Rodolfo J. Silva,2026-02-11 21:26:52.897924
+",BBB,Bloqueado,2026-01-02 18:30:37.000000,2026-02-11 22:06:38.395731,admin.sistema,admin,Usuario nv 02,2026-02-11 22:06:38.395731
 PEND-004,Troca de lâmpadas de sinalização,Renata Costa,Em Andamento,2025-12-25 18:30:37.000000,2026-02-11 21:37:52.560322,admin.sistema,admin,Rodolfo J. Silva,2026-02-11 21:37:52.560322
 PEND-005,Substituição de correia transportadora Linha 2,Carlos Souza,Pendente,2025-12-30 18:30:37.000000,2026-02-08 18:30:37.000000,admin.sistema,admin,admin.sistema,2026-02-08 18:30:37.000000
 PEND-006,Troca de óleo lubrificante redutor MM05,Carlos Souza,Em Andamento,2026-01-28 18:30:37.000000,2026-02-01 18:30:37.000000,admin.sistema,admin,admin.sistema,2026-02-01 18:30:37.000000

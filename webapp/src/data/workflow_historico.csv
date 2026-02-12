@@ -267,3 +267,5 @@ PEND-004,Primeira inspeção concluída,2026-02-11 21:37:00.849333,BBB,atualizac
 Tipo de evento e obs",
 PEND-004,Teste realizado com sucesso,2026-02-11 21:37:52.560322,Renata Costa,atualizacao_workflow,Rodolfo J. Silva,"Terceiro teste
 Completo",Responsável: BBB → Renata Costa | Status: Pendente → Em Andamento
+PEND-002,Teste realizado com sucesso,2026-02-11 22:04:37.236225,Usuario nv 02,atualizacao_workflow,Rodolfo J. Silva,Teste,Responsável: Márcio Pires → Usuario nv 02
+PEND-003,Teste realizado com sucesso,2026-02-11 22:06:38.395731,BBB,atualizacao_workflow,Usuario nv 02,Alterei porque quis,Responsável: Renata Costa → BBB

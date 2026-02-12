@@ -75,12 +75,8 @@ def register_edit_callbacks(app):
 
             pend = pend.iloc[0].to_dict()
 
-            # VALIDAÇÃO RBAC: Responsável ou Nível 3
-            if pend['responsavel'] != username and user_level != 3:
-                return False, "", "", None, None, None, "", None, dbc.Alert([
-                    html.I(className="fas fa-shield-x me-2"),
-                    "PERMISSÃO NEGADA: Apenas o responsável ou admins podem editar"
-                ], color="danger", dismissable=True)
+            # VALIDAÇÃO RBAC: Qualquer usuário autenticado pode editar
+            # (Apenas criação e exclusão são restritas a nível 3)
 
             # Popula dados originais
             original_data = {
