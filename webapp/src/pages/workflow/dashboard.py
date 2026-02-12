@@ -22,30 +22,26 @@ from src.components.workflow.edit_modal import edit_pendencia_modal, delete_conf
 
 def carregar_dados_csv():
     """
-    Carrega os dados de pendências e histórico dos arquivos CSV.
+    Carrega os dados de pendências e histórico do MongoDB.
 
     Returns:
         tuple: (df_pendencias, df_historico) ou (None, None) em caso de erro
     """
     try:
-        # Definir caminhos dos arquivos
-        base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        caminho_pendencias = os.path.join(base_dir, "data", "workflow_pendencias.csv")
-        caminho_historico = os.path.join(base_dir, "data", "workflow_historico.csv")
+        from src.utils.workflow_db import carregar_pendencias, carregar_historico
 
-        # Carregar CSVs
-        df_pendencias = pd.read_csv(caminho_pendencias)
-        df_historico = pd.read_csv(caminho_historico)
+        # Carregar do MongoDB
+        df_pendencias = carregar_pendencias()
+        df_historico = carregar_historico()
 
-        # Converter datas (usar format='mixed' para suportar timestamps com microsegundos)
-        df_pendencias['data_criacao'] = pd.to_datetime(df_pendencias['data_criacao'], format='mixed')
-        df_pendencias['ultima_atualizacao'] = pd.to_datetime(df_pendencias['ultima_atualizacao'], format='mixed')
-        df_historico['data'] = pd.to_datetime(df_historico['data'], format='mixed')
+        # Ajustar nome da coluna no histórico (para compatibilidade com código existente)
+        if 'MaintenanceWF_id' in df_historico.columns:
+            df_historico['pendencia_id'] = df_historico['MaintenanceWF_id']
 
         return df_pendencias, df_historico
 
     except Exception as e:
-        print(f"Erro ao carregar dados CSV: {e}")
+        print(f"Erro ao carregar dados do MongoDB: {e}")
         return None, None
 
 

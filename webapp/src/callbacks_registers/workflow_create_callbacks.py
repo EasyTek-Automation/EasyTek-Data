@@ -4,7 +4,7 @@ import dash_bootstrap_components as dbc
 from dash import html
 from flask_login import current_user
 
-from src.utils.workflow_csv import (
+from src.utils.workflow_db import (
     criar_pendencia,
     get_usuarios_por_perfil
 )

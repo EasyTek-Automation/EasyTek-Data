@@ -5,7 +5,7 @@ import dash_bootstrap_components as dbc
 from dash import html
 import json
 
-from src.utils.workflow_csv import (
+from src.utils.workflow_db import (
     editar_pendencia,
     get_usuarios_por_perfil,
     carregar_pendencias,
