@@ -235,7 +235,7 @@ def create_history_row(log: dict):
         icon = html.I(className="bi bi-x-circle text-danger me-2")
     else:  # running
         badge = dbc.Badge("Processando...", color="warning", className="me-2")
-        icon = dbc.Spinner(size="sm", className="me-2")
+        icon = dbc.Spinner(size="sm", spinnerClassName="me-2")
 
     # Formatar data
     try:

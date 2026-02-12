@@ -26,4 +26,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:5002/api/health || exit 1
 
 # Comando de inicialização
-CMD ["gunicorn", "--workers", "2", "--bind", "0.0.0.0:5002", "--timeout", "600", "api:app"]
+# NOTA: Usar apenas 1 worker porque o scheduler roda em background
+# Múltiplos workers causariam processamentos duplicados
+CMD ["gunicorn", "--workers", "1", "--bind", "0.0.0.0:5002", "--timeout", "600", "--preload", "api:app"]

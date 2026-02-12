@@ -33,6 +33,7 @@ app = Flask(__name__)
 # Estado global
 processing_jobs: Dict[str, dict] = {}  # job_id -> status info
 scheduler: ZPPScheduler = None
+_initialized = False
 
 
 def get_db():
@@ -364,14 +365,19 @@ def list_input_files():
         files = []
 
         if config.INPUT_DIR.exists():
-            for file_path in config.INPUT_DIR.glob('*.xlsx'):
-                if not file_path.name.startswith('~$'):  # Ignorar temporários
-                    stat = file_path.stat()
-                    files.append({
-                        "filename": file_path.name,
-                        "size_mb": round(stat.st_size / (1024 * 1024), 2),
-                        "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
-                    })
+            # Buscar .xlsx e .XLSX (case-insensitive)
+            seen_files = set()
+            for pattern in ['*.xlsx', '*.XLSX']:
+                for file_path in config.INPUT_DIR.glob(pattern):
+                    # Evitar duplicatas e arquivos temporários
+                    if file_path.name not in seen_files and not file_path.name.startswith('~$'):
+                        seen_files.add(file_path.name)
+                        stat = file_path.stat()
+                        files.append({
+                            "filename": file_path.name,
+                            "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                        })
 
         # Ordenar por data de modificação (mais recente primeiro)
         files.sort(key=lambda x: x["modified_at"], reverse=True)
@@ -400,14 +406,19 @@ def list_output_files():
         files = []
 
         if config.OUTPUT_DIR.exists():
-            for file_path in config.OUTPUT_DIR.glob('*.xlsx'):
-                if not file_path.name.startswith('~$'):
-                    stat = file_path.stat()
-                    files.append({
-                        "filename": file_path.name,
-                        "size_mb": round(stat.st_size / (1024 * 1024), 2),
-                        "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
-                    })
+            # Buscar .xlsx e .XLSX (case-insensitive)
+            seen_files = set()
+            for pattern in ['*.xlsx', '*.XLSX']:
+                for file_path in config.OUTPUT_DIR.glob(pattern):
+                    # Evitar duplicatas e arquivos temporários
+                    if file_path.name not in seen_files and not file_path.name.startswith('~$'):
+                        seen_files.add(file_path.name)
+                        stat = file_path.stat()
+                        files.append({
+                            "filename": file_path.name,
+                            "size_mb": round(stat.st_size / (1024 * 1024), 2),
+                            "modified_at": datetime.fromtimestamp(stat.st_mtime).isoformat()
+                        })
 
         files.sort(key=lambda x: x["modified_at"], reverse=True)
 
@@ -541,7 +552,14 @@ def update_config():
 
 def initialize_app():
     """Inicializa aplicação e serviços"""
-    global scheduler
+    global scheduler, _initialized
+
+    # Prevenir inicialização múltipla (importante para Gunicorn com múltiplos workers)
+    if _initialized:
+        logger.info("App já inicializado, pulando...")
+        return
+
+    _initialized = True
 
     logger.info("\n" + "="*80)
     logger.info("ZPP PROCESSOR - Inicializando")
@@ -585,6 +603,11 @@ def initialize_app():
     logger.info("="*80 + "\n")
 
 
+# Inicializar aplicação automaticamente quando módulo é importado
+# (necessário para Gunicorn, que não executa __main__)
+initialize_app()
+
+
 if __name__ == '__main__':
-    initialize_app()
+    # Se rodar diretamente, apenas iniciar o servidor
     app.run(host='0.0.0.0', port=config.PORT, debug=False)

@@ -224,7 +224,7 @@ def register_zpp_processor_callbacks(app):
             # Se ainda está rodando, manter polling
             if status == 'running':
                 status_msg = dbc.Alert([
-                    dbc.Spinner(size="sm", className="me-2"),
+                    dbc.Spinner(size="sm", spinnerClassName="me-2"),
                     "Processamento em andamento..."
                 ], color="info", className="mb-0")
 
