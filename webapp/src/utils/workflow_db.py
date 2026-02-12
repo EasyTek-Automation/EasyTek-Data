@@ -83,10 +83,10 @@ def carregar_historico():
 
 def gerar_proximo_id():
     """
-    Gera próximo ID sequencial (PEND-XXX).
+    Gera próximo ID sequencial (AMG_WFXXX).
 
     Returns:
-        str: Novo ID (ex: PEND-051)
+        str: Novo ID (ex: AMG_WF051)
     """
     try:
         collection = get_mongo_connection(COLLECTION_PENDENCIAS)
@@ -98,18 +98,18 @@ def gerar_proximo_id():
         )
 
         if not ultimo_doc:
-            return "PEND-001"
+            return "AMG_WF001"
 
         # Extrair número do ID
-        ultimo_id = ultimo_doc.get('id', 'PEND-000')
-        numero = int(ultimo_id.split('-')[1])
+        ultimo_id = ultimo_doc.get('id', 'AMG_WF000')
+        numero = int(ultimo_id.replace('AMG_WF', ''))
         proximo_num = numero + 1
 
-        return f"PEND-{proximo_num:03d}"
+        return f"AMG_WF{proximo_num:03d}"
 
     except Exception as e:
         print(f"Erro ao gerar ID: {e}")
-        return "PEND-001"
+        return "AMG_WF001"
 
 
 def criar_pendencia(descricao, responsavel, status, criado_por, criado_por_perfil):
