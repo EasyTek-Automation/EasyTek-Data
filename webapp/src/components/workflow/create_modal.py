@@ -1,4 +1,4 @@
-"""Modal para criar nova pendência."""
+"""Modal para criar novo workflow."""
 import dash_bootstrap_components as dbc
 from dash import html, dcc
 
@@ -13,7 +13,7 @@ def create_pendencia_modal():
     return dbc.Modal([
         dbc.ModalHeader(dbc.ModalTitle([
             html.I(className="fas fa-plus-circle me-2"),
-            "Nova Pendência"
+            "Novo Workflow"
         ])),
 
         dbc.ModalBody([

@@ -1,5 +1,5 @@
 """
-Dashboard de Pendências - Página principal do módulo Workflow.
+Workflow Dashboard - Página principal do módulo Workflow.
 
 Exibe pendências em formato de tabela expansível, onde cada linha pode ser expandida
 para revelar o histórico detalhado dessa pendência.
@@ -92,7 +92,7 @@ def criar_cards_kpi(df_pendencias):
         dbc.Col([
             dbc.Card([
                 dbc.CardBody([
-                    html.H6("Total de Pendências", className="text-muted mb-2"),
+                    html.H6("Total de Workflows", className="text-muted mb-2"),
                     html.H3(str(total), className="mb-0")
                 ])
             ], className="shadow-sm")
@@ -391,7 +391,7 @@ def criar_tabela_pendencias(df_pendencias):
 
 def layout():
     """
-    Layout principal da página Dashboard de Pendências.
+    Layout principal da página Workflow Dashboard.
 
     Returns:
         dbc.Container: Layout completo da página
@@ -419,16 +419,16 @@ def layout():
             dbc.Col([
                 html.H2([
                     html.I(className="fas fa-project-diagram me-2"),
-                    "Dashboard de Pendências"
+                    "Workflow Dashboard"
                 ], className="mb-0")
             ], width=12, md=6),
 
             dbc.Col([
                 dbc.ButtonGroup([
-                    # Botão Nova Pendência (só nível 3)
+                    # Botão Novo Workflow (só nível 3)
                     dbc.Button([
                         html.I(className="fas fa-plus-circle me-2"),
-                        "Nova Pendência"
+                        "Novo Workflow"
                     ], id="btn-nova-pendencia", color="success", outline=True,
                        style={"display": "inline-block" if current_user.is_authenticated and current_user.level == 3 else "none"}),
 
@@ -448,8 +448,8 @@ def layout():
         # Container de Alertas (mensagens de sucesso/erro)
         html.Div(id="alert-container-workflow", className="mb-3"),
 
-        # Cards KPI
-        criar_cards_kpi(df_pendencias),
+        # Cards KPI (com ID para atualização dinâmica)
+        html.Div(criar_cards_kpi(df_pendencias), id="container-cards-kpi"),
 
         # Painel de Filtros
         criar_painel_filtros(),

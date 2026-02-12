@@ -269,3 +269,40 @@ def register_workflow_callbacks(app):
         except Exception as e:
             print(f"Erro ao buscar usuários: {e}")
             return [{"label": "Todos", "value": "todos"}]
+
+
+    # ==================================================================================
+    # CALLBACK 6: Atualizar cards KPI quando dados mudam
+    # ==================================================================================
+    @app.callback(
+        Output("container-cards-kpi", "children"),
+        Input("store-pendencias", "data")
+    )
+    def atualizar_cards_kpi(pendencias_data):
+        """
+        Atualiza os cards KPI quando os dados de pendências mudam.
+
+        Este callback garante que os totalizadores refletem sempre os dados
+        mais recentes do MongoDB (após criar, editar, deletar ou aplicar filtros).
+        """
+        if not pendencias_data:
+            return criar_cards_kpi(None)
+
+        # Converter dados para DataFrame
+        df_pendencias = pd.DataFrame(pendencias_data)
+
+        # Converter datas (se necessário)
+        if not df_pendencias.empty:
+            if 'data_criacao' in df_pendencias.columns:
+                df_pendencias['data_criacao'] = pd.to_datetime(
+                    df_pendencias['data_criacao'],
+                    format='mixed'
+                )
+            if 'ultima_atualizacao' in df_pendencias.columns:
+                df_pendencias['ultima_atualizacao'] = pd.to_datetime(
+                    df_pendencias['ultima_atualizacao'],
+                    format='mixed'
+                )
+
+        # Recriar cards com dados atualizados
+        return criar_cards_kpi(df_pendencias)
