@@ -239,3 +239,33 @@ def register_workflow_callbacks(app):
             df_pendencias.to_dict('records'),
             df_historico.to_dict('records')
         )
+
+
+    # ==================================================================================
+    # CALLBACK 5: Popular dropdown de responsáveis com usuários do MongoDB
+    # ==================================================================================
+    @app.callback(
+        Output("filtro-responsavel", "options"),
+        Input("store-pendencias", "data")
+    )
+    def popular_filtro_responsavel(pendencias_data):
+        """Popula dropdown de responsáveis com usuários únicos do MongoDB."""
+        from src.database.connection import get_mongo_connection
+
+        try:
+            # Buscar todos os usuários
+            usuarios = get_mongo_connection("usuarios")
+            users = list(usuarios.find({}, {"username": 1}).sort("username", 1))
+
+            # Criar opções
+            options = [{"label": "Todos", "value": "todos"}]
+            options.extend([
+                {"label": u['username'], "value": u['username']}
+                for u in users
+            ])
+
+            return options
+
+        except Exception as e:
+            print(f"Erro ao buscar usuários: {e}")
+            return [{"label": "Todos", "value": "todos"}]

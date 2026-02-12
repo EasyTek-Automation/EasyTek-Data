@@ -142,19 +142,12 @@ def criar_painel_filtros():
     return dbc.Card([
         dbc.CardBody([
             dbc.Row([
-                # Filtro por responsável
+                # Filtro por responsável (populado dinamicamente)
                 dbc.Col([
                     html.Label("Responsável:", className="fw-bold mb-2"),
                     dcc.Dropdown(
                         id="filtro-responsavel",
-                        options=[
-                            {"label": "Todos", "value": "todos"},
-                            {"label": "João Silva", "value": "João Silva"},
-                            {"label": "Maria Santos", "value": "Maria Santos"},
-                            {"label": "Pedro Costa", "value": "Pedro Costa"},
-                            {"label": "Ana Oliveira", "value": "Ana Oliveira"},
-                            {"label": "Carlos Souza", "value": "Carlos Souza"}
-                        ],
+                        options=[{"label": "Todos", "value": "todos"}],  # Será populado por callback
                         value="todos",
                         clearable=False
                     )
