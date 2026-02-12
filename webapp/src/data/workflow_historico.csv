@@ -1,266 +1,271 @@
-pendencia_id,descricao,data,responsavel,tipo_evento,editado_por
-PEND-001,Pendência criada,2025-08-31 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-001,Primeira inspeção concluída,2025-09-02 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-001,Primeira inspeção concluída,2025-09-10 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-001,Teste realizado com sucesso,2025-10-01 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-001,Identificado problema adicional,2025-10-05 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-002,Pendência criada,2025-10-11 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-002,Ajustes finais em andamento,2025-10-14 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-002,Documentação atualizada,2025-10-18 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-002,Primeira inspeção concluída,2025-11-04 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-003,Pendência criada,2026-01-02 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-003,Aguardando aprovação do supervisor,2026-01-02 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-003,Identificado problema adicional,2026-01-19 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-003,Ajustes finais em andamento,2026-01-22 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-003,Aguardando peça de reposição,2026-01-24 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-003,Iniciada execução,2026-01-24 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-003,Solicitado suporte especializado,2026-01-27 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-004,Pendência criada,2026-01-08 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-004,Aguardando aprovação do supervisor,2026-01-12 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-004,Ajustes finais em andamento,2026-01-16 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-004,Atribuída para técnico,2026-01-17 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-004,Identificado problema adicional,2026-01-19 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-005,Pendência criada,2026-01-06 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-005,Atribuída para técnico,2026-01-06 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-005,Primeira inspeção concluída,2026-01-08 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-005,Atribuída para técnico,2026-01-23 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-005,Ajustes finais em andamento,2026-01-23 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-005,Teste realizado com sucesso,2026-01-29 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-005,Ajustes finais em andamento,2026-02-02 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-006,Pendência criada,2026-01-28 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-006,Atribuída para técnico,2026-01-30 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-006,Solicitado suporte especializado,2026-01-31 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-006,Iniciada execução,2026-02-01 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-007,Pendência criada,2025-11-19 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-007,Identificado problema adicional,2025-11-21 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-007,Aguardando peça de reposição,2025-11-27 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-007,"Peça recebida, retomando trabalho",2025-12-02 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-008,Pendência criada,2025-11-01 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-008,Aguardando peça de reposição,2025-11-27 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-008,Aguardando peça de reposição,2025-12-08 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-008,Equipamento liberado para operação,2025-12-14 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-008,"Peça recebida, retomando trabalho",2026-01-06 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-008,Concluída com sucesso,2026-01-10 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-009,Pendência criada,2025-11-28 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-009,Iniciada execução,2025-12-07 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-009,Atribuída para técnico,2025-12-08 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-010,Pendência criada,2025-12-24 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-010,"Peça recebida, retomando trabalho",2025-12-28 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-010,Ajustes finais em andamento,2026-01-03 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-010,Equipamento liberado para operação,2026-01-09 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-010,Documentação atualizada,2026-01-10 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-010,Teste realizado com sucesso,2026-01-15 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-010,Concluída com sucesso,2026-01-15 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-011,Pendência criada,2025-09-28 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-011,Identificado problema adicional,2025-10-10 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-011,Treinamento da equipe realizado,2025-11-12 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-011,Primeira inspeção concluída,2025-11-13 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-012,Pendência criada,2025-12-12 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-012,Identificado problema adicional,2025-12-12 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-012,Primeira inspeção concluída,2025-12-15 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-012,Concluída com sucesso,2025-12-22 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-013,Pendência criada,2025-10-14 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-013,Equipamento liberado para operação,2025-10-16 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-013,Primeira inspeção concluída,2025-10-19 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-013,Aguardando peça de reposição,2025-10-23 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-013,Treinamento da equipe realizado,2025-10-27 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-013,Primeira inspeção concluída,2025-10-28 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-013,Equipamento liberado para operação,2025-11-01 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-014,Pendência criada,2025-09-13 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-014,Aguardando peça de reposição,2025-10-03 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-014,Documentação atualizada,2025-10-08 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-014,Concluída com sucesso,2025-10-08 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-015,Pendência criada,2025-11-23 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-015,"Peça recebida, retomando trabalho",2025-11-23 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-015,Ajustes finais em andamento,2025-11-24 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-015,Ajustes finais em andamento,2025-11-25 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-015,Solicitado suporte especializado,2025-11-26 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-015,Teste realizado com sucesso,2025-11-27 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-015,Concluída com sucesso,2025-11-28 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-016,Pendência criada,2025-12-26 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-016,Solicitado suporte especializado,2025-12-29 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-016,"Peça recebida, retomando trabalho",2025-12-30 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-016,Concluída com sucesso,2026-01-03 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-017,Pendência criada,2025-12-29 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-017,Identificado problema adicional,2025-12-30 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-017,Treinamento da equipe realizado,2026-01-04 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-017,Documentação atualizada,2026-01-04 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-017,Ajustes finais em andamento,2026-01-05 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-017,Primeira inspeção concluída,2026-01-05 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-018,Pendência criada,2025-12-22 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-018,Aguardando peça de reposição,2026-01-08 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-018,Concluída com sucesso,2026-01-14 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-019,Pendência criada,2025-09-24 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-019,Ajustes finais em andamento,2025-10-10 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-019,Primeira inspeção concluída,2026-01-04 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-019,Concluída com sucesso,2026-01-15 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-020,Pendência criada,2025-11-20 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-020,Identificado problema adicional,2025-11-20 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-020,Treinamento da equipe realizado,2025-11-26 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-020,Identificado problema adicional,2025-12-30 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-020,Iniciada execução,2026-01-17 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-020,Documentação atualizada,2026-01-25 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-021,Pendência criada,2025-12-01 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-021,Primeira inspeção concluída,2025-12-05 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-021,"Peça recebida, retomando trabalho",2025-12-06 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-021,Aguardando aprovação do supervisor,2025-12-14 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-021,Treinamento da equipe realizado,2025-12-14 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-021,Aguardando aprovação do supervisor,2025-12-19 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-021,Concluída com sucesso,2025-12-23 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-022,Pendência criada,2025-08-29 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-022,Ajustes finais em andamento,2025-09-03 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-022,Atribuída para técnico,2025-09-22 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-022,Equipamento liberado para operação,2025-10-01 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-023,Pendência criada,2025-12-22 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-023,Treinamento da equipe realizado,2025-12-27 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-023,Identificado problema adicional,2025-12-28 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-023,Atribuída para técnico,2025-12-30 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-023,Primeira inspeção concluída,2026-01-01 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-023,Iniciada execução,2026-01-01 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-023,Concluída com sucesso,2026-01-02 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-024,Pendência criada,2025-12-31 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-024,Aguardando peça de reposição,2025-12-31 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-024,Equipamento liberado para operação,2026-01-04 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-025,Pendência criada,2025-09-28 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-025,Ajustes finais em andamento,2025-10-21 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-025,Equipamento liberado para operação,2025-11-05 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-025,Ajustes finais em andamento,2025-11-26 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-025,Concluída com sucesso,2025-12-07 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-026,Pendência criada,2025-09-28 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-026,Identificado problema adicional,2025-10-19 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-026,Teste realizado com sucesso,2025-10-26 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-026,Teste realizado com sucesso,2025-11-10 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-026,Equipamento liberado para operação,2025-11-22 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-026,Identificado problema adicional,2025-11-24 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-027,Pendência criada,2025-11-08 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-027,Iniciada execução,2025-11-16 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-027,Primeira inspeção concluída,2025-11-25 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-027,Identificado problema adicional,2025-11-29 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-027,Treinamento da equipe realizado,2025-12-16 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-028,Pendência criada,2025-11-06 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-028,Aguardando peça de reposição,2025-11-30 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-028,Documentação atualizada,2025-12-12 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-028,"Peça recebida, retomando trabalho",2025-12-19 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-028,Identificado problema adicional,2025-12-29 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-029,Pendência criada,2025-10-27 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-029,Teste realizado com sucesso,2025-11-10 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-029,Documentação atualizada,2025-11-23 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-029,"Peça recebida, retomando trabalho",2025-11-28 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-029,Identificado problema adicional,2025-12-02 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-029,Aguardando aprovação do supervisor,2025-12-05 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-029,Solicitado suporte especializado,2025-12-06 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-030,Pendência criada,2025-10-14 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-030,Iniciada execução,2025-11-04 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-030,Ajustes finais em andamento,2025-11-21 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-031,Pendência criada,2025-12-26 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-031,Atribuída para técnico,2026-01-04 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-031,Atribuída para técnico,2026-01-14 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-032,Pendência criada,2025-12-02 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-032,Atribuída para técnico,2025-12-28 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-032,Primeira inspeção concluída,2026-01-06 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-032,Iniciada execução,2026-01-07 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-032,Iniciada execução,2026-01-13 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-032,Solicitado suporte especializado,2026-01-15 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-032,Ajustes finais em andamento,2026-01-30 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-033,Pendência criada,2025-10-02 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-033,Treinamento da equipe realizado,2025-10-17 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-033,Aguardando aprovação do supervisor,2025-11-03 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-034,Pendência criada,2025-09-27 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-034,Primeira inspeção concluída,2025-09-28 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-034,Iniciada execução,2025-09-30 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-035,Pendência criada,2025-09-15 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-035,Treinamento da equipe realizado,2025-09-15 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-035,Ajustes finais em andamento,2025-09-16 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-035,Teste realizado com sucesso,2025-09-17 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-035,Atribuída para técnico,2025-09-17 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-035,Aguardando aprovação do supervisor,2025-09-20 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-036,Pendência criada,2025-12-18 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-036,Treinamento da equipe realizado,2025-12-28 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-036,Equipamento liberado para operação,2026-01-10 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-037,Pendência criada,2025-12-08 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-037,Iniciada execução,2025-12-10 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-037,Equipamento liberado para operação,2025-12-18 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-037,Atribuída para técnico,2025-12-19 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-037,Documentação atualizada,2026-01-02 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-037,Solicitado suporte especializado,2026-01-20 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-038,Pendência criada,2026-01-25 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-038,Ajustes finais em andamento,2026-01-29 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-038,"Peça recebida, retomando trabalho",2026-01-30 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-038,Aguardando peça de reposição,2026-01-30 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-038,Identificado problema adicional,2026-02-01 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-038,Documentação atualizada,2026-02-02 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-039,Pendência criada,2025-12-14 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-039,Documentação atualizada,2025-12-15 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-039,Primeira inspeção concluída,2025-12-15 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-039,Identificado problema adicional,2025-12-16 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-039,Iniciada execução,2025-12-17 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-039,Aguardando aprovação do supervisor,2025-12-17 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-039,Aguardando peça de reposição,2025-12-21 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-040,Pendência criada,2025-10-16 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-040,Identificado problema adicional,2025-10-23 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-040,Concluída com sucesso,2025-10-27 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-041,Pendência criada,2025-10-21 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-041,Documentação atualizada,2025-10-21 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-041,Aguardando peça de reposição,2025-10-21 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-041,Treinamento da equipe realizado,2025-10-21 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-042,Pendência criada,2026-01-26 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-042,Teste realizado com sucesso,2026-01-26 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-042,Aguardando aprovação do supervisor,2026-01-31 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-042,Ajustes finais em andamento,2026-01-31 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-042,Documentação atualizada,2026-01-31 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-043,Pendência criada,2025-09-02 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-043,Documentação atualizada,2025-09-13 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-043,Atribuída para técnico,2025-10-08 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-043,Equipamento liberado para operação,2025-10-18 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-043,Ajustes finais em andamento,2025-11-05 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-043,Equipamento liberado para operação,2025-11-13 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-044,Pendência criada,2025-09-26 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-044,Treinamento da equipe realizado,2025-10-03 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-044,Equipamento liberado para operação,2025-10-14 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-044,Aguardando peça de reposição,2025-10-24 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-044,Solicitado suporte especializado,2025-11-08 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-044,Iniciada execução,2025-11-12 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-045,Pendência criada,2025-09-10 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-045,Aguardando aprovação do supervisor,2025-09-30 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-045,Solicitado suporte especializado,2025-11-10 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-045,Ajustes finais em andamento,2025-11-18 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-046,Pendência criada,2025-09-27 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-046,Treinamento da equipe realizado,2025-09-29 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-046,Documentação atualizada,2025-10-17 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-046,Identificado problema adicional,2025-11-15 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-046,Primeira inspeção concluída,2025-11-21 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-047,Pendência criada,2025-09-26 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-047,Iniciada execução,2025-10-20 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-047,Documentação atualizada,2025-10-27 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-047,Ajustes finais em andamento,2025-11-02 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-047,Solicitado suporte especializado,2025-11-02 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-047,Ajustes finais em andamento,2025-12-18 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-047,Identificado problema adicional,2025-12-25 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-048,Pendência criada,2026-01-21 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-048,Identificado problema adicional,2026-01-21 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-048,Equipamento liberado para operação,2026-01-24 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-048,Primeira inspeção concluída,2026-01-26 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-049,Pendência criada,2025-10-16 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-049,Documentação atualizada,2025-10-24 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos
-PEND-049,Treinamento da equipe realizado,2025-11-15 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-049,Treinamento da equipe realizado,2025-11-16 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-049,Equipamento liberado para operação,2025-12-21 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-049,Solicitado suporte especializado,2026-01-06 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira
-PEND-049,Equipamento liberado para operação,2026-01-08 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-050,Pendência criada,2025-12-05 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-050,"Peça recebida, retomando trabalho",2025-12-13 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza
-PEND-050,Equipamento liberado para operação,2025-12-14 18:30:37.000000,João Silva,atualizacao_manual,João Silva
-PEND-050,Ajustes finais em andamento,2025-12-14 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa
-PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:19:05.666533,BBB,edicao_descricao,Rodolfo J. Silva
-PEND-001,Responsável alterado de 'Rodolfo J. Silva' para 'BBB' por Rodolfo J. Silva,2026-02-10 20:19:05.666533,BBB,responsavel_mudanca,Rodolfo J. Silva
-PEND-001,Responsável alterado de 'BBB' para 'Rodolfo J. Silva' por Rodolfo J. Silva,2026-02-10 20:20:04.252398,Rodolfo J. Silva,responsavel_mudanca,Rodolfo J. Silva
-PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:22:23.836466,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva
-PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:27:38.864881,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva
-PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:32:39.475789,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva
-PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:37:41.776007,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva
-PEND-002,Responsável alterado de 'Ana Oliveira' para 'Márcio Pires' por Rodolfo J. Silva,2026-02-10 20:38:14.387193,Márcio Pires,responsavel_mudanca,Rodolfo J. Silva
-PEND-002,Status alterado de 'Bloqueado' para 'Em Andamento' por Rodolfo J. Silva,2026-02-10 20:38:14.387193,Márcio Pires,status_mudanca,Rodolfo J. Silva
-PEND-002,Status alterado de 'Em Andamento' para 'Pendente' por Rodolfo J. Silva: Necessario Aprovação para início do processo,2026-02-10 20:49:51.275180,Márcio Pires,status_mudanca,Rodolfo J. Silva
-PEND-051,Pendência criada,2026-02-10 20:51:37.825573,Rodolfo J. Silva,criacao,Rodolfo J. Silva
-PEND-003,Descrição editada por Rodolfo J. Silva,2026-02-10 21:21:10.716607,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva
-PEND-003,Responsável alterado de 'Carlos Souza' para 'Rodolfo J. Silva' por Rodolfo J. Silva,2026-02-10 21:21:10.716607,Rodolfo J. Silva,responsavel_mudanca,Rodolfo J. Silva
+pendencia_id,descricao,data,responsavel,tipo_evento,editado_por,observacoes
+PEND-001,Pendência criada,2025-08-31 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-001,Primeira inspeção concluída,2025-09-02 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-001,Primeira inspeção concluída,2025-09-10 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-001,Teste realizado com sucesso,2025-10-01 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-001,Identificado problema adicional,2025-10-05 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-002,Pendência criada,2025-10-11 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-002,Ajustes finais em andamento,2025-10-14 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-002,Documentação atualizada,2025-10-18 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-002,Primeira inspeção concluída,2025-11-04 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-003,Pendência criada,2026-01-02 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-003,Aguardando aprovação do supervisor,2026-01-02 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-003,Identificado problema adicional,2026-01-19 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-003,Ajustes finais em andamento,2026-01-22 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-003,Aguardando peça de reposição,2026-01-24 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-003,Iniciada execução,2026-01-24 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-003,Solicitado suporte especializado,2026-01-27 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-004,Pendência criada,2026-01-08 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-004,Aguardando aprovação do supervisor,2026-01-12 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-004,Ajustes finais em andamento,2026-01-16 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-004,Atribuída para técnico,2026-01-17 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-004,Identificado problema adicional,2026-01-19 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-005,Pendência criada,2026-01-06 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-005,Atribuída para técnico,2026-01-06 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-005,Primeira inspeção concluída,2026-01-08 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-005,Atribuída para técnico,2026-01-23 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-005,Ajustes finais em andamento,2026-01-23 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-005,Teste realizado com sucesso,2026-01-29 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-005,Ajustes finais em andamento,2026-02-02 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-006,Pendência criada,2026-01-28 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-006,Atribuída para técnico,2026-01-30 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-006,Solicitado suporte especializado,2026-01-31 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-006,Iniciada execução,2026-02-01 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-007,Pendência criada,2025-11-19 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-007,Identificado problema adicional,2025-11-21 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-007,Aguardando peça de reposição,2025-11-27 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-007,"Peça recebida, retomando trabalho",2025-12-02 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-008,Pendência criada,2025-11-01 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-008,Aguardando peça de reposição,2025-11-27 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-008,Aguardando peça de reposição,2025-12-08 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-008,Equipamento liberado para operação,2025-12-14 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-008,"Peça recebida, retomando trabalho",2026-01-06 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-008,Concluída com sucesso,2026-01-10 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-009,Pendência criada,2025-11-28 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-009,Iniciada execução,2025-12-07 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-009,Atribuída para técnico,2025-12-08 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-010,Pendência criada,2025-12-24 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-010,"Peça recebida, retomando trabalho",2025-12-28 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-010,Ajustes finais em andamento,2026-01-03 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-010,Equipamento liberado para operação,2026-01-09 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-010,Documentação atualizada,2026-01-10 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-010,Teste realizado com sucesso,2026-01-15 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-010,Concluída com sucesso,2026-01-15 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-011,Pendência criada,2025-09-28 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-011,Identificado problema adicional,2025-10-10 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-011,Treinamento da equipe realizado,2025-11-12 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-011,Primeira inspeção concluída,2025-11-13 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-012,Pendência criada,2025-12-12 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-012,Identificado problema adicional,2025-12-12 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-012,Primeira inspeção concluída,2025-12-15 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-012,Concluída com sucesso,2025-12-22 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-013,Pendência criada,2025-10-14 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-013,Equipamento liberado para operação,2025-10-16 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-013,Primeira inspeção concluída,2025-10-19 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-013,Aguardando peça de reposição,2025-10-23 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-013,Treinamento da equipe realizado,2025-10-27 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-013,Primeira inspeção concluída,2025-10-28 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-013,Equipamento liberado para operação,2025-11-01 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-014,Pendência criada,2025-09-13 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-014,Aguardando peça de reposição,2025-10-03 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-014,Documentação atualizada,2025-10-08 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-014,Concluída com sucesso,2025-10-08 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-015,Pendência criada,2025-11-23 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-015,"Peça recebida, retomando trabalho",2025-11-23 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-015,Ajustes finais em andamento,2025-11-24 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-015,Ajustes finais em andamento,2025-11-25 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-015,Solicitado suporte especializado,2025-11-26 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-015,Teste realizado com sucesso,2025-11-27 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-015,Concluída com sucesso,2025-11-28 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-016,Pendência criada,2025-12-26 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-016,Solicitado suporte especializado,2025-12-29 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-016,"Peça recebida, retomando trabalho",2025-12-30 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-016,Concluída com sucesso,2026-01-03 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-017,Pendência criada,2025-12-29 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-017,Identificado problema adicional,2025-12-30 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-017,Treinamento da equipe realizado,2026-01-04 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-017,Documentação atualizada,2026-01-04 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-017,Ajustes finais em andamento,2026-01-05 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-017,Primeira inspeção concluída,2026-01-05 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-018,Pendência criada,2025-12-22 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-018,Aguardando peça de reposição,2026-01-08 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-018,Concluída com sucesso,2026-01-14 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-019,Pendência criada,2025-09-24 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-019,Ajustes finais em andamento,2025-10-10 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-019,Primeira inspeção concluída,2026-01-04 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-019,Concluída com sucesso,2026-01-15 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-020,Pendência criada,2025-11-20 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-020,Identificado problema adicional,2025-11-20 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-020,Treinamento da equipe realizado,2025-11-26 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-020,Identificado problema adicional,2025-12-30 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-020,Iniciada execução,2026-01-17 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-020,Documentação atualizada,2026-01-25 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-021,Pendência criada,2025-12-01 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-021,Primeira inspeção concluída,2025-12-05 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-021,"Peça recebida, retomando trabalho",2025-12-06 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-021,Aguardando aprovação do supervisor,2025-12-14 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-021,Treinamento da equipe realizado,2025-12-14 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-021,Aguardando aprovação do supervisor,2025-12-19 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-021,Concluída com sucesso,2025-12-23 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-022,Pendência criada,2025-08-29 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-022,Ajustes finais em andamento,2025-09-03 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-022,Atribuída para técnico,2025-09-22 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-022,Equipamento liberado para operação,2025-10-01 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-023,Pendência criada,2025-12-22 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-023,Treinamento da equipe realizado,2025-12-27 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-023,Identificado problema adicional,2025-12-28 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-023,Atribuída para técnico,2025-12-30 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-023,Primeira inspeção concluída,2026-01-01 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-023,Iniciada execução,2026-01-01 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-023,Concluída com sucesso,2026-01-02 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-024,Pendência criada,2025-12-31 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-024,Aguardando peça de reposição,2025-12-31 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-024,Equipamento liberado para operação,2026-01-04 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-025,Pendência criada,2025-09-28 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-025,Ajustes finais em andamento,2025-10-21 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-025,Equipamento liberado para operação,2025-11-05 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-025,Ajustes finais em andamento,2025-11-26 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-025,Concluída com sucesso,2025-12-07 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-026,Pendência criada,2025-09-28 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-026,Identificado problema adicional,2025-10-19 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-026,Teste realizado com sucesso,2025-10-26 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-026,Teste realizado com sucesso,2025-11-10 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-026,Equipamento liberado para operação,2025-11-22 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-026,Identificado problema adicional,2025-11-24 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-027,Pendência criada,2025-11-08 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-027,Iniciada execução,2025-11-16 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-027,Primeira inspeção concluída,2025-11-25 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-027,Identificado problema adicional,2025-11-29 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-027,Treinamento da equipe realizado,2025-12-16 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-028,Pendência criada,2025-11-06 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-028,Aguardando peça de reposição,2025-11-30 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-028,Documentação atualizada,2025-12-12 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-028,"Peça recebida, retomando trabalho",2025-12-19 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-028,Identificado problema adicional,2025-12-29 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-029,Pendência criada,2025-10-27 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-029,Teste realizado com sucesso,2025-11-10 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-029,Documentação atualizada,2025-11-23 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-029,"Peça recebida, retomando trabalho",2025-11-28 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-029,Identificado problema adicional,2025-12-02 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-029,Aguardando aprovação do supervisor,2025-12-05 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-029,Solicitado suporte especializado,2025-12-06 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-030,Pendência criada,2025-10-14 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-030,Iniciada execução,2025-11-04 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-030,Ajustes finais em andamento,2025-11-21 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-031,Pendência criada,2025-12-26 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-031,Atribuída para técnico,2026-01-04 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-031,Atribuída para técnico,2026-01-14 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-032,Pendência criada,2025-12-02 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-032,Atribuída para técnico,2025-12-28 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-032,Primeira inspeção concluída,2026-01-06 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-032,Iniciada execução,2026-01-07 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-032,Iniciada execução,2026-01-13 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-032,Solicitado suporte especializado,2026-01-15 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-032,Ajustes finais em andamento,2026-01-30 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-033,Pendência criada,2025-10-02 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-033,Treinamento da equipe realizado,2025-10-17 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-033,Aguardando aprovação do supervisor,2025-11-03 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-034,Pendência criada,2025-09-27 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-034,Primeira inspeção concluída,2025-09-28 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-034,Iniciada execução,2025-09-30 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-035,Pendência criada,2025-09-15 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-035,Treinamento da equipe realizado,2025-09-15 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-035,Ajustes finais em andamento,2025-09-16 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-035,Teste realizado com sucesso,2025-09-17 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-035,Atribuída para técnico,2025-09-17 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-035,Aguardando aprovação do supervisor,2025-09-20 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-036,Pendência criada,2025-12-18 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-036,Treinamento da equipe realizado,2025-12-28 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-036,Equipamento liberado para operação,2026-01-10 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-037,Pendência criada,2025-12-08 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-037,Iniciada execução,2025-12-10 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-037,Equipamento liberado para operação,2025-12-18 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-037,Atribuída para técnico,2025-12-19 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-037,Documentação atualizada,2026-01-02 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-037,Solicitado suporte especializado,2026-01-20 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-038,Pendência criada,2026-01-25 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-038,Ajustes finais em andamento,2026-01-29 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-038,"Peça recebida, retomando trabalho",2026-01-30 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-038,Aguardando peça de reposição,2026-01-30 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-038,Identificado problema adicional,2026-02-01 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-038,Documentação atualizada,2026-02-02 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-039,Pendência criada,2025-12-14 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-039,Documentação atualizada,2025-12-15 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-039,Primeira inspeção concluída,2025-12-15 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-039,Identificado problema adicional,2025-12-16 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-039,Iniciada execução,2025-12-17 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-039,Aguardando aprovação do supervisor,2025-12-17 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-039,Aguardando peça de reposição,2025-12-21 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-040,Pendência criada,2025-10-16 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-040,Identificado problema adicional,2025-10-23 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-040,Concluída com sucesso,2025-10-27 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-041,Pendência criada,2025-10-21 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-041,Documentação atualizada,2025-10-21 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-041,Aguardando peça de reposição,2025-10-21 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-041,Treinamento da equipe realizado,2025-10-21 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-042,Pendência criada,2026-01-26 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-042,Teste realizado com sucesso,2026-01-26 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-042,Aguardando aprovação do supervisor,2026-01-31 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-042,Ajustes finais em andamento,2026-01-31 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-042,Documentação atualizada,2026-01-31 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-043,Pendência criada,2025-09-02 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-043,Documentação atualizada,2025-09-13 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-043,Atribuída para técnico,2025-10-08 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-043,Equipamento liberado para operação,2025-10-18 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-043,Ajustes finais em andamento,2025-11-05 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-043,Equipamento liberado para operação,2025-11-13 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-044,Pendência criada,2025-09-26 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-044,Treinamento da equipe realizado,2025-10-03 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-044,Equipamento liberado para operação,2025-10-14 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-044,Aguardando peça de reposição,2025-10-24 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-044,Solicitado suporte especializado,2025-11-08 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-044,Iniciada execução,2025-11-12 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-045,Pendência criada,2025-09-10 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-045,Aguardando aprovação do supervisor,2025-09-30 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-045,Solicitado suporte especializado,2025-11-10 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-045,Ajustes finais em andamento,2025-11-18 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-046,Pendência criada,2025-09-27 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-046,Treinamento da equipe realizado,2025-09-29 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-046,Documentação atualizada,2025-10-17 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-046,Identificado problema adicional,2025-11-15 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-046,Primeira inspeção concluída,2025-11-21 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-047,Pendência criada,2025-09-26 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-047,Iniciada execução,2025-10-20 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-047,Documentação atualizada,2025-10-27 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-047,Ajustes finais em andamento,2025-11-02 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-047,Solicitado suporte especializado,2025-11-02 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-047,Ajustes finais em andamento,2025-12-18 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-047,Identificado problema adicional,2025-12-25 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-048,Pendência criada,2026-01-21 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-048,Identificado problema adicional,2026-01-21 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-048,Equipamento liberado para operação,2026-01-24 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-048,Primeira inspeção concluída,2026-01-26 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-049,Pendência criada,2025-10-16 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-049,Documentação atualizada,2025-10-24 18:30:37.000000,Maria Santos,atualizacao_manual,Maria Santos,
+PEND-049,Treinamento da equipe realizado,2025-11-15 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-049,Treinamento da equipe realizado,2025-11-16 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-049,Equipamento liberado para operação,2025-12-21 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-049,Solicitado suporte especializado,2026-01-06 18:30:37.000000,Ana Oliveira,atualizacao_manual,Ana Oliveira,
+PEND-049,Equipamento liberado para operação,2026-01-08 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-050,Pendência criada,2025-12-05 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-050,"Peça recebida, retomando trabalho",2025-12-13 18:30:37.000000,Carlos Souza,atualizacao_manual,Carlos Souza,
+PEND-050,Equipamento liberado para operação,2025-12-14 18:30:37.000000,João Silva,atualizacao_manual,João Silva,
+PEND-050,Ajustes finais em andamento,2025-12-14 18:30:37.000000,Pedro Costa,atualizacao_manual,Pedro Costa,
+PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:19:05.666533,BBB,edicao_descricao,Rodolfo J. Silva,
+PEND-001,Responsável alterado de 'Rodolfo J. Silva' para 'BBB' por Rodolfo J. Silva,2026-02-10 20:19:05.666533,BBB,responsavel_mudanca,Rodolfo J. Silva,
+PEND-001,Responsável alterado de 'BBB' para 'Rodolfo J. Silva' por Rodolfo J. Silva,2026-02-10 20:20:04.252398,Rodolfo J. Silva,responsavel_mudanca,Rodolfo J. Silva,
+PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:22:23.836466,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva,
+PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:27:38.864881,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva,
+PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:32:39.475789,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva,
+PEND-001,Descrição editada por Rodolfo J. Silva,2026-02-10 20:37:41.776007,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva,
+PEND-002,Responsável alterado de 'Ana Oliveira' para 'Márcio Pires' por Rodolfo J. Silva,2026-02-10 20:38:14.387193,Márcio Pires,responsavel_mudanca,Rodolfo J. Silva,
+PEND-002,Status alterado de 'Bloqueado' para 'Em Andamento' por Rodolfo J. Silva,2026-02-10 20:38:14.387193,Márcio Pires,status_mudanca,Rodolfo J. Silva,
+PEND-002,Status alterado de 'Em Andamento' para 'Pendente' por Rodolfo J. Silva: Necessario Aprovação para início do processo,2026-02-10 20:49:51.275180,Márcio Pires,status_mudanca,Rodolfo J. Silva,
+PEND-051,Pendência criada,2026-02-10 20:51:37.825573,Rodolfo J. Silva,criacao,Rodolfo J. Silva,
+PEND-003,Descrição editada por Rodolfo J. Silva,2026-02-10 21:21:10.716607,Rodolfo J. Silva,edicao_descricao,Rodolfo J. Silva,
+PEND-003,Responsável alterado de 'Carlos Souza' para 'Rodolfo J. Silva' por Rodolfo J. Silva,2026-02-10 21:21:10.716607,Rodolfo J. Silva,responsavel_mudanca,Rodolfo J. Silva,
+PEND-001,Revisão técnica concluída,2026-02-11 21:05:37.483427,Rodolfo J. Silva,atualizacao_workflow,Rodolfo J. Silva,Observação Teste
+PEND-002,Aguardando peça do fornecedor,2026-02-11 21:07:06.420449,Renata Costa,atualizacao_workflow,Rodolfo J. Silva,"Alterado para Renata para aprovação
+Aprovação necessária pelo item a
+Item b necessita laudo
+Item c falta fornecedor faturar"

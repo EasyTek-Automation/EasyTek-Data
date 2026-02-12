@@ -58,15 +58,40 @@ def edit_pendencia_modal():
                 className="mb-3"
             ),
 
-            # Campo: Observações (opcional)
-            html.Label("Observações (opcional):", className="fw-bold mb-1"),
+            # Campo: Tipo de Evento (dropdown pré-determinado)
+            html.Label("Tipo de Evento:", className="fw-bold mb-1"),
+            dcc.Dropdown(
+                id="edit-pend-tipo-evento",
+                options=[
+                    {"label": "Primeira inspeção concluída", "value": "Primeira inspeção concluída"},
+                    {"label": "Teste realizado com sucesso", "value": "Teste realizado com sucesso"},
+                    {"label": "Aguardando peça do fornecedor", "value": "Aguardando peça do fornecedor"},
+                    {"label": "Manutenção preventiva realizada", "value": "Manutenção preventiva realizada"},
+                    {"label": "Problema identificado", "value": "Problema identificado"},
+                    {"label": "Solução implementada", "value": "Solução implementada"},
+                    {"label": "Revisão técnica concluída", "value": "Revisão técnica concluída"},
+                    {"label": "Documentação atualizada", "value": "Documentação atualizada"},
+                    {"label": "Treinamento realizado", "value": "Treinamento realizado"},
+                    {"label": "Validação em andamento", "value": "Validação em andamento"},
+                ],
+                placeholder="Selecione o tipo de evento",
+                clearable=False,
+                className="mb-3"
+            ),
+            html.Small("Selecione o evento que descreve esta atualização no workflow.",
+                      className="text-muted d-block mb-3"),
+
+            # Campo: Observações (OBRIGATÓRIO)
+            html.Label("Observações:", className="fw-bold mb-1"),
+            html.Span("*", className="text-danger ms-1"),
             dbc.Textarea(
                 id="edit-pend-observacoes",
-                placeholder="Justifique as mudanças realizadas (ex: 'Aguardando peça do fornecedor', 'Concluído teste inicial')...",
+                placeholder="Detalhe as ações realizadas, justificativas ou informações relevantes...",
                 className="mb-2",
-                rows=3
+                rows=3,
+                required=True
             ),
-            html.Small("Use este campo para explicar o motivo das alterações. Aparecerá no histórico.",
+            html.Small("Campo obrigatório. Descreva detalhes sobre esta atualização.",
                       className="text-muted d-block mb-3"),
 
             # Área de alerta

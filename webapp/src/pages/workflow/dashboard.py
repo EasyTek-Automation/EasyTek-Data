@@ -208,10 +208,11 @@ def criar_painel_filtros():
 
 def criar_timeline_historico(historico_items):
     """
-    Cria uma timeline visual do histórico da pendência.
+    Cria uma timeline visual do histórico da pendência com observações em balão de chat.
 
     Args:
         historico_items: Lista de dicts com o histórico
+            Cada item deve conter: descricao (título), observacoes, responsavel, data
 
     Returns:
         html.Div: Timeline do histórico
@@ -225,6 +226,24 @@ def criar_timeline_historico(historico_items):
         # Última item não tem linha vertical
         is_last = (i == len(historico_items) - 1)
 
+        # Observações (se existir)
+        observacoes_content = None
+        if item.get('observacoes') and item['observacoes'].strip():
+            observacoes_content = dbc.Card([
+                dbc.CardBody([
+                    html.I(className="fas fa-comment-dots me-2 text-muted"),
+                    html.Span(
+                        item['observacoes'],
+                        className="text-dark",
+                        style={"whiteSpace": "pre-line"}  # Preserva quebras de linha
+                    )
+                ], className="py-2 px-3")
+            ], className="mb-2 shadow-sm", style={
+                "backgroundColor": "#f8f9fa",
+                "borderLeft": "4px solid #007bff",
+                "borderRadius": "8px"
+            })
+
         timeline_items.append(
             html.Div([
                 # Coluna esquerda: bolinha + linha
@@ -234,16 +253,22 @@ def criar_timeline_historico(historico_items):
                     html.Div(className="bg-secondary" if not is_last else "",
                              style={"width": "2px", "height": "100%", "marginLeft": "5px"} if not is_last else {})
                 ], style={"display": "flex", "flexDirection": "column", "alignItems": "center",
-                         "marginRight": "15px", "minHeight": "60px"}),
+                         "marginRight": "15px", "minHeight": "80px"}),
 
                 # Coluna direita: conteúdo
                 html.Div([
-                    html.Div(item['descricao'], className="fw-bold mb-1"),
+                    # Título do evento em negrito
+                    html.Div(item['descricao'], className="fw-bold mb-2", style={"fontSize": "1.05rem"}),
+
+                    # Card com observações (balão de chat)
+                    observacoes_content if observacoes_content else html.Div(),
+
+                    # Nome do responsável e data
                     html.Small([
                         html.Span(item['responsavel'], className="text-muted me-3"),
                         html.Span(item['data'], className="text-muted")
                     ])
-                ], style={"flex": "1", "paddingBottom": "20px"})
+                ], style={"flex": "1", "paddingBottom": "25px"})
             ], style={"display": "flex"})
         )
 

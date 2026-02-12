@@ -31,7 +31,7 @@ def carregar_historico():
     if not HISTORICO_CSV.exists():
         return pd.DataFrame(columns=[
             'pendencia_id', 'descricao', 'data', 'responsavel',
-            'tipo_evento', 'editado_por'
+            'tipo_evento', 'editado_por', 'observacoes'
         ])
 
     df = pd.read_csv(HISTORICO_CSV)
@@ -102,11 +102,12 @@ def criar_pendencia(descricao, responsavel, status, criado_por, criado_por_perfi
         # Adicionar entrada no histórico
         nova_hist = {
             'pendencia_id': novo_id,
-            'descricao': 'Pendência criada',
+            'descricao': 'Início Workflow',
             'data': agora,
             'responsavel': responsavel,
             'tipo_evento': 'criacao',
-            'editado_por': criado_por
+            'editado_por': criado_por,
+            'observacoes': f'Pendência criada e atribuída a {responsavel}'
         }
 
         df_hist = pd.concat([df_hist, pd.DataFrame([nova_hist])], ignore_index=True)
@@ -120,9 +121,9 @@ def criar_pendencia(descricao, responsavel, status, criado_por, criado_por_perfi
 
 def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
                      descricao_original, responsavel_original, status_original,
-                     editado_por, observacoes=None):
+                     editado_por, tipo_evento, observacoes):
     """
-    Edita pendência existente e adiciona entradas no histórico.
+    Edita pendência existente e adiciona entrada no histórico.
 
     Args:
         pend_id: ID da pendência
@@ -133,7 +134,8 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
         responsavel_original: Responsável antes da edição
         status_original: Status antes da edição
         editado_por: Username de quem está editando
-        observacoes: Observações/justificativa das mudanças (opcional)
+        tipo_evento: Tipo de evento (título do histórico) - OBRIGATÓRIO
+        observacoes: Detalhes/observações da atualização - OBRIGATÓRIO
 
     Returns:
         tuple: (sucesso: bool, mensagem: str)
@@ -149,47 +151,20 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
             return False, "Pendência não encontrada"
 
         idx = idx[0]
-        mudancas = []
+        houve_mudanca = False
 
-        # Verificar mudanças e criar entradas de histórico
-        # Sufixo de observações (se fornecido)
-        obs_suffix = f": {observacoes}" if observacoes else ""
-
+        # Aplicar mudanças nos campos (se houver)
         if nova_descricao and nova_descricao != descricao_original:
             df_pend.at[idx, 'descricao'] = nova_descricao
-            mudancas.append({
-                'pendencia_id': pend_id,
-                'descricao': f'Descrição editada por {editado_por}{obs_suffix}',
-                'data': agora,
-                'responsavel': novo_responsavel or responsavel_original,
-                'tipo_evento': 'edicao_descricao',
-                'editado_por': editado_por
-            })
+            houve_mudanca = True
 
         if novo_responsavel and novo_responsavel != responsavel_original:
             df_pend.at[idx, 'responsavel'] = novo_responsavel
-            mudancas.append({
-                'pendencia_id': pend_id,
-                'descricao': f"Responsável alterado de '{responsavel_original}' para '{novo_responsavel}' por {editado_por}{obs_suffix}",
-                'data': agora,
-                'responsavel': novo_responsavel,
-                'tipo_evento': 'responsavel_mudanca',
-                'editado_por': editado_por
-            })
+            houve_mudanca = True
 
         if novo_status and novo_status != status_original:
             df_pend.at[idx, 'status'] = novo_status
-            mudancas.append({
-                'pendencia_id': pend_id,
-                'descricao': f"Status alterado de '{status_original}' para '{novo_status}' por {editado_por}{obs_suffix}",
-                'data': agora,
-                'responsavel': novo_responsavel or responsavel_original,
-                'tipo_evento': 'status_mudanca',
-                'editado_por': editado_por
-            })
-
-        if not mudancas:
-            return False, "Nenhuma alteração detectada"
+            houve_mudanca = True
 
         # Atualizar metadata
         df_pend.at[idx, 'ultima_atualizacao'] = agora
@@ -199,11 +174,22 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
         # Salvar pendências
         df_pend.to_csv(PENDENCIAS_CSV, index=False)
 
-        # Adicionar mudanças ao histórico
-        df_hist = pd.concat([df_hist, pd.DataFrame(mudancas)], ignore_index=True)
+        # SEMPRE adicionar entrada no histórico com tipo_evento e observações
+        nova_entrada_historico = {
+            'pendencia_id': pend_id,
+            'descricao': tipo_evento,  # Título do evento (ex: "Primeira inspeção concluída")
+            'data': agora,
+            'responsavel': novo_responsavel or responsavel_original,
+            'tipo_evento': 'atualizacao_workflow',
+            'editado_por': editado_por,
+            'observacoes': observacoes  # Detalhes da atualização
+        }
+
+        df_hist = pd.concat([df_hist, pd.DataFrame([nova_entrada_historico])], ignore_index=True)
         df_hist.to_csv(HISTORICO_CSV, index=False)
 
-        return True, f"{len(mudancas)} alteração(ões) salva(s) com sucesso"
+        msg_mudanca = " (com alterações nos campos)" if houve_mudanca else ""
+        return True, f"Atualização registrada com sucesso{msg_mudanca}"
 
     except Exception as e:
         return False, str(e)

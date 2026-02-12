@@ -23,6 +23,7 @@ def register_edit_callbacks(app):
             Output("edit-pend-descricao", "value"),
             Output("edit-pend-responsavel", "value"),
             Output("edit-pend-status", "value"),
+            Output("edit-pend-tipo-evento", "value"),
             Output("edit-pend-observacoes", "value"),
             Output("edit-pend-original-data", "data"),
             Output("edit-pend-alert", "children")
@@ -48,9 +49,9 @@ def register_edit_callbacks(app):
 
         trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
-        # Fechar modal (limpar observações também)
+        # Fechar modal (limpar todos os campos)
         if "cancel" in trigger_id or "submit" in trigger_id:
-            return False, "", "", None, None, "", None, ""
+            return False, "", "", None, None, None, "", None, ""
 
         # Verificar se é um clique válido nos botões de editar
         # (n_clicks deve ser > 0 e não None)
@@ -66,7 +67,7 @@ def register_edit_callbacks(app):
             pend = df_pend[df_pend['id'] == pend_id]
 
             if pend.empty:
-                return False, "", "", None, None, "", None, dbc.Alert(
+                return False, "", "", None, None, None, "", None, dbc.Alert(
                     "Pendência não encontrada", color="danger"
                 )
 
@@ -74,7 +75,7 @@ def register_edit_callbacks(app):
 
             # VALIDAÇÃO RBAC: Responsável ou Nível 3
             if pend['responsavel'] != username and user_level != 3:
-                return False, "", "", None, None, "", None, dbc.Alert([
+                return False, "", "", None, None, None, "", None, dbc.Alert([
                     html.I(className="fas fa-shield-x me-2"),
                     "PERMISSÃO NEGADA: Apenas o responsável ou admins podem editar"
                 ], color="danger", dismissable=True)
@@ -93,7 +94,8 @@ def register_edit_callbacks(app):
                 pend['descricao'],
                 pend['responsavel'],
                 pend['status'],
-                "",  # Observações sempre vazio ao abrir
+                None,  # Tipo evento sempre vazio ao abrir
+                "",    # Observações sempre vazio ao abrir
                 original_data,
                 ""
             )
@@ -143,6 +145,7 @@ def register_edit_callbacks(app):
             State("edit-pend-descricao", "value"),
             State("edit-pend-responsavel", "value"),
             State("edit-pend-status", "value"),
+            State("edit-pend-tipo-evento", "value"),
             State("edit-pend-observacoes", "value"),
             State("edit-pend-original-data", "data"),
             State("user-level-store", "data"),
@@ -151,7 +154,7 @@ def register_edit_callbacks(app):
         ],
         prevent_initial_call=True
     )
-    def salvar_edicao_pendencia(n_clicks, nova_desc, novo_resp, novo_status, observacoes,
+    def salvar_edicao_pendencia(n_clicks, nova_desc, novo_resp, novo_status, tipo_evento, observacoes,
                                 original_data, user_level, user_perfil, username):
         """Valida e salva edições da pendência."""
         if not n_clicks or not original_data:
@@ -159,13 +162,20 @@ def register_edit_callbacks(app):
 
         pend_id = original_data["id"]
 
-        # VALIDAÇÃO 1: Campos obrigatórios
-        if not all([nova_desc, novo_resp, novo_status]):
+        # VALIDAÇÃO 1: Campos obrigatórios (incluindo tipo_evento e observações)
+        if not all([nova_desc, novo_resp, novo_status, tipo_evento, observacoes]):
+            campos_faltantes = []
+            if not nova_desc: campos_faltantes.append("Descrição")
+            if not novo_resp: campos_faltantes.append("Responsável")
+            if not novo_status: campos_faltantes.append("Status")
+            if not tipo_evento: campos_faltantes.append("Tipo de Evento")
+            if not observacoes or not observacoes.strip(): campos_faltantes.append("Observações")
+
             return (
                 True,  # Modal continua aberto
                 dbc.Alert([
                     html.I(className="fas fa-exclamation-triangle me-2"),
-                    "Todos os campos são obrigatórios"
+                    f"Campos obrigatórios faltando: {', '.join(campos_faltantes)}"
                 ], color="warning", dismissable=True),
                 no_update,  # Sem alerta no container principal
                 no_update,  # Tabela não muda
@@ -209,7 +219,8 @@ def register_edit_callbacks(app):
             responsavel_original=original_data["responsavel"],
             status_original=original_data["status"],
             editado_por=username,
-            observacoes=observacoes.strip() if observacoes else None
+            tipo_evento=tipo_evento,
+            observacoes=observacoes.strip()
         )
 
         if sucesso:

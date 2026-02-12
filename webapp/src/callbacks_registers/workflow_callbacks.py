@@ -47,6 +47,7 @@ def criar_conteudo_historico(pendencia_id, df_historico):
     for _, row in historico_pendencia.iterrows():
         historico_items.append({
             'descricao': row['descricao'],
+            'observacoes': row.get('observacoes', ''),  # Observações (pode não existir em registros antigos)
             'responsavel': row['responsavel'],
             'data': row['data'].strftime("%d/%m/%Y %H:%M")
         })
