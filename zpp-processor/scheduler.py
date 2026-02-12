@@ -106,11 +106,22 @@ class ZPPScheduler:
         """
         Executa processamento automático
         """
+        # Verificar se há arquivos antes de processar
+        from cleaner import find_excel_files
+        files_to_process = find_excel_files(config.INPUT_DIR)
+
+        if not files_to_process:
+            logger.info("[Scheduler] Nenhum arquivo para processar - pulando execução")
+            # Atualizar timestamp mesmo sem processar
+            self.last_run = datetime.now()
+            return
+
         job_id = generate_job_id()
 
         logger.info(f"\n{'='*80}")
         logger.info(f"[Scheduler] Processamento Automático Iniciado")
         logger.info(f"Job ID: {job_id}")
+        logger.info(f"Arquivos encontrados: {len(files_to_process)}")
         logger.info(f"{'='*80}\n")
 
         # Criar log inicial
@@ -145,8 +156,8 @@ class ZPPScheduler:
             log_update = update_processing_log(
                 current_log=log_doc,
                 files_processed=results,
-                status="success" if results else "failed",
-                error_message=None if results else "Nenhum arquivo encontrado"
+                status="success",
+                error_message=None
             )
 
             self.db[config.LOGS_COLLECTION].update_one(
