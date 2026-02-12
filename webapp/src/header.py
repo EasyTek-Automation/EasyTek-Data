@@ -119,6 +119,14 @@ def create_header(pathname, user):
                     html.Div([html.Span(clipboard_icon(), style={"marginRight": "8px"}), "Procedimentos"], className="d-flex align-items-center"),
                     href="/maintenance/procedures", active=(pathname == "/maintenance/procedures"),
                 ),
+                dbc.DropdownMenuItem(
+                    html.Div([
+                        html.Span(html.I(className="bi bi-file-earmark-spreadsheet me-2")),
+                        "Processamento ZPP"
+                    ], className="d-flex align-items-center"),
+                    href="/maintenance/zpp-processor",
+                    active=(pathname == "/maintenance/zpp-processor")
+                ),
                 dbc.DropdownMenuItem(divider=True),
                 dbc.DropdownMenuItem(
                     html.Div([html.Span(history_icon(), style={"marginRight": "8px"}), "Histórico de Intervenções"], className="d-flex align-items-center"),

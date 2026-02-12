@@ -132,6 +132,12 @@ ROUTE_ACCESS = {
         "min_level": 1,
         "description": "Procedimentos de Manutenção"
     },
+    "/maintenance/zpp-processor": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 2,  # Nível 2+ (avançado)
+        "description": "Processamento de Planilhas ZPP"
+    },
 
     # ========================================
     # PRODUÇÃO

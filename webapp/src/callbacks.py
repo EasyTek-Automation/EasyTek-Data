@@ -34,6 +34,7 @@ from src.callbacks_registers.energy_sidebar_callbacks import register_energy_sid
 from src.callbacks_registers.procedures_collapse_callbacks import register_procedures_collapse_callbacks
 from src.callbacks_registers.maintenance_kpi_callbacks import register_maintenance_kpi_callbacks
 from src.callbacks_registers.maintenance_config_callbacks import register_maintenance_config_callbacks
+from src.callbacks_registers.zpp_processor_callbacks import register_zpp_processor_callbacks
 from src.callbacks_registers.database_error_callbacks import register_database_error_callbacks
 from src.callbacks_registers.workflow_callbacks import register_workflow_callbacks
 from src.callbacks_registers.workflow_create_callbacks import register_create_callbacks
@@ -110,6 +111,9 @@ def register_callbacks(app):
 
     # Maintenance configuration callbacks
     register_maintenance_config_callbacks(app)
+
+    # ZPP Processor callbacks
+    register_zpp_processor_callbacks(app)
 
     # Workflow callbacks
     register_workflow_callbacks(app)

@@ -81,12 +81,22 @@ print("="*80)
 print("""
 Os índices antigos foram removidos com sucesso.
 
-PRÓXIMO PASSO:
-Execute novamente o processamento com:
-  python process_zpp_quick.py
+PRÓXIMOS PASSOS:
+1. Via Interface Web:
+   - Acesse: http://localhost:8050/maintenance/zpp-processor
+   - Clique em "Processar Agora"
 
-O script irá criar automaticamente os índices corretos com os
-nomes de campos normalizados.
+2. Via API:
+   - POST http://localhost:5002/api/zpp/process
+
+3. Via Script (se zpp-processor estiver rodando):
+   - curl -X POST http://localhost:5002/api/zpp/process
+
+O serviço zpp-processor irá criar automaticamente os índices corretos
+com os nomes de campos normalizados.
+
+NOTA: Os scripts process_zpp_quick.py e process_zpp_to_mongo.py foram
+descontinuados. Use o novo sistema containerizado.
 """)
 print("="*80)
 
