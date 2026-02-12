@@ -154,11 +154,11 @@ def create_header(pathname, user):
 
                 dbc.DropdownMenuItem(divider=True),
 
-                # Workflow - Gestão de Pendências
+                # Workflow - AMG WorkFlow
                 dbc.DropdownMenuItem(
                     html.Div([
                         html.Span(workflow_icon(), style={"marginRight": "8px"}),
-                        "Gestão de Pendências"
+                        "AMG WorkFlow"
                     ], className="d-flex align-items-center"),
                     href="/workflow/dashboard",
                     active=(pathname == "/workflow/dashboard")
