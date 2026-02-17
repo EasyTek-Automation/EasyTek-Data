@@ -18,17 +18,15 @@ print("="*80 + "\n")
 try:
     # Conectar
     print("[1] Conectando ao MongoDB...")
-    producao = get_mongo_connection("ZPP_Producao_2025")
-    paradas = get_mongo_connection("ZPP_Paradas_2025")
+    producao = get_mongo_connection("ZPP_Producao")
+    paradas = get_mongo_connection("ZPP_Paradas")
     print("    ✓ Conectado\n")
 
     # Verificar produção
-    print("[2] Verificando ZPP_Producao_2025...")
+    print("[2] Verificando ZPP_Producao...")
     count_prod = producao.count_documents({})
-    count_prod_2025 = producao.count_documents({"_year": 2025})
 
     print(f"    Total registros: {count_prod:,}")
-    print(f"    Registros 2025: {count_prod_2025:,}")
 
     # Verificar campos
     if count_prod > 0:
@@ -44,22 +42,19 @@ try:
     print()
 
     # Verificar paradas
-    print("[3] Verificando ZPP_Paradas_2025...")
+    print("[3] Verificando ZPP_Paradas...")
     count_paradas = paradas.count_documents({})
-    count_paradas_2025 = paradas.count_documents({"_year": 2025})
 
     print(f"    Total registros: {count_paradas:,}")
-    print(f"    Registros 2025: {count_paradas_2025:,}")
 
     # Verificar códigos de motivo
-    motivos = paradas.distinct("motivo", {"_year": 2025})
-    print(f"    Códigos de motivo encontrados: {motivos}")
+    motivos = paradas.distinct("causa_do_desvio", {})
+    print(f"    Códigos de causa encontrados (primeiros 10): {motivos[:10]}")
 
     # Verificar se tem os códigos de avaria que estamos procurando
     codigos_avaria = ['201', 'S201', '202', 'S202', '203', 'S203']
     count_avarias = paradas.count_documents({
-        "_year": 2025,
-        "motivo": {"$in": codigos_avaria}
+        "causa_do_desvio": {"$in": codigos_avaria}
     })
     print(f"    Paradas com códigos de avaria {codigos_avaria}: {count_avarias}")
 
@@ -67,16 +62,16 @@ try:
 
     # Diagnóstico
     print("[4] DIAGNÓSTICO:")
-    if count_prod_2025 == 0:
-        print("    ✗ PROBLEMA: Não há dados de produção para 2025")
+    if count_prod == 0:
+        print("    ✗ PROBLEMA: Não há dados de produção")
     else:
-        print(f"    ✓ Há {count_prod_2025:,} registros de produção em 2025")
+        print(f"    ✓ Há {count_prod:,} registros de produção")
 
     if count_avarias == 0:
-        print("    ⚠ AVISO: Não há paradas com códigos de avaria em 2025")
+        print("    ⚠ AVISO: Não há paradas com códigos de avaria")
         print("      (Isso pode ser normal se não houver avarias registradas)")
     else:
-        print(f"    ✓ Há {count_avarias} paradas (avarias) em 2025")
+        print(f"    ✓ Há {count_avarias} paradas (avarias)")
 
     print("\n" + "="*80 + "\n")
 

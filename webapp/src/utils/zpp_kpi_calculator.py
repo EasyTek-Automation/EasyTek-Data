@@ -4,10 +4,10 @@ Implementa indicadores M01 (MTBF), M02 (MTTR) e M03 (Taxa de Avaria)
 conforme documento PRO017 - KPI Calculation Procedures
 
 Collections utilizadas (FIXAS - não mudar dinamicamente):
-- ZPP_Producao_2025: Dados de produção (horas de atividade) - contém dados de múltiplos anos
-- ZPP_Paradas_2025: Dados de paradas (avarias) - contém dados de múltiplos anos
+- ZPP_Producao: Dados de produção (horas de atividade) - contém dados de múltiplos anos
+- ZPP_Paradas: Dados de paradas (avarias) - contém dados de múltiplos anos
 
-IMPORTANTE: Os nomes das collections são FIXOS (sempre 2025) mesmo contendo dados de outros anos.
+IMPORTANTE: Os nomes das collections são FIXOS.
 O filtro por ano é feito nos DADOS, não no nome da collection.
 NÃO modificar para usar nomes dinâmicos (ZPP_*_{year}).
 
@@ -29,8 +29,8 @@ logger = logging.getLogger(__name__)
 # IMPORTANTE: Não alterar para usar ano dinâmico!
 # Estas collections contêm dados de MÚLTIPLOS anos.
 # O filtro por ano é feito nos documentos, não no nome da collection.
-ZPP_PRODUCAO_COLLECTION = "ZPP_Producao_2025"
-ZPP_PARADAS_COLLECTION = "ZPP_Paradas_2025"
+ZPP_PRODUCAO_COLLECTION = "ZPP_Producao"
+ZPP_PARADAS_COLLECTION = "ZPP_Paradas"
 
 # Códigos de motivo que representam AVARIAS
 BREAKDOWN_CODES = ['201', 'S201', '202', 'S202', '203', 'S203']

@@ -75,23 +75,7 @@ class ZPPProcessor:
 
         self.archive_dir = archive_dir
 
-    def extract_year_from_data(self, df: pd.DataFrame, file_type: str) -> int:
-        """Extrai o ano dos dados baseado nas colunas de data"""
-        try:
-            if file_type == 'zppprd':
-                date_col = 'FIniNotif'
-            else:
-                date_col = 'Início execução'
-
-            first_date = df[date_col].dropna().iloc[0]
-            if isinstance(first_date, pd.Timestamp):
-                return first_date.year
-            else:
-                return datetime.now().year
-        except:
-            return datetime.now().year
-
-    def prepare_dataframe(self, df: pd.DataFrame, file_type: str, year: int,
+    def prepare_dataframe(self, df: pd.DataFrame, file_type: str,
                          file_name: str) -> pd.DataFrame:
         """Prepara DataFrame para upload ao MongoDB"""
         df = df.copy()
@@ -138,7 +122,6 @@ class ZPPProcessor:
         df['_uploaded_at'] = datetime.now()
         df['_source_file'] = file_type
         df['_source_filename'] = file_name
-        df['_year'] = year
         df['_processed'] = True
 
         return df
@@ -151,7 +134,6 @@ class ZPPProcessor:
             ([('pto_trab', ASCENDING), ('fininotif', DESCENDING)], 'idx_equipamento_data', {}),
             ([('ordem', ASCENDING)], 'idx_ordem_unique', {'unique': True, 'sparse': True}),
             ([('fininotif', ASCENDING), ('ffinnotif', ASCENDING)], 'idx_range_datas', {}),
-            ([('_year', ASCENDING)], 'idx_year', {}),
             ([('pto_trab', ASCENDING), ('kg_proc', DESCENDING)], 'idx_equipamento_producao', {})
         ]
 
@@ -174,7 +156,6 @@ class ZPPProcessor:
              'idx_parada_unique', {'unique': True, 'sparse': True}),
             ([('causa_do_desvio', ASCENDING)], 'idx_motivo', {}),
             ([('inicio_execucao', ASCENDING), ('fim_execucao', ASCENDING)], 'idx_range_datas', {}),
-            ([('_year', ASCENDING)], 'idx_year', {}),
             ([('duration_min', DESCENDING)], 'idx_duracao', {})
         ]
 
@@ -277,16 +258,14 @@ class ZPPProcessor:
 
         # 3. Preparar para MongoDB
         logger.info("Etapa 3/5: Preparando para MongoDB...")
-        year = self.extract_year_from_data(df_clean, file_type)
-        df_prepared = self.prepare_dataframe(df_clean, file_type, year, file_name)
+        df_prepared = self.prepare_dataframe(df_clean, file_type, file_name)
 
-        # Determinar collection baseado no ano
+        # Determinar collection (nomes fixos)
         if file_type == 'zppprd':
-            collection_name = f'ZPP_Producao_{year}'
+            collection_name = 'ZPP_Producao'
         else:
-            collection_name = f'ZPP_Paradas_{year}'
+            collection_name = 'ZPP_Paradas'
 
-        logger.info(f"  [OK] Ano detectado: {year}")
         logger.info(f"  [OK] Collection: {collection_name}\n")
 
         # FILTRAR EQUIPAMENTOS INDESEJADOS

@@ -16,8 +16,8 @@ try:
     from src.utils.zpp_kpi_calculator import ZPP_PRODUCAO_COLLECTION, ZPP_PARADAS_COLLECTION
 except ImportError:
     get_mongo_connection = None
-    ZPP_PRODUCAO_COLLECTION = "ZPP_Producao_2025"  # Fallback
-    ZPP_PARADAS_COLLECTION = "ZPP_Paradas_2025"
+    ZPP_PRODUCAO_COLLECTION = "ZPP_Producao"  # Fallback
+    ZPP_PARADAS_COLLECTION = "ZPP_Paradas"
 
 
 # ==================== SISTEMA DE CORES SIMPLIFICADO ====================

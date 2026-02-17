@@ -201,14 +201,14 @@ def insert_sample_log(db):
             {
                 'filename': 'zppprd_202601.xlsx',
                 'type': 'zppprd',
-                'collection_name': 'ZPP_Producao_2025',
+                'collection_name': 'ZPP_Producao',
                 'uploaded_rows': 15000,
                 'status': 'success'
             },
             {
                 'filename': 'paradas_202601.xlsx',
                 'type': 'zppparadas',
-                'collection_name': 'ZPP_Paradas_2025',
+                'collection_name': 'ZPP_Paradas',
                 'uploaded_rows': 8300,
                 'status': 'success'
             }
