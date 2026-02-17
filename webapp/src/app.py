@@ -27,7 +27,15 @@ if not SECRET_KEY:
    
     raise ValueError("A variável de ambiente SECRET_KEY é obrigatória e não foi definida.")
 
-server.config.update(SECRET_KEY=SECRET_KEY)
+server.config.update(
+    SECRET_KEY=SECRET_KEY,
+    # Configurações de cookies para API REST mobile
+    SESSION_COOKIE_SAMESITE='Lax',      # Permite navegação cross-location no mesmo domínio
+    SESSION_COOKIE_SECURE=True,         # Exige HTTPS (produção)
+    SESSION_COOKIE_HTTPONLY=True,       # Proteção contra XSS
+    SESSION_COOKIE_PATH='/',            # Cookie válido para todo o domínio
+    SESSION_COOKIE_NAME='etd_session',  # Nome customizado
+)
 
 
 
@@ -76,6 +84,11 @@ app.index_string = '''
 login_manager = LoginManager()
 login_manager.init_app(server)
 login_manager.login_view = '/login'
+
+
+# --- Registro da API REST ---
+from src.api import api_bp
+server.register_blueprint(api_bp)
 
 
 # --- Rota para servir assets do volume de documentação ---
