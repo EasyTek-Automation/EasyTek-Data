@@ -934,6 +934,224 @@ def register_maintenance_kpi_callbacks(app):
         )
 
     # ============================================================
+    # CALLBACK 6B: Aba de Dados Brutos (Conferência)
+    # ============================================================
+    @app.callback(
+        [
+            Output("raw-data-summary-cards", "children"),
+            Output("raw-data-table-container", "children"),
+        ],
+        [
+            Input("store-indicator-filters", "data"),
+            Input("indicator-tabs", "active_tab"),
+        ]
+    )
+    def update_raw_data_tab(stored_data, active_tab):
+        """
+        Constrói a aba de conferência de dados brutos por equipamento.
+        Agrega totais do período filtrado e recalcula KPIs a partir dos totais.
+        """
+        from dash import dash_table
+
+        if active_tab != "tab-data":
+            raise PreventUpdate
+
+        _empty = html.P(
+            "Sem dados disponíveis para o período selecionado.",
+            className="text-muted text-center py-5"
+        )
+
+        if not stored_data or not stored_data.get("has_data", False):
+            return [_empty, _empty]
+
+        data = stored_data["data"]
+        names = stored_data.get("names", {})
+        categories = stored_data.get("categories", {})
+        equipment_ids = stored_data.get("equipment_ids", [])  # Todos os equipamentos, igual aos cards do topo
+        months = stored_data.get("months", [])
+
+        # Mapa reverso: eq_id → categoria
+        eq_category = {
+            eq: cat
+            for cat, eq_list in categories.items()
+            for eq in eq_list
+        }
+
+        # Agregar totais do período por equipamento
+        rows = []
+        for eq_id in equipment_ids:
+            if eq_id not in data:
+                continue
+            monthly_list = [m for m in data[eq_id] if m["month"] in months]
+            if not monthly_list:
+                continue
+
+            tot_fail = sum(m.get("num_failures", 0) for m in monthly_list)
+            tot_act_h = sum(m.get("total_active_hours", 0.0) for m in monthly_list)
+            tot_bd_min = sum(m.get("total_breakdown_minutes", 0.0) for m in monthly_list)
+            tot_bd_h = tot_bd_min / 60.0
+            tot_up_h = max(tot_act_h - tot_bd_h, 0)
+
+            # KPIs recalculados dos totais (mais preciso que média de médias)
+            bd_rate = (tot_bd_h / tot_act_h * 100) if tot_act_h > 0 else None
+            if tot_fail > 0:
+                mtbf = (tot_act_h - tot_bd_h) / tot_fail
+                mttr_min = tot_bd_min / tot_fail
+            elif tot_act_h > 0:
+                mtbf = tot_act_h
+                mttr_min = 0.0
+            else:
+                mtbf = None
+                mttr_min = None
+
+            rows.append({
+                "eq_id": eq_id,
+                "equipamento": names.get(eq_id, eq_id),
+                "categoria": eq_category.get(eq_id, "—"),
+                "num_paradas": tot_fail,
+                "avaria_min": round(tot_bd_min, 1),
+                "avaria_h": round(tot_bd_h, 2),
+                "atividade_h": round(tot_act_h, 2),
+                "uptime_h": round(tot_up_h, 2),
+                "mtbf_h": round(mtbf, 1) if mtbf is not None else None,
+                "mttr_min": round(mttr_min, 1) if mttr_min is not None else None,
+                "taxa_avaria": round(bd_rate, 2) if bd_rate is not None else None,
+            })
+
+        if not rows:
+            return [_empty, _empty]
+
+        # ── Totais da planta ─────────────────────────────────────
+        # Somar os valores brutos (não os já arredondados) para máxima precisão
+        p_fail   = sum(r["num_paradas"]  for r in rows)
+        p_act_h  = sum(r["atividade_h"]  for r in rows)
+        p_bd_min = sum(r["avaria_min"]   for r in rows)
+        p_bd_h   = p_bd_min / 60.0
+        p_up_h   = sum(r["uptime_h"]     for r in rows)
+        p_bd_rate = round(p_bd_h / p_act_h * 100, 2) if p_act_h > 0 else None
+        p_mtbf    = round((p_act_h - p_bd_h) / p_fail, 1) if p_fail > 0 else (round(p_act_h, 1) if p_act_h > 0 else None)
+        p_mttr    = round(p_bd_min / p_fail, 1) if p_fail > 0 else 0.0
+
+        def _fv(v, dec=1):
+            """Formata float para string ou '—' se None."""
+            return f"{v:.{dec}f}" if v is not None else "—"
+
+        # ── Cards de resumo da planta ─────────────────────────────
+        def _stat_card(icon, label, value, color):
+            return dbc.Col([
+                dbc.Card([dbc.CardBody([
+                    html.Div([
+                        html.I(className=f"bi {icon}", style={"fontSize": "1.3rem", "color": color}),
+                        html.Div([
+                            html.Small(label, className="text-muted d-block", style={"fontSize": "0.75rem"}),
+                            html.Strong(value, style={"fontSize": "1.05rem"})
+                        ], className="ms-3")
+                    ], className="d-flex align-items-center")
+                ])], className="shadow-sm h-100")
+            ], xs=6, sm=4, md=3, lg=2, className="mb-3")
+
+        summary_cards = dbc.Row([
+            _stat_card("bi-exclamation-circle-fill", "Nº Paradas",      str(p_fail),              "#dc3545"),
+            _stat_card("bi-hourglass-split",         "Avaria (min)",    f"{p_bd_min:.0f}",         "#fd7e14"),
+            _stat_card("bi-hourglass-split",         "Avaria (h)",      f"{p_bd_h:.2f}",           "#fd7e14"),
+            _stat_card("bi-lightning-charge-fill",   "Atividade (h)",   f"{p_act_h:.2f}",          "#0d6efd"),
+            _stat_card("bi-arrow-up-circle-fill",    "Uptime (h)",      f"{p_up_h:.2f}",           "#198754"),
+            _stat_card("bi-clock-history",           "MTBF (h)",        _fv(p_mtbf, 1),            "#20c997"),
+            _stat_card("bi-tools",                   "MTTR (min)",      _fv(p_mttr, 1),            "#6f42c1"),
+            _stat_card("bi-graph-down",              "Taxa Avaria (%)", _fv(p_bd_rate, 2),         "#ffc107"),
+        ], className="g-2")
+
+        # ── Tabela por equipamento ────────────────────────────────
+        # Guardar valores como números para que o sort nativo funcione corretamente
+        table_data = []
+        for r in sorted(rows, key=lambda x: (x["categoria"], x["equipamento"])):
+            table_data.append({
+                "equipamento":  r["equipamento"],
+                "categoria":    r["categoria"],
+                "num_paradas":  r["num_paradas"],
+                "avaria_min":   r["avaria_min"],
+                "avaria_h":     r["avaria_h"],
+                "atividade_h":  r["atividade_h"],
+                "uptime_h":     r["uptime_h"],
+                "mtbf_h":       r["mtbf_h"],   # pode ser None → DataTable mostra vazio
+                "mttr_min":     r["mttr_min"],
+                "taxa_avaria":  r["taxa_avaria"],
+            })
+
+        # Linha de total da planta (sempre ao final)
+        table_data.append({
+            "equipamento":  "TOTAL DA PLANTA",
+            "categoria":    "—",
+            "num_paradas":  p_fail,
+            "avaria_min":   round(p_bd_min, 1),
+            "avaria_h":     round(p_bd_h, 2),
+            "atividade_h":  round(p_act_h, 2),
+            "uptime_h":     round(p_up_h, 2),
+            "mtbf_h":       p_mtbf,
+            "mttr_min":     p_mttr,
+            "taxa_avaria":  p_bd_rate,
+        })
+
+        def _col(name, col_id, dec=None):
+            """Helper para coluna numérica com ou sem formato."""
+            c = {"name": name, "id": col_id, "type": "numeric"}
+            if dec is not None:
+                c["format"] = {"specifier": f".{dec}f"}
+            return c
+
+        columns = [
+            {"name": "Equipamento",     "id": "equipamento"},
+            {"name": "Categoria",       "id": "categoria"},
+            _col("Nº Paradas",      "num_paradas",  0),
+            _col("Avaria (min)",    "avaria_min",   1),
+            _col("Avaria (h)",      "avaria_h",     2),
+            _col("Atividade (h)",   "atividade_h",  2),
+            _col("Uptime (h)",      "uptime_h",     2),
+            _col("MTBF (h)",        "mtbf_h",       1),
+            _col("MTTR (min)",      "mttr_min",     1),
+            _col("Taxa Avaria (%)", "taxa_avaria",  2),
+        ]
+
+        table = dash_table.DataTable(
+            columns=columns,
+            data=table_data,
+            sort_action="native",
+            style_table={"overflowX": "auto"},
+            style_cell={
+                "textAlign": "center",
+                "padding": "8px 14px",
+                "fontFamily": "inherit",
+                "fontSize": "0.85rem",
+                "borderBottom": "1px solid #dee2e6",
+            },
+            style_cell_conditional=[
+                {"if": {"column_id": "equipamento"}, "textAlign": "left", "fontWeight": "500", "minWidth": "130px"},
+                {"if": {"column_id": "categoria"},   "textAlign": "left", "minWidth": "110px"},
+            ],
+            style_header={
+                "backgroundColor": "#f8f9fa",
+                "fontWeight": "bold",
+                "borderBottom": "2px solid #dee2e6",
+                "fontSize": "0.8rem",
+                "textAlign": "center",
+            },
+            style_data_conditional=[
+                {
+                    "if": {"filter_query": '{equipamento} = "TOTAL DA PLANTA"'},
+                    "backgroundColor": "#e9ecef",
+                    "fontWeight": "bold",
+                    "borderTop": "2px solid #6c757d",
+                },
+                {"if": {"row_index": "odd"}, "backgroundColor": "#fafafa"},
+            ],
+        )
+
+        return [
+            summary_cards,
+            dbc.Card([dbc.CardBody(table)], className="shadow-sm")
+        ]
+
+    # ============================================================
     # CALLBACK 7: Exportar Dados
     # ============================================================
     @app.callback(

@@ -530,6 +530,11 @@ def calculate_monthly_kpis(production_df: pd.DataFrame, breakdown_df: pd.DataFra
 
             monthly_data.append({
                 "month": month,
+                "num_failures": int(num_failures),
+                "total_active_hours": round(total_active_hours, 4),
+                "total_breakdown_minutes": round(total_breakdown_minutes, 4),
+                "total_breakdown_hours": round(total_breakdown_hours, 4),
+                "uptime_hours": round(max(total_active_hours - total_breakdown_hours, 0), 4),
                 "mtbf": round(mtbf, 2) if mtbf is not None else None,
                 "mttr": round(mttr, 2) if mttr is not None else None,
                 "breakdown_rate": round(breakdown_rate, 2) if breakdown_rate is not None else None
@@ -664,12 +669,12 @@ def get_zpp_equipment_names() -> Dict[str, str]:
     # Se um equipamento estiver neste dicionário, usa o nome customizado
     # Caso contrário, gera automaticamente baseado no prefixo
     CUSTOM_NAMES = {
-        "LONGI001": "LCL-4,5",  # Pode alterar lado direito depois para "Longitudinal 1"
-        "LONGI002": "LCL-08",
+        "LONGI001": "LCL-08",
+        "LONGI002": "LCL-4,5",
         "PRENS001": "PRENSA-01",
         "PRENS002": "PRENSA-02",
-        "TRANS001": "LCT-16",
-        "TRANS002": "LCT-08",
+        "TRANS001": "LCT-08",
+        "TRANS002": "LCT-16",
         "TRANS003": "LCT-2,5"
         }
 

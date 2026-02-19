@@ -603,6 +603,31 @@ def layout():
 
                     ], className="p-3")
                 ]
+            ),
+
+            # Tab 3: Dados Brutos (Conferência)
+            dbc.Tab(
+                label="📋 Dados",
+                tab_id="tab-data",
+                children=[
+                    html.Div([
+
+                        # Card resumo geral da planta
+                        html.H5([
+                            html.I(className="bi bi-calculator me-2"),
+                            "Resumo da Planta"
+                        ], className="mt-3 mb-3"),
+                        html.Div(id="raw-data-summary-cards", className="mb-4"),
+
+                        # Tabela detalhada por equipamento
+                        html.H5([
+                            html.I(className="bi bi-table me-2"),
+                            "Detalhamento por Equipamento"
+                        ], className="mb-3"),
+                        html.Div(id="raw-data-table-container")
+
+                    ], className="p-3")
+                ]
             )
 
         ], id="indicator-tabs", active_tab="tab-general", className="mb-4"),
