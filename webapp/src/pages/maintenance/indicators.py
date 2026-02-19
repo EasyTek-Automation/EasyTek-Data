@@ -85,6 +85,13 @@ def layout():
             ], width=4, className="text-end d-flex align-items-center justify-content-end")
         ], className="mb-4"),
 
+        # ==================== PERÍODO ANALISADO ====================
+        dbc.Row([
+            dbc.Col([
+                html.Div(id="period-analysis-label")
+            ])
+        ], className="mb-2"),
+
         # ==================== SUMMARY CARDS ====================
         dbc.Row([
             dbc.Col([create_mtbf_summary_card()], xs=12, sm=6, md=3, className="mb-3"),

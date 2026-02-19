@@ -220,10 +220,14 @@ def register_maintenance_kpi_callbacks(app):
         if not ref_year:
             ref_year = 2026  # Ano padrão onde os dados ZPP estão disponíveis
 
+        from datetime import date as _date, datetime as _datetime
+
         if period_type == "year":
             # Todos os meses do ano selecionado
             months = list(range(1, 13))
             year = ref_year
+            period_start = f"{year}-01-01"
+            period_end = f"{year}-12-31"
 
         elif period_type == "custom":
             # Período personalizado via date range
@@ -231,10 +235,11 @@ def register_maintenance_kpi_callbacks(app):
                 # Fallback: usar ano completo
                 year = ref_year
                 months = list(range(1, 13))
+                period_start = f"{year}-01-01"
+                period_end = f"{year}-12-31"
             else:
-                from datetime import datetime
-                start = datetime.fromisoformat(start_date) if isinstance(start_date, str) else start_date
-                end = datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
+                start = _datetime.fromisoformat(start_date) if isinstance(start_date, str) else start_date
+                end = _datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
 
                 year = start.year
                 # Gerar lista de meses entre start e end
@@ -250,11 +255,15 @@ def register_maintenance_kpi_callbacks(app):
                     current = current.replace(month=current.month + 1)
 
                 months = sorted(months) if months else [start.month]
+                period_start = start_date if isinstance(start_date, str) else start_date.isoformat()
+                period_end = end_date if isinstance(end_date, str) else end_date.isoformat()
 
         else:
             # Fallback: ano completo
             year = ref_year
             months = list(range(1, 13))
+            period_start = f"{year}-01-01"
+            period_end = f"{year}-12-31"
 
         # Buscar dados reais - INTEGRAÇÃO ZPP
 
@@ -362,6 +371,8 @@ def register_maintenance_kpi_callbacks(app):
 
         return {
             "period_type": period_type,
+            "period_start": period_start,
+            "period_end": period_end,
             "year": year,
             "months": months,
             "equipment_ids": all_equipment,  # TODOS os equipamentos (para cards gerais)
@@ -378,8 +389,41 @@ def register_maintenance_kpi_callbacks(app):
     # ============================================================
     # CALLBACK 3: Atualizar Summary Cards
     # ============================================================
+    _MONTH_NAMES_PT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+                       "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+
+    def _build_period_label(period_start, period_end, period_type):
+        """Constrói o componente de rótulo do período analisado com datas completas."""
+        from datetime import datetime as _dt
+        try:
+            s = _dt.fromisoformat(period_start)
+            e = _dt.fromisoformat(period_end)
+        except (TypeError, ValueError):
+            return None
+
+        sm = _MONTH_NAMES_PT[s.month - 1]
+        em = _MONTH_NAMES_PT[e.month - 1]
+
+        if s.year == e.year:
+            date_text = f"{s.day:02d}/{sm} a {e.day:02d}/{em}/{e.year}"
+        else:
+            date_text = f"{s.day:02d}/{sm}/{s.year} a {e.day:02d}/{em}/{e.year}"
+
+        type_label = {
+            "year": "Ano completo",
+            "last12": "Últimos 12 meses",
+            "custom": "Período personalizado",
+        }.get(period_type, "Período")
+
+        return html.Span([
+            html.I(className="bi bi-calendar3 me-2"),
+            html.Strong(f"{type_label}: "),
+            date_text
+        ], className="text-muted small")
+
     @app.callback(
         [
+            Output("period-analysis-label", "children"),
             Output("summary-mtbf-value", "children"),
             Output("summary-mtbf-badge", "children"),
             Output("summary-mtbf-badge", "color"),
@@ -397,12 +441,17 @@ def register_maintenance_kpi_callbacks(app):
         """
         Atualiza os 4 cards de resumo com médias gerais comparadas com meta da planta.
         """
+        _no_data_period = html.Span(
+            [html.I(className="bi bi-calendar3 me-2"), "Período: —"],
+            className="text-muted small"
+        )
+
         # Verificar se MongoDB está offline
         if stored_data and stored_data.get("db_error"):
-            return ["--"] * 3 + ["BD Offline", "danger"] * 3 + ["0"]
+            return [_no_data_period] + ["--"] * 3 + ["BD Offline", "danger"] * 3 + ["0"]
 
         if not stored_data or not stored_data.get("has_data", False):
-            return ["--"] * 3 + ["Sem dados", "secondary"] * 3 + ["0"]
+            return [_no_data_period] + ["--"] * 3 + ["Sem dados", "secondary"] * 3 + ["0"]
 
         data = stored_data["data"]
         equipment_targets = stored_data["equipment_targets"]  # ALTERADO
@@ -416,7 +465,7 @@ def register_maintenance_kpi_callbacks(app):
 
         # Se não houver médias válidas após o cálculo
         if not averages.get("by_equipment"):
-            return ["--"] * 3 + ["Sem dados", "secondary"] * 3 + ["0"]
+            return [_no_data_period] + ["--"] * 3 + ["Sem dados", "secondary"] * 3 + ["0"]
 
         # Importar função helper para cores simplificadas
         from src.components.maintenance_kpi_graphs import get_kpi_color
@@ -473,14 +522,36 @@ def register_maintenance_kpi_callbacks(app):
         # Contagem de equipamentos
         eq_count = len(equipment_ids)
 
-        return [
+        target_style = {"fontSize": "0.65em", "color": "#6c757d", "fontWeight": "normal"}
+
+        mtbf_display = [
             f"{mtbf_avg:.1f} h",
+            html.Span(f" / {general_target['mtbf']:.1f} h", style=target_style)
+        ]
+        mttr_display = [
+            f"{mttr_avg_minutes:.1f} min",
+            html.Span(f" / {mttr_target_minutes:.1f} min", style=target_style)
+        ]
+        breakdown_display = [
+            f"{breakdown_avg:.2f} %",
+            html.Span(f" / {general_target['breakdown_rate']:.2f} %", style=target_style)
+        ]
+
+        period_label = _build_period_label(
+            stored_data.get("period_start"),
+            stored_data.get("period_end"),
+            stored_data.get("period_type", "year")
+        )
+
+        return [
+            period_label,
+            mtbf_display,
             mtbf_badge_text,
             mtbf_badge_color,
-            f"{mttr_avg_minutes:.1f} min",
+            mttr_display,
             mttr_badge_text,
             mttr_badge_color,
-            f"{breakdown_avg:.2f} %",
+            breakdown_display,
             breakdown_badge_text,
             breakdown_badge_color,
             f"{eq_count}"
