@@ -612,6 +612,21 @@ def layout():
                 children=[
                     html.Div([
 
+                        # Cobertura de dados: último dia e nº de dias por collection
+                        html.Div(id="raw-data-coverage-info", className="mb-4"),
+
+                        # Tabela de diagnóstico — base de cálculo dos cards do topo
+                        html.H5([
+                            html.I(className="bi bi-eyeglasses me-2"),
+                            "Como os Cards do Topo São Calculados"
+                        ], className="mt-3 mb-1"),
+                        html.P(
+                            "Para cada mês: KPI calculado dos totais brutos daquele mês. "
+                            "O valor exibido nos cards do topo é a média aritmética desses valores mensais.",
+                            className="text-muted small mb-3"
+                        ),
+                        html.Div(id="raw-data-monthly-debug", className="mb-4"),
+
                         # Card resumo geral da planta
                         html.H5([
                             html.I(className="bi bi-calculator me-2"),

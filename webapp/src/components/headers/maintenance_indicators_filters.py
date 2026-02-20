@@ -99,6 +99,46 @@ def create_maintenance_indicators_filters():
                     )
                 ], className="mb-3"),
 
+                # Códigos de Avaria
+                html.Div([
+                    html.Label(
+                        "Motivos de Parada",
+                        className="form-label fw-bold mb-2",
+                        style={"fontSize": "0.85rem", "color": "#495057"}
+                    ),
+                    dcc.Dropdown(
+                        id="filter-breakdown-codes",
+                        options=[
+                            {"label": "110",  "value": "110"},
+                            {"label": "S110", "value": "S110"},
+                            {"label": "201",  "value": "201"},
+                            {"label": "S201", "value": "S201"},
+                            {"label": "202",  "value": "202"},
+                            {"label": "S202", "value": "S202"},
+                            {"label": "203",  "value": "203"},
+                            {"label": "S203", "value": "S203"},
+                            {"label": "204",  "value": "204"},
+                            {"label": "S204", "value": "S204"},
+                            {"label": "205",  "value": "205"},
+                            {"label": "S205", "value": "S205"},
+                        ],
+                        value=["110", "S110",
+                               "201", "S201",
+                               "202", "S202",
+                               "203", "S203",
+                               "204", "S204",
+                               "205", "S205"],
+                        multi=True,
+                        placeholder="Selecione os códigos...",
+                        style={"fontSize": "0.85rem"}
+                    ),
+                    html.Small(
+                        "Padrão: todos os códigos de avaria",
+                        className="text-muted",
+                        style={"fontSize": "0.7rem"}
+                    )
+                ], className="mb-3"),
+
                 # Date Picker Range
                 html.Div([
                     html.Label(

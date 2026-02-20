@@ -428,6 +428,14 @@ def create_kpi_bar_chart(equipment_ids: List[str],
                 # Se falhar o polyfit, ignora a tendência
                 pass
 
+    # Calcular teto do eixo Y com 20% de folga acima do maior valor (para os labels não serem cortados)
+    valid_values = [v for v in values if v is not None]
+    if valid_values:
+        y_max = max(valid_values)
+        y_ceiling = y_max * 1.20 if y_max > 0 else 1.0
+    else:
+        y_ceiling = None
+
     # Layout
     fig.update_layout(
         template=template,
@@ -437,7 +445,8 @@ def create_kpi_bar_chart(equipment_ids: List[str],
         ),
         yaxis=dict(
             title=f"{kpi_name} ({unit})",
-            rangemode='tozero'
+            rangemode='tozero',
+            range=[0, y_ceiling] if y_ceiling is not None else None
         ),
         showlegend=True,
         legend=dict(
@@ -448,7 +457,7 @@ def create_kpi_bar_chart(equipment_ids: List[str],
             x=0
         ),
         height=350,
-        margin=dict(t=20, b=100, l=60, r=40),
+        margin=dict(t=50, b=100, l=60, r=40),
         hovermode='x'
     )
 

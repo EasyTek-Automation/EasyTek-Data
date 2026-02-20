@@ -11,7 +11,7 @@ IMPORTANTE: Os nomes das collections são FIXOS.
 O filtro por ano é feito nos DADOS, não no nome da collection.
 NÃO modificar para usar nomes dinâmicos (ZPP_*_{year}).
 
-Códigos de avaria considerados: 201, S201, 202, S202, 203, S203
+Códigos de avaria considerados: 201, S201, 202, S202, 203, S203, 204, S204, 205, S205, 110, S110
 """
 
 import pandas as pd
@@ -33,7 +33,8 @@ ZPP_PRODUCAO_COLLECTION = "ZPP_Producao"
 ZPP_PARADAS_COLLECTION = "ZPP_Paradas"
 
 # Códigos de motivo que representam AVARIAS
-BREAKDOWN_CODES = ['201', 'S201', '202', 'S202', '203', 'S203']
+BREAKDOWN_CODES = ['201', 'S201', '202', 'S202', '203', 'S203',
+                   '204', 'S204', '205', 'S205', '110', 'S110']
 
 # Mapeamento de categorias por prefixo de equipamento
 EQUIPMENT_CATEGORY_PREFIXES = {
@@ -290,7 +291,8 @@ def fetch_zpp_production_data(year: int, months: List[int]) -> pd.DataFrame:
         return pd.DataFrame(columns=["linea", "date", "month", "horasact", "boundary_case"])
 
 
-def fetch_zpp_breakdown_data(year: int, months: List[int]) -> pd.DataFrame:
+def fetch_zpp_breakdown_data(year: int, months: List[int],
+                             breakdown_codes: Optional[List[str]] = None) -> pd.DataFrame:
     """
     Busca dados de paradas (avarias) da collection ZPP (nome fixo: ZPP_Paradas_2025)
 
@@ -301,10 +303,12 @@ def fetch_zpp_breakdown_data(year: int, months: List[int]) -> pd.DataFrame:
     Args:
         year: Ano de referência para FILTRAR os dados (ex: 2025, 2026)
         months: Lista de meses (ex: [1, 2, 3])
+        breakdown_codes: Códigos de avaria a considerar (padrão: BREAKDOWN_CODES)
 
     Returns:
         DataFrame com colunas: [linea, date, month, motivo, duracao_min, boundary_case]
     """
+    codes = breakdown_codes if breakdown_codes else BREAKDOWN_CODES
     try:
         from calendar import monthrange
 
@@ -319,7 +323,7 @@ def fetch_zpp_breakdown_data(year: int, months: List[int]) -> pd.DataFrame:
         # Buscar TODOS os registros processados do ano baseado em DATA REAL
         query = {
             "_processed": True,
-            "causa_do_desvio": {"$in": BREAKDOWN_CODES},
+            "causa_do_desvio": {"$in": codes},
             "inicio_execucao": {
                 "$gte": start_date,
                 "$lte": end_date
@@ -545,15 +549,102 @@ def calculate_monthly_kpis(production_df: pd.DataFrame, breakdown_df: pd.DataFra
     return result
 
 
+# ==================== COBERTURA DE DADOS ====================
+
+def get_zpp_data_coverage(year: int, months: List[int],
+                          breakdown_codes: Optional[List[str]] = None) -> dict:
+    """
+    Retorna metadados de cobertura dos dados ZPP para o período selecionado.
+
+    Consulta as duas collections e retorna:
+    - Último dia com registro (ffinnotif em ZPP_Producao, fim_execucao em ZPP_Paradas)
+    - Quantidade de dias distintos com registros dentro dos meses filtrados
+
+    Args:
+        year: Ano de referência
+        months: Lista de meses (ex: [1, 2, 3])
+        breakdown_codes: Códigos de avaria a considerar (padrão: BREAKDOWN_CODES)
+
+    Returns:
+        dict: {prod_last_date, prod_num_days, paradas_last_date, paradas_num_days}
+    """
+    result = {
+        "prod_last_date": None,
+        "prod_num_days": 0,
+        "paradas_last_date": None,
+        "paradas_num_days": 0,
+    }
+
+    def _parse(d):
+        if d is None:
+            return None
+        if isinstance(d, dict) and "$date" in d:
+            return datetime.fromisoformat(d["$date"].replace('Z', '+00:00'))
+        if isinstance(d, datetime):
+            return d
+        return None
+
+    try:
+        start_dt = datetime(year, 1, 1)
+        end_dt = datetime(year, 12, 31, 23, 59, 59)
+        months_set = set(months)
+
+        # ── ZPP_Producao ──────────────────────────────────────────────
+        prod_coll = get_mongo_connection(ZPP_PRODUCAO_COLLECTION)
+        prod_docs = list(prod_coll.find(
+            {"_processed": True, "fininotif": {"$gte": start_dt, "$lte": end_dt}},
+            {"ffinnotif": 1, "_id": 0}
+        ))
+
+        prod_days = set()
+        for doc in prod_docs:
+            d = _parse(doc.get("ffinnotif"))
+            if d and d.month in months_set:
+                prod_days.add(d.date())
+
+        if prod_days:
+            result["prod_last_date"] = max(prod_days).strftime("%d/%m/%Y")
+            result["prod_num_days"] = len(prod_days)
+
+        # ── ZPP_Paradas ───────────────────────────────────────────────
+        codes = breakdown_codes if breakdown_codes else BREAKDOWN_CODES
+        paradas_coll = get_mongo_connection(ZPP_PARADAS_COLLECTION)
+        paradas_docs = list(paradas_coll.find(
+            {
+                "_processed": True,
+                "causa_do_desvio": {"$in": codes},
+                "inicio_execucao": {"$gte": start_dt, "$lte": end_dt}
+            },
+            {"fim_execucao": 1, "inicio_execucao": 1, "_id": 0}
+        ))
+
+        paradas_days = set()
+        for doc in paradas_docs:
+            d = _parse(doc.get("fim_execucao")) or _parse(doc.get("inicio_execucao"))
+            if d and d.month in months_set:
+                paradas_days.add(d.date())
+
+        if paradas_days:
+            result["paradas_last_date"] = max(paradas_days).strftime("%d/%m/%Y")
+            result["paradas_num_days"] = len(paradas_days)
+
+    except Exception as e:
+        logger.error("Erro ao buscar cobertura ZPP: %s", e)
+
+    return result
+
+
 # ==================== FUNÇÃO PRINCIPAL ====================
 
-def fetch_zpp_kpi_data(year: int, months: List[int]) -> Dict:
+def fetch_zpp_kpi_data(year: int, months: List[int],
+                       breakdown_codes: Optional[List[str]] = None) -> Dict:
     """
     Função principal: busca dados do MongoDB e calcula KPIs
 
     Args:
         year: Ano de referência (ex: 2025)
         months: Lista de meses (ex: [1, 2, 3] para Jan-Mar)
+        breakdown_codes: Códigos de avaria a considerar (padrão: BREAKDOWN_CODES)
 
     Returns:
         dict: Dados de KPIs no formato esperado pelos callbacks
@@ -566,8 +657,8 @@ def fetch_zpp_kpi_data(year: int, months: List[int]) -> Dict:
         # 1. Buscar dados de produção
         production_df = fetch_zpp_production_data(year, months)
 
-        # 2. Buscar dados de paradas
-        breakdown_df = fetch_zpp_breakdown_data(year, months)
+        # 2. Buscar dados de paradas (com filtro de códigos selecionados)
+        breakdown_df = fetch_zpp_breakdown_data(year, months, breakdown_codes=breakdown_codes)
 
         # 3. Calcular KPIs
         kpi_data = calculate_monthly_kpis(production_df, breakdown_df)
@@ -713,7 +804,9 @@ def get_zpp_equipment_names() -> Dict[str, str]:
 
 # ==================== FUNÇÃO DE TESTE ====================
 
-def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List[int], top_n: int = 10) -> List[Dict]:
+def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List[int],
+                                      top_n: int = 10,
+                                      breakdown_codes: Optional[List[str]] = None) -> List[Dict]:
     """
     Busca as N paradas com maior duração para um equipamento específico
 
@@ -722,6 +815,7 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
         year: Ano de referência para FILTRAR os dados (ex: 2025, 2026)
         months: Lista de meses (ex: [1, 2, 3])
         top_n: Número de paradas a retornar (padrão: 10)
+        breakdown_codes: Códigos de avaria a considerar (padrão: BREAKDOWN_CODES)
 
     Returns:
         Lista de dicionários ordenada por duração (maior para menor):
@@ -736,6 +830,7 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
             ...
         ]
     """
+    codes = breakdown_codes if breakdown_codes else BREAKDOWN_CODES
     try:
         # IMPORTANTE: Usar constante fixa, não nome dinâmico
         collection = get_mongo_connection(ZPP_PARADAS_COLLECTION)
@@ -753,7 +848,7 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str, year: int, months: List
                 "$match": {
                     "_processed": True,
                     "centro_de_trabalho": equipment_id,
-                    "causa_do_desvio": {"$in": BREAKDOWN_CODES},
+                    "causa_do_desvio": {"$in": codes},
                     "inicio_execucao": {
                         "$gte": start_date,
                         "$lte": end_date,

@@ -453,7 +453,7 @@ if should_show_demo_badge(page_path="/production/oee"):
 - Automatic equipment categorization (Longitudinais, Prensas, Transversais)
 - Month-boundary filtering with configurable rules (início vs fim)
 - Custom equipment naming support
-- Breakdown codes filtering (201, S201, 202, S202, 203, S203)
+- Breakdown codes filtering (201, S201, 202, S202, 203, S203, 204, S204, 205, S205, 110, S110)
 
 **Target Management** (`utils/maintenance_demo_data.py`):
 - Individual targets per equipment stored in MongoDB (`maintenance_kpi_targets`)

@@ -30,7 +30,8 @@ try:
         fetch_zpp_kpi_data,
         get_zpp_equipment_names,
         get_zpp_equipment_categories,
-        fetch_top_breakdowns_by_equipment
+        fetch_top_breakdowns_by_equipment,
+        get_zpp_data_coverage,
     )
     ZPP_KPI_AVAILABLE = True
 except ImportError:
@@ -140,13 +141,14 @@ def register_maintenance_kpi_callbacks(app):
             State("filter-date-range", "start_date"),
             State("filter-date-range", "end_date"),
             State("filter-equipment-selection", "value"),
+            State("filter-breakdown-codes", "value"),
             State("store-indicator-filters", "data")
         ]
     )
     def process_filters_and_load_data(n_clicks, n_intervals,
                                       period_type, ref_year,
                                       start_date, end_date,
-                                      selected_equipment,
+                                      selected_equipment, selected_breakdown_codes,
                                       current_data):
         """
         Processa filtros e gera dados baseado no tipo de período.
@@ -274,10 +276,14 @@ def register_maintenance_kpi_callbacks(app):
         logger.debug("ZPP_KPI_AVAILABLE=%s, buscando dados year=%d months=%s",
                     ZPP_KPI_AVAILABLE, year, months)
 
+        # Normalizar lista de códigos selecionados
+        from src.utils.zpp_kpi_calculator import BREAKDOWN_CODES as _DEFAULT_CODES
+        active_codes = selected_breakdown_codes if selected_breakdown_codes else _DEFAULT_CODES
+
         if ZPP_KPI_AVAILABLE:
             try:
-                # Tentar buscar dados reais do ZPP
-                data = fetch_zpp_kpi_data(year, months)
+                # Tentar buscar dados reais do ZPP (com filtro de códigos selecionados)
+                data = fetch_zpp_kpi_data(year, months, breakdown_codes=active_codes)
                 all_equipment = list(data.keys())
                 has_data = len(data) > 0
 
@@ -345,6 +351,14 @@ def register_maintenance_kpi_callbacks(app):
             except Exception as e:
                 monthly_aggregates = None
 
+        # Cobertura de dados: último dia e nº de dias distintos em cada collection
+        data_coverage = {}
+        if has_data and ZPP_KPI_AVAILABLE:
+            try:
+                data_coverage = get_zpp_data_coverage(year, months, breakdown_codes=active_codes)
+            except Exception as e:
+                logger.error("Erro ao buscar cobertura ZPP: %s", e)
+
         # Processar seleção de equipamentos para gráficos
         # all_equipment = TODOS (usado para cards gerais da planta)
         # selected_equipment_ids = FILTRADOS (usado para gráficos)
@@ -383,7 +397,9 @@ def register_maintenance_kpi_callbacks(app):
             "names": names,
             "categories": categories,
             "has_data": has_data,  # Indicador se há dados disponíveis
-            "monthly_aggregates": monthly_aggregates  # Cache de agregações mensais
+            "monthly_aggregates": monthly_aggregates,  # Cache de agregações mensais
+            "data_coverage": data_coverage,  # Último dia e nº dias por collection
+            "selected_breakdown_codes": active_codes,  # Códigos de avaria filtrados
         }
 
     # ============================================================
@@ -938,6 +954,8 @@ def register_maintenance_kpi_callbacks(app):
     # ============================================================
     @app.callback(
         [
+            Output("raw-data-coverage-info", "children"),
+            Output("raw-data-monthly-debug", "children"),
             Output("raw-data-summary-cards", "children"),
             Output("raw-data-table-container", "children"),
         ],
@@ -962,7 +980,7 @@ def register_maintenance_kpi_callbacks(app):
         )
 
         if not stored_data or not stored_data.get("has_data", False):
-            return [_empty, _empty]
+            return [_empty, _empty, _empty, _empty]
 
         data = stored_data["data"]
         names = stored_data.get("names", {})
@@ -1019,7 +1037,7 @@ def register_maintenance_kpi_callbacks(app):
             })
 
         if not rows:
-            return [_empty, _empty]
+            return [_empty, _empty, _empty, _empty]
 
         # ── Totais da planta ─────────────────────────────────────
         # Somar os valores brutos (não os já arredondados) para máxima precisão
@@ -1052,7 +1070,7 @@ def register_maintenance_kpi_callbacks(app):
 
         summary_cards = dbc.Row([
             _stat_card("bi-exclamation-circle-fill", "Nº Paradas",      str(p_fail),              "#dc3545"),
-            _stat_card("bi-hourglass-split",         "Avaria (min)",    f"{p_bd_min:.0f}",         "#fd7e14"),
+            _stat_card("bi-hourglass-split",         "Avaria (min)",    f"{p_bd_min:.1f}",         "#fd7e14"),
             _stat_card("bi-hourglass-split",         "Avaria (h)",      f"{p_bd_h:.2f}",           "#fd7e14"),
             _stat_card("bi-lightning-charge-fill",   "Atividade (h)",   f"{p_act_h:.2f}",          "#0d6efd"),
             _stat_card("bi-arrow-up-circle-fill",    "Uptime (h)",      f"{p_up_h:.2f}",           "#198754"),
@@ -1146,7 +1164,143 @@ def register_maintenance_kpi_callbacks(app):
             ],
         )
 
+        # ── Tabela diagnóstico: base de cálculo dos cards do topo ──
+        _MN = ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"]
+
+        # Agregar todos os equipamentos por mês (igual ao que calculate_general_avg_by_month faz)
+        monthly_debug_rows = []
+        for month in sorted(months):
+            m_act_h  = sum(m.get("total_active_hours", 0.0)       for eq in equipment_ids if eq in data for m in data[eq] if m["month"] == month)
+            m_bd_min = sum(m.get("total_breakdown_minutes", 0.0)  for eq in equipment_ids if eq in data for m in data[eq] if m["month"] == month)
+            m_fail   = sum(m.get("num_failures", 0)               for eq in equipment_ids if eq in data for m in data[eq] if m["month"] == month)
+            m_bd_h   = m_bd_min / 60.0
+
+            if m_fail > 0 and m_act_h > 0:
+                m_mtbf     = (m_act_h - m_bd_h) / m_fail
+                m_mttr_min = m_bd_min / m_fail
+                m_bd_rate  = (m_bd_h / m_act_h) * 100
+            elif m_act_h > 0:
+                m_mtbf     = m_act_h
+                m_mttr_min = 0.0
+                m_bd_rate  = 0.0
+            else:
+                m_mtbf = m_mttr_min = m_bd_rate = None
+
+            monthly_debug_rows.append({
+                "mes":       _MN[month - 1],
+                "falhas":    m_fail,
+                "act_h":     round(m_act_h, 2),
+                "bd_h":      round(m_bd_h, 2),
+                "mtbf":      round(m_mtbf, 1)     if m_mtbf     is not None else None,
+                "mttr_min":  round(m_mttr_min, 1) if m_mttr_min is not None else None,
+                "bd_rate":   round(m_bd_rate, 2)  if m_bd_rate  is not None else None,
+            })
+
+        # Média final = o que aparece nos cards do topo
+        valid_mtbf  = [r["mtbf"]     for r in monthly_debug_rows if r["mtbf"]     is not None]
+        valid_mttr  = [r["mttr_min"] for r in monthly_debug_rows if r["mttr_min"] is not None]
+        valid_bdr   = [r["bd_rate"]  for r in monthly_debug_rows if r["bd_rate"]  is not None]
+        avg_mtbf    = round(sum(valid_mtbf) / len(valid_mtbf), 1) if valid_mtbf else None
+        avg_mttr    = round(sum(valid_mttr) / len(valid_mttr), 1) if valid_mttr else None
+        avg_bdr     = round(sum(valid_bdr)  / len(valid_bdr),  2) if valid_bdr  else None
+
+        def _td(content, bold=False, bg=None, align="center"):
+            style = {"textAlign": align, "padding": "6px 10px", "fontSize": "0.82rem"}
+            if bold:
+                style["fontWeight"] = "bold"
+            if bg:
+                style["backgroundColor"] = bg
+            return html.Td(content, style=style)
+
+        def _fmt(v, dec=1):
+            return f"{v:.{dec}f}" if v is not None else "—"
+
+        header = html.Thead(html.Tr([
+            html.Th("Mês",             style={"textAlign":"center","padding":"6px 10px","fontSize":"0.8rem"}),
+            html.Th("Nº Falhas",       style={"textAlign":"center","padding":"6px 10px","fontSize":"0.8rem"}),
+            html.Th("Atividade (h)",   style={"textAlign":"center","padding":"6px 10px","fontSize":"0.8rem"}),
+            html.Th("Avaria (h)",      style={"textAlign":"center","padding":"6px 10px","fontSize":"0.8rem"}),
+            html.Th("MTBF mensal (h)", style={"textAlign":"center","padding":"6px 10px","fontSize":"0.8rem"}),
+            html.Th("MTTR mensal (min)",style={"textAlign":"center","padding":"6px 10px","fontSize":"0.8rem"}),
+            html.Th("Taxa Avaria (%)", style={"textAlign":"center","padding":"6px 10px","fontSize":"0.8rem"}),
+        ], style={"backgroundColor":"#f8f9fa","borderBottom":"2px solid #dee2e6"}))
+
+        body_rows = []
+        for r in monthly_debug_rows:
+            body_rows.append(html.Tr([
+                _td(r["mes"], bold=True, align="left"),
+                _td(str(r["falhas"])),
+                _td(_fmt(r["act_h"],    2)),
+                _td(_fmt(r["bd_h"],     2)),
+                _td(_fmt(r["mtbf"],     1)),
+                _td(_fmt(r["mttr_min"], 1)),
+                _td(_fmt(r["bd_rate"],  2)),
+            ]))
+
+        # Linha separadora + linha de média (= cards do topo)
+        n = len(monthly_debug_rows)
+        body_rows.append(html.Tr([
+            _td(f"Média ({n} meses) → Cards topo", bold=True, bg="#fff3cd", align="left"),
+            _td("—",              bg="#fff3cd"),
+            _td("—",              bg="#fff3cd"),
+            _td("—",              bg="#fff3cd"),
+            _td(_fmt(avg_mtbf,  1), bold=True, bg="#fff3cd"),
+            _td(_fmt(avg_mttr,  1), bold=True, bg="#fff3cd"),
+            _td(_fmt(avg_bdr,   2), bold=True, bg="#fff3cd"),
+        ]))
+
+        debug_table = dbc.Card([
+            dbc.CardBody(
+                dbc.Table(
+                    [header, html.Tbody(body_rows)],
+                    bordered=True, hover=True, size="sm",
+                    className="mb-0"
+                ),
+                style={"padding": "0.5rem"}
+            )
+        ], className="shadow-sm")
+
+        # ── Card de cobertura de dados ────────────────────────────
+        coverage = stored_data.get("data_coverage", {})
+
+        def _cov_item(label, last_date, num_days, icon, color):
+            return dbc.Col([
+                html.Div([
+                    html.I(className=f"bi {icon} me-2", style={"color": color, "fontSize": "1.1rem"}),
+                    html.Strong(label, className="me-2"),
+                    html.Span(
+                        f"{num_days} dias  |  último: {last_date}" if last_date else "sem dados",
+                        className="text-muted small"
+                    ),
+                ], className="d-flex align-items-center py-1")
+            ], xs=12, md=6)
+
+        coverage_div = dbc.Card([
+            dbc.CardBody([
+                html.Div([
+                    html.I(className="bi bi-database-check me-2", style={"color": "#0d6efd"}),
+                    html.Strong("Cobertura dos dados"),
+                ], className="d-flex align-items-center mb-2"),
+                dbc.Row([
+                    _cov_item(
+                        "ZPP Prod",
+                        coverage.get("prod_last_date"),
+                        coverage.get("prod_num_days", 0),
+                        "bi-play-circle-fill", "#198754"
+                    ),
+                    _cov_item(
+                        "ZPP Paradas",
+                        coverage.get("paradas_last_date"),
+                        coverage.get("paradas_num_days", 0),
+                        "bi-exclamation-triangle-fill", "#dc3545"
+                    ),
+                ], className="g-0"),
+            ], style={"padding": "0.75rem 1rem"})
+        ], className="shadow-sm mb-3 border-start border-primary border-3")
+
         return [
+            coverage_div,
+            debug_table,
             summary_cards,
             dbc.Card([dbc.CardBody(table)], className="shadow-sm")
         ]
@@ -1216,18 +1370,19 @@ def register_maintenance_kpi_callbacks(app):
 
         year = current_data.get("year", 2026)
         months = current_data.get("months", list(range(1, 13)))
+        active_codes = current_data.get("selected_breakdown_codes") or None
 
         # PASSO 1: Atualizar metas do MongoDB (SEMPRE)
         equipment_targets = get_all_equipment_targets()
         general_targets = get_kpi_targets("GENERAL")
 
-        # PASSO 2: Re-buscar dados do ZPP
+        # PASSO 2: Re-buscar dados do ZPP (com mesmos códigos de avaria)
         new_data = {}
         has_data = False
 
         if ZPP_KPI_AVAILABLE:
             try:
-                new_data = fetch_zpp_kpi_data(year, months)
+                new_data = fetch_zpp_kpi_data(year, months, breakdown_codes=active_codes)
                 has_data = len(new_data) > 0
 
                 if has_data:
@@ -1886,15 +2041,17 @@ def register_maintenance_kpi_callbacks(app):
         year = stored_data.get("year")
         months = stored_data.get("months", [])
         names = stored_data.get("names", {})
+        active_codes = stored_data.get("selected_breakdown_codes") or None
 
-        # Buscar top 5 paradas do equipamento
+        # Buscar top 5 paradas do equipamento (com filtro de códigos ativo)
         if ZPP_KPI_AVAILABLE:
             try:
                 breakdowns_data = fetch_top_breakdowns_by_equipment(
                     equipment_id=equipment_id,
                     year=year,
                     months=months,
-                    top_n=5
+                    top_n=5,
+                    breakdown_codes=active_codes
                 )
 
                 # Criar gráfico
