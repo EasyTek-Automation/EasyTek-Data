@@ -648,7 +648,7 @@ def layout():
         ], id="indicator-tabs", active_tab="tab-general", className="mb-4"),
 
         # ==================== STORES & DOWNLOADS ====================
-        dcc.Store(id='store-indicator-filters', storage_type='session'),
+        dcc.Store(id='store-indicator-filters', storage_type='memory'),
         dcc.Download(id="download-indicators-data"),
 
         # Interval para carregamento inicial de dados (executa apenas 1 vez)
