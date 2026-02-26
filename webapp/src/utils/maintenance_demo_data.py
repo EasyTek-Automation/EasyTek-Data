@@ -375,9 +375,12 @@ def generate_monthly_kpi_data(year: int,
 
 def calculate_kpi_averages(data: Dict[str, List[Dict]],
                            equipment_filter: List[str],
-                           month_filter: List[int],
+                           month_filter: List[int] = None,
                            year: int = None,
-                           monthly_aggregates: Dict[int, Dict] = None) -> Dict:
+                           monthly_aggregates: Dict = None,
+                           year_months: List[str] = None,
+                           start_date=None,
+                           end_date=None) -> Dict:
     """
     Calcula médias dos KPIs considerando filtros.
 
@@ -404,7 +407,7 @@ def calculate_kpi_averages(data: Dict[str, List[Dict]],
         }
     """
     # Validar que há dados
-    if not data or not equipment_filter or not month_filter:
+    if not data or not equipment_filter or (not month_filter and not year_months):
         return {
             "mtbf": 0.0,
             "mttr": 0.0,
@@ -419,11 +422,19 @@ def calculate_kpi_averages(data: Dict[str, List[Dict]],
         if eq_id not in data:
             continue
 
-        # Filtrar apenas os meses selecionados
-        filtered_months = [
-            month_data for month_data in data[eq_id]
-            if month_data["month"] in month_filter
-        ]
+        # Filtrar pelos períodos selecionados:
+        # - Preferir year_months ("YYYY-MM") para correta distinção em ranges multi-ano
+        # - Fallback para month_filter (inteiros) quando year_months não disponível
+        if year_months:
+            filtered_months = [
+                month_data for month_data in data[eq_id]
+                if month_data.get("year_month") in year_months
+            ]
+        else:
+            filtered_months = [
+                month_data for month_data in data[eq_id]
+                if month_data["month"] in (month_filter or [])
+            ]
 
         if not filtered_months:
             continue
@@ -450,9 +461,16 @@ def calculate_kpi_averages(data: Dict[str, List[Dict]],
     if monthly_aggregates is not None:
         # Usar valores mensais já calculados (evita re-buscar MongoDB)
         monthly_values = monthly_aggregates
+    elif start_date is not None and end_date is not None:
+        # Novo caminho: usar start_date/end_date (suporta multi-ano)
+        monthly_values = calculate_general_avg_by_month(
+            data, equipment_filter, start_date=start_date, end_date=end_date
+        )
     elif year is not None:
-        # Buscar valores mensais do MongoDB
-        monthly_values = calculate_general_avg_by_month(data, equipment_filter, month_filter, year=year)
+        # Legado: usar year + months
+        monthly_values = calculate_general_avg_by_month(
+            data, equipment_filter, month_filter, year=year
+        )
     else:
         monthly_values = None
 
@@ -511,8 +529,10 @@ def check_equipment_meets_targets(mtbf: float, mttr: float,
 
 def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
                                    equipment_ids: List[str],
-                                   months: List[int],
-                                   year: int = None) -> Dict[int, Dict]:
+                                   months: List[int] = None,
+                                   year: int = None,
+                                   start_date=None,
+                                   end_date=None) -> Dict:
     """
     Calcula KPI geral por mês agregando dados BRUTOS de todos os equipamentos.
 
@@ -540,78 +560,102 @@ def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
     """
     result = {}
 
-    # Se year não foi passado, usar método antigo (média aritmética) para compatibilidade
-    if year is None:
-        for month in months:
-            mtbf_sum = 0
-            mttr_sum = 0
-            breakdown_sum = 0
-            count = 0
+    # Resolver start_date/end_date a partir dos parâmetros disponíveis
+    if start_date is None or end_date is None:
+        if year is None:
+            # Fallback legado: média aritmética dos KPIs individuais (sem MongoDB)
+            if not months:
+                return result
+            for month in months:
+                mtbf_sum = 0.0
+                mttr_sum = 0.0
+                breakdown_sum = 0.0
+                count = 0
+                for eq_id in equipment_ids:
+                    for month_data in data.get(eq_id, []):
+                        if month_data["month"] == month:
+                            if month_data.get("mtbf") is not None:
+                                mtbf_sum += month_data["mtbf"]
+                            if month_data.get("mttr") is not None:
+                                mttr_sum += month_data["mttr"]
+                            if month_data.get("breakdown_rate") is not None:
+                                breakdown_sum += month_data["breakdown_rate"]
+                            count += 1
+                            break
+                if count > 0:
+                    result[month] = {
+                        "mtbf": round(mtbf_sum / count, 1),
+                        "mttr": round(mttr_sum / count, 1),
+                        "breakdown_rate": round(breakdown_sum / count, 1)
+                    }
+            return result
+        else:
+            # Legado com year: construir start_date/end_date
+            from datetime import datetime as _dt
+            import calendar as _cal
+            months_to_use = sorted(months) if months else list(range(1, 13))
+            start_date = _dt(year, months_to_use[0], 1)
+            last_month = months_to_use[-1]
+            last_day = _cal.monthrange(year, last_month)[1]
+            end_date = _dt(year, last_month, last_day, 23, 59, 59)
 
-            for eq_id in equipment_ids:
-                for month_data in data[eq_id]:
-                    if month_data["month"] == month:
-                        mtbf_sum += month_data["mtbf"]
-                        mttr_sum += month_data["mttr"]
-                        breakdown_sum += month_data["breakdown_rate"]
-                        count += 1
-                        break
-
-            if count > 0:
-                result[month] = {
-                    "mtbf": round(mtbf_sum / count, 1),
-                    "mttr": round(mttr_sum / count, 1),
-                    "breakdown_rate": round(breakdown_sum / count, 1)
-                }
-
-        return result
-
-    # NOVO MÉTODO: Agregação de dados brutos (igual debug cards)
+    # Método principal: busca dados brutos usando range de datas completo
     try:
-        from src.utils.zpp_kpi_calculator import fetch_zpp_production_data, fetch_zpp_breakdown_data
+        from src.utils.zpp_kpi_calculator import (
+            fetch_zpp_production_data, fetch_zpp_breakdown_data, _get_month_periods
+        )
 
-        # Buscar dados brutos do MongoDB
-        production_df = fetch_zpp_production_data(year, months)
-        breakdown_df = fetch_zpp_breakdown_data(year, months)
+        production_df = fetch_zpp_production_data(start_date, end_date)
+        breakdown_df = fetch_zpp_breakdown_data(start_date, end_date)
 
         if production_df.empty:
             return result
 
-        # Calcular KPIs por mês agregando TODOS os equipamentos
-        for month in months:
-            # Filtrar dados do mês
-            prod_month = production_df[production_df['month'] == month]
-            breakdown_month = breakdown_df[breakdown_df['month'] == month]
+        # Calcular KPIs por (year, month) agregando TODOS os equipamentos
+        for (target_year, target_month) in _get_month_periods(start_date, end_date):
+            year_month_key = f"{target_year}-{target_month:02d}"
 
-            # Calcular agregações
+            if 'year' in production_df.columns:
+                prod_month = production_df[
+                    (production_df['year'] == target_year) & (production_df['month'] == target_month)
+                ]
+            else:
+                prod_month = production_df[production_df['month'] == target_month]
+
+            if not breakdown_df.empty and 'year' in breakdown_df.columns:
+                breakdown_month = breakdown_df[
+                    (breakdown_df['year'] == target_year) & (breakdown_df['month'] == target_month)
+                ]
+            elif not breakdown_df.empty:
+                breakdown_month = breakdown_df[breakdown_df['month'] == target_month]
+            else:
+                breakdown_month = breakdown_df.iloc[0:0]  # DataFrame vazio tipado
+
             total_active_hours = prod_month['horasact'].sum()
 
             if breakdown_month.empty:
                 num_failures = 0
-                total_breakdown_minutes = 0
+                total_breakdown_minutes = 0.0
             else:
                 num_failures = len(breakdown_month)
                 total_breakdown_minutes = breakdown_month['duracao_min'].sum()
 
             total_breakdown_hours = total_breakdown_minutes / 60.0
 
-            # Calcular KPIs (mesma lógica dos debug cards)
             if num_failures > 0 and total_active_hours > 0:
                 mtbf = (total_active_hours - total_breakdown_hours) / num_failures
                 mttr = total_breakdown_hours / num_failures
                 breakdown_rate = (total_breakdown_hours / total_active_hours) * 100
             elif total_active_hours > 0:
-                # Sem falhas
                 mtbf = 999.0
                 mttr = 0.0
                 breakdown_rate = 0.0
             else:
-                # Sem dados
                 continue
 
-            result[month] = {
+            result[year_month_key] = {
                 "mtbf": round(mtbf, 1),
-                "mttr": round(mttr, 4),  # MTTR em horas (será convertido para minutos na exibição)
+                "mttr": round(mttr, 4),  # em horas
                 "breakdown_rate": round(breakdown_rate, 2)
             }
 

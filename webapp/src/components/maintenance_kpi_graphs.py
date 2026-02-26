@@ -1080,16 +1080,16 @@ def create_performance_radar_chart(equipment_data: Dict[str, float],
 
 
 def create_breakdown_calendar_heatmap(equipment_id: str,
-                                       year: int,
-                                       months: List[int],
+                                       start_date,
+                                       end_date,
                                        template: str = 'minty') -> go.Figure:
     """
     Cria calendar heatmap mostrando padrões de falhas ao longo dos dias.
 
     Args:
         equipment_id: ID do equipamento
-        year: Ano
-        months: Lista de meses
+        start_date: datetime de início do período
+        end_date: datetime de fim do período
         template: 'minty' ou 'darkly'
 
     Returns:
@@ -1099,19 +1099,21 @@ def create_breakdown_calendar_heatmap(equipment_id: str,
         from datetime import datetime, timedelta
         import calendar as cal
 
-
         is_dark = (template == 'darkly')
         bg_color = '#2c2c2c' if is_dark else '#ffffff'
         text_color = '#e9ecef' if is_dark else '#2c3e50'
 
         # Validar parâmetros
-        if not months or len(months) == 0:
+        if start_date is None or end_date is None:
             return create_no_data_figure("heatmap", template)
 
-        # Gerar todos os dias do período
-        start_date = datetime(year, min(months), 1)
-        end_month = max(months)
-        end_date = datetime(year, end_month, cal.monthrange(year, end_month)[1])
+        # Normalizar para datetime sem fuso
+        if hasattr(start_date, 'tzinfo') and start_date.tzinfo:
+            start_date = start_date.replace(tzinfo=None)
+        if hasattr(end_date, 'tzinfo') and end_date.tzinfo:
+            end_date = end_date.replace(tzinfo=None)
+        # Garantir que end_date aponta para o último instante do dia
+        end_date = end_date.replace(hour=23, minute=59, second=59)
 
 
         # ✅ OTIMIZAÇÃO: Agregação única ao invés de loop de consultas

@@ -204,59 +204,55 @@ def register_maintenance_kpi_callbacks(app):
         if not ref_year:
             ref_year = 2026  # Ano padrão onde os dados ZPP estão disponíveis
 
-        from datetime import date as _date, datetime as _datetime
+        from datetime import datetime as _datetime
+        from src.utils.zpp_kpi_calculator import _get_month_periods
 
+        # ── Calcular start_date_dt / end_date_dt para todos os tipos de período ──
+        # Suporta ranges multi-ano (ex: Out/2025 → Fev/2026) sem truncar no fim do ano.
         if period_type == "year":
-            # Todos os meses do ano selecionado
-            months = list(range(1, 13))
             year = ref_year
+            start_date_dt = _datetime(year, 1, 1)
+            end_date_dt = _datetime(year, 12, 31, 23, 59, 59)
             period_start = f"{year}-01-01"
             period_end = f"{year}-12-31"
 
         elif period_type == "custom":
-            # Período personalizado via date range
             if not start_date or not end_date:
                 # Fallback: usar ano completo
                 year = ref_year
-                months = list(range(1, 13))
+                start_date_dt = _datetime(year, 1, 1)
+                end_date_dt = _datetime(year, 12, 31, 23, 59, 59)
                 period_start = f"{year}-01-01"
                 period_end = f"{year}-12-31"
             else:
-                start = _datetime.fromisoformat(start_date) if isinstance(start_date, str) else start_date
-                end = _datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
-
-                year = start.year
-                # Gerar lista de meses entre start e end
-                # LIMITAÇÃO: Apenas meses do mesmo ano (start.year)
-                months = []
-                current = start
-                while current <= end and current.year == start.year:
-                    if current.month not in months:
-                        months.append(current.month)
-                    # Avançar para próximo mês
-                    if current.month == 12:
-                        break
-                    current = current.replace(month=current.month + 1)
-
-                months = sorted(months) if months else [start.month]
+                start_date_dt = _datetime.fromisoformat(start_date) if isinstance(start_date, str) else start_date
+                end_date_dt = _datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
                 period_start = start_date if isinstance(start_date, str) else start_date.isoformat()
                 period_end = end_date if isinstance(end_date, str) else end_date.isoformat()
+                year = start_date_dt.year  # Ano de início (para compatibilidade em display)
 
         else:
             # Fallback: ano completo
             year = ref_year
-            months = list(range(1, 13))
+            start_date_dt = _datetime(year, 1, 1)
+            end_date_dt = _datetime(year, 12, 31, 23, 59, 59)
             period_start = f"{year}-01-01"
             period_end = f"{year}-12-31"
 
-        # Buscar dados reais - INTEGRAÇÃO ZPP
+        # Derivar months e year_months a partir do range completo (suporta multi-ano)
+        all_periods = _get_month_periods(start_date_dt, end_date_dt)
+        months = sorted(set(m for (_, m) in all_periods))            # Flat ints (para labels)
+        year_months = [f"{y}-{m:02d}" for (y, m) in all_periods]    # "YYYY-MM" (filtro preciso)
 
+        # Buscar dados reais - INTEGRAÇÃO ZPP
         data = {}
         all_equipment = []
         has_data = False
 
-        logger.debug("ZPP_KPI_AVAILABLE=%s, buscando dados year=%d months=%s",
-                    ZPP_KPI_AVAILABLE, year, months)
+        logger.debug(
+            "ZPP_KPI_AVAILABLE=%s, buscando dados %s → %s (%d períodos)",
+            ZPP_KPI_AVAILABLE, start_date_dt.date(), end_date_dt.date(), len(all_periods)
+        )
 
         # Normalizar lista de códigos selecionados
         from src.utils.zpp_kpi_calculator import BREAKDOWN_CODES as _DEFAULT_CODES
@@ -265,7 +261,7 @@ def register_maintenance_kpi_callbacks(app):
         if ZPP_KPI_AVAILABLE:
             try:
                 # Tentar buscar dados reais do ZPP (com filtro de códigos selecionados)
-                data = fetch_zpp_kpi_data(year, months, breakdown_codes=active_codes)
+                data = fetch_zpp_kpi_data(start_date_dt, end_date_dt, breakdown_codes=active_codes)
                 all_equipment = list(data.keys())
                 has_data = len(data) > 0
 
@@ -291,7 +287,6 @@ def register_maintenance_kpi_callbacks(app):
                 names = get_zpp_equipment_names()
                 categories = get_zpp_equipment_categories()
 
-                # Log diagnóstico: verificar se categorias foram carregadas
                 logger.debug("Nomes carregados: %d equipamentos", len(names))
                 logger.info("Categorias carregadas: %d categorias", len(categories))
 
@@ -310,7 +305,7 @@ def register_maintenance_kpi_callbacks(app):
                     str(e),
                     exc_info=True
                 )
-                names = {eq: eq for eq in all_equipment}  # Fallback: usar IDs como nomes
+                names = {eq: eq for eq in all_equipment}
                 categories = {}
         else:
             logger.debug("Usando nomes/categorias vazias (has_data=%s, ZPP_AVAILABLE=%s)",
@@ -329,7 +324,10 @@ def register_maintenance_kpi_callbacks(app):
         if has_data:
             from src.utils.maintenance_demo_data import calculate_general_avg_by_month
             try:
-                monthly_aggregates = calculate_general_avg_by_month(data, all_equipment, months, year=year)
+                monthly_aggregates = calculate_general_avg_by_month(
+                    data, all_equipment,
+                    start_date=start_date_dt, end_date=end_date_dt
+                )
             except Exception as e:
                 monthly_aggregates = None
 
@@ -337,24 +335,21 @@ def register_maintenance_kpi_callbacks(app):
         data_coverage = {}
         if has_data and ZPP_KPI_AVAILABLE:
             try:
-                data_coverage = get_zpp_data_coverage(year, months, breakdown_codes=active_codes)
+                data_coverage = get_zpp_data_coverage(
+                    start_date_dt, end_date_dt, breakdown_codes=active_codes
+                )
             except Exception as e:
                 logger.error("Erro ao buscar cobertura ZPP: %s", e)
 
         # Processar seleção de equipamentos para gráficos
-        # all_equipment = TODOS (usado para cards gerais da planta)
-        # selected_equipment_ids = FILTRADOS (usado para gráficos)
         if not selected_equipment or len(selected_equipment) == 0:
-            # Se nenhum selecionado, usar todos EXCETO os excluídos por padrão
             selected_equipment_ids = [
                 eq for eq in all_equipment
                 if eq not in EQUIPMENT_EXCLUDED_BY_DEFAULT
             ]
         else:
-            # Usar seleção do usuário
             selected_equipment_ids = [eq for eq in selected_equipment if eq in all_equipment]
 
-        # Log diagnóstico: verificar o que está sendo armazenado no store
         logger.debug(
             "Armazenando no store: %d equipamentos total, %d selecionados para gráficos, %d categorias",
             len(all_equipment), len(selected_equipment_ids), len(categories)
@@ -369,19 +364,22 @@ def register_maintenance_kpi_callbacks(app):
             "period_type": period_type,
             "period_start": period_start,
             "period_end": period_end,
-            "year": year,
-            "months": months,
-            "equipment_ids": all_equipment,  # TODOS os equipamentos (para cards gerais)
-            "selected_equipment_ids": selected_equipment_ids,  # Filtrados (para gráficos)
+            "start_date": start_date_dt.isoformat(),   # Novo: datetime de início do período
+            "end_date": end_date_dt.isoformat(),        # Novo: datetime de fim do período
+            "year": year,                               # Ano de início (compatibilidade display)
+            "months": months,                           # Meses únicos flat (compatibilidade labels)
+            "year_months": year_months,                 # "YYYY-MM" para filtro multi-ano preciso
+            "equipment_ids": all_equipment,
+            "selected_equipment_ids": selected_equipment_ids,
             "data": data,
-            "targets": general_target,  # Meta geral (para compatibilidade)
-            "equipment_targets": equipment_targets,  # Metas por equipamento
+            "targets": general_target,
+            "equipment_targets": equipment_targets,
             "names": names,
             "categories": categories,
-            "has_data": has_data,  # Indicador se há dados disponíveis
-            "monthly_aggregates": monthly_aggregates,  # Cache de agregações mensais
-            "data_coverage": data_coverage,  # Último dia e nº dias por collection
-            "selected_breakdown_codes": active_codes,  # Códigos de avaria filtrados
+            "has_data": has_data,
+            "monthly_aggregates": monthly_aggregates,
+            "data_coverage": data_coverage,
+            "selected_breakdown_codes": active_codes,
         }
 
     # ============================================================
@@ -459,7 +457,7 @@ def register_maintenance_kpi_callbacks(app):
         monthly_aggregates = stored_data.get("monthly_aggregates")
 
         # Calcular médias (usando cache de monthly_aggregates do store)
-        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates, year_months=stored_data.get("year_months"))
 
         # Se não houver médias válidas após o cálculo
         if not averages.get("by_equipment"):
@@ -605,7 +603,7 @@ def register_maintenance_kpi_callbacks(app):
             eq_data = data.get(eq_id, [])
 
         # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
-        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates, year_months=stored_data.get("year_months"))
 
         # Verificar se há dados válidos
         if not averages.get("by_equipment"):
@@ -735,7 +733,7 @@ def register_maintenance_kpi_callbacks(app):
             logger.warning("Sunburst recebeu categorias VAZIO do store")
 
         # Calcular médias por equipamento SELECIONADO (usando cache de monthly_aggregates do store)
-        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates, year_months=stored_data.get("year_months"))
 
         if not averages.get("by_equipment"):
             return [
@@ -830,11 +828,20 @@ def register_maintenance_kpi_callbacks(app):
         data = stored_data["data"]
         equipment_ids = stored_data["equipment_ids"]
         months = stored_data["months"]
+        year_months = stored_data.get("year_months") or [f"{stored_data.get('year', 2026)}-{m:02d}" for m in months]
         equipment_targets = stored_data.get("equipment_targets", {})
-        year = stored_data.get("year", 2026)
 
-        # Calcular médias gerais por mês (AGREGANDO dados brutos)
-        general_avg_by_month = calculate_general_avg_by_month(data, equipment_ids, months, year=year)
+        from datetime import datetime as _dt
+        _sd = stored_data.get("start_date")
+        _ed = stored_data.get("end_date")
+        _start_dt = _dt.fromisoformat(_sd) if _sd else None
+        _end_dt = _dt.fromisoformat(_ed) if _ed else None
+
+        # Calcular médias gerais por mês (AGREGANDO dados brutos, suporta multi-ano)
+        general_avg_by_month = calculate_general_avg_by_month(
+            data, equipment_ids,
+            start_date=_start_dt, end_date=_end_dt
+        )
 
         if not general_avg_by_month:
             return [
@@ -843,10 +850,12 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("linha", template)
             ]
 
-        # Extrair valores por mês
-        mtbf_values = [general_avg_by_month[m]["mtbf"] for m in months if m in general_avg_by_month]
-        mttr_values = [general_avg_by_month[m]["mttr"] for m in months if m in general_avg_by_month]
-        breakdown_values = [general_avg_by_month[m]["breakdown_rate"] for m in months if m in general_avg_by_month]
+        # Extrair valores na ordem cronológica dos year_months
+        mtbf_values = [general_avg_by_month[ym]["mtbf"] for ym in year_months if ym in general_avg_by_month]
+        mttr_values = [general_avg_by_month[ym]["mttr"] for ym in year_months if ym in general_avg_by_month]
+        breakdown_values = [general_avg_by_month[ym]["breakdown_rate"] for ym in year_months if ym in general_avg_by_month]
+        # Meses presentes nos dados (para labels no eixo X)
+        months_present = [int(ym.split("-")[1]) for ym in year_months if ym in general_avg_by_month]
 
         # Obter meta geral da planta
         general_target = equipment_targets.get("GENERAL", {"mtbf": 0, "mttr": 999, "breakdown_rate": 100, "alert_range": 3.0})
@@ -854,7 +863,7 @@ def register_maintenance_kpi_callbacks(app):
 
         # Criar gráficos de linha (sem linha de média, pois JÁ É a média da planta)
         fig_mtbf = create_kpi_line_chart(
-            months, mtbf_values, None,  # None = não mostrar linha de comparação
+            months_present, mtbf_values, None,
             "MTBF", "Média da Planta",
             general_target.get("mtbf", 0),
             template,
@@ -862,7 +871,7 @@ def register_maintenance_kpi_callbacks(app):
         )
 
         fig_mttr = create_kpi_line_chart(
-            months, mttr_values, None,
+            months_present, mttr_values, None,
             "MTTR", "Média da Planta",
             general_target.get("mttr", 999),
             template,
@@ -870,7 +879,7 @@ def register_maintenance_kpi_callbacks(app):
         )
 
         fig_breakdown = create_kpi_line_chart(
-            months, breakdown_values, None,
+            months_present, breakdown_values, None,
             "Taxa de Avaria", "Média da Planta",
             general_target.get("breakdown_rate", 100),
             template,
@@ -913,7 +922,7 @@ def register_maintenance_kpi_callbacks(app):
         monthly_aggregates = stored_data.get("monthly_aggregates")
 
         # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
-        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates, year_months=stored_data.get("year_months"))
 
         if not averages.get("by_equipment"):
             return html.Div([
@@ -969,6 +978,7 @@ def register_maintenance_kpi_callbacks(app):
         categories = stored_data.get("categories", {})
         equipment_ids = stored_data.get("equipment_ids", [])  # Todos os equipamentos, igual aos cards do topo
         months = stored_data.get("months", [])
+        year_months = stored_data.get("year_months")
 
         # Mapa reverso: eq_id → categoria
         eq_category = {
@@ -982,7 +992,10 @@ def register_maintenance_kpi_callbacks(app):
         for eq_id in equipment_ids:
             if eq_id not in data:
                 continue
-            monthly_list = [m for m in data[eq_id] if m["month"] in months]
+            if year_months:
+                monthly_list = [m for m in data[eq_id] if m.get("year_month") in year_months]
+            else:
+                monthly_list = [m for m in data[eq_id] if m["month"] in months]
             if not monthly_list:
                 continue
 
@@ -1151,10 +1164,18 @@ def register_maintenance_kpi_callbacks(app):
 
         # Agregar todos os equipamentos por mês (igual ao que calculate_general_avg_by_month faz)
         monthly_debug_rows = []
-        for month in sorted(months):
-            m_act_h  = sum(m.get("total_active_hours", 0.0)       for eq in equipment_ids if eq in data for m in data[eq] if m["month"] == month)
-            m_bd_min = sum(m.get("total_breakdown_minutes", 0.0)  for eq in equipment_ids if eq in data for m in data[eq] if m["month"] == month)
-            m_fail   = sum(m.get("num_failures", 0)               for eq in equipment_ids if eq in data for m in data[eq] if m["month"] == month)
+        # Usar year_months para correta distinção em ranges multi-ano
+        _ym_list = year_months if year_months else [f"????-{m:02d}" for m in sorted(months)]
+        for ym in _ym_list:
+            month = int(ym.split("-")[1])
+            if year_months:
+                m_act_h  = sum(m.get("total_active_hours", 0.0)       for eq in equipment_ids if eq in data for m in data[eq] if m.get("year_month") == ym)
+                m_bd_min = sum(m.get("total_breakdown_minutes", 0.0)  for eq in equipment_ids if eq in data for m in data[eq] if m.get("year_month") == ym)
+                m_fail   = sum(m.get("num_failures", 0)               for eq in equipment_ids if eq in data for m in data[eq] if m.get("year_month") == ym)
+            else:
+                m_act_h  = sum(m.get("total_active_hours", 0.0)       for eq in equipment_ids if eq in data for m in data[eq] if m["month"] == month)
+                m_bd_min = sum(m.get("total_breakdown_minutes", 0.0)  for eq in equipment_ids if eq in data for m in data[eq] if m["month"] == month)
+                m_fail   = sum(m.get("num_failures", 0)               for eq in equipment_ids if eq in data for m in data[eq] if m["month"] == month)
             m_bd_h   = m_bd_min / 60.0
 
             if m_fail > 0 and m_act_h > 0:
@@ -1168,8 +1189,10 @@ def register_maintenance_kpi_callbacks(app):
             else:
                 m_mtbf = m_mttr_min = m_bd_rate = None
 
+            _year_str = ym.split("-")[0]
+            _mes_label = f"{_MN[month - 1]}/{_year_str[2:]}" if len(set(ym.split('-')[0] for ym in _ym_list)) > 1 else _MN[month - 1]
             monthly_debug_rows.append({
-                "mes":       _MN[month - 1],
+                "mes":       _mes_label,
                 "falhas":    m_fail,
                 "act_h":     round(m_act_h, 2),
                 "bd_h":      round(m_bd_h, 2),
@@ -1576,7 +1599,7 @@ def register_maintenance_kpi_callbacks(app):
         monthly_aggregates = stored_data.get("monthly_aggregates")
 
         # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
-        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates, year_months=stored_data.get("year_months"))
 
         if not averages.get("by_equipment") or equipment_id not in averages["by_equipment"]:
             return ["--", "--", "--"]
@@ -1629,7 +1652,7 @@ def register_maintenance_kpi_callbacks(app):
         monthly_aggregates = stored_data.get("monthly_aggregates")
 
         # Calcular médias por equipamento (usando cache de monthly_aggregates do store)
-        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates)
+        averages = calculate_kpi_averages(data, equipment_ids, months, year=year, monthly_aggregates=monthly_aggregates, year_months=stored_data.get("year_months"))
 
         if not averages.get("by_equipment") or equipment_id not in averages["by_equipment"]:
             return [
@@ -1731,14 +1754,22 @@ def register_maintenance_kpi_callbacks(app):
             ]
 
         data = stored_data["data"]
-        equipment_targets = stored_data["equipment_targets"]  # ALTERADO: Usar metas por equipamento
+        equipment_targets = stored_data["equipment_targets"]
         names = stored_data["names"]
         months = stored_data["months"]
+        year_months = stored_data.get("year_months") or [f"{stored_data.get('year', 2026)}-{m:02d}" for m in months]
         all_equipment = stored_data["equipment_ids"]
-        year = stored_data.get("year", 2026)
 
-        # Calcular médias gerais por mês (AGREGANDO dados brutos)
-        general_avg_by_month = calculate_general_avg_by_month(data, all_equipment, months, year=year)
+        from datetime import datetime as _dt
+        _sd = stored_data.get("start_date")
+        _ed = stored_data.get("end_date")
+        _start_dt = _dt.fromisoformat(_sd) if _sd else None
+        _end_dt = _dt.fromisoformat(_ed) if _ed else None
+
+        # Calcular médias gerais por mês (AGREGANDO dados brutos, suporta multi-ano)
+        general_avg_by_month = calculate_general_avg_by_month(
+            data, all_equipment, start_date=_start_dt, end_date=_end_dt
+        )
 
         # Dados do equipamento selecionado
         eq_data_by_month = data.get(equipment_id, [])
@@ -1752,30 +1783,30 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("heatmap", template)
             ]
 
-        # Extrair valores por mês (mantendo None para meses sem dados)
-        # Garantir que temos um valor para cada mês solicitado
+        # Lookup por year_month (preciso para multi-ano)
+        eq_data_dict = {m.get("year_month", f"????-{m['month']:02d}"): m for m in eq_data_by_month}
+
         mtbf_values = []
         mttr_values = []
         breakdown_values = []
+        months_present = []
 
-        # Criar dicionário de dados por mês para lookup rápido
-        eq_data_dict = {m["month"]: m for m in eq_data_by_month}
-
-        for month in months:
-            if month in eq_data_dict:
-                mtbf_values.append(eq_data_dict[month]["mtbf"])
-                mttr_values.append(eq_data_dict[month]["mttr"])
-                breakdown_values.append(eq_data_dict[month]["breakdown_rate"])
+        for ym in year_months:
+            month_int = int(ym.split("-")[1])
+            if ym in eq_data_dict:
+                mtbf_values.append(eq_data_dict[ym]["mtbf"])
+                mttr_values.append(eq_data_dict[ym]["mttr"])
+                breakdown_values.append(eq_data_dict[ym]["breakdown_rate"])
             else:
-                # Mês sem dados - usar None
                 mtbf_values.append(None)
                 mttr_values.append(None)
                 breakdown_values.append(None)
+            months_present.append(month_int)
 
-        # Médias gerais por mês
-        mtbf_avg = [general_avg_by_month.get(m, {}).get("mtbf") for m in months]
-        mttr_avg = [general_avg_by_month.get(m, {}).get("mttr") for m in months]
-        breakdown_avg = [general_avg_by_month.get(m, {}).get("breakdown_rate") for m in months]
+        # Médias gerais por mês (indexadas por year_month)
+        mtbf_avg = [general_avg_by_month.get(ym, {}).get("mtbf") for ym in year_months]
+        mttr_avg = [general_avg_by_month.get(ym, {}).get("mttr") for ym in year_months]
+        breakdown_avg = [general_avg_by_month.get(ym, {}).get("breakdown_rate") for ym in year_months]
 
         # Verificar se há pelo menos UM valor não-None em cada lista
         has_valid_data = (
@@ -1802,7 +1833,7 @@ def register_maintenance_kpi_callbacks(app):
 
         # Criar gráficos de linha com meta individualizada
         fig_mtbf = create_kpi_line_chart(
-            months, mtbf_values, mtbf_avg,
+            months_present, mtbf_values, mtbf_avg,
             "MTBF", names.get(equipment_id, equipment_id),
             eq_target.get("mtbf", 0),
             template,
@@ -1810,7 +1841,7 @@ def register_maintenance_kpi_callbacks(app):
         )
 
         fig_mttr = create_kpi_line_chart(
-            months, mttr_values, mttr_avg,
+            months_present, mttr_values, mttr_avg,
             "MTTR", names.get(equipment_id, equipment_id),
             eq_target.get("mttr", 999),
             template,
@@ -1818,7 +1849,7 @@ def register_maintenance_kpi_callbacks(app):
         )
 
         fig_breakdown = create_kpi_line_chart(
-            months, breakdown_values, breakdown_avg,
+            months_present, breakdown_values, breakdown_avg,
             "Taxa de Avaria", names.get(equipment_id, equipment_id),
             eq_target.get("breakdown_rate", 100),
             template,
@@ -1853,9 +1884,8 @@ def register_maintenance_kpi_callbacks(app):
         )
 
         # Calendar heatmap (✅ OTIMIZADO: usa agregação ao invés de loop)
-        year = stored_data.get("year", 2026)
         fig_calendar, stats = create_breakdown_calendar_heatmap(
-            equipment_id, year, months, template
+            equipment_id, _start_dt, _end_dt, template
         )
 
         # Criar card de estatísticas em 2 colunas
@@ -1950,18 +1980,21 @@ def register_maintenance_kpi_callbacks(app):
             # Retornar figura com mensagem de sem dados
             return create_no_data_figure("paradas", template)
 
-        year = stored_data.get("year")
-        months = stored_data.get("months", [])
         names = stored_data.get("names", {})
         active_codes = stored_data.get("selected_breakdown_codes") or None
 
         # Buscar top 5 paradas do equipamento (com filtro de códigos ativo)
         if ZPP_KPI_AVAILABLE:
             try:
+                from datetime import datetime as _dt
+                _sd = stored_data.get("start_date")
+                _ed = stored_data.get("end_date")
+                _start_dt = _dt.fromisoformat(_sd) if _sd else _dt(stored_data.get("year", 2026), 1, 1)
+                _end_dt = _dt.fromisoformat(_ed) if _ed else _dt(stored_data.get("year", 2026), 12, 31, 23, 59, 59)
                 breakdowns_data = fetch_top_breakdowns_by_equipment(
                     equipment_id=equipment_id,
-                    year=year,
-                    months=months,
+                    start_date=_start_dt,
+                    end_date=_end_dt,
                     top_n=5,
                     breakdown_codes=active_codes
                 )
