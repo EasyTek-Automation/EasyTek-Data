@@ -192,27 +192,9 @@ def register_maintenance_kpi_callbacks(app):
                 "categories": {}
             }
 
-        # IMPORTANTE: Verificar se dados estão COMPLETOS (incluindo categorias)
-        # Se store tem dados MAS não tem categorias, precisa recarregar tudo
-        has_complete_data = (
-            current_data and
-            current_data.get("data") and
-            current_data.get("categories")  # ← CRÍTICO: Verificar categorias também!
-        )
-
-        if trigger_id == "interval-initial-load" and has_complete_data:
-            # Interval disparou e temos dados COMPLETOS - apenas atualizar metas sem recarregar ZPP
-            logger.debug("Interval: dados completos no store, apenas atualizando metas")
-            logger.debug("Store: %d equipamentos, %d categorias",
-                        len(current_data.get("equipment_ids", [])),
-                        len(current_data.get("categories", {})))
-            current_data["equipment_targets"] = get_all_equipment_targets()
-            current_data["targets"] = get_kpi_targets("GENERAL")
-            return current_data
-        elif trigger_id == "interval-initial-load" and current_data and current_data.get("data"):
-            # Store tem dados mas SEM categorias - forçar recarga completa
-            logger.warning("Store sem categorias - forçando recarga completa")
-            # Continua para o fluxo normal de recarga abaixo
+        # Sempre fazer recarga completa — sem cache condicional.
+        # O store usa storage_type='memory', então já é limpo no refresh da página.
+        # Cache condicional causava dados desatualizados e race conditions.
 
         # Validar inputs baseado no tipo
         # Padrão: sempre usar modo "year" (ano completo)
@@ -1361,84 +1343,81 @@ def register_maintenance_kpi_callbacks(app):
     )
     def refresh_data(n_clicks, current_data):
         """
-        Força atualização completa de dados E metas do MongoDB.
-        Útil após salvar novas metas na página de configuração.
+        Força atualização completa de dados E metas do MongoDB,
+        reconstruindo o store inteiramente (sem mutar o dict atual).
         """
         if not current_data:
             raise PreventUpdate
 
-
         year = current_data.get("year", 2026)
         months = current_data.get("months", list(range(1, 13)))
+        period_type = current_data.get("period_type", "year")
+        period_start = current_data.get("period_start", f"{year}-01-01")
+        period_end = current_data.get("period_end", f"{year}-12-31")
         active_codes = current_data.get("selected_breakdown_codes") or None
 
-        # PASSO 1: Atualizar metas do MongoDB (SEMPRE)
         equipment_targets = get_all_equipment_targets()
         general_targets = get_kpi_targets("GENERAL")
 
-        # PASSO 2: Re-buscar dados do ZPP (com mesmos códigos de avaria)
         new_data = {}
         has_data = False
+        names = {}
+        categories = {}
+        all_equipment = []
 
         if ZPP_KPI_AVAILABLE:
             try:
                 new_data = fetch_zpp_kpi_data(year, months, breakdown_codes=active_codes)
+                all_equipment = list(new_data.keys())
                 has_data = len(new_data) > 0
-
-                if has_data:
-                    pass
-                else:
-                    pass
             except Exception as e:
-                has_data = False
-        else:
-            has_data = False
+                logger.error("Refresh: erro ao buscar dados ZPP: %s", e)
 
-        # Atualizar nomes e categorias se houver dados
         if has_data and ZPP_KPI_AVAILABLE:
             try:
-                current_data["names"] = get_zpp_equipment_names()
-                current_data["categories"] = get_zpp_equipment_categories()
-                current_data["equipment_ids"] = list(new_data.keys())
+                names = get_zpp_equipment_names()
+                categories = get_zpp_equipment_categories()
             except Exception as e:
-                pass
+                logger.error("Refresh: erro ao buscar nomes/categorias: %s", e)
+                names = {eq: eq for eq in all_equipment}
 
-        # Atualizar store com novos dados e metas
-        current_data["data"] = new_data
-        current_data["has_data"] = has_data
-        current_data["equipment_targets"] = equipment_targets
-        current_data["targets"] = general_targets
+        monthly_aggregates = None
+        if has_data:
+            try:
+                monthly_aggregates = calculate_general_avg_by_month(new_data, all_equipment, months, year=year)
+            except Exception as e:
+                logger.error("Refresh: erro ao calcular monthly_aggregates: %s", e)
 
-        return current_data
+        data_coverage = {}
+        if has_data and ZPP_KPI_AVAILABLE:
+            try:
+                data_coverage = get_zpp_data_coverage(year, months, breakdown_codes=active_codes)
+            except Exception as e:
+                logger.error("Refresh: erro ao buscar cobertura: %s", e)
 
-    # ============================================================
-    # CALLBACK 8B: Auto-refresh ao navegar para a página
-    # ============================================================
-    @app.callback(
-        Output("store-indicator-filters", "data", allow_duplicate=True),
-        [Input("url", "pathname")],
-        [State("store-indicator-filters", "data")],
-        prevent_initial_call=True
-    )
-    def auto_refresh_on_navigation(pathname, current_data):
-        """
-        Atualiza metas quando usuário navega de volta para a página de indicadores.
-        Útil após salvar metas na página de configuração.
-        """
-        # Apenas atualizar se estiver na página de indicadores
-        if pathname != "/maintenance/indicators":
-            raise PreventUpdate
+        selected_equipment_ids = [
+            eq for eq in all_equipment
+            if eq not in EQUIPMENT_EXCLUDED_BY_DEFAULT
+        ]
 
-        # Se não há dados ainda, deixar o interval inicial carregar
-        if not current_data or not current_data.get("data"):
-            raise PreventUpdate
-
-
-        # Atualizar apenas as metas (não recarregar dados pesados do ZPP)
-        current_data["equipment_targets"] = get_all_equipment_targets()
-        current_data["targets"] = get_kpi_targets("GENERAL")
-
-        return current_data
+        return {
+            "period_type": period_type,
+            "period_start": period_start,
+            "period_end": period_end,
+            "year": year,
+            "months": months,
+            "equipment_ids": all_equipment,
+            "selected_equipment_ids": selected_equipment_ids,
+            "data": new_data,
+            "targets": general_targets,
+            "equipment_targets": equipment_targets,
+            "names": names,
+            "categories": categories,
+            "has_data": has_data,
+            "monthly_aggregates": monthly_aggregates,
+            "data_coverage": data_coverage,
+            "selected_breakdown_codes": active_codes,
+        }
 
     # ============================================================
     # CALLBACK 9: Popular Dropdown de Equipamentos
