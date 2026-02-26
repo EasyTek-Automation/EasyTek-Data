@@ -1333,91 +1333,24 @@ def register_maintenance_kpi_callbacks(app):
         )
 
     # ============================================================
-    # CALLBACK 8: Botão Atualizar (Refresh)
+    # CALLBACK 8: Botão Atualizar → delega para Aplicar Filtros
+    # Opção C (clientside): evita duplicação de lógica de fetch.
+    # "Atualizar" usa os filtros ATUAIS do header (não os do store).
+    # DÍVIDA TÉCNICA: ver .dev-docs/technical-debt/indicadores-botao-atualizar.md
     # ============================================================
-    @app.callback(
-        Output("store-indicator-filters", "data", allow_duplicate=True),
+    app.clientside_callback(
+        "function(n) { if (!n) return window.dash_clientside.no_update; return n; }",
+        Output("btn-apply-indicator-filters", "n_clicks"),
         Input("btn-refresh-indicators", "n_clicks"),
-        State("store-indicator-filters", "data"),
         prevent_initial_call=True
     )
-    def refresh_data(n_clicks, current_data):
-        """
-        Força atualização completa de dados E metas do MongoDB,
-        reconstruindo o store inteiramente (sem mutar o dict atual).
-        """
-        if not current_data:
-            raise PreventUpdate
 
-        year = current_data.get("year", 2026)
-        months = current_data.get("months", list(range(1, 13)))
-        period_type = current_data.get("period_type", "year")
-        period_start = current_data.get("period_start", f"{year}-01-01")
-        period_end = current_data.get("period_end", f"{year}-12-31")
-        active_codes = current_data.get("selected_breakdown_codes") or None
-
-        equipment_targets = get_all_equipment_targets()
-        general_targets = get_kpi_targets("GENERAL")
-
-        new_data = {}
-        has_data = False
-        names = {}
-        categories = {}
-        all_equipment = []
-
-        if ZPP_KPI_AVAILABLE:
-            try:
-                new_data = fetch_zpp_kpi_data(year, months, breakdown_codes=active_codes)
-                all_equipment = list(new_data.keys())
-                has_data = len(new_data) > 0
-            except Exception as e:
-                logger.error("Refresh: erro ao buscar dados ZPP: %s", e)
-
-        if has_data and ZPP_KPI_AVAILABLE:
-            try:
-                names = get_zpp_equipment_names()
-                categories = get_zpp_equipment_categories()
-            except Exception as e:
-                logger.error("Refresh: erro ao buscar nomes/categorias: %s", e)
-                names = {eq: eq for eq in all_equipment}
-
-        monthly_aggregates = None
-        if has_data:
-            try:
-                monthly_aggregates = calculate_general_avg_by_month(new_data, all_equipment, months, year=year)
-            except Exception as e:
-                logger.error("Refresh: erro ao calcular monthly_aggregates: %s", e)
-
-        data_coverage = {}
-        if has_data and ZPP_KPI_AVAILABLE:
-            try:
-                data_coverage = get_zpp_data_coverage(year, months, breakdown_codes=active_codes)
-            except Exception as e:
-                logger.error("Refresh: erro ao buscar cobertura: %s", e)
-
-        selected_equipment_ids = [
-            eq for eq in all_equipment
-            if eq not in EQUIPMENT_EXCLUDED_BY_DEFAULT
-        ]
-
-        return {
-            "period_type": period_type,
-            "period_start": period_start,
-            "period_end": period_end,
-            "year": year,
-            "months": months,
-            "equipment_ids": all_equipment,
-            "selected_equipment_ids": selected_equipment_ids,
-            "data": new_data,
-            "targets": general_targets,
-            "equipment_targets": equipment_targets,
-            "names": names,
-            "categories": categories,
-            "has_data": has_data,
-            "monthly_aggregates": monthly_aggregates,
-            "data_coverage": data_coverage,
-            "selected_breakdown_codes": active_codes,
-        }
+    # REMOVIDO: refresh_data callback separado.
+    # Mantido aqui apenas para registrar o motivo da remoção:
+    # - Duplicava toda a lógica de process_filters_and_load_data
+    # - Não atualizava monthly_aggregates, data_coverage e period_start/end
+    # - Causava segundo escritor no store (potencial race condition)
+    # A delegação via clientside elimina todos esses problemas.
 
     # ============================================================
     # CALLBACK 9: Popular Dropdown de Equipamentos

@@ -14,9 +14,9 @@
 | Módulo | Total | 🔴 Alta | 🟡 Média | 🟢 Baixa | ✅ Concluído |
 |--------|-------|---------|----------|----------|--------------|
 | **ZPP Processing** | 9 | 3 | 3 | 3 | 0 |
-| **Webapp (KPI)** | 1 | 0 | 1 | 0 | 0 |
+| **Webapp (KPI)** | 2 | 0 | 1 | 1 | 0 |
 | Event Gateway | - | - | - | - | - |
-| **TOTAL** | **10** | **3** | **4** | **3** | **0** |
+| **TOTAL** | **11** | **3** | **4** | **4** | **0** |
 
 ---
 
@@ -72,6 +72,13 @@ Melhorias de código e performance.
 ### 🟢 Baixa Prioridade
 
 Nice-to-have, funcionalidades extras.
+
+#### Webapp (KPI)
+
+8. **[Semântica do Botão Atualizar](./indicadores-botao-atualizar.md)**
+   Definir comportamento claro entre "Atualizar" e "Aplicar Filtros"
+   `webapp/src/callbacks_registers/maintenance_kpi_callbacks.py` — CALLBACK 8
+   **Mitigação atual**: Opção C (clientside redirect) — funcional mas com UX ambígua
 
 #### ZPP Processing
 
@@ -135,8 +142,9 @@ Nice-to-have, funcionalidades extras.
 - **[zpp-processing-improvements.md](./zpp-processing-improvements.md)** - Melhorias ZPP detalhadas
 - **[filtro-inclusivo-month-boundary.md](./filtro-inclusivo-month-boundary.md)** - Otimização filtro de virada de mês
 - **[performance-indicators-kpi.md](./performance-indicators-kpi.md)** - Performance página indicadores
+- **[indicadores-botao-atualizar.md](./indicadores-botao-atualizar.md)** - Semântica do botão Atualizar
 - **[refatoracao-arquivos.md](./refatoracao-arquivos.md)** - Refatorações arquiteturais
 
 ---
 
-**Última atualização**: 2026-02-05
+**Última atualização**: 2026-02-26
