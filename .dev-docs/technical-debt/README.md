@@ -14,9 +14,9 @@
 | Módulo | Total | 🔴 Alta | 🟡 Média | 🟢 Baixa | ✅ Concluído |
 |--------|-------|---------|----------|----------|--------------|
 | **ZPP Processing** | 9 | 3 | 3 | 3 | 0 |
-| **Webapp (KPI)** | 2 | 0 | 1 | 1 | 0 |
+| **Webapp (KPI)** | 4 | 0 | 0 | 0 | 4 |
 | Event Gateway | - | - | - | - | - |
-| **TOTAL** | **11** | **3** | **4** | **4** | **0** |
+| **TOTAL** | **13** | **3** | **3** | **3** | **4** |
 
 ---
 
@@ -60,25 +60,11 @@ Melhorias de código e performance.
    Tornar `process_zpp_quick.py` configurável via argumentos
    `process_zpp_quick.py:16-18`
 
-#### Webapp (KPI)
-
-7. **[Filtro Inclusivo Month Boundary](./filtro-inclusivo-month-boundary.md)**
-   Otimizar filtro de virada de mês usando agregação MongoDB
-   `webapp/src/utils/zpp_kpi_calculator.py:81-420`
-   **Mitigação atual**: Cache em store (Opção A) - performance aceitável
-
 ---
 
 ### 🟢 Baixa Prioridade
 
 Nice-to-have, funcionalidades extras.
-
-#### Webapp (KPI)
-
-8. **[Semântica do Botão Atualizar](./indicadores-botao-atualizar.md)**
-   Definir comportamento claro entre "Atualizar" e "Aplicar Filtros"
-   `webapp/src/callbacks_registers/maintenance_kpi_callbacks.py` — CALLBACK 8
-   **Mitigação atual**: Opção C (clientside redirect) — funcional mas com UX ambígua
 
 #### ZPP Processing
 
@@ -98,9 +84,14 @@ Nice-to-have, funcionalidades extras.
 
 ## ✅ Concluídos
 
-| # | Item | Data | Responsável | Commit/PR |
-|---|------|------|-------------|-----------|
-| - | *(nenhum ainda)* | - | - | - |
+| # | Item | Data | Commit |
+|---|------|------|--------|
+| NR | **Cache persistente no `dcc.Store`** — Store de indicadores usava `storage_type="session"`, mantendo dados obsoletos entre navegações e causando exibição de KPIs errados ao retornar à página. Corrigido para `storage_type="memory"`. *(não registrado como dívida)* `webapp/src/pages/maintenance/indicators.py` | 2026-02-26 | `df806a9` |
+| NR | **Race condition nos callbacks de indicadores** — Callback de renderização de UI podia executar antes do callback de dados terminar, lendo um store vazio e gerando outputs inválidos. Eliminado reordenando as dependências de input/output. *(não registrado como dívida)* `maintenance_kpi_callbacks.py` | 2026-02-26 | `a6999c4` |
+| 7 | **Filtro Month Boundary / Filtro Multi-ano** — API `(year, months)` truncava filtro na virada de ano (loop `while current.year == start.year`), tornando impossível consultas como Out/2025 → Fev/2026. Refatorado para API `(start_date, end_date)` com helper `_get_month_periods()` gerando tuplas `(year, month)` corretamente através de qualquer fronteira de ano. Chaves `year_months` ("YYYY-MM") adicionadas ao store para filtro preciso. Ver [filtro-inclusivo-month-boundary.md](./filtro-inclusivo-month-boundary.md) | 2026-02-26 | `852b159` |
+| 8 | **Semântica do Botão Atualizar** — Callback Python do `btn-atualizar` replicava toda a lógica do `btn-aplicar`, causando chamadas duplicadas ao MongoDB. Substituído por clientside callback que delega o clique ao `btn-aplicar`. Ver [indicadores-botao-atualizar.md](./indicadores-botao-atualizar.md) | 2026-02-26 | `8898a41` |
+
+> **NR** = Não Registrado — item concluído que não constava na lista de débitos mas é documentado aqui para rastreabilidade.
 
 ---
 
@@ -110,8 +101,9 @@ Nice-to-have, funcionalidades extras.
 
 **Progresso**:
 - 🔴 Alta: 0/3 concluído (0%)
-- 🟡 Média: 0/4 concluído (0%)
-- 🟢 Baixa: 0/3 concluído (0%)
+- 🟡 Média: 1/4 concluído (25%) — item 7 (Webapp KPI) concluído
+- 🟢 Baixa: 1/4 concluído (25%) — item 8 (Webapp KPI) concluído
+- Não registrados: 2 concluído (race condition + cache store)
 
 ---
 
@@ -126,7 +118,7 @@ Nice-to-have, funcionalidades extras.
 ### Marcar como Concluído
 
 1. Mova o item para seção **"Concluídos"**
-2. Adicione data, responsável e link do commit/PR
+2. Adicione data e link do commit
 3. Atualize a **tabela de Status Geral**
 
 ### Adicionar Novo Débito
