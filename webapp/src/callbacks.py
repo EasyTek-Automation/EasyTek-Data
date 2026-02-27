@@ -41,6 +41,7 @@ from src.callbacks_registers.workflow_create_callbacks import register_create_ca
 from src.callbacks_registers.workflow_edit_callbacks import register_edit_callbacks
 
 from src.pages.energy import callbacks as energy_callbacks
+from src.callbacks_registers.se03_telemetry_callbacks import register_se03_telemetry_callbacks
 
 # (Seu logger, se houver)
 
@@ -122,3 +123,7 @@ def register_callbacks(app):
 
     # Database error handling callbacks
     register_database_error_callbacks(app)
+
+    # SE03 Telemetria ao vivo
+    collection_telemetry = get_mongo_connection("AMG_EnergyTelemetry", silent=True)
+    register_se03_telemetry_callbacks(app, collection_telemetry)

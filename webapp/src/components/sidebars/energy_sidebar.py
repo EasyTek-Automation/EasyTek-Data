@@ -5,7 +5,7 @@ Conteúdo da sidebar específico para páginas de energia.
 Suporta exibição dinâmica de custos quando a tab SE03 está ativa.
 """
 
-from dash import html
+from dash import html, dcc
 import dash_bootstrap_components as dbc
 
 
@@ -445,6 +445,70 @@ def create_default_energy_sidebar_content():
         html.Small([
             html.I(className="bi bi-info-circle me-1"),
             "Análise de custos para outras subestações estará disponível em breve."
+        ], className="text-muted d-block", style={"fontSize": "0.7rem"}),
+
+    ], style={"padding": "10px"})
+
+
+def create_se03_telemetry_sidebar():
+    """
+    Sidebar para a página de telemetria ao vivo da SE03.
+    Oferece seletor de medidores e janela de tempo para os gráficos.
+
+    Returns:
+        html.Div: Componente com filtros de telemetria
+    """
+    machine_options = [
+        {"label": "SE03_MM01 (Geral)", "value": "SE03_MM01"},
+        {"label": "SE03_MM02", "value": "SE03_MM02"},
+        {"label": "SE03_MM03", "value": "SE03_MM03"},
+        {"label": "SE03_MM04", "value": "SE03_MM04"},
+        {"label": "SE03_MM05", "value": "SE03_MM05"},
+        {"label": "SE03_MM06", "value": "SE03_MM06"},
+        {"label": "SE03_MM07", "value": "SE03_MM07"},
+    ]
+
+    window_options = [
+        {"label": "Últimos 5 min", "value": 5},
+        {"label": "Últimos 15 min", "value": 15},
+        {"label": "Última hora", "value": 60},
+    ]
+
+    return html.Div([
+        html.H6([
+            html.I(className="bi bi-lightning-charge-fill me-2 text-warning"),
+            "SE03 — Telemetria",
+        ], className="text-primary fw-bold mb-3"),
+
+        html.Hr(className="my-2"),
+
+        # Seletor de medidores
+        html.Label("Medidores", className="fw-semibold small mb-1"),
+        dcc.Checklist(
+            id="se03-tel-machine-sel",
+            options=machine_options,
+            value=["SE03_MM01"],
+            labelStyle={"display": "block", "fontSize": "0.82rem", "marginBottom": "4px"},
+            inputStyle={"marginRight": "6px"},
+        ),
+
+        html.Hr(className="my-3"),
+
+        # Seletor de janela de tempo
+        html.Label("Janela de Tempo", className="fw-semibold small mb-1"),
+        dcc.RadioItems(
+            id="se03-tel-window",
+            options=window_options,
+            value=15,
+            labelStyle={"display": "block", "fontSize": "0.82rem", "marginBottom": "4px"},
+            inputStyle={"marginRight": "6px"},
+        ),
+
+        html.Hr(className="my-3"),
+
+        html.Small([
+            html.I(className="bi bi-info-circle me-1"),
+            "Atualização automática a cada 10 segundos.",
         ], className="text-muted d-block", style={"fontSize": "0.7rem"}),
 
     ], style={"padding": "10px"})

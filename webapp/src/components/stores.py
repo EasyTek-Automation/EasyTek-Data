@@ -33,4 +33,7 @@ app_stores = [
     # Store para status de reconexão do banco de dados
     dcc.Store(id='store-db-reconnect-status', storage_type='memory'),
 
+    # Store para telemetria ao vivo da SE03
+    dcc.Store(id='store-se03-telemetry', storage_type='memory'),
+
 ]

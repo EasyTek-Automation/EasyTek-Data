@@ -53,6 +53,11 @@ def get_sidebar_content_for_page(pathname):
     elif pathname in ["/utilities/energy", "/energy"]:
         return create_default_energy_sidebar_content()
 
+    # SE03 Telemetria ao vivo
+    elif pathname == "/utilities/energy/se03":
+        from src.components.sidebars.energy_sidebar import create_se03_telemetry_sidebar
+        return create_se03_telemetry_sidebar()
+
     # Water pages
     elif pathname == "/utilities/water":
         return create_water_sidebar_content()

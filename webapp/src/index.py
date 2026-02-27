@@ -28,7 +28,7 @@ from src.pages.auth import login, register, change_password
 from src.pages.dashboards import home, production_oee
 
 # Energia
-from src.pages.energy import overview as energy_overview, config as energy_config, water, gas, compressed_air
+from src.pages.energy import overview as energy_overview, config as energy_config, water, gas, compressed_air, se03_telemetry
 
 # Produção
 from src.pages.production import states
@@ -95,7 +95,7 @@ ROUTES = {
     # Energia - Subestações
     "/utilities/energy/se01": lambda: under_development.layout("Subestação SE01 - Em Desenvolvimento"),
     "/utilities/energy/se02": lambda: under_development.layout("Subestação SE02 - Em Desenvolvimento"),
-    "/utilities/energy/se03": lambda: under_development.layout("Subestação SE03 - Em Desenvolvimento"),
+    "/utilities/energy/se03": se03_telemetry.layout,
     "/utilities/energy/se04": lambda: under_development.layout("Subestação SE04 - Em Desenvolvimento"),
     "/utilities/energy/history": lambda: under_development.layout("Histórico de Consumo - Em Desenvolvimento"),
     "/utilities/energy/costs": lambda: under_development.layout("Análise de Custos - Em Desenvolvimento"),

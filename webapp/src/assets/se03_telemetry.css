@@ -1,0 +1,29 @@
+/* ===================================================
+   SE03 Telemetria — estilos do badge "AO VIVO" e dot
+   =================================================== */
+
+.se03-live-badge {
+    font-size: 0.75rem;
+    letter-spacing: 0.08em;
+    animation: se03-pulse-badge 2s infinite;
+}
+
+.se03-live-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: #fff;
+    animation: se03-pulse-dot 1.2s ease-in-out infinite;
+    vertical-align: middle;
+}
+
+@keyframes se03-pulse-badge {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.65; }
+}
+
+@keyframes se03-pulse-dot {
+    0%, 100% { transform: scale(1);   opacity: 1; }
+    50%      { transform: scale(1.5); opacity: 0.6; }
+}
