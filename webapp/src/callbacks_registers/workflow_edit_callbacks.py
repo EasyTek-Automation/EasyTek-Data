@@ -197,6 +197,24 @@ def register_edit_callbacks(app):
 
         pend_id = original_data["id"]
 
+        # VALIDAÇÃO 0: Bloquear edição se tarefa não foi aceita (nível < 3)
+        if user_level < 3:
+            from src.utils.workflow_db import carregar_pendencias as _cp
+            import pandas as _pd
+            _df = _cp()
+            _pend = _df[_df['id'] == pend_id]
+            if not _pend.empty:
+                _status_aceite = str(_pend.iloc[0].get('status_aceite') or 'aceito')
+                if _status_aceite != 'aceito':
+                    return (
+                        True,  # Modal continua aberto
+                        dbc.Alert([
+                            html.I(className="fas fa-lock me-2"),
+                            "Esta tarefa ainda não foi aceita. Aceite a tarefa antes de editá-la."
+                        ], color="warning", dismissable=True),
+                        no_update, no_update, no_update, no_update
+                    )
+
         # VALIDAÇÃO 1: Campos obrigatórios (incluindo tipo_evento e observações)
         if not all([nova_desc, novo_resp, novo_status, tipo_evento, observacoes]):
             campos_faltantes = []
@@ -275,7 +293,9 @@ def register_edit_callbacks(app):
             # Recarregar tabela E histórico
             from src.pages.workflow.dashboard import carregar_dados_csv, criar_tabela_pendencias
             df_pend, df_hist = carregar_dados_csv()
-            nova_tabela = criar_tabela_pendencias(df_pend, df_hist)
+            nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
+                                                  user_level=user_level or 1,
+                                                  username_atual=username)
 
             return (
                 False,  # Fechar modal
@@ -377,8 +397,14 @@ def register_edit_callbacks(app):
         if sucesso:
             # Recarregar tabela e histórico
             from src.pages.workflow.dashboard import carregar_dados_csv, criar_tabela_pendencias
+            from src.database.connection import get_mongo_connection as _get_mc
+            from flask_login import current_user as _cu
             df_pend, df_hist = carregar_dados_csv()
-            nova_tabela = criar_tabela_pendencias(df_pend, df_hist)
+            _ul = _cu.level if _cu.is_authenticated else 1
+            _un = _cu.username if _cu.is_authenticated else None
+            nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
+                                                  user_level=_ul,
+                                                  username_atual=_un)
 
             return (
                 False,  # Fechar modal de edição

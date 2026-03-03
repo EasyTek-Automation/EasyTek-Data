@@ -19,8 +19,7 @@ from src.pages.workflow.dashboard import (
     carregar_dados_csv,
     criar_tabela_pendencias,
     criar_cards_kpi,
-    criar_timeline_historico,
-    criar_grafico_horas
+    criar_timeline_historico
 )
 
 
@@ -73,15 +72,9 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None):
             'status_aprovacao': _str_or_none(row.get('status_aprovacao')),
         })
 
-    grafico = criar_grafico_horas(historico_items)
     timeline = criar_timeline_historico(historico_items, username_atual)
 
-    conteudo = []
-    if grafico:
-        conteudo.append(grafico)
-    conteudo.append(timeline)
-
-    return html.Div(conteudo)
+    return html.Div([timeline])
 
 
 def aplicar_filtros_dataframe(df, responsavel, status_list, busca):
@@ -124,9 +117,11 @@ def register_workflow_callbacks(app):
         State("store-pendencias", "data"),
         State("store-historico", "data"),
         State("user-username-store", "data"),
+        State("user-level-store", "data"),
         prevent_initial_call=True
     )
-    def toggle_linha_historico(n_clicks, is_open, pendencias_data, historico_data, username_atual):
+    def toggle_linha_historico(n_clicks, is_open, pendencias_data, historico_data,
+                               username_atual, user_level):
         """Expande/colapsa uma linha individual e carrega o histórico."""
         if not n_clicks:
             raise PreventUpdate
@@ -171,9 +166,11 @@ def register_workflow_callbacks(app):
         State("filtro-responsavel", "value"),
         State("filtro-status", "value"),
         State("filtro-busca", "value"),
+        State("user-level-store", "data"),
+        State("user-username-store", "data"),
         prevent_initial_call=True
     )
-    def aplicar_filtros(n_clicks, responsavel, status_list, busca):
+    def aplicar_filtros(n_clicks, responsavel, status_list, busca, user_level, username_atual):
         """Aplica os filtros selecionados e reconstrói a tabela."""
         if not n_clicks:
             raise PreventUpdate
@@ -184,7 +181,9 @@ def register_workflow_callbacks(app):
             return html.Div("Erro ao carregar dados.", className="text-danger"), []
 
         df_filtrado = aplicar_filtros_dataframe(df_pendencias, responsavel, status_list, busca)
-        nova_tabela = criar_tabela_pendencias(df_filtrado, df_historico)
+        nova_tabela = criar_tabela_pendencias(df_filtrado, df_historico,
+                                              user_level=user_level or 1,
+                                              username_atual=username_atual)
 
         return nova_tabela, df_filtrado.to_dict('records')
 
@@ -197,9 +196,11 @@ def register_workflow_callbacks(app):
         Output("store-pendencias", "data", allow_duplicate=True),
         Output("store-historico", "data"),
         Input("btn-refresh", "n_clicks"),
+        State("user-level-store", "data"),
+        State("user-username-store", "data"),
         prevent_initial_call=True
     )
-    def refresh_dados(n_clicks):
+    def refresh_dados(n_clicks, user_level, username_atual):
         """Recarrega os dados e reconstrói a tabela."""
         if not n_clicks:
             raise PreventUpdate
@@ -209,7 +210,9 @@ def register_workflow_callbacks(app):
         if df_pendencias is None or df_historico is None:
             return html.Div("Erro ao carregar dados.", className="text-danger"), [], []
 
-        nova_tabela = criar_tabela_pendencias(df_pendencias, df_historico)
+        nova_tabela = criar_tabela_pendencias(df_pendencias, df_historico,
+                                              user_level=user_level or 1,
+                                              username_atual=username_atual)
 
         return (
             nova_tabela,
@@ -249,10 +252,11 @@ def register_workflow_callbacks(app):
     # CALLBACK 5: Atualizar cards KPI
     # ==================================================================================
     @app.callback(
-        Output("container-cards-kpi", "children"),
+        Output("container-cards-kpi", "children", allow_duplicate=True),
         Input("store-pendencias", "data"),
         Input("store-historico", "data"),
-        State("user-username-store", "data")
+        State("user-username-store", "data"),
+        prevent_initial_call=False
     )
     def atualizar_cards_kpi(pendencias_data, historico_data, username_atual):
         """Atualiza os cards KPI quando os dados mudam."""
@@ -324,9 +328,11 @@ def register_workflow_callbacks(app):
         Output("concluir-subtarefa-modal", "is_open", allow_duplicate=True),
         Input("concluir-subtarefa-confirm-btn", "n_clicks"),
         State("store-subtarefa-concluir-pending", "data"),
+        State("user-level-store", "data"),
+        State("user-username-store", "data"),
         prevent_initial_call=True
     )
-    def confirmar_concluir_subtarefa(n_clicks, hist_id):
+    def confirmar_concluir_subtarefa(n_clicks, hist_id, user_level, username_atual):
         """Marca a subatividade como concluída após confirmação."""
         if not n_clicks or not hist_id:
             raise PreventUpdate
@@ -336,7 +342,9 @@ def register_workflow_callbacks(app):
         sucesso = marcar_subtarefa_concluida(hist_id)
 
         df_pend, df_hist = carregar_dados_csv()
-        nova_tabela = criar_tabela_pendencias(df_pend, df_hist)
+        nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
+                                              user_level=user_level or 1,
+                                              username_atual=username_atual)
 
         if sucesso:
             alerta = dbc.Alert([
@@ -367,9 +375,11 @@ def register_workflow_callbacks(app):
         Output("store-historico", "data", allow_duplicate=True),
         Output("alert-container-workflow", "children", allow_duplicate=True),
         Input({"type": "btn-aprovar", "index": ALL}, "n_clicks"),
+        State("user-level-store", "data"),
+        State("user-username-store", "data"),
         prevent_initial_call=True
     )
-    def aprovar_subtarefa(n_clicks):
+    def aprovar_subtarefa(n_clicks, user_level, username_atual):
         """Aprova uma subatividade pendente de aprovação."""
         ctx = callback_context
         if not ctx.triggered or not any(c for c in n_clicks if c):
@@ -383,7 +393,9 @@ def register_workflow_callbacks(app):
 
         sucesso = aprovar_ou_rejeitar(hist_id, 'aprovado')
         df_pend, df_hist = carregar_dados_csv()
-        nova_tabela = criar_tabela_pendencias(df_pend, df_hist)
+        nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
+                                              user_level=user_level or 1,
+                                              username_atual=username_atual)
 
         if sucesso:
             alerta = dbc.Alert([
@@ -413,9 +425,11 @@ def register_workflow_callbacks(app):
         Output("store-historico", "data", allow_duplicate=True),
         Output("alert-container-workflow", "children", allow_duplicate=True),
         Input({"type": "btn-rejeitar", "index": ALL}, "n_clicks"),
+        State("user-level-store", "data"),
+        State("user-username-store", "data"),
         prevent_initial_call=True
     )
-    def rejeitar_subtarefa(n_clicks):
+    def rejeitar_subtarefa(n_clicks, user_level, username_atual):
         """Rejeita uma subatividade pendente de aprovação."""
         ctx = callback_context
         if not ctx.triggered or not any(c for c in n_clicks if c):
@@ -429,7 +443,9 @@ def register_workflow_callbacks(app):
 
         sucesso = aprovar_ou_rejeitar(hist_id, 'rejeitado')
         df_pend, df_hist = carregar_dados_csv()
-        nova_tabela = criar_tabela_pendencias(df_pend, df_hist)
+        nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
+                                              user_level=user_level or 1,
+                                              username_atual=username_atual)
 
         if sucesso:
             alerta = dbc.Alert([
@@ -447,4 +463,110 @@ def register_workflow_callbacks(app):
             df_pend.to_dict('records') if df_pend is not None else [],
             df_hist.to_dict('records') if df_hist is not None else [],
             alerta
+        )
+
+
+    # ==================================================================================
+    # CALLBACK 10: Aceitar tarefa (responsável aceita a designação)
+    # ==================================================================================
+    @app.callback(
+        Output("container-tabela", "children", allow_duplicate=True),
+        Output("store-pendencias", "data", allow_duplicate=True),
+        Output("store-historico", "data", allow_duplicate=True),
+        Output("alert-container-workflow", "children", allow_duplicate=True),
+        Output("container-cards-kpi", "children", allow_duplicate=True),
+        Input({"type": "btn-aceitar-tarefa", "index": ALL}, "n_clicks"),
+        State("user-level-store", "data"),
+        State("user-username-store", "data"),
+        prevent_initial_call=True
+    )
+    def aceitar_tarefa_callback(n_clicks, user_level, username_atual):
+        """Aceita uma tarefa designada ao responsável."""
+        ctx = callback_context
+        if not ctx.triggered or not any(c for c in n_clicks if c):
+            raise PreventUpdate
+
+        trigger_id_str = ctx.triggered[0]['prop_id'].split('.')[0]
+        id_dict = json.loads(trigger_id_str)
+        pend_id = id_dict['index']
+
+        from src.utils.workflow_db import aceitar_tarefa as _aceitar
+
+        sucesso, mensagem = _aceitar(pend_id, username_atual or '')
+        df_pend, df_hist = carregar_dados_csv()
+        nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
+                                              user_level=user_level or 1,
+                                              username_atual=username_atual)
+        novos_kpis = criar_cards_kpi(df_pend, df_hist, username_atual)
+
+        if sucesso:
+            alerta = dbc.Alert([
+                html.I(className="fas fa-check me-2"),
+                mensagem
+            ], color="success", dismissable=True, duration=5000)
+        else:
+            alerta = dbc.Alert([
+                html.I(className="fas fa-exclamation-circle me-2"),
+                f"Erro: {mensagem}"
+            ], color="danger", dismissable=True, duration=5000)
+
+        return (
+            nova_tabela,
+            df_pend.to_dict('records') if df_pend is not None else [],
+            df_hist.to_dict('records') if df_hist is not None else [],
+            alerta,
+            novos_kpis
+        )
+
+
+    # ==================================================================================
+    # CALLBACK 11: Rejeitar aceite de tarefa (responsável recusa a designação)
+    # ==================================================================================
+    @app.callback(
+        Output("container-tabela", "children", allow_duplicate=True),
+        Output("store-pendencias", "data", allow_duplicate=True),
+        Output("store-historico", "data", allow_duplicate=True),
+        Output("alert-container-workflow", "children", allow_duplicate=True),
+        Output("container-cards-kpi", "children", allow_duplicate=True),
+        Input({"type": "btn-rejeitar-tarefa-aceite", "index": ALL}, "n_clicks"),
+        State("user-level-store", "data"),
+        State("user-username-store", "data"),
+        prevent_initial_call=True
+    )
+    def rejeitar_tarefa_aceite_callback(n_clicks, user_level, username_atual):
+        """Rejeita a designação de uma tarefa (responsável recusa)."""
+        ctx = callback_context
+        if not ctx.triggered or not any(c for c in n_clicks if c):
+            raise PreventUpdate
+
+        trigger_id_str = ctx.triggered[0]['prop_id'].split('.')[0]
+        id_dict = json.loads(trigger_id_str)
+        pend_id = id_dict['index']
+
+        from src.utils.workflow_db import rejeitar_tarefa as _rejeitar
+
+        sucesso, mensagem = _rejeitar(pend_id, username_atual or '')
+        df_pend, df_hist = carregar_dados_csv()
+        nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
+                                              user_level=user_level or 1,
+                                              username_atual=username_atual)
+        novos_kpis = criar_cards_kpi(df_pend, df_hist, username_atual)
+
+        if sucesso:
+            alerta = dbc.Alert([
+                html.I(className="fas fa-ban me-2"),
+                mensagem
+            ], color="warning", dismissable=True, duration=7000)
+        else:
+            alerta = dbc.Alert([
+                html.I(className="fas fa-exclamation-circle me-2"),
+                f"Erro: {mensagem}"
+            ], color="danger", dismissable=True, duration=5000)
+
+        return (
+            nova_tabela,
+            df_pend.to_dict('records') if df_pend is not None else [],
+            df_hist.to_dict('records') if df_hist is not None else [],
+            alerta,
+            novos_kpis
         )

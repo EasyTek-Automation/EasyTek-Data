@@ -10,12 +10,20 @@ COLLECTION_PENDENCIAS = "Maintenance_workflow"
 COLLECTION_HISTORICO = "MaintenanceHistory_workflow"
 
 # Tipos de evento que requerem aprovação
-TIPOS_REQUEREM_APROVACAO = ["Aguardando Aprovação", "Em Produção Assistida", "Encerramento"]
+TIPOS_REQUEREM_APROVACAO = [
+    "Aguardando Aprovação",
+    "Em Produção Assistida",
+    "Encerramento",
+    "Trabalho Adicional"
+]
 
 
 def carregar_pendencias():
     """
     Carrega pendências do MongoDB.
+
+    Retrocompatibilidade: documentos sem campo 'status_aceite' recebem 'aceito'
+    (tarefas criadas antes da feature são consideradas aceitas por padrão).
 
     Returns:
         pd.DataFrame: DataFrame com as pendências
@@ -28,10 +36,19 @@ def carregar_pendencias():
             return pd.DataFrame(columns=[
                 'id', 'descricao', 'responsavel', 'status', 'data_criacao',
                 'ultima_atualizacao', 'criado_por', 'criado_por_perfil',
-                'ultima_edicao_por', 'ultima_edicao_data'
+                'ultima_edicao_por', 'ultima_edicao_data', 'status_aceite', 'data_aceite'
             ])
 
         df = pd.DataFrame(documentos)
+
+        # Retrocompatibilidade: status_aceite ausente → 'aceito'
+        if 'status_aceite' not in df.columns:
+            df['status_aceite'] = 'aceito'
+        else:
+            df['status_aceite'] = df['status_aceite'].fillna('aceito')
+
+        if 'data_aceite' not in df.columns:
+            df['data_aceite'] = None
 
         # Converter datas para datetime (já vêm como datetime do MongoDB)
         if 'data_criacao' in df.columns:
@@ -48,7 +65,7 @@ def carregar_pendencias():
         return pd.DataFrame(columns=[
             'id', 'descricao', 'responsavel', 'status', 'data_criacao',
             'ultima_atualizacao', 'criado_por', 'criado_por_perfil',
-            'ultima_edicao_por', 'ultima_edicao_data'
+            'ultima_edicao_por', 'ultima_edicao_data', 'status_aceite', 'data_aceite'
         ])
 
 
@@ -164,7 +181,9 @@ def criar_pendencia(descricao, responsavel, status, criado_por, criado_por_perfi
             'criado_por': criado_por,
             'criado_por_perfil': criado_por_perfil,
             'ultima_edicao_por': criado_por,
-            'ultima_edicao_data': agora
+            'ultima_edicao_data': agora,
+            'status_aceite': 'pendente',  # novo responsável deve aceitar a tarefa
+            'data_aceite': None
         }
 
         # Inserir pendência
@@ -239,6 +258,9 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
         if novo_responsavel and novo_responsavel != responsavel_original:
             updates['responsavel'] = novo_responsavel
             alteracoes_log.append(f"Responsável: {responsavel_original} → {novo_responsavel}")
+            # Ao redesignar, o novo responsável deve aceitar a tarefa
+            updates['status_aceite'] = 'pendente'
+            updates['data_aceite'] = None
 
         if novo_status and novo_status != status_original:
             updates['status'] = novo_status
@@ -418,3 +440,124 @@ def aprovar_ou_rejeitar(hist_id_str, status_aprovacao):
     except Exception as e:
         print(f"Erro ao aprovar/rejeitar: {e}")
         return False
+
+
+def aceitar_tarefa(pend_id, username):
+    """
+    Registra o aceite de uma tarefa pelo responsável.
+
+    Atualiza status_aceite → 'aceito' e cria entrada no histórico.
+
+    Args:
+        pend_id: ID da pendência (ex: 'AMG_WF001')
+        username: Username de quem está aceitando
+
+    Returns:
+        tuple: (sucesso: bool, mensagem: str)
+    """
+    try:
+        collection_pend = get_mongo_connection(COLLECTION_PENDENCIAS)
+        collection_hist = get_mongo_connection(COLLECTION_HISTORICO)
+        agora = datetime.now()
+
+        # Verificar se pendência existe e está pendente de aceite
+        pendencia = collection_pend.find_one({'id': pend_id})
+        if not pendencia:
+            return False, "Pendência não encontrada"
+
+        if pendencia.get('status_aceite') == 'aceito':
+            return False, "Tarefa já foi aceita"
+
+        # Atualizar status_aceite
+        collection_pend.update_one(
+            {'id': pend_id},
+            {'$set': {
+                'status_aceite': 'aceito',
+                'data_aceite': agora,
+                'ultima_atualizacao': agora
+            }}
+        )
+
+        # Criar entrada no histórico
+        collection_hist.insert_one({
+            'MaintenanceWF_id': pend_id,
+            'descricao': 'Aceite de Tarefa',
+            'data': agora,
+            'responsavel': username,
+            'tipo_evento': 'aceite',
+            'editado_por': username,
+            'observacoes': f'Tarefa aceita por {username}',
+            'alteracoes': 'status_aceite: pendente → aceito',
+            'horas': None,
+            'concluido': False,
+            'aprovador': None,
+            'status_aprovacao': None,
+            'data_aprovacao': None
+        })
+
+        return True, "Tarefa aceita com sucesso"
+
+    except Exception as e:
+        print(f"Erro ao aceitar tarefa: {e}")
+        return False, str(e)
+
+
+def rejeitar_tarefa(pend_id, username):
+    """
+    Registra a rejeição de uma tarefa pelo responsável.
+
+    Atualiza status_aceite → 'rejeitado' e cria entrada no histórico.
+    Nível 3 pode redesignar a tarefa (o reset de status_aceite ocorre em editar_pendencia).
+
+    Args:
+        pend_id: ID da pendência (ex: 'AMG_WF001')
+        username: Username de quem está rejeitando
+
+    Returns:
+        tuple: (sucesso: bool, mensagem: str)
+    """
+    try:
+        collection_pend = get_mongo_connection(COLLECTION_PENDENCIAS)
+        collection_hist = get_mongo_connection(COLLECTION_HISTORICO)
+        agora = datetime.now()
+
+        # Verificar se pendência existe
+        pendencia = collection_pend.find_one({'id': pend_id})
+        if not pendencia:
+            return False, "Pendência não encontrada"
+
+        if pendencia.get('status_aceite') == 'aceito':
+            return False, "Tarefa já foi aceita e não pode ser rejeitada"
+
+        # Atualizar status_aceite
+        collection_pend.update_one(
+            {'id': pend_id},
+            {'$set': {
+                'status_aceite': 'rejeitado',
+                'data_aceite': agora,
+                'ultima_atualizacao': agora
+            }}
+        )
+
+        # Criar entrada no histórico
+        collection_hist.insert_one({
+            'MaintenanceWF_id': pend_id,
+            'descricao': 'Rejeição de Aceite',
+            'data': agora,
+            'responsavel': username,
+            'tipo_evento': 'rejeicao_aceite',
+            'editado_por': username,
+            'observacoes': f'Tarefa rejeitada por {username}. Aguardando redesignação.',
+            'alteracoes': 'status_aceite: pendente → rejeitado',
+            'horas': None,
+            'concluido': False,
+            'aprovador': None,
+            'status_aprovacao': None,
+            'data_aprovacao': None
+        })
+
+        return True, "Tarefa rejeitada. Solicite redesignação a um usuário nível 3."
+
+    except Exception as e:
+        print(f"Erro ao rejeitar tarefa: {e}")
+        return False, str(e)

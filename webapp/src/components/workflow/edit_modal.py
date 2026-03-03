@@ -74,6 +74,7 @@ def edit_pendencia_modal():
                     {"label": "Documentação Técnica", "value": "Documentação Técnica"},
                     {"label": "Treinamento Operacional", "value": "Treinamento Operacional"},
                     {"label": "Encerramento", "value": "Encerramento"},
+                    {"label": "Trabalho Adicional", "value": "Trabalho Adicional"},
                 ],
                 placeholder="Selecione o tipo de evento",
                 clearable=False,

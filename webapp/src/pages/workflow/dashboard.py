@@ -9,7 +9,6 @@ e marcação de subatividades como concluídas.
 import pandas as pd
 from dash import html, dcc
 import dash_bootstrap_components as dbc
-import plotly.graph_objects as go
 from flask_login import current_user
 
 from src.components.workflow.create_modal import create_pendencia_modal
@@ -59,77 +58,66 @@ def criar_badge_status(status):
     return dbc.Badge(status, color=cores.get(status, "secondary"), className="ms-2")
 
 
-def criar_grafico_horas(historico_items):
+def criar_barra_horas_inline(historico_items):
     """
-    Cria gráfico de barras horizontal mostrando distribuição de horas por subatividade.
+    Cria barra segmentada colorida inline com total de horas por subatividade.
+
+    Cada subatividade com horas > 0 vira um segmento da barra Bootstrap stacked progress.
+    Retorna None se nenhuma subatividade tiver horas.
 
     Args:
         historico_items: Lista de dicts com dados do histórico
 
     Returns:
-        dcc.Graph ou None se não houver horas registradas
+        html.Div com barra + legenda, ou None se sem horas
     """
-    items_com_horas = [
-        item for item in historico_items
-        if item.get('horas') is not None and item['horas'] > 0
-    ]
+    PALETA = ['primary', 'success', 'info', 'warning', 'danger', 'secondary']
+
+    items_com_horas = []
+    for item in historico_items:
+        h = item.get('horas')
+        try:
+            if h is not None and str(h) != 'nan' and float(h) > 0:
+                items_com_horas.append({'item': item, 'horas': float(h)})
+        except (ValueError, TypeError):
+            pass
 
     if not items_com_horas:
         return None
 
-    # Truncar descrições longas para o eixo Y
-    labels = []
-    for item in items_com_horas:
-        desc = item['descricao']
-        if len(desc) > 30:
-            desc = desc[:27] + "..."
-        labels.append(desc)
+    total = sum(e['horas'] for e in items_com_horas)
 
-    horas = [item['horas'] for item in items_com_horas]
-    total = sum(horas)
+    # Segmentos da barra
+    bars = []
+    legenda = []
+    for i, entry in enumerate(items_com_horas):
+        cor = PALETA[i % len(PALETA)]
+        pct = entry['horas'] / total * 100
+        desc = entry['item'].get('descricao', '')
+        if len(desc) > 20:
+            desc = desc[:17] + "..."
 
-    # Cores baseadas no status de conclusão
-    cores = []
-    for item in items_com_horas:
-        if item.get('concluido'):
-            cores.append('#28a745')  # verde
-        elif item.get('status_aprovacao') == 'pendente':
-            cores.append('#ffc107')  # amarelo
-        elif item.get('status_aprovacao') == 'rejeitado':
-            cores.append('#dc3545')  # vermelho
-        else:
-            cores.append('#007bff')  # azul
+        bars.append(dbc.Progress(
+            value=pct,
+            color=cor,
+            bar=True,
+            label=f"{entry['horas']}h"
+        ))
+        legenda.append(
+            html.Span([
+                html.Span("■ ", style={"color": f"var(--bs-{cor})"}),
+                f"{desc} {entry['horas']}h"
+            ], className="me-2", style={"fontSize": "0.70rem", "whiteSpace": "nowrap"})
+        )
 
-    fig = go.Figure(go.Bar(
-        x=horas,
-        y=labels,
-        orientation='h',
-        marker_color=cores,
-        text=[f"{h}h ({h/total*100:.0f}%)" for h in horas],
-        textposition='outside',
-        hovertemplate="<b>%{y}</b><br>%{x}h<extra></extra>"
-    ))
-
-    fig.update_layout(
-        height=max(120, len(items_com_horas) * 40 + 60),
-        margin=dict(l=10, r=60, t=30, b=10),
-        xaxis=dict(title="Horas", showgrid=True),
-        yaxis=dict(showgrid=False),
-        title=dict(
-            text=f"Distribuição de Horas — Total: {total}h",
-            font=dict(size=13),
-            x=0
+    return html.Div([
+        dbc.Progress(
+            bars,
+            style={"height": "7px"},
+            className="mb-1"
         ),
-        plot_bgcolor='rgba(0,0,0,0)',
-        paper_bgcolor='rgba(0,0,0,0)',
-        showlegend=False
-    )
-
-    return dcc.Graph(
-        figure=fig,
-        config={"displayModeBar": False},
-        className="mb-3"
-    )
+        html.Div(legenda, className="d-flex flex-wrap")
+    ], className="mt-1 mb-1")
 
 
 def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
@@ -146,11 +134,21 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
     """
     if df_pendencias is None or df_pendencias.empty:
         total = pendentes = em_andamento = concluidas = 0
+        aguardando_aceite = 0
     else:
         total = len(df_pendencias)
         pendentes = len(df_pendencias[df_pendencias['status'] == 'Pendente'])
         em_andamento = len(df_pendencias[df_pendencias['status'] == 'Em Andamento'])
         concluidas = len(df_pendencias[df_pendencias['status'] == 'Concluído'])
+
+        # Tarefas aguardando aceite pelo usuário atual (responsável)
+        aguardando_aceite = 0
+        if username_atual and 'status_aceite' in df_pendencias.columns and 'responsavel' in df_pendencias.columns:
+            mask_aceite = (
+                (df_pendencias['responsavel'] == username_atual) &
+                (df_pendencias['status_aceite'] != 'aceito')
+            )
+            aguardando_aceite = int(mask_aceite.sum())
 
     # Calcular aprovações pendentes para o usuário atual
     aguardando_aprovacao = 0
@@ -201,6 +199,22 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
                     html.H3(str(concluidas), className="mb-0 text-success")
                 ])
             ], className="shadow-sm")
+        ], width=12, lg=True, className="mb-3"),
+
+        # Card Aguardando Aceite (minhas tarefas não aceitas)
+        dbc.Col([
+            dbc.Card([
+                dbc.CardBody([
+                    html.H6([
+                        html.I(className="fas fa-inbox me-1"),
+                        "Aguard. Aceite"
+                    ], className="text-muted mb-2"),
+                    html.H3(
+                        str(aguardando_aceite),
+                        className="mb-0 text-secondary" if aguardando_aceite > 0 else "mb-0"
+                    )
+                ])
+            ], className="shadow-sm border-secondary" if aguardando_aceite > 0 else "shadow-sm")
         ], width=12, lg=True, className="mb-3"),
 
         # Card Aguardando Minha Aprovação
@@ -447,14 +461,17 @@ def criar_timeline_historico(historico_items, username_atual=None):
     return html.Div(timeline_items, className="p-3")
 
 
-def criar_linha_pendencia(pendencia, index, historico_pendencia=None):
+def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
+                          user_level=1, username_atual=None):
     """
     Cria duas linhas (<tr>) para cada pendência: linha principal + linha de histórico colapsável.
 
     Args:
         pendencia: Dict com dados da pendência
         index: Índice da linha (para IDs dinâmicos)
-        historico_pendencia: Lista de dicts do histórico desta pendência (para calcular horas/badges)
+        historico_pendencia: Lista de dicts do histórico desta pendência
+        user_level: Nível do usuário logado (1, 2 ou 3)
+        username_atual: Username do usuário logado
 
     Returns:
         list: Lista com 2 elementos <tr>
@@ -462,42 +479,89 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None):
     data_criacao = pendencia['data_criacao'].strftime("%d/%m/%Y")
     ultima_atualizacao = pendencia['ultima_atualizacao'].strftime("%d/%m/%Y")
 
-    # Calcular total de horas das subatividades
-    total_horas = None
+    # Status de aceite e aprovação pendente
+    status_aceite = str(pendencia.get('status_aceite') or 'aceito')
     tem_aprovacao_pendente = False
 
     if historico_pendencia:
-        horas_lista = []
-        for item in historico_pendencia:
-            h = item.get('horas')
-            try:
-                if h is not None and str(h) != 'nan' and float(h) > 0:
-                    horas_lista.append(float(h))
-            except (ValueError, TypeError):
-                pass
-        if horas_lista:
-            total_horas = sum(horas_lista)
-
         tem_aprovacao_pendente = any(
             str(item.get('status_aprovacao', '') or '') == 'pendente'
             for item in historico_pendencia
         )
 
-    # Badges extras na linha principal
-    badges_linha = []
-    if total_horas is not None:
-        badges_linha.append(dbc.Badge(
-            [html.I(className="fas fa-clock me-1"), f"{total_horas}h"],
-            color="info",
-            className="ms-2",
-            title=f"Total de horas registradas: {total_horas}h"
-        ))
+    # Barra de horas inline
+    barra_horas = None
+    if historico_pendencia:
+        barra_horas = criar_barra_horas_inline(historico_pendencia)
+
+    # Badge de aprovação pendente (se houver)
+    badge_aprov = None
     if tem_aprovacao_pendente:
-        badges_linha.append(dbc.Badge(
+        badge_aprov = dbc.Badge(
             [html.I(className="fas fa-hourglass-half me-1"), "Aguard. Aprov."],
             color="warning",
             className="ms-2"
-        ))
+        )
+
+    # Badge de aceite pendente
+    badge_aceite = None
+    if status_aceite == 'pendente':
+        badge_aceite = dbc.Badge(
+            [html.I(className="fas fa-inbox me-1"), "Aguard. Aceite"],
+            color="secondary",
+            className="ms-2"
+        )
+    elif status_aceite == 'rejeitado':
+        badge_aceite = dbc.Badge(
+            [html.I(className="fas fa-ban me-1"), "Rejeitado"],
+            color="danger",
+            className="ms-2"
+        )
+
+    # Célula de descrição: texto + barra de horas + badges
+    desc_content = [pendencia['descricao']]
+    if badge_aceite:
+        desc_content.append(badge_aceite)
+    if badge_aprov:
+        desc_content.append(badge_aprov)
+    if barra_horas:
+        desc_content.append(barra_horas)
+
+    # Botões de ação na linha
+    pend_id = pendencia['id']
+    responsavel = pendencia.get('responsavel', '')
+    e_responsavel_atual = (username_atual and responsavel == username_atual)
+
+    if status_aceite != 'aceito' and user_level < 3 and e_responsavel_atual:
+        # Responsável precisa aceitar/rejeitar → mostrar botões de aceite
+        botoes_acao = html.Div([
+            dbc.Button(
+                [html.I(className="fas fa-check me-1"), "Aceitar"],
+                id={"type": "btn-aceitar-tarefa", "index": pend_id},
+                color="success",
+                size="sm",
+                className="me-1"
+            ),
+            dbc.Button(
+                [html.I(className="fas fa-times me-1"), "Rejeitar"],
+                id={"type": "btn-rejeitar-tarefa-aceite", "index": pend_id},
+                color="danger",
+                size="sm",
+                outline=True
+            )
+        ], className="d-flex")
+    elif status_aceite != 'aceito' and user_level < 3 and not e_responsavel_atual:
+        # Outro usuário nível < 3 vê tarefa não aceita de outro: apenas visualiza
+        botoes_acao = html.Div()
+    else:
+        # Nível 3 ou tarefa já aceita: botão editar normal
+        botoes_acao = dbc.Button(
+            html.I(className="fas fa-edit"),
+            id={"type": "btn-edit-pend", "index": pend_id},
+            color="info",
+            size="sm",
+            outline=True
+        )
 
     # Linha principal
     linha_principal = html.Tr([
@@ -510,21 +574,13 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None):
                 className="p-0 text-decoration-none"
             )
         ], style={"width": "40px", "textAlign": "center"}),
-        html.Td(pendencia['id']),
-        html.Td([pendencia['descricao'], *badges_linha]),
-        html.Td(pendencia['responsavel']),
+        html.Td(pend_id),
+        html.Td(desc_content),
+        html.Td(responsavel),
         html.Td(criar_badge_status(pendencia['status'])),
         html.Td(data_criacao),
         html.Td(ultima_atualizacao),
-        html.Td([
-            dbc.Button(
-                html.I(className="fas fa-edit"),
-                id={"type": "btn-edit-pend", "index": pendencia['id']},
-                color="info",
-                size="sm",
-                outline=True
-            )
-        ], style={"width": "60px", "textAlign": "center"})
+        html.Td(botoes_acao, style={"width": "120px", "textAlign": "center"})
     ])
 
     # Linha de histórico (colapsável)
@@ -546,13 +602,15 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None):
     return [linha_principal, linha_historico]
 
 
-def criar_tabela_pendencias(df_pendencias, df_historico=None):
+def criar_tabela_pendencias(df_pendencias, df_historico=None, user_level=1, username_atual=None):
     """
     Cria a tabela Bootstrap com todas as pendências.
 
     Args:
         df_pendencias: DataFrame com as pendências
-        df_historico: DataFrame com o histórico (para badges de horas e aprovação)
+        df_historico: DataFrame com o histórico (para barra de horas e badges)
+        user_level: Nível do usuário logado (1, 2 ou 3)
+        username_atual: Username do usuário logado
 
     Returns:
         dbc.Table: Tabela com pendências expansíveis
@@ -573,7 +631,7 @@ def criar_tabela_pendencias(df_pendencias, df_historico=None):
             html.Th("Status", style={"width": "150px"}),
             html.Th("Criação", style={"width": "120px"}),
             html.Th("Atualização", style={"width": "120px"}),
-            html.Th("Ações", style={"width": "60px"})
+            html.Th("Ações", style={"width": "120px"})
         ])
     ])
 
@@ -589,7 +647,10 @@ def criar_tabela_pendencias(df_pendencias, df_historico=None):
             if not hist_df.empty:
                 hist_items = hist_df.to_dict('records')
 
-        linhas.extend(criar_linha_pendencia(pendencia, index, hist_items))
+        linhas.extend(criar_linha_pendencia(
+            pendencia, index, hist_items,
+            user_level=user_level, username_atual=username_atual
+        ))
 
     tbody = html.Tbody(linhas)
 
@@ -723,7 +784,11 @@ def layout():
         dbc.Card([
             dbc.CardBody([
                 html.Div(
-                    criar_tabela_pendencias(df_pendencias, df_historico),
+                    criar_tabela_pendencias(
+                        df_pendencias, df_historico,
+                        user_level=current_user.level if current_user.is_authenticated else 1,
+                        username_atual=username_atual
+                    ),
                     id="container-tabela"
                 )
             ], className="p-0")
