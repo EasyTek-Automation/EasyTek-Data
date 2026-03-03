@@ -41,11 +41,12 @@ def carregar_pendencias():
 
         df = pd.DataFrame(documentos)
 
-        # Retrocompatibilidade: status_aceite ausente → 'aceito'
+        # Retrocompatibilidade: status_aceite ausente → 'pendente'
+        # (documentos antigos sem o campo precisam ser aceitos pelo responsável)
         if 'status_aceite' not in df.columns:
-            df['status_aceite'] = 'aceito'
+            df['status_aceite'] = 'pendente'
         else:
-            df['status_aceite'] = df['status_aceite'].fillna('aceito')
+            df['status_aceite'] = df['status_aceite'].fillna('pendente')
 
         if 'data_aceite' not in df.columns:
             df['data_aceite'] = None
@@ -255,6 +256,7 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
         # Construir log de alterações e updates
         alteracoes_log = []
         updates = {}
+        status_aceite_atual = pendencia.get('status_aceite')
 
         if nova_descricao and nova_descricao != descricao_original:
             updates['descricao'] = nova_descricao
@@ -266,6 +268,12 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
             # Ao redesignar, o novo responsável deve aceitar a tarefa
             updates['status_aceite'] = 'pendente'
             updates['data_aceite'] = None
+        elif status_aceite_atual == 'rejeitado':
+            # Tarefa rejeitada editada pelo nível 3 (mesmo sem trocar responsável):
+            # reseta para pendente para que o responsável aceite novamente
+            updates['status_aceite'] = 'pendente'
+            updates['data_aceite'] = None
+            alteracoes_log.append("Aceite resetado para pendente após edição")
 
         if novo_status and novo_status != status_original:
             updates['status'] = novo_status

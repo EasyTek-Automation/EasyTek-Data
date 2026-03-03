@@ -421,7 +421,7 @@ class TestCarregarPendenciasStatusAceite:
             df = carregar_pendencias()
 
         assert 'status_aceite' in df.columns
-        assert df.iloc[0]['status_aceite'] == 'aceito'
+        assert df.iloc[0]['status_aceite'] == 'pendente'
 
     def test_documento_com_status_aceite_pendente_mantem(self):
         """Documentos com status_aceite='pendente' devem manter o valor."""

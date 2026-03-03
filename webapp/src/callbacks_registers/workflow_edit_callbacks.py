@@ -200,16 +200,17 @@ def register_edit_callbacks(app):
 
         pend_id = original_data["id"]
 
-        # VALIDAÇÃO 0: Bloquear edição se tarefa ainda pendente de aceite
+        # VALIDAÇÃO 0: Bloquear edição baseada em status_aceite e nível
         from src.utils.workflow_db import carregar_pendencias as _cp
         _df = _cp()
         _pend = _df[_df['id'] == pend_id]
         if not _pend.empty:
-            _status_aceite = str(_pend.iloc[0].get('status_aceite') or 'aceito')
+            _status_aceite = str(_pend.iloc[0].get('status_aceite') or 'pendente')
             _responsavel = str(_pend.iloc[0].get('responsavel') or '')
-            if _status_aceite != 'aceito':
+
+            if _status_aceite == 'pendente':
                 if _responsavel == username:
-                    # Responsável (qualquer nível) precisa aceitar antes de editar
+                    # Responsável pendente (qualquer nível): deve aceitar antes de editar
                     return (
                         True,
                         dbc.Alert([
@@ -219,7 +220,7 @@ def register_edit_callbacks(app):
                         no_update, no_update, no_update, no_update
                     )
                 elif user_level < 3:
-                    # Não-responsável nível < 3 não pode editar tarefa não aceita
+                    # Não-responsável nível < 3: sem permissão
                     return (
                         True,
                         dbc.Alert([
@@ -228,7 +229,20 @@ def register_edit_callbacks(app):
                         ], color="warning", dismissable=True),
                         no_update, no_update, no_update, no_update
                     )
-                # Nível 3 não-responsável: pode prosseguir (redesignar)
+                # Nível 3 não-responsável: pode redesignar (prossegue)
+
+            elif _status_aceite == 'rejeitado':
+                if user_level < 3:
+                    # Nível < 3 não pode editar tarefa rejeitada
+                    return (
+                        True,
+                        dbc.Alert([
+                            html.I(className="fas fa-lock me-2"),
+                            "Tarefa rejeitada. Aguardando redesignação por nível 3."
+                        ], color="warning", dismissable=True),
+                        no_update, no_update, no_update, no_update
+                    )
+                # Nível 3 (qualquer, inclusive responsável): pode redesignar (prossegue)
 
         # VALIDAÇÃO 1: Campos obrigatórios (incluindo tipo_evento e observações)
         if not all([nova_desc, novo_resp, novo_status, tipo_evento, observacoes]):

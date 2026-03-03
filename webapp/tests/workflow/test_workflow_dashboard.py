@@ -109,13 +109,14 @@ class TestCriarCardsKpi:
         resultado = criar_cards_kpi(None, None)
         assert resultado is not None
 
-    def test_retorna_9_cards(self, df_pendencias_vazio, df_historico_vazio):
-        """Deve retornar 9 cards KPI: Total, Pendentes, Em Andamento, Concluídas,
-        Aguard. Aceite, Aguard. Aprovação, Abertos por Mim, Abertos-Aceitos, Abertos-Rejeitados."""
+    def test_retorna_2_linhas_de_cards(self, df_pendencias_vazio, df_historico_vazio):
+        """Deve retornar html.Div com 2 dbc.Row (linha de status + linha de fila/abertos)."""
         from src.pages.workflow.dashboard import criar_cards_kpi
+        from dash import html
         resultado = criar_cards_kpi(df_pendencias_vazio, df_historico_vazio)
-        assert hasattr(resultado, 'children')
-        assert len(resultado.children) == 9
+        assert resultado is not None
+        assert isinstance(resultado, html.Div)
+        assert len(resultado.children) == 2  # 2 linhas (dbc.Row)
 
     def test_conta_pendentes_corretamente(self, df_pendencias_com_dados, df_historico_vazio):
         """Com 1 pendência com status 'Pendente', o card de Pendentes deve refletir 1."""

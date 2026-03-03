@@ -176,123 +176,65 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
             )
             aguardando_aprovacao = int(mask.sum())
 
-    cards = dbc.Row([
-        # Card Total
-        dbc.Col([
-            dbc.Card([
-                dbc.CardBody([
-                    html.H6("Total de Workflows", className="text-muted mb-2"),
-                    html.H3(str(total), className="mb-0")
-                ])
-            ], className="shadow-sm")
-        ], width=12, lg=True, className="mb-3"),
+    def _card(titulo, valor, cor_valor=None, icone=None, borda=None):
+        """Helper para criar card KPI padronizado."""
+        h6_children = []
+        if icone:
+            h6_children.append(html.I(className=f"{icone} me-1"))
+        h6_children.append(titulo)
+        return dbc.Card([
+            dbc.CardBody([
+                html.H6(h6_children, className="text-muted mb-2"),
+                html.H3(str(valor), className=f"mb-0 {cor_valor}" if cor_valor else "mb-0")
+            ])
+        ], className=f"shadow-sm h-100{' border-' + borda if borda else ''}")
 
-        # Card Pendentes
-        dbc.Col([
-            dbc.Card([
-                dbc.CardBody([
-                    html.H6("Pendentes", className="text-muted mb-2"),
-                    html.H3(str(pendentes), className="mb-0 text-warning")
-                ])
-            ], className="shadow-sm")
-        ], width=12, lg=True, className="mb-3"),
+    cards = html.Div([
+        # --- Linha 1: Situação geral dos workflows ---
+        dbc.Row([
+            dbc.Col(_card("Total de Workflows", total),
+                    width=6, md=3, className="mb-3"),
+            dbc.Col(_card("Pendentes", pendentes, cor_valor="text-warning" if pendentes else None),
+                    width=6, md=3, className="mb-3"),
+            dbc.Col(_card("Em Andamento", em_andamento, cor_valor="text-primary" if em_andamento else None),
+                    width=6, md=3, className="mb-3"),
+            dbc.Col(_card("Concluídas", concluidas, cor_valor="text-success" if concluidas else None),
+                    width=6, md=3, className="mb-3"),
+        ]),
 
-        # Card Em Andamento
-        dbc.Col([
-            dbc.Card([
-                dbc.CardBody([
-                    html.H6("Em Andamento", className="text-muted mb-2"),
-                    html.H3(str(em_andamento), className="mb-0 text-primary")
-                ])
-            ], className="shadow-sm")
-        ], width=12, lg=True, className="mb-3"),
+        # --- Linha 2: Minha fila de trabalho ---
+        dbc.Row([
+            dbc.Col(_card(
+                "Aguard. Aceite", aguardando_aceite,
+                icone="fas fa-inbox",
+                cor_valor="text-secondary" if aguardando_aceite else None,
+                borda="secondary" if aguardando_aceite else None
+            ), width=6, md=3, className="mb-3"),
+            dbc.Col(_card(
+                "Aguard. Aprovação", aguardando_aprovacao,
+                icone="fas fa-clock",
+                cor_valor="text-warning" if aguardando_aprovacao else None,
+                borda="warning" if aguardando_aprovacao else None
+            ), width=6, md=3, className="mb-3"),
 
-        # Card Concluídas
-        dbc.Col([
-            dbc.Card([
-                dbc.CardBody([
-                    html.H6("Concluídas", className="text-muted mb-2"),
-                    html.H3(str(concluidas), className="mb-0 text-success")
-                ])
-            ], className="shadow-sm")
-        ], width=12, lg=True, className="mb-3"),
-
-        # Card Aguardando Aceite (minhas tarefas não aceitas)
-        dbc.Col([
-            dbc.Card([
-                dbc.CardBody([
-                    html.H6([
-                        html.I(className="fas fa-inbox me-1"),
-                        "Aguard. Aceite"
-                    ], className="text-muted mb-2"),
-                    html.H3(
-                        str(aguardando_aceite),
-                        className="mb-0 text-secondary" if aguardando_aceite > 0 else "mb-0"
-                    )
-                ])
-            ], className="shadow-sm border-secondary" if aguardando_aceite > 0 else "shadow-sm")
-        ], width=12, lg=True, className="mb-3"),
-
-        # Card Aguardando Minha Aprovação
-        dbc.Col([
-            dbc.Card([
-                dbc.CardBody([
-                    html.H6([
-                        html.I(className="fas fa-clock me-1"),
-                        "Aguard. Aprovação"
-                    ], className="text-muted mb-2"),
-                    html.H3(
-                        str(aguardando_aprovacao),
-                        className="mb-0 text-warning" if aguardando_aprovacao > 0 else "mb-0"
-                    )
-                ])
-            ], className="shadow-sm border-warning" if aguardando_aprovacao > 0 else "shadow-sm")
-        ], width=12, lg=True, className="mb-3"),
-
-        # Card Abertos por Mim
-        dbc.Col([
-            dbc.Card([
-                dbc.CardBody([
-                    html.H6([
-                        html.I(className="fas fa-folder-open me-1"),
-                        "Abertos por Mim"
-                    ], className="text-muted mb-2"),
-                    html.H3(str(abertos_por_mim), className="mb-0")
-                ])
-            ], className="shadow-sm")
-        ], width=12, lg=True, className="mb-3"),
-
-        # Card Abertos por Mim — Aceitos
-        dbc.Col([
-            dbc.Card([
-                dbc.CardBody([
-                    html.H6([
-                        html.I(className="fas fa-check-circle me-1"),
-                        "Abertos — Aceitos"
-                    ], className="text-muted mb-2"),
-                    html.H3(
-                        str(abertos_aceitos),
-                        className="mb-0 text-success" if abertos_aceitos > 0 else "mb-0"
-                    )
-                ])
-            ], className="shadow-sm border-success" if abertos_aceitos > 0 else "shadow-sm")
-        ], width=12, lg=True, className="mb-3"),
-
-        # Card Abertos por Mim — Rejeitados
-        dbc.Col([
-            dbc.Card([
-                dbc.CardBody([
-                    html.H6([
-                        html.I(className="fas fa-times-circle me-1"),
-                        "Abertos — Rejeitados"
-                    ], className="text-muted mb-2"),
-                    html.H3(
-                        str(abertos_rejeitados),
-                        className="mb-0 text-danger" if abertos_rejeitados > 0 else "mb-0"
-                    )
-                ])
-            ], className="shadow-sm border-danger" if abertos_rejeitados > 0 else "shadow-sm")
-        ], width=12, lg=True, className="mb-3"),
+            # --- Linha 3 (embutida): Tarefas que abri ---
+            dbc.Col(_card(
+                "Tarefas que Abri", abertos_por_mim,
+                icone="fas fa-folder-open"
+            ), width=12, md=2, className="mb-3"),
+            dbc.Col(_card(
+                "Abri — Aceitas", abertos_aceitos,
+                icone="fas fa-check-circle",
+                cor_valor="text-success" if abertos_aceitos else None,
+                borda="success" if abertos_aceitos else None
+            ), width=6, md=2, className="mb-3"),
+            dbc.Col(_card(
+                "Abri — Rejeitadas", abertos_rejeitados,
+                icone="fas fa-times-circle",
+                cor_valor="text-danger" if abertos_rejeitados else None,
+                borda="danger" if abertos_rejeitados else None
+            ), width=6, md=2, className="mb-3"),
+        ]),
     ], className="mb-4")
 
     return cards
@@ -614,57 +556,51 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
     responsavel = pendencia.get('responsavel', '')
     e_responsavel_atual = (username_atual and responsavel == username_atual)
 
-    if status_aceite == 'pendente' and e_responsavel_atual:
-        # Responsável (qualquer nível) precisa aceitar ou rejeitar
-        botoes_acao = html.Div([
-            dbc.Button(
-                [html.I(className="fas fa-check me-1"), "Aceitar"],
-                id={"type": "btn-aceitar-tarefa", "index": pend_id},
-                color="success",
-                size="sm",
-                className="me-1"
-            ),
-            dbc.Button(
-                [html.I(className="fas fa-times me-1"), "Rejeitar"],
-                id={"type": "btn-rejeitar-tarefa-aceite", "index": pend_id},
-                color="danger",
-                size="sm",
-                outline=True
-            )
-        ], className="d-flex")
-    elif status_aceite == 'rejeitado' and e_responsavel_atual:
-        # Responsável rejeitou: edit desabilitado, aguardando redesignação
-        botoes_acao = dbc.Button(
-            html.I(className="fas fa-edit"),
-            id={"type": "btn-edit-pend", "index": pend_id},
-            color="secondary",
-            size="sm",
-            outline=True,
-            disabled=True,
-            title="Tarefa rejeitada — aguardando redesignação por nível 3"
-        )
-    elif status_aceite != 'aceito' and not e_responsavel_atual:
-        if user_level >= 3:
-            # Nível 3 não-responsável pode editar/redesignar
-            botoes_acao = dbc.Button(
-                html.I(className="fas fa-edit"),
-                id={"type": "btn-edit-pend", "index": pend_id},
-                color="info",
-                size="sm",
-                outline=True
-            )
+    _btn_edit = lambda cor="info", disabled=False, titulo=None: dbc.Button(
+        html.I(className="fas fa-edit"),
+        id={"type": "btn-edit-pend", "index": pend_id},
+        color=cor, size="sm", outline=True,
+        disabled=disabled,
+        title=titulo or ""
+    )
+
+    if status_aceite == 'pendente':
+        if e_responsavel_atual:
+            # Responsável (qualquer nível): aceitar ou rejeitar
+            botoes_acao = html.Div([
+                dbc.Button(
+                    [html.I(className="fas fa-check me-1"), "Aceitar"],
+                    id={"type": "btn-aceitar-tarefa", "index": pend_id},
+                    color="success", size="sm", className="me-1"
+                ),
+                dbc.Button(
+                    [html.I(className="fas fa-times me-1"), "Rejeitar"],
+                    id={"type": "btn-rejeitar-tarefa-aceite", "index": pend_id},
+                    color="danger", size="sm", outline=True
+                )
+            ], className="d-flex")
+        elif user_level >= 3:
+            # Nível 3 não-responsável: pode editar/redesignar mesmo pendente
+            botoes_acao = _btn_edit()
         else:
-            # Outro usuário nível < 3: apenas visualiza
+            # Nível < 3 não-responsável: apenas visualiza
             botoes_acao = html.Div()
+
+    elif status_aceite == 'rejeitado':
+        if user_level >= 3:
+            # Nível 3 (qualquer, inclusive responsável): pode editar para redesignar
+            botoes_acao = _btn_edit()
+        elif e_responsavel_atual:
+            # Nível < 3 responsável: aguardando nível 3 redesignar
+            botoes_acao = _btn_edit(cor="secondary", disabled=True,
+                                    titulo="Tarefa rejeitada — aguardando redesignação por nível 3")
+        else:
+            # Nível < 3 não-responsável: apenas visualiza
+            botoes_acao = html.Div()
+
     else:
-        # Tarefa aceita: botão editar normal para todos
-        botoes_acao = dbc.Button(
-            html.I(className="fas fa-edit"),
-            id={"type": "btn-edit-pend", "index": pend_id},
-            color="info",
-            size="sm",
-            outline=True
-        )
+        # status_aceite == 'aceito': botão editar para todos
+        botoes_acao = _btn_edit()
 
     # Linha principal
     linha_principal = html.Tr([
