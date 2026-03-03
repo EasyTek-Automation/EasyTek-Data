@@ -252,11 +252,10 @@ def register_workflow_callbacks(app):
     # CALLBACK 5: Atualizar cards KPI
     # ==================================================================================
     @app.callback(
-        Output("container-cards-kpi", "children", allow_duplicate=True),
+        Output("container-cards-kpi", "children"),
         Input("store-pendencias", "data"),
         Input("store-historico", "data"),
-        State("user-username-store", "data"),
-        prevent_initial_call=False
+        State("user-username-store", "data")
     )
     def atualizar_cards_kpi(pendencias_data, historico_data, username_atual):
         """Atualiza os cards KPI quando os dados mudam."""
