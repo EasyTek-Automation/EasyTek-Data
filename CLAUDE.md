@@ -13,6 +13,17 @@ AMG_Data is an industrial IoT data platform built with Dash/Plotly for real-time
 
 The platform provides dashboards for production monitoring (OEE), energy consumption, maintenance alarms, supervisory control, and utility management.
 
+## Testes
+
+Antes de alterar qualquer função existente:
+1. Verificar se já existe teste cobrindo ela em `webapp/tests/`
+2. Se não existir, escrever o teste primeiro (captura o comportamento atual)
+3. Rodar `pytest webapp/tests/` para confirmar verde
+4. Só então fazer a alteração
+5. Rodar pytest novamente para confirmar que continua verde
+
+Não é necessário criar testes para código que não será alterado.
+
 ## Common Commands
 
 ### Development
