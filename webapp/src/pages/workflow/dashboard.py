@@ -231,29 +231,29 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
             icone="fas fa-inbox",
             cor_valor="text-secondary" if aguardando_aceite else None,
             borda="secondary" if aguardando_aceite else None
-        ), width=6, md=3, className="mb-3"),
+        ), width=True, className="mb-3"),
         dbc.Col(_card(
             "Aguard. Aprovação", aguardando_aprovacao,
             icone="fas fa-clock",
             cor_valor="text-warning" if aguardando_aprovacao else None,
             borda="warning" if aguardando_aprovacao else None
-        ), width=6, md=3, className="mb-3"),
+        ), width=True, className="mb-3"),
         dbc.Col(_card(
             "Abertas por Mim", abertos_por_mim,
             icone="fas fa-folder-open"
-        ), width=12, md=2, className="mb-3"),
+        ), width=True, className="mb-3"),
         dbc.Col(_card(
             "Abertas — Aceitas", abertos_aceitos,
             icone="fas fa-check-circle",
             cor_valor="text-success" if abertos_aceitos else None,
             borda="success" if abertos_aceitos else None
-        ), width=6, md=2, className="mb-3"),
+        ), width=True, className="mb-3"),
         dbc.Col(_card(
             "Abertas — Rejeitadas", abertos_rejeitados,
             icone="fas fa-times-circle",
             cor_valor="text-danger" if abertos_rejeitados else None,
             borda="danger" if abertos_rejeitados else None
-        ), width=6, md=2, className="mb-3"),
+        ), width=True, className="mb-3"),
     ])
 
     return html.Div([status_strip, cards_pessoais], className="mb-4")
