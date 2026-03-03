@@ -95,7 +95,8 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
         busca_lower = busca.lower()
         mask = (
             df_filtrado['id'].str.lower().str.contains(busca_lower, na=False) |
-            df_filtrado['descricao'].str.lower().str.contains(busca_lower, na=False)
+            df_filtrado['descricao'].str.lower().str.contains(busca_lower, na=False) |
+            df_filtrado['nota_gam'].astype(str).str.lower().str.contains(busca_lower, na=False)
         )
         df_filtrado = df_filtrado[mask]
 
