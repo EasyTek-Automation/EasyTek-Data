@@ -200,23 +200,35 @@ def register_edit_callbacks(app):
 
         pend_id = original_data["id"]
 
-        # VALIDAÇÃO 0: Bloquear edição se tarefa não foi aceita (nível < 3)
-        if user_level < 3:
-            from src.utils.workflow_db import carregar_pendencias as _cp
-            import pandas as _pd
-            _df = _cp()
-            _pend = _df[_df['id'] == pend_id]
-            if not _pend.empty:
-                _status_aceite = str(_pend.iloc[0].get('status_aceite') or 'aceito')
-                if _status_aceite != 'aceito':
+        # VALIDAÇÃO 0: Bloquear edição se tarefa ainda pendente de aceite
+        from src.utils.workflow_db import carregar_pendencias as _cp
+        _df = _cp()
+        _pend = _df[_df['id'] == pend_id]
+        if not _pend.empty:
+            _status_aceite = str(_pend.iloc[0].get('status_aceite') or 'aceito')
+            _responsavel = str(_pend.iloc[0].get('responsavel') or '')
+            if _status_aceite != 'aceito':
+                if _responsavel == username:
+                    # Responsável (qualquer nível) precisa aceitar antes de editar
                     return (
-                        True,  # Modal continua aberto
+                        True,
                         dbc.Alert([
                             html.I(className="fas fa-lock me-2"),
-                            "Esta tarefa ainda não foi aceita. Aceite a tarefa antes de editá-la."
+                            "Aceite a tarefa antes de editá-la."
                         ], color="warning", dismissable=True),
                         no_update, no_update, no_update, no_update
                     )
+                elif user_level < 3:
+                    # Não-responsável nível < 3 não pode editar tarefa não aceita
+                    return (
+                        True,
+                        dbc.Alert([
+                            html.I(className="fas fa-lock me-2"),
+                            "Esta tarefa ainda não foi aceita pelo responsável."
+                        ], color="warning", dismissable=True),
+                        no_update, no_update, no_update, no_update
+                    )
+                # Nível 3 não-responsável: pode prosseguir (redesignar)
 
         # VALIDAÇÃO 1: Campos obrigatórios (incluindo tipo_evento e observações)
         if not all([nova_desc, novo_resp, novo_status, tipo_evento, observacoes]):

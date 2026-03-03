@@ -137,6 +137,7 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
     if df_pendencias is None or df_pendencias.empty:
         total = pendentes = em_andamento = concluidas = 0
         aguardando_aceite = 0
+        abertos_por_mim = abertos_aceitos = abertos_rejeitados = 0
     else:
         total = len(df_pendencias)
         pendentes = len(df_pendencias[df_pendencias['status'] == 'Pendente'])
@@ -151,6 +152,19 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
                 (df_pendencias['status_aceite'] != 'aceito')
             )
             aguardando_aceite = int(mask_aceite.sum())
+
+        # Tarefas abertas por mim e seus status de aceite
+        abertos_por_mim = abertos_aceitos = abertos_rejeitados = 0
+        if username_atual and 'criado_por' in df_pendencias.columns:
+            mask_meus = df_pendencias['criado_por'] == username_atual
+            abertos_por_mim = int(mask_meus.sum())
+            if 'status_aceite' in df_pendencias.columns:
+                abertos_aceitos = int(
+                    (mask_meus & (df_pendencias['status_aceite'] == 'aceito')).sum()
+                )
+                abertos_rejeitados = int(
+                    (mask_meus & (df_pendencias['status_aceite'] == 'rejeitado')).sum()
+                )
 
     # Calcular aprovações pendentes para o usuário atual
     aguardando_aprovacao = 0
@@ -234,6 +248,51 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
                 ])
             ], className="shadow-sm border-warning" if aguardando_aprovacao > 0 else "shadow-sm")
         ], width=12, lg=True, className="mb-3"),
+
+        # Card Abertos por Mim
+        dbc.Col([
+            dbc.Card([
+                dbc.CardBody([
+                    html.H6([
+                        html.I(className="fas fa-folder-open me-1"),
+                        "Abertos por Mim"
+                    ], className="text-muted mb-2"),
+                    html.H3(str(abertos_por_mim), className="mb-0")
+                ])
+            ], className="shadow-sm")
+        ], width=12, lg=True, className="mb-3"),
+
+        # Card Abertos por Mim — Aceitos
+        dbc.Col([
+            dbc.Card([
+                dbc.CardBody([
+                    html.H6([
+                        html.I(className="fas fa-check-circle me-1"),
+                        "Abertos — Aceitos"
+                    ], className="text-muted mb-2"),
+                    html.H3(
+                        str(abertos_aceitos),
+                        className="mb-0 text-success" if abertos_aceitos > 0 else "mb-0"
+                    )
+                ])
+            ], className="shadow-sm border-success" if abertos_aceitos > 0 else "shadow-sm")
+        ], width=12, lg=True, className="mb-3"),
+
+        # Card Abertos por Mim — Rejeitados
+        dbc.Col([
+            dbc.Card([
+                dbc.CardBody([
+                    html.H6([
+                        html.I(className="fas fa-times-circle me-1"),
+                        "Abertos — Rejeitados"
+                    ], className="text-muted mb-2"),
+                    html.H3(
+                        str(abertos_rejeitados),
+                        className="mb-0 text-danger" if abertos_rejeitados > 0 else "mb-0"
+                    )
+                ])
+            ], className="shadow-sm border-danger" if abertos_rejeitados > 0 else "shadow-sm")
+        ], width=12, lg=True, className="mb-3"),
     ], className="mb-4")
 
     return cards
@@ -280,6 +339,21 @@ def criar_painel_filtros():
             ]),
             dbc.Row([
                 dbc.Col([
+                    html.Label("Aceite:", className="fw-bold mb-2"),
+                    dcc.Dropdown(
+                        id="filtro-status-aceite",
+                        options=[
+                            {"label": "Aguard. Aceite", "value": "pendente"},
+                            {"label": "Aceito", "value": "aceito"},
+                            {"label": "Rejeitado", "value": "rejeitado"},
+                        ],
+                        multi=True,
+                        placeholder="Todos"
+                    )
+                ], width=12, md=6, className="mb-3"),
+
+                dbc.Col([
+                    html.Label("\u00a0", className="fw-bold mb-2 d-block"),
                     dbc.Button(
                         "Aplicar Filtros",
                         id="btn-aplicar-filtros",
@@ -540,8 +614,8 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
     responsavel = pendencia.get('responsavel', '')
     e_responsavel_atual = (username_atual and responsavel == username_atual)
 
-    if status_aceite != 'aceito' and user_level < 3 and e_responsavel_atual:
-        # Responsável precisa aceitar/rejeitar → mostrar botões de aceite
+    if status_aceite == 'pendente' and e_responsavel_atual:
+        # Responsável (qualquer nível) precisa aceitar ou rejeitar
         botoes_acao = html.Div([
             dbc.Button(
                 [html.I(className="fas fa-check me-1"), "Aceitar"],
@@ -558,11 +632,32 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
                 outline=True
             )
         ], className="d-flex")
-    elif status_aceite != 'aceito' and user_level < 3 and not e_responsavel_atual:
-        # Outro usuário nível < 3 vê tarefa não aceita de outro: apenas visualiza
-        botoes_acao = html.Div()
+    elif status_aceite == 'rejeitado' and e_responsavel_atual:
+        # Responsável rejeitou: edit desabilitado, aguardando redesignação
+        botoes_acao = dbc.Button(
+            html.I(className="fas fa-edit"),
+            id={"type": "btn-edit-pend", "index": pend_id},
+            color="secondary",
+            size="sm",
+            outline=True,
+            disabled=True,
+            title="Tarefa rejeitada — aguardando redesignação por nível 3"
+        )
+    elif status_aceite != 'aceito' and not e_responsavel_atual:
+        if user_level >= 3:
+            # Nível 3 não-responsável pode editar/redesignar
+            botoes_acao = dbc.Button(
+                html.I(className="fas fa-edit"),
+                id={"type": "btn-edit-pend", "index": pend_id},
+                color="info",
+                size="sm",
+                outline=True
+            )
+        else:
+            # Outro usuário nível < 3: apenas visualiza
+            botoes_acao = html.Div()
     else:
-        # Nível 3 ou tarefa já aceita: botão editar normal
+        # Tarefa aceita: botão editar normal para todos
         botoes_acao = dbc.Button(
             html.I(className="fas fa-edit"),
             id={"type": "btn-edit-pend", "index": pend_id},

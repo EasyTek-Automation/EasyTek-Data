@@ -77,7 +77,7 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None):
     return html.Div([timeline])
 
 
-def aplicar_filtros_dataframe(df, responsavel, status_list, busca):
+def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite_list=None):
     """Aplica filtros ao DataFrame de pendências."""
     df_filtrado = df.copy()
 
@@ -86,6 +86,10 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca):
 
     if status_list and len(status_list) > 0:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(status_list)]
+
+    if status_aceite_list and len(status_aceite_list) > 0:
+        if 'status_aceite' in df_filtrado.columns:
+            df_filtrado = df_filtrado[df_filtrado['status_aceite'].isin(status_aceite_list)]
 
     if busca and busca.strip():
         busca_lower = busca.lower()
@@ -166,11 +170,13 @@ def register_workflow_callbacks(app):
         State("filtro-responsavel", "value"),
         State("filtro-status", "value"),
         State("filtro-busca", "value"),
+        State("filtro-status-aceite", "value"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
         prevent_initial_call=True
     )
-    def aplicar_filtros(n_clicks, responsavel, status_list, busca, user_level, username_atual):
+    def aplicar_filtros(n_clicks, responsavel, status_list, busca, status_aceite_list,
+                        user_level, username_atual):
         """Aplica os filtros selecionados e reconstrói a tabela."""
         if not n_clicks:
             raise PreventUpdate
@@ -180,7 +186,9 @@ def register_workflow_callbacks(app):
         if df_pendencias is None or df_pendencias.empty:
             return html.Div("Erro ao carregar dados.", className="text-danger"), []
 
-        df_filtrado = aplicar_filtros_dataframe(df_pendencias, responsavel, status_list, busca)
+        df_filtrado = aplicar_filtros_dataframe(
+            df_pendencias, responsavel, status_list, busca, status_aceite_list
+        )
         nova_tabela = criar_tabela_pendencias(df_filtrado, df_historico,
                                               user_level=user_level or 1,
                                               username_atual=username_atual)
