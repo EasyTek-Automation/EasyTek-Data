@@ -159,7 +159,7 @@ def register_create_callbacks(app):
             # Recarregar tabela E histórico
             from src.pages.workflow.dashboard import carregar_dados_csv, criar_tabela_pendencias
             df_pend, df_hist = carregar_dados_csv()
-            nova_tabela = criar_tabela_pendencias(df_pend)
+            nova_tabela = criar_tabela_pendencias(df_pend, df_hist)
 
             return (
                 False,  # Fechar modal

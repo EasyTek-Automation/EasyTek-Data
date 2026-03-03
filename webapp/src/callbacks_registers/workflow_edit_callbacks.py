@@ -8,8 +8,10 @@ import json
 from src.utils.workflow_db import (
     editar_pendencia,
     get_usuarios_por_perfil,
+    get_usuarios_nivel3_por_perfil,
     carregar_pendencias,
-    deletar_pendencia
+    deletar_pendencia,
+    TIPOS_REQUEREM_APROVACAO
 )
 
 
@@ -26,6 +28,8 @@ def register_edit_callbacks(app):
             Output("edit-pend-status", "value"),
             Output("edit-pend-tipo-evento", "value"),
             Output("edit-pend-observacoes", "value"),
+            Output("edit-pend-horas", "value"),
+            Output("edit-pend-aprovador-dropdown", "value"),
             Output("edit-pend-original-data", "data"),
             Output("edit-pend-alert", "children")
         ],
@@ -53,7 +57,7 @@ def register_edit_callbacks(app):
 
         # Fechar modal (limpar todos os campos)
         if "cancel" in trigger_id or "submit" in trigger_id:
-            return False, "", "", None, None, None, "", None, ""
+            return False, "", "", None, None, None, "", None, None, None, ""
 
         # Verificar se é um clique válido nos botões de editar
         # (n_clicks deve ser > 0 e não None)
@@ -69,7 +73,7 @@ def register_edit_callbacks(app):
             pend = df_pend[df_pend['id'] == pend_id]
 
             if pend.empty:
-                return False, "", "", None, None, None, "", None, dbc.Alert(
+                return False, "", "", None, None, None, "", None, None, None, dbc.Alert(
                     "Pendência não encontrada", color="danger"
                 )
 
@@ -100,18 +104,36 @@ def register_edit_callbacks(app):
                         ultimo_tipo_evento = hist_pend.iloc[0]['descricao']
 
             return (
-                True,  # Modal abre
+                True,           # Modal abre
                 pend['id'],
                 pend['descricao'],
                 pend['responsavel'],
                 pend['status'],
                 ultimo_tipo_evento,  # Precarregar último tipo de evento
-                "",    # Observações sempre vazio ao abrir
+                "",             # Observações sempre vazio ao abrir
+                None,           # Horas sempre vazio ao abrir
+                None,           # Aprovador sempre vazio ao abrir
                 original_data,
                 ""
             )
 
         return no_update
+
+
+    # CALLBACK 1.5: Mostrar/Ocultar campo de aprovador baseado no tipo de evento
+    @app.callback(
+        Output("edit-pend-aprovador-container", "style"),
+        Output("edit-pend-aprovador-dropdown", "options"),
+        Input("edit-pend-tipo-evento", "value"),
+        State("user-perfil-store", "data"),
+        prevent_initial_call=True
+    )
+    def toggle_campo_aprovador(tipo_evento, user_perfil):
+        """Mostra campo de aprovador quando tipo de evento requer aprovação."""
+        if tipo_evento in TIPOS_REQUEREM_APROVACAO:
+            aprovadores = get_usuarios_nivel3_por_perfil(user_perfil or "admin")
+            return {"display": "block"}, aprovadores
+        return {"display": "none"}, []
 
 
     # CALLBACK 2: Popular dropdown de responsáveis no modal de edição
@@ -158,6 +180,8 @@ def register_edit_callbacks(app):
             State("edit-pend-status", "value"),
             State("edit-pend-tipo-evento", "value"),
             State("edit-pend-observacoes", "value"),
+            State("edit-pend-horas", "value"),
+            State("edit-pend-aprovador-dropdown", "value"),
             State("edit-pend-original-data", "data"),
             State("user-level-store", "data"),
             State("user-perfil-store", "data"),
@@ -166,7 +190,7 @@ def register_edit_callbacks(app):
         prevent_initial_call=True
     )
     def salvar_edicao_pendencia(n_clicks, nova_desc, novo_resp, novo_status, tipo_evento, observacoes,
-                                original_data, user_level, user_perfil, username):
+                                horas, aprovador, original_data, user_level, user_perfil, username):
         """Valida e salva edições da pendência."""
         if not n_clicks or not original_data:
             return no_update, no_update, no_update, no_update, no_update, no_update
@@ -188,13 +212,21 @@ def register_edit_callbacks(app):
                     html.I(className="fas fa-exclamation-triangle me-2"),
                     f"Campos obrigatórios faltando: {', '.join(campos_faltantes)}"
                 ], color="warning", dismissable=True),
-                no_update,  # Sem alerta no container principal
-                no_update,  # Tabela não muda
-                no_update,  # Store pendências não muda
-                no_update   # Store histórico não muda
+                no_update, no_update, no_update, no_update
             )
 
-        # VALIDAÇÃO 2: Departamento (se mudou responsável)
+        # VALIDAÇÃO 2: Aprovador obrigatório quando tipo requer aprovação
+        if tipo_evento in TIPOS_REQUEREM_APROVACAO and not aprovador:
+            return (
+                True,  # Modal continua aberto
+                dbc.Alert([
+                    html.I(className="fas fa-exclamation-triangle me-2"),
+                    f"O tipo '{tipo_evento}' requer a seleção de um aprovador (nível 3)."
+                ], color="warning", dismissable=True),
+                no_update, no_update, no_update, no_update
+            )
+
+        # VALIDAÇÃO 3: Departamento (se mudou responsável)
         if novo_resp != original_data["responsavel"]:
             from src.database.connection import get_mongo_connection
             usuarios = get_mongo_connection("usuarios")
@@ -220,6 +252,9 @@ def register_edit_callbacks(app):
                     no_update, no_update, no_update, no_update
                 )
 
+        # Converter horas para float se fornecido
+        horas_valor = float(horas) if horas is not None else None
+
         # EDITAR PENDÊNCIA
         sucesso, mensagem = editar_pendencia(
             pend_id=pend_id,
@@ -231,14 +266,16 @@ def register_edit_callbacks(app):
             status_original=original_data["status"],
             editado_por=username,
             tipo_evento=tipo_evento,
-            observacoes=observacoes.strip()
+            observacoes=observacoes.strip(),
+            horas=horas_valor,
+            aprovador=aprovador if tipo_evento in TIPOS_REQUEREM_APROVACAO else None
         )
 
         if sucesso:
             # Recarregar tabela E histórico
             from src.pages.workflow.dashboard import carregar_dados_csv, criar_tabela_pendencias
             df_pend, df_hist = carregar_dados_csv()
-            nova_tabela = criar_tabela_pendencias(df_pend)
+            nova_tabela = criar_tabela_pendencias(df_pend, df_hist)
 
             return (
                 False,  # Fechar modal
@@ -341,7 +378,7 @@ def register_edit_callbacks(app):
             # Recarregar tabela e histórico
             from src.pages.workflow.dashboard import carregar_dados_csv, criar_tabela_pendencias
             df_pend, df_hist = carregar_dados_csv()
-            nova_tabela = criar_tabela_pendencias(df_pend)
+            nova_tabela = criar_tabela_pendencias(df_pend, df_hist)
 
             return (
                 False,  # Fechar modal de edição

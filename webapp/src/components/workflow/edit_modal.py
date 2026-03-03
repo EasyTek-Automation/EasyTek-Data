@@ -63,27 +63,59 @@ def edit_pendencia_modal():
             dcc.Dropdown(
                 id="edit-pend-tipo-evento",
                 options=[
-                    {"label": "Primeira inspeção concluída", "value": "Primeira inspeção concluída"},
-                    {"label": "Teste realizado com sucesso", "value": "Teste realizado com sucesso"},
-                    {"label": "Aguardando peça do fornecedor", "value": "Aguardando peça do fornecedor"},
-                    {"label": "Manutenção preventiva realizada", "value": "Manutenção preventiva realizada"},
-                    {"label": "Problema identificado", "value": "Problema identificado"},
-                    {"label": "Solução implementada", "value": "Solução implementada"},
-                    {"label": "Revisão técnica concluída", "value": "Revisão técnica concluída"},
-                    {"label": "Documentação atualizada", "value": "Documentação atualizada"},
-                    {"label": "Treinamento realizado", "value": "Treinamento realizado"},
-                    {"label": "Validação em andamento", "value": "Validação em andamento"},
+                    {"label": "Análise de Falha", "value": "Análise de Falha"},
+                    {"label": "Aguardando Material", "value": "Aguardando Material"},
+                    {"label": "Aguardando Aprovação", "value": "Aguardando Aprovação"},
+                    {"label": "Manutenção Corretiva", "value": "Manutenção Corretiva"},
+                    {"label": "Manutenção Preventiva", "value": "Manutenção Preventiva"},
+                    {"label": "Revisão de Software", "value": "Revisão de Software"},
+                    {"label": "Teste e Validação", "value": "Teste e Validação"},
+                    {"label": "Em Produção Assistida", "value": "Em Produção Assistida"},
+                    {"label": "Documentação Técnica", "value": "Documentação Técnica"},
+                    {"label": "Treinamento Operacional", "value": "Treinamento Operacional"},
+                    {"label": "Encerramento", "value": "Encerramento"},
                 ],
                 placeholder="Selecione o tipo de evento",
                 clearable=False,
                 className="mb-3"
             ),
             html.Small("Selecione o evento que descreve esta atualização no workflow.",
+                      className="text-muted d-block mb-2"),
+
+            # Campo: Aprovador (aparece quando tipo requer aprovação)
+            html.Div([
+                html.Label("Aprovador (Nível 3):", className="fw-bold mb-1"),
+                html.Span(" *", className="text-danger"),
+                dcc.Dropdown(
+                    id="edit-pend-aprovador-dropdown",
+                    placeholder="Selecione o aprovador",
+                    clearable=False,
+                    searchable=True,
+                    className="mb-1"
+                ),
+                html.Small(
+                    "Este tipo de evento requer aprovação de um usuário nível 3.",
+                    className="text-warning d-block mb-3"
+                ),
+            ], id="edit-pend-aprovador-container", style={"display": "none"}),
+
+            # Campo: Horas trabalhadas (OPCIONAL)
+            html.Label("Horas trabalhadas:", className="fw-bold mb-1"),
+            html.Span(" (opcional)", className="text-muted small"),
+            dbc.Input(
+                id="edit-pend-horas",
+                type="number",
+                min=0,
+                step=0.5,
+                placeholder="Ex: 2.5",
+                className="mb-1"
+            ),
+            html.Small("Informe o tempo gasto nesta subatividade (em horas).",
                       className="text-muted d-block mb-3"),
 
             # Campo: Observações (OBRIGATÓRIO)
             html.Label("Observações:", className="fw-bold mb-1"),
-            html.Span("*", className="text-danger ms-1"),
+            html.Span(" *", className="text-danger"),
             dbc.Textarea(
                 id="edit-pend-observacoes",
                 placeholder="Detalhe as ações realizadas, justificativas ou informações relevantes...",

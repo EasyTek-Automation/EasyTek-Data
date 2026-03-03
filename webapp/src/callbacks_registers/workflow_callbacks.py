@@ -2,22 +2,25 @@
 Callbacks para o Dashboard de Pendências (Workflow).
 
 Implementa:
-- Toggle do painel de filtros
 - Expansão/colapso de linhas com pattern-matching
 - Aplicação de filtros
 - Refresh de dados
+- Marcar subatividade como concluída
+- Aprovar / Rejeitar subatividades
 """
 
 import pandas as pd
-from dash import Input, Output, State, MATCH, html
+from dash import Input, Output, State, MATCH, ALL, html, callback_context, no_update
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
+import json
 
 from src.pages.workflow.dashboard import (
     carregar_dados_csv,
     criar_tabela_pendencias,
     criar_cards_kpi,
-    criar_timeline_historico
+    criar_timeline_historico,
+    criar_grafico_horas
 )
 
 
@@ -25,62 +28,72 @@ from src.pages.workflow.dashboard import (
 # HELPERS
 # ======================================================================================
 
-def criar_conteudo_historico(pendencia_id, df_historico):
+def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None):
     """
     Cria o conteúdo do histórico para uma pendência específica.
 
     Args:
-        pendencia_id: ID da pendência (ex: PEND-001)
+        pendencia_id: ID da pendência
         df_historico: DataFrame com todo o histórico
+        username_atual: Username do usuário logado (para botões de aprovação)
 
     Returns:
-        html.Div: Timeline do histórico
+        html.Div: Timeline do histórico + gráfico de horas
     """
-    # Filtrar histórico da pendência
     historico_pendencia = df_historico[df_historico['pendencia_id'] == pendencia_id].copy()
-
-    # Ordenar por data
     historico_pendencia = historico_pendencia.sort_values('data')
 
-    # Converter para lista de dicts
     historico_items = []
     for _, row in historico_pendencia.iterrows():
+        # Normalizar horas: None/NaN → None, valor numérico válido → float
+        horas_raw = row.get('horas')
+        try:
+            horas_val = float(horas_raw) if horas_raw is not None and str(horas_raw) != 'nan' else None
+        except (ValueError, TypeError):
+            horas_val = None
+
+        # Normalizar concluido: apenas bool True conta como concluído
+        concluido_val = row.get('concluido') is True
+
+        # Normalizar strings (None/NaN → None)
+        def _str_or_none(v):
+            return str(v) if v is not None and str(v) != 'nan' else None
+
         historico_items.append({
+            'hist_id': row.get('hist_id', ''),
             'descricao': row['descricao'],
-            'observacoes': row.get('observacoes', ''),  # Observações (pode não existir em registros antigos)
-            'alteracoes': row.get('alteracoes', ''),  # Log de campos alterados
-            'editado_por': row.get('editado_por', row['responsavel']),  # Quem editou (fallback: responsável)
-            'responsavel': row['responsavel'],  # Mantém para referência
-            'data': row['data'].strftime("%d/%m/%Y %H:%M")
+            'observacoes': row.get('observacoes', '') or '',
+            'alteracoes': row.get('alteracoes', '') or '',
+            'editado_por': row.get('editado_por', row['responsavel']),
+            'responsavel': row['responsavel'],
+            'data': row['data'].strftime("%d/%m/%Y %H:%M"),
+            'horas': horas_val,
+            'concluido': concluido_val,
+            'aprovador': _str_or_none(row.get('aprovador')),
+            'status_aprovacao': _str_or_none(row.get('status_aprovacao')),
         })
 
-    return criar_timeline_historico(historico_items)
+    grafico = criar_grafico_horas(historico_items)
+    timeline = criar_timeline_historico(historico_items, username_atual)
+
+    conteudo = []
+    if grafico:
+        conteudo.append(grafico)
+    conteudo.append(timeline)
+
+    return html.Div(conteudo)
 
 
 def aplicar_filtros_dataframe(df, responsavel, status_list, busca):
-    """
-    Aplica filtros ao DataFrame de pendências.
-
-    Args:
-        df: DataFrame original
-        responsavel: Responsável selecionado ou "todos"
-        status_list: Lista de status selecionados ou None
-        busca: Texto de busca ou None
-
-    Returns:
-        pd.DataFrame: DataFrame filtrado
-    """
+    """Aplica filtros ao DataFrame de pendências."""
     df_filtrado = df.copy()
 
-    # Filtro por responsável
     if responsavel and responsavel != "todos":
         df_filtrado = df_filtrado[df_filtrado['responsavel'] == responsavel]
 
-    # Filtro por status (multi-select)
     if status_list and len(status_list) > 0:
         df_filtrado = df_filtrado[df_filtrado['status'].isin(status_list)]
 
-    # Filtro por busca (ID ou descrição)
     if busca and busca.strip():
         busca_lower = busca.lower()
         mask = (
@@ -97,22 +110,10 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca):
 # ======================================================================================
 
 def register_workflow_callbacks(app):
-    """
-    Registra todos os callbacks do módulo Workflow.
-
-    Args:
-        app: Instância do Dash app
-    """
+    """Registra todos os callbacks do módulo Workflow."""
 
     # ==================================================================================
-    # CALLBACK 1: Toggle do painel de filtros (REMOVIDO - Painel agora sempre visível)
-    # ==================================================================================
-    # Callback removido pois o painel de filtros agora está sempre visível
-    # O botão "Filtros" foi removido da interface
-
-
-    # ==================================================================================
-    # CALLBACK 2: Expansão/Colapso de linha individual (Pattern-Matching)
+    # CALLBACK 1: Expansão/Colapso de linha individual (Pattern-Matching)
     # ==================================================================================
     @app.callback(
         Output({"type": "collapse-historico", "index": MATCH}, "is_open"),
@@ -122,52 +123,38 @@ def register_workflow_callbacks(app):
         State({"type": "collapse-historico", "index": MATCH}, "is_open"),
         State("store-pendencias", "data"),
         State("store-historico", "data"),
+        State("user-username-store", "data"),
         prevent_initial_call=True
     )
-    def toggle_linha_historico(n_clicks, is_open, pendencias_data, historico_data):
-        """
-        Expande/colapsa uma linha individual e carrega o histórico.
-
-        Usa pattern-matching (MATCH) para afetar apenas a linha clicada.
-        """
+    def toggle_linha_historico(n_clicks, is_open, pendencias_data, historico_data, username_atual):
+        """Expande/colapsa uma linha individual e carrega o histórico."""
         if not n_clicks:
             raise PreventUpdate
 
-        # Converter dados para DataFrames
         df_pendencias = pd.DataFrame(pendencias_data)
         df_historico = pd.DataFrame(historico_data)
 
-        # Converter datas (usar format='mixed' para suportar timestamps com microsegundos)
         if not df_historico.empty:
             df_historico['data'] = pd.to_datetime(df_historico['data'], format='mixed')
 
-        # Obter o índice da linha clicada (extraído do callback context)
-        from dash import callback_context
         triggered_id = callback_context.triggered[0]['prop_id']
-
-        # Extrair o index do ID dinâmico
-        import json
         id_dict = json.loads(triggered_id.split('.')[0])
         index = id_dict['index']
 
-        # Obter ID da pendência
         if index >= len(df_pendencias):
             raise PreventUpdate
 
         pendencia_id = df_pendencias.iloc[index]['id']
 
-        # Alternar estado
+        # Ajustar coluna pendencia_id no histórico
+        if not df_historico.empty and 'MaintenanceWF_id' in df_historico.columns and 'pendencia_id' not in df_historico.columns:
+            df_historico['pendencia_id'] = df_historico['MaintenanceWF_id']
+
         new_is_open = not is_open
+        chevron_class = "fas fa-chevron-down" if new_is_open else "fas fa-chevron-right"
 
-        # Rotacionar chevron
         if new_is_open:
-            chevron_class = "fas fa-chevron-down"
-        else:
-            chevron_class = "fas fa-chevron-right"
-
-        # Carregar histórico apenas se estiver abrindo
-        if new_is_open:
-            conteudo_historico = criar_conteudo_historico(pendencia_id, df_historico)
+            conteudo_historico = criar_conteudo_historico(pendencia_id, df_historico, username_atual)
         else:
             conteudo_historico = html.Div()
 
@@ -175,7 +162,7 @@ def register_workflow_callbacks(app):
 
 
     # ==================================================================================
-    # CALLBACK 3: Aplicar filtros
+    # CALLBACK 2: Aplicar filtros
     # ==================================================================================
     @app.callback(
         Output("container-tabela", "children"),
@@ -187,29 +174,23 @@ def register_workflow_callbacks(app):
         prevent_initial_call=True
     )
     def aplicar_filtros(n_clicks, responsavel, status_list, busca):
-        """
-        Aplica os filtros selecionados e reconstrói a tabela.
-        """
+        """Aplica os filtros selecionados e reconstrói a tabela."""
         if not n_clicks:
             raise PreventUpdate
 
-        # Carregar dados originais
-        df_pendencias, _ = carregar_dados_csv()
+        df_pendencias, df_historico = carregar_dados_csv()
 
         if df_pendencias is None or df_pendencias.empty:
             return html.Div("Erro ao carregar dados.", className="text-danger"), []
 
-        # Aplicar filtros
         df_filtrado = aplicar_filtros_dataframe(df_pendencias, responsavel, status_list, busca)
-
-        # Reconstruir tabela
-        nova_tabela = criar_tabela_pendencias(df_filtrado)
+        nova_tabela = criar_tabela_pendencias(df_filtrado, df_historico)
 
         return nova_tabela, df_filtrado.to_dict('records')
 
 
     # ==================================================================================
-    # CALLBACK 4: Refresh de dados
+    # CALLBACK 3: Refresh de dados
     # ==================================================================================
     @app.callback(
         Output("container-tabela", "children", allow_duplicate=True),
@@ -219,20 +200,16 @@ def register_workflow_callbacks(app):
         prevent_initial_call=True
     )
     def refresh_dados(n_clicks):
-        """
-        Recarrega os dados dos CSVs e reconstrói a tabela.
-        """
+        """Recarrega os dados e reconstrói a tabela."""
         if not n_clicks:
             raise PreventUpdate
 
-        # Recarregar CSVs
         df_pendencias, df_historico = carregar_dados_csv()
 
         if df_pendencias is None or df_historico is None:
             return html.Div("Erro ao carregar dados.", className="text-danger"), [], []
 
-        # Reconstruir tabela
-        nova_tabela = criar_tabela_pendencias(df_pendencias)
+        nova_tabela = criar_tabela_pendencias(df_pendencias, df_historico)
 
         return (
             nova_tabela,
@@ -242,7 +219,7 @@ def register_workflow_callbacks(app):
 
 
     # ==================================================================================
-    # CALLBACK 5: Popular dropdown de responsáveis com usuários do MongoDB
+    # CALLBACK 4: Popular dropdown de responsáveis
     # ==================================================================================
     @app.callback(
         Output("filtro-responsavel", "options"),
@@ -253,17 +230,14 @@ def register_workflow_callbacks(app):
         from src.database.connection import get_mongo_connection
 
         try:
-            # Buscar todos os usuários
             usuarios = get_mongo_connection("usuarios")
             users = list(usuarios.find({}, {"username": 1}).sort("username", 1))
 
-            # Criar opções
             options = [{"label": "Todos", "value": "todos"}]
             options.extend([
                 {"label": u['username'], "value": u['username']}
                 for u in users
             ])
-
             return options
 
         except Exception as e:
@@ -272,37 +246,205 @@ def register_workflow_callbacks(app):
 
 
     # ==================================================================================
-    # CALLBACK 6: Atualizar cards KPI quando dados mudam
+    # CALLBACK 5: Atualizar cards KPI
     # ==================================================================================
     @app.callback(
         Output("container-cards-kpi", "children"),
-        Input("store-pendencias", "data")
+        Input("store-pendencias", "data"),
+        Input("store-historico", "data"),
+        State("user-username-store", "data")
     )
-    def atualizar_cards_kpi(pendencias_data):
-        """
-        Atualiza os cards KPI quando os dados de pendências mudam.
+    def atualizar_cards_kpi(pendencias_data, historico_data, username_atual):
+        """Atualiza os cards KPI quando os dados mudam."""
+        df_pendencias = None
+        df_historico = None
 
-        Este callback garante que os totalizadores refletem sempre os dados
-        mais recentes do MongoDB (após criar, editar, deletar ou aplicar filtros).
-        """
-        if not pendencias_data:
-            return criar_cards_kpi(None)
+        if pendencias_data:
+            df_pendencias = pd.DataFrame(pendencias_data)
+            if not df_pendencias.empty:
+                if 'data_criacao' in df_pendencias.columns:
+                    df_pendencias['data_criacao'] = pd.to_datetime(
+                        df_pendencias['data_criacao'], format='mixed'
+                    )
+                if 'ultima_atualizacao' in df_pendencias.columns:
+                    df_pendencias['ultima_atualizacao'] = pd.to_datetime(
+                        df_pendencias['ultima_atualizacao'], format='mixed'
+                    )
 
-        # Converter dados para DataFrame
-        df_pendencias = pd.DataFrame(pendencias_data)
+        if historico_data:
+            df_historico = pd.DataFrame(historico_data)
 
-        # Converter datas (se necessário)
-        if not df_pendencias.empty:
-            if 'data_criacao' in df_pendencias.columns:
-                df_pendencias['data_criacao'] = pd.to_datetime(
-                    df_pendencias['data_criacao'],
-                    format='mixed'
-                )
-            if 'ultima_atualizacao' in df_pendencias.columns:
-                df_pendencias['ultima_atualizacao'] = pd.to_datetime(
-                    df_pendencias['ultima_atualizacao'],
-                    format='mixed'
-                )
+        return criar_cards_kpi(df_pendencias, df_historico, username_atual)
 
-        # Recriar cards com dados atualizados
-        return criar_cards_kpi(df_pendencias)
+
+    # ==================================================================================
+    # CALLBACK 6: Abrir/fechar modal de confirmação para concluir subatividade
+    # O confirm é tratado apenas pelo callback 7 para evitar duplo Input
+    # ==================================================================================
+    @app.callback(
+        Output("concluir-subtarefa-modal", "is_open"),
+        Output("store-subtarefa-concluir-pending", "data"),
+        Input({"type": "btn-concluir-subtarefa", "index": ALL}, "n_clicks"),
+        Input("concluir-subtarefa-cancel-btn", "n_clicks"),
+        State("concluir-subtarefa-modal", "is_open"),
+        prevent_initial_call=True
+    )
+    def toggle_concluir_modal(concluir_clicks, cancel_clicks, is_open):
+        """Abre modal ao clicar 'Concluir'; fecha ao cancelar."""
+        ctx = callback_context
+        if not ctx.triggered:
+            raise PreventUpdate
+
+        trigger_prop = ctx.triggered[0]['prop_id']
+        trigger_id_str = trigger_prop.split('.')[0]
+
+        # Fechar modal ao cancelar
+        if 'cancel' in trigger_id_str:
+            return False, no_update
+
+        # Abrir modal ao clicar no botão de concluir
+        if 'btn-concluir-subtarefa' in trigger_id_str:
+            if not any(c for c in concluir_clicks if c):
+                raise PreventUpdate
+            id_dict = json.loads(trigger_id_str)
+            hist_id = id_dict['index']
+            return True, hist_id
+
+        raise PreventUpdate
+
+
+    # ==================================================================================
+    # CALLBACK 7: Confirmar conclusão da subatividade
+    # ==================================================================================
+    @app.callback(
+        Output("container-tabela", "children", allow_duplicate=True),
+        Output("store-pendencias", "data", allow_duplicate=True),
+        Output("store-historico", "data", allow_duplicate=True),
+        Output("alert-container-workflow", "children", allow_duplicate=True),
+        Output("concluir-subtarefa-modal", "is_open", allow_duplicate=True),
+        Input("concluir-subtarefa-confirm-btn", "n_clicks"),
+        State("store-subtarefa-concluir-pending", "data"),
+        prevent_initial_call=True
+    )
+    def confirmar_concluir_subtarefa(n_clicks, hist_id):
+        """Marca a subatividade como concluída após confirmação."""
+        if not n_clicks or not hist_id:
+            raise PreventUpdate
+
+        from src.utils.workflow_db import marcar_subtarefa_concluida
+
+        sucesso = marcar_subtarefa_concluida(hist_id)
+
+        df_pend, df_hist = carregar_dados_csv()
+        nova_tabela = criar_tabela_pendencias(df_pend, df_hist)
+
+        if sucesso:
+            alerta = dbc.Alert([
+                html.I(className="fas fa-check-circle me-2"),
+                "Subatividade marcada como concluída."
+            ], color="success", dismissable=True, duration=5000)
+        else:
+            alerta = dbc.Alert([
+                html.I(className="fas fa-exclamation-circle me-2"),
+                "Não foi possível marcar como concluída (já concluída ou erro)."
+            ], color="warning", dismissable=True, duration=5000)
+
+        return (
+            nova_tabela,
+            df_pend.to_dict('records') if df_pend is not None else [],
+            df_hist.to_dict('records') if df_hist is not None else [],
+            alerta,
+            False  # Fechar modal
+        )
+
+
+    # ==================================================================================
+    # CALLBACK 8: Aprovar subatividade (pattern-matching)
+    # ==================================================================================
+    @app.callback(
+        Output("container-tabela", "children", allow_duplicate=True),
+        Output("store-pendencias", "data", allow_duplicate=True),
+        Output("store-historico", "data", allow_duplicate=True),
+        Output("alert-container-workflow", "children", allow_duplicate=True),
+        Input({"type": "btn-aprovar", "index": ALL}, "n_clicks"),
+        prevent_initial_call=True
+    )
+    def aprovar_subtarefa(n_clicks):
+        """Aprova uma subatividade pendente de aprovação."""
+        ctx = callback_context
+        if not ctx.triggered or not any(c for c in n_clicks if c):
+            raise PreventUpdate
+
+        trigger_id_str = ctx.triggered[0]['prop_id'].split('.')[0]
+        id_dict = json.loads(trigger_id_str)
+        hist_id = id_dict['index']
+
+        from src.utils.workflow_db import aprovar_ou_rejeitar
+
+        sucesso = aprovar_ou_rejeitar(hist_id, 'aprovado')
+        df_pend, df_hist = carregar_dados_csv()
+        nova_tabela = criar_tabela_pendencias(df_pend, df_hist)
+
+        if sucesso:
+            alerta = dbc.Alert([
+                html.I(className="fas fa-thumbs-up me-2"),
+                "Subatividade aprovada com sucesso."
+            ], color="success", dismissable=True, duration=5000)
+        else:
+            alerta = dbc.Alert([
+                html.I(className="fas fa-exclamation-circle me-2"),
+                "Erro ao aprovar subatividade."
+            ], color="danger", dismissable=True, duration=5000)
+
+        return (
+            nova_tabela,
+            df_pend.to_dict('records') if df_pend is not None else [],
+            df_hist.to_dict('records') if df_hist is not None else [],
+            alerta
+        )
+
+
+    # ==================================================================================
+    # CALLBACK 9: Rejeitar subatividade (pattern-matching)
+    # ==================================================================================
+    @app.callback(
+        Output("container-tabela", "children", allow_duplicate=True),
+        Output("store-pendencias", "data", allow_duplicate=True),
+        Output("store-historico", "data", allow_duplicate=True),
+        Output("alert-container-workflow", "children", allow_duplicate=True),
+        Input({"type": "btn-rejeitar", "index": ALL}, "n_clicks"),
+        prevent_initial_call=True
+    )
+    def rejeitar_subtarefa(n_clicks):
+        """Rejeita uma subatividade pendente de aprovação."""
+        ctx = callback_context
+        if not ctx.triggered or not any(c for c in n_clicks if c):
+            raise PreventUpdate
+
+        trigger_id_str = ctx.triggered[0]['prop_id'].split('.')[0]
+        id_dict = json.loads(trigger_id_str)
+        hist_id = id_dict['index']
+
+        from src.utils.workflow_db import aprovar_ou_rejeitar
+
+        sucesso = aprovar_ou_rejeitar(hist_id, 'rejeitado')
+        df_pend, df_hist = carregar_dados_csv()
+        nova_tabela = criar_tabela_pendencias(df_pend, df_hist)
+
+        if sucesso:
+            alerta = dbc.Alert([
+                html.I(className="fas fa-thumbs-down me-2"),
+                "Subatividade rejeitada."
+            ], color="warning", dismissable=True, duration=5000)
+        else:
+            alerta = dbc.Alert([
+                html.I(className="fas fa-exclamation-circle me-2"),
+                "Erro ao rejeitar subatividade."
+            ], color="danger", dismissable=True, duration=5000)
+
+        return (
+            nova_tabela,
+            df_pend.to_dict('records') if df_pend is not None else [],
+            df_hist.to_dict('records') if df_hist is not None else [],
+            alerta
+        )

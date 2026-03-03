@@ -1,12 +1,16 @@
 """Funções para manipulação de Workflow via MongoDB."""
 import pandas as pd
 from datetime import datetime
+from bson import ObjectId
 from src.database.connection import get_mongo_connection
 
 
 # Collections MongoDB
 COLLECTION_PENDENCIAS = "Maintenance_workflow"
 COLLECTION_HISTORICO = "MaintenanceHistory_workflow"
+
+# Tipos de evento que requerem aprovação
+TIPOS_REQUEREM_APROVACAO = ["Aguardando Aprovação", "Em Produção Assistida", "Encerramento"]
 
 
 def carregar_pendencias():
@@ -57,15 +61,32 @@ def carregar_historico():
     """
     try:
         collection = get_mongo_connection(COLLECTION_HISTORICO)
-        documentos = list(collection.find({}, {'_id': 0}).sort('data', -1))
+        documentos = list(collection.find({}).sort('data', -1))
 
         if not documentos:
             return pd.DataFrame(columns=[
-                'MaintenanceWF_id', 'descricao', 'data', 'responsavel',
-                'tipo_evento', 'editado_por', 'observacoes', 'alteracoes'
+                'hist_id', 'MaintenanceWF_id', 'descricao', 'data', 'responsavel',
+                'tipo_evento', 'editado_por', 'observacoes', 'alteracoes',
+                'horas', 'concluido', 'aprovador', 'status_aprovacao', 'data_aprovacao'
             ])
 
+        # Converter _id para string e remover campo _id original
+        for doc in documentos:
+            doc['hist_id'] = str(doc.pop('_id'))
+
         df = pd.DataFrame(documentos)
+
+        # Garantir colunas novas com valores padrão para registros antigos
+        if 'horas' not in df.columns:
+            df['horas'] = None
+        if 'concluido' not in df.columns:
+            df['concluido'] = False
+        if 'aprovador' not in df.columns:
+            df['aprovador'] = None
+        if 'status_aprovacao' not in df.columns:
+            df['status_aprovacao'] = None
+        if 'data_aprovacao' not in df.columns:
+            df['data_aprovacao'] = None
 
         # Converter datas
         if 'data' in df.columns:
@@ -76,8 +97,9 @@ def carregar_historico():
     except Exception as e:
         print(f"Erro ao carregar histórico: {e}")
         return pd.DataFrame(columns=[
-            'MaintenanceWF_id', 'descricao', 'data', 'responsavel',
-            'tipo_evento', 'editado_por', 'observacoes', 'alteracoes'
+            'hist_id', 'MaintenanceWF_id', 'descricao', 'data', 'responsavel',
+            'tipo_evento', 'editado_por', 'observacoes', 'alteracoes',
+            'horas', 'concluido', 'aprovador', 'status_aprovacao', 'data_aprovacao'
         ])
 
 
@@ -158,7 +180,12 @@ def criar_pendencia(descricao, responsavel, status, criado_por, criado_por_perfi
             'tipo_evento': 'criacao',
             'editado_por': criado_por,
             'observacoes': f'Pendência criada e atribuída a {responsavel}',
-            'alteracoes': ''  # Sem alterações na criação
+            'alteracoes': '',
+            'horas': None,
+            'concluido': False,
+            'aprovador': None,
+            'status_aprovacao': None,
+            'data_aprovacao': None
         }
 
         collection_hist = get_mongo_connection(COLLECTION_HISTORICO)
@@ -172,7 +199,7 @@ def criar_pendencia(descricao, responsavel, status, criado_por, criado_por_perfi
 
 def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
                      descricao_original, responsavel_original, status_original,
-                     editado_por, tipo_evento, observacoes):
+                     editado_por, tipo_evento, observacoes, horas=None, aprovador=None):
     """
     Edita pendência existente e adiciona entrada no histórico.
 
@@ -237,7 +264,12 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
             'tipo_evento': 'atualizacao_workflow',
             'editado_por': editado_por,
             'observacoes': observacoes,
-            'alteracoes': ' | '.join(alteracoes_log) if alteracoes_log else ''
+            'alteracoes': ' | '.join(alteracoes_log) if alteracoes_log else '',
+            'horas': horas,
+            'concluido': False,
+            'aprovador': aprovador,
+            'status_aprovacao': 'pendente' if aprovador else None,
+            'data_aprovacao': None
         }
 
         collection_hist.insert_one(nova_entrada_historico)
@@ -310,3 +342,79 @@ def get_usuarios_por_perfil(perfil):
         ]
     except Exception:
         return []
+
+
+def get_usuarios_nivel3_por_perfil(perfil):
+    """
+    Retorna lista de usuários nível 3 de um determinado perfil (para seleção de aprovador).
+
+    Args:
+        perfil: Nome do perfil/departamento
+
+    Returns:
+        list: Lista de dicts com label e value para dropdown
+    """
+    try:
+        usuarios = get_mongo_connection("usuarios")
+
+        if perfil == "admin":
+            query = {"level": 3}
+        else:
+            query = {"level": 3, "perfil": perfil}
+
+        users = list(usuarios.find(query, {"username": 1}))
+
+        return [
+            {"label": u['username'], "value": u['username']}
+            for u in users
+        ]
+    except Exception:
+        return []
+
+
+def marcar_subtarefa_concluida(hist_id_str):
+    """
+    Marca uma subatividade do histórico como concluída (operação irreversível).
+
+    Args:
+        hist_id_str: String com o ObjectId da entrada de histórico
+
+    Returns:
+        bool: True se a atualização foi bem-sucedida
+    """
+    try:
+        collection = get_mongo_connection(COLLECTION_HISTORICO)
+        result = collection.update_one(
+            {'_id': ObjectId(hist_id_str), 'concluido': {'$ne': True}},
+            {'$set': {'concluido': True}}
+        )
+        return result.modified_count > 0
+    except Exception as e:
+        print(f"Erro ao marcar subtarefa como concluída: {e}")
+        return False
+
+
+def aprovar_ou_rejeitar(hist_id_str, status_aprovacao):
+    """
+    Aprova ou rejeita uma entrada de histórico que aguarda aprovação.
+
+    Args:
+        hist_id_str: String com o ObjectId da entrada de histórico
+        status_aprovacao: 'aprovado' ou 'rejeitado'
+
+    Returns:
+        bool: True se a atualização foi bem-sucedida
+    """
+    try:
+        collection = get_mongo_connection(COLLECTION_HISTORICO)
+        result = collection.update_one(
+            {'_id': ObjectId(hist_id_str), 'status_aprovacao': 'pendente'},
+            {'$set': {
+                'status_aprovacao': status_aprovacao,
+                'data_aprovacao': datetime.now()
+            }}
+        )
+        return result.modified_count > 0
+    except Exception as e:
+        print(f"Erro ao aprovar/rejeitar: {e}")
+        return False
