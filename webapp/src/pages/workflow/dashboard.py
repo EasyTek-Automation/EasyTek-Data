@@ -219,17 +219,17 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
 
             # --- Linha 3 (embutida): Tarefas que abri ---
             dbc.Col(_card(
-                "Tarefas que Abri", abertos_por_mim,
+                "Abertas por Mim", abertos_por_mim,
                 icone="fas fa-folder-open"
             ), width=12, md=2, className="mb-3"),
             dbc.Col(_card(
-                "Abri — Aceitas", abertos_aceitos,
+                "Abertas por Mim — Aceitas", abertos_aceitos,
                 icone="fas fa-check-circle",
                 cor_valor="text-success" if abertos_aceitos else None,
                 borda="success" if abertos_aceitos else None
             ), width=6, md=2, className="mb-3"),
             dbc.Col(_card(
-                "Abri — Rejeitadas", abertos_rejeitados,
+                "Abertas por Mim — Rejeitadas", abertos_rejeitados,
                 icone="fas fa-times-circle",
                 cor_valor="text-danger" if abertos_rejeitados else None,
                 borda="danger" if abertos_rejeitados else None
@@ -540,10 +540,15 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
     nota_gam = pendencia.get('nota_gam') or ''
     desc_content = [pendencia['descricao']]
     if nota_gam:
-        desc_content.append(html.Span([
-            html.I(className="fas fa-hashtag me-1"),
-            f"GAM: {nota_gam}"
-        ], className="ms-2 text-muted", style={"fontSize": "0.80rem"}))
+        desc_content.append(
+            dbc.Badge(
+                [html.I(className="fas fa-hashtag me-1"), nota_gam],
+                color="secondary",
+                outline=True,
+                className="ms-2 align-middle",
+                style={"fontSize": "0.75rem", "fontWeight": "500"}
+            )
+        )
     if badge_aceite:
         desc_content.append(badge_aceite)
     if badge_aprov:
