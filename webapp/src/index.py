@@ -346,7 +346,7 @@ def _build_404_page(pathname):
                             )
                         ], className="text-center mb-4"),
 
-                        html.H2("404 - Página Não Encontrada", className="text-center mb-3"),
+                        html.H2("404 - Página Não Encontrada!", className="text-center mb-3"),
                         html.P(
                             f"A rota '{pathname}' não existe.",
                             className="text-center text-muted mb-4"
