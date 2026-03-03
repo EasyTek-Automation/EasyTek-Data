@@ -386,8 +386,8 @@ Key collections referenced in codebase:
 - `DecapadoTemp`: Temperature sensor data
 - `AMG_EnergyData`: Energy consumption data
 - `AMG_Consumo`: Hourly consumption aggregates
-- `ZPP_Producao_2025`: Production data from ZPP system (activity hours by equipment)
-- `ZPP_Paradas_2025`: Breakdown/stop data from ZPP system (failure events with duration and cause)
+- `ZPP_Producao`: Production data from ZPP system (activity hours by equipment) — nome fixo, não muda com o ano
+- `ZPP_Paradas`: Breakdown/stop data from ZPP system (failure events with duration and cause) — nome fixo, não muda com o ano
 - `maintenance_kpi_targets`: Maintenance KPI targets (MTBF, MTTR, breakdown rate) per equipment
 
 #### 8. Documentation System (`config/docs_config.py`)
