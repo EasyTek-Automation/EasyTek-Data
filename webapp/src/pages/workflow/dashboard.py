@@ -50,6 +50,7 @@ def carregar_dados_csv():
 def criar_badge_status(status):
     """Cria um badge colorido para o status."""
     cores = {
+        "Em Fila (Planejamento)": "info",
         "Pendente": "warning",
         "Em Andamento": "primary",
         "Bloqueado": "danger",
@@ -135,13 +136,15 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
         dbc.Row: Linha com os cards KPI
     """
     if df_pendencias is None or df_pendencias.empty:
-        total = pendentes = em_andamento = concluidas = 0
+        total = em_fila = pendentes = em_andamento = bloqueados = concluidas = 0
         aguardando_aceite = 0
         abertos_por_mim = abertos_aceitos = abertos_rejeitados = 0
     else:
         total = len(df_pendencias)
+        em_fila = len(df_pendencias[df_pendencias['status'] == 'Em Fila (Planejamento)'])
         pendentes = len(df_pendencias[df_pendencias['status'] == 'Pendente'])
         em_andamento = len(df_pendencias[df_pendencias['status'] == 'Em Andamento'])
+        bloqueados = len(df_pendencias[df_pendencias['status'] == 'Bloqueado'])
         concluidas = len(df_pendencias[df_pendencias['status'] == 'Concluído'])
 
         # Tarefas aguardando aceite pelo usuário atual (responsável)
@@ -176,68 +179,84 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
             )
             aguardando_aprovacao = int(mask.sum())
 
+    # --- Barra de status compacta (substitui a grade de 4 cards) ---
+    def _stat(rotulo, valor, cor=""):
+        return html.Div([
+            html.Span(
+                str(valor),
+                className=f"d-block fs-3 fw-bold lh-1{' ' + cor if cor else ''}"
+            ),
+            html.Small(rotulo, className="text-muted"),
+        ], className="text-center px-3 py-1 flex-fill")
+
+    def _vsep():
+        return html.Div(style={"width": "1px", "backgroundColor": "#dee2e6", "margin": "4px 0"})
+
+    status_strip = dbc.Card(
+        dbc.CardBody(
+            html.Div([
+                _stat("Total", total),
+                _vsep(),
+                _stat("Em Fila", em_fila, "text-info" if em_fila else ""),
+                _vsep(),
+                _stat("Pendentes", pendentes, "text-warning" if pendentes else ""),
+                _vsep(),
+                _stat("Em Andamento", em_andamento, "text-primary" if em_andamento else ""),
+                _vsep(),
+                _stat("Bloqueados", bloqueados, "text-danger" if bloqueados else ""),
+                _vsep(),
+                _stat("Concluídas", concluidas, "text-success" if concluidas else ""),
+            ], className="d-flex align-items-center justify-content-around flex-wrap"),
+            className="py-2"
+        ),
+        className="shadow-sm mb-3"
+    )
+
+    # --- Cards de ação pessoal ---
     def _card(titulo, valor, cor_valor=None, icone=None, borda=None):
-        """Helper para criar card KPI padronizado."""
         h6_children = []
         if icone:
             h6_children.append(html.I(className=f"{icone} me-1"))
         h6_children.append(titulo)
         return dbc.Card([
             dbc.CardBody([
-                html.H6(h6_children, className="text-muted mb-2"),
-                html.H3(str(valor), className=f"mb-0 {cor_valor}" if cor_valor else "mb-0")
+                html.H6(h6_children, className="text-muted mb-2 small"),
+                html.H4(str(valor), className=f"mb-0 {cor_valor}" if cor_valor else "mb-0")
             ])
         ], className=f"shadow-sm h-100{' border-' + borda if borda else ''}")
 
-    cards = html.Div([
-        # --- Linha 1: Situação geral dos workflows ---
-        dbc.Row([
-            dbc.Col(_card("Total de Workflows", total),
-                    width=6, md=3, className="mb-3"),
-            dbc.Col(_card("Pendentes", pendentes, cor_valor="text-warning" if pendentes else None),
-                    width=6, md=3, className="mb-3"),
-            dbc.Col(_card("Em Andamento", em_andamento, cor_valor="text-primary" if em_andamento else None),
-                    width=6, md=3, className="mb-3"),
-            dbc.Col(_card("Concluídas", concluidas, cor_valor="text-success" if concluidas else None),
-                    width=6, md=3, className="mb-3"),
-        ]),
+    cards_pessoais = dbc.Row([
+        dbc.Col(_card(
+            "Aguard. Aceite", aguardando_aceite,
+            icone="fas fa-inbox",
+            cor_valor="text-secondary" if aguardando_aceite else None,
+            borda="secondary" if aguardando_aceite else None
+        ), width=6, md=3, className="mb-3"),
+        dbc.Col(_card(
+            "Aguard. Aprovação", aguardando_aprovacao,
+            icone="fas fa-clock",
+            cor_valor="text-warning" if aguardando_aprovacao else None,
+            borda="warning" if aguardando_aprovacao else None
+        ), width=6, md=3, className="mb-3"),
+        dbc.Col(_card(
+            "Abertas por Mim", abertos_por_mim,
+            icone="fas fa-folder-open"
+        ), width=12, md=2, className="mb-3"),
+        dbc.Col(_card(
+            "Abertas — Aceitas", abertos_aceitos,
+            icone="fas fa-check-circle",
+            cor_valor="text-success" if abertos_aceitos else None,
+            borda="success" if abertos_aceitos else None
+        ), width=6, md=2, className="mb-3"),
+        dbc.Col(_card(
+            "Abertas — Rejeitadas", abertos_rejeitados,
+            icone="fas fa-times-circle",
+            cor_valor="text-danger" if abertos_rejeitados else None,
+            borda="danger" if abertos_rejeitados else None
+        ), width=6, md=2, className="mb-3"),
+    ])
 
-        # --- Linha 2: Minha fila de trabalho ---
-        dbc.Row([
-            dbc.Col(_card(
-                "Aguard. Aceite", aguardando_aceite,
-                icone="fas fa-inbox",
-                cor_valor="text-secondary" if aguardando_aceite else None,
-                borda="secondary" if aguardando_aceite else None
-            ), width=6, md=3, className="mb-3"),
-            dbc.Col(_card(
-                "Aguard. Aprovação", aguardando_aprovacao,
-                icone="fas fa-clock",
-                cor_valor="text-warning" if aguardando_aprovacao else None,
-                borda="warning" if aguardando_aprovacao else None
-            ), width=6, md=3, className="mb-3"),
-
-            # --- Linha 3 (embutida): Tarefas que abri ---
-            dbc.Col(_card(
-                "Abertas por Mim", abertos_por_mim,
-                icone="fas fa-folder-open"
-            ), width=12, md=2, className="mb-3"),
-            dbc.Col(_card(
-                "Abertas por Mim — Aceitas", abertos_aceitos,
-                icone="fas fa-check-circle",
-                cor_valor="text-success" if abertos_aceitos else None,
-                borda="success" if abertos_aceitos else None
-            ), width=6, md=2, className="mb-3"),
-            dbc.Col(_card(
-                "Abertas por Mim — Rejeitadas", abertos_rejeitados,
-                icone="fas fa-times-circle",
-                cor_valor="text-danger" if abertos_rejeitados else None,
-                borda="danger" if abertos_rejeitados else None
-            ), width=6, md=2, className="mb-3"),
-        ]),
-    ], className="mb-4")
-
-    return cards
+    return html.Div([status_strip, cards_pessoais], className="mb-4")
 
 
 def criar_painel_filtros():
@@ -260,6 +279,7 @@ def criar_painel_filtros():
                     dcc.Dropdown(
                         id="filtro-status",
                         options=[
+                            {"label": "Em Fila (Planejamento)", "value": "Em Fila (Planejamento)"},
                             {"label": "Pendente", "value": "Pendente"},
                             {"label": "Em Andamento", "value": "Em Andamento"},
                             {"label": "Bloqueado", "value": "Bloqueado"},
@@ -275,7 +295,7 @@ def criar_painel_filtros():
                     dbc.Input(
                         id="filtro-busca",
                         type="text",
-                        placeholder="ID ou descrição..."
+                        placeholder="ID, descrição ou nota GAM..."
                     )
                 ], width=12, md=4, className="mb-3"),
             ]),

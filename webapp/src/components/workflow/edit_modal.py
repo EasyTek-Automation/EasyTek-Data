@@ -49,6 +49,7 @@ def edit_pendencia_modal():
             dcc.Dropdown(
                 id="edit-pend-status",
                 options=[
+                    {"label": "Em Fila (Planejamento)", "value": "Em Fila (Planejamento)"},
                     {"label": "Pendente", "value": "Pendente"},
                     {"label": "Em Andamento", "value": "Em Andamento"},
                     {"label": "Bloqueado", "value": "Bloqueado"},

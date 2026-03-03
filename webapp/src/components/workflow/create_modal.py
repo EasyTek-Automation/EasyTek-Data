@@ -43,10 +43,11 @@ def create_pendencia_modal():
             dcc.Dropdown(
                 id="create-pend-status",
                 options=[
+                    {"label": "Em Fila (Planejamento)", "value": "Em Fila (Planejamento)"},
                     {"label": "Pendente", "value": "Pendente"},
                     {"label": "Em Andamento", "value": "Em Andamento"},
                 ],
-                value="Pendente",  # Default
+                value="Em Fila (Planejamento)",  # Default
                 clearable=False,
                 className="mb-3"
             ),
