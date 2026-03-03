@@ -31,7 +31,8 @@ def register_edit_callbacks(app):
             Output("edit-pend-horas", "value"),
             Output("edit-pend-aprovador-dropdown", "value"),
             Output("edit-pend-original-data", "data"),
-            Output("edit-pend-alert", "children")
+            Output("edit-pend-alert", "children"),
+            Output("edit-pend-nota-gam", "value")
         ],
         [
             Input({"type": "btn-edit-pend", "index": ALL}, "n_clicks"),
@@ -57,7 +58,7 @@ def register_edit_callbacks(app):
 
         # Fechar modal (limpar todos os campos)
         if "cancel" in trigger_id or "submit" in trigger_id:
-            return False, "", "", None, None, None, "", None, None, None, ""
+            return False, "", "", None, None, None, "", None, None, None, "", ""
 
         # Verificar se é um clique válido nos botões de editar
         # (n_clicks deve ser > 0 e não None)
@@ -75,7 +76,7 @@ def register_edit_callbacks(app):
             if pend.empty:
                 return False, "", "", None, None, None, "", None, None, None, dbc.Alert(
                     "Pendência não encontrada", color="danger"
-                )
+                ), ""
 
             pend = pend.iloc[0].to_dict()
 
@@ -114,7 +115,8 @@ def register_edit_callbacks(app):
                 None,           # Horas sempre vazio ao abrir
                 None,           # Aprovador sempre vazio ao abrir
                 original_data,
-                ""
+                "",
+                pend.get('nota_gam') or ""  # Nota GAM atual
             )
 
         return no_update
@@ -182,6 +184,7 @@ def register_edit_callbacks(app):
             State("edit-pend-observacoes", "value"),
             State("edit-pend-horas", "value"),
             State("edit-pend-aprovador-dropdown", "value"),
+            State("edit-pend-nota-gam", "value"),
             State("edit-pend-original-data", "data"),
             State("user-level-store", "data"),
             State("user-perfil-store", "data"),
@@ -190,7 +193,7 @@ def register_edit_callbacks(app):
         prevent_initial_call=True
     )
     def salvar_edicao_pendencia(n_clicks, nova_desc, novo_resp, novo_status, tipo_evento, observacoes,
-                                horas, aprovador, original_data, user_level, user_perfil, username):
+                                horas, aprovador, nota_gam, original_data, user_level, user_perfil, username):
         """Valida e salva edições da pendência."""
         if not n_clicks or not original_data:
             return no_update, no_update, no_update, no_update, no_update, no_update
@@ -286,7 +289,8 @@ def register_edit_callbacks(app):
             tipo_evento=tipo_evento,
             observacoes=observacoes.strip(),
             horas=horas_valor,
-            aprovador=aprovador if tipo_evento in TIPOS_REQUEREM_APROVACAO else None
+            aprovador=aprovador if tipo_evento in TIPOS_REQUEREM_APROVACAO else None,
+            nota_gam=nota_gam if nota_gam is not None else None
         )
 
         if sucesso:

@@ -50,6 +50,9 @@ def carregar_pendencias():
         if 'data_aceite' not in df.columns:
             df['data_aceite'] = None
 
+        if 'nota_gam' not in df.columns:
+            df['nota_gam'] = None
+
         # Converter datas para datetime (já vêm como datetime do MongoDB)
         if 'data_criacao' in df.columns:
             df['data_criacao'] = pd.to_datetime(df['data_criacao'])
@@ -151,7 +154,7 @@ def gerar_proximo_id():
         return "AMG_WF001"
 
 
-def criar_pendencia(descricao, responsavel, status, criado_por, criado_por_perfil):
+def criar_pendencia(descricao, responsavel, status, criado_por, criado_por_perfil, nota_gam=None):
     """
     Cria nova pendência no MongoDB.
 
@@ -183,7 +186,8 @@ def criar_pendencia(descricao, responsavel, status, criado_por, criado_por_perfi
             'ultima_edicao_por': criado_por,
             'ultima_edicao_data': agora,
             'status_aceite': 'pendente',  # novo responsável deve aceitar a tarefa
-            'data_aceite': None
+            'data_aceite': None,
+            'nota_gam': nota_gam or None
         }
 
         # Inserir pendência
@@ -218,7 +222,8 @@ def criar_pendencia(descricao, responsavel, status, criado_por, criado_por_perfi
 
 def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
                      descricao_original, responsavel_original, status_original,
-                     editado_por, tipo_evento, observacoes, horas=None, aprovador=None):
+                     editado_por, tipo_evento, observacoes, horas=None, aprovador=None,
+                     nota_gam=None):
     """
     Edita pendência existente e adiciona entrada no histórico.
 
@@ -265,6 +270,10 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
         if novo_status and novo_status != status_original:
             updates['status'] = novo_status
             alteracoes_log.append(f"Status: {status_original} → {novo_status}")
+
+        # Atualizar nota GAM (campo opcional — sempre sobrescreve se enviado)
+        if nota_gam is not None:
+            updates['nota_gam'] = nota_gam.strip() if nota_gam.strip() else None
 
         # Atualizar metadata
         updates['ultima_atualizacao'] = agora

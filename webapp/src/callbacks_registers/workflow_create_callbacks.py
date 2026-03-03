@@ -19,7 +19,8 @@ def register_create_callbacks(app):
             Output("create-pend-modal", "is_open"),
             Output("create-pend-descricao", "value"),
             Output("create-pend-status", "value"),
-            Output("create-pend-alert", "children")
+            Output("create-pend-alert", "children"),
+            Output("create-pend-nota-gam", "value")
         ],
         [
             Input("btn-nova-pendencia", "n_clicks"),
@@ -35,11 +36,11 @@ def register_create_callbacks(app):
 
         # Fechar modal
         if "cancel" in trigger_id or "submit" in trigger_id:
-            return False, "", "Pendente", ""
+            return False, "", "Pendente", "", ""
 
         # Abrir modal
         if "nova-pendencia" in trigger_id:
-            return True, "", "Pendente", ""
+            return True, "", "Pendente", "", ""
 
         return no_update
 
@@ -87,13 +88,14 @@ def register_create_callbacks(app):
             State("create-pend-descricao", "value"),
             State("create-pend-responsavel", "value"),
             State("create-pend-status", "value"),
+            State("create-pend-nota-gam", "value"),
             State("user-level-store", "data"),
             State("user-perfil-store", "data"),
             State("user-username-store", "data")
         ],
         prevent_initial_call=True
     )
-    def criar_nova_pendencia(n_clicks, descricao, responsavel, status,
+    def criar_nova_pendencia(n_clicks, descricao, responsavel, status, nota_gam,
                              user_level, user_perfil, username):
         """Valida e cria nova pendência."""
         if not n_clicks:
@@ -152,7 +154,8 @@ def register_create_callbacks(app):
             responsavel=responsavel,
             status=status,
             criado_por=username,
-            criado_por_perfil=user_perfil
+            criado_por_perfil=user_perfil,
+            nota_gam=nota_gam.strip() if nota_gam and nota_gam.strip() else None
         )
 
         if sucesso:

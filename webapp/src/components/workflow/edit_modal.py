@@ -114,6 +114,18 @@ def edit_pendencia_modal():
             html.Small("Informe o tempo gasto nesta subatividade (em horas).",
                       className="text-muted d-block mb-3"),
 
+            # Campo: Nota GAM (opcional)
+            html.Label("Nota GAM:", className="fw-bold mb-1"),
+            html.Span(" (opcional)", className="text-muted small"),
+            dbc.Input(
+                id="edit-pend-nota-gam",
+                type="text",
+                placeholder="Número da OS/nota no sistema GAM",
+                className="mb-1"
+            ),
+            html.Small("Número da ordem de serviço no sistema GAM.",
+                      className="text-muted d-block mb-3"),
+
             # Campo: Observações (OBRIGATÓRIO)
             html.Label("Observações:", className="fw-bold mb-1"),
             html.Span(" *", className="text-danger"),

@@ -60,9 +60,10 @@ def criar_badge_status(status):
 
 def criar_barra_horas_inline(historico_items):
     """
-    Cria barra segmentada colorida inline com total de horas por subatividade.
+    Cria barra segmentada colorida inline com total de horas por tipo de evento.
 
-    Cada subatividade com horas > 0 vira um segmento da barra Bootstrap stacked progress.
+    Agrupa subatividades pelo mesmo tipo (descricao) e soma as horas.
+    Cada tipo de evento recebe uma cor fixa — mesmo tipo = mesma cor.
     Retorna None se nenhuma subatividade tiver horas.
 
     Args:
@@ -73,47 +74,48 @@ def criar_barra_horas_inline(historico_items):
     """
     PALETA = ['primary', 'success', 'info', 'warning', 'danger', 'secondary']
 
-    items_com_horas = []
+    # Agrupar por tipo de evento (descricao) e somar horas
+    grupos = {}
     for item in historico_items:
         h = item.get('horas')
         try:
             if h is not None and str(h) != 'nan' and float(h) > 0:
-                items_com_horas.append({'item': item, 'horas': float(h)})
+                desc = item.get('descricao', 'Sem descrição') or 'Sem descrição'
+                grupos[desc] = grupos.get(desc, 0.0) + float(h)
         except (ValueError, TypeError):
             pass
 
-    if not items_com_horas:
+    if not grupos:
         return None
 
-    total = sum(e['horas'] for e in items_com_horas)
+    total = sum(grupos.values())
 
-    # Segmentos da barra
+    # Segmentos da barra — um por tipo, cor determinada pela posição
     bars = []
     legenda = []
-    for i, entry in enumerate(items_com_horas):
+    for i, (desc, horas_soma) in enumerate(grupos.items()):
         cor = PALETA[i % len(PALETA)]
-        pct = entry['horas'] / total * 100
-        desc = entry['item'].get('descricao', '')
-        if len(desc) > 20:
-            desc = desc[:17] + "..."
+        pct = horas_soma / total * 100
+        desc_curta = desc if len(desc) <= 20 else desc[:17] + "..."
+        horas_fmt = f"{int(horas_soma)}h" if horas_soma == int(horas_soma) else f"{horas_soma:.1f}h"
 
         bars.append(dbc.Progress(
             value=pct,
             color=cor,
             bar=True,
-            label=f"{entry['horas']}h"
+            label=horas_fmt
         ))
         legenda.append(
             html.Span([
                 html.Span("■ ", style={"color": f"var(--bs-{cor})"}),
-                f"{desc} {entry['horas']}h"
+                f"{desc_curta} {horas_fmt}"
             ], className="me-2", style={"fontSize": "0.70rem", "whiteSpace": "nowrap"})
         )
 
     return html.Div([
         dbc.Progress(
             bars,
-            style={"height": "7px"},
+            style={"height": "14px"},
             className="mb-1"
         ),
         html.Div(legenda, className="d-flex flex-wrap")
@@ -518,8 +520,14 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
             className="ms-2"
         )
 
-    # Célula de descrição: texto + barra de horas + badges
+    # Célula de descrição: texto + nota GAM + barra de horas + badges
+    nota_gam = pendencia.get('nota_gam') or ''
     desc_content = [pendencia['descricao']]
+    if nota_gam:
+        desc_content.append(html.Span([
+            html.I(className="fas fa-hashtag me-1"),
+            f"GAM: {nota_gam}"
+        ], className="ms-2 text-muted", style={"fontSize": "0.80rem"}))
     if badge_aceite:
         desc_content.append(badge_aceite)
     if badge_aprov:

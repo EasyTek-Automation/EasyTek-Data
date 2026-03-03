@@ -51,6 +51,18 @@ def create_pendencia_modal():
                 className="mb-3"
             ),
 
+            # Campo: Nota GAM (opcional)
+            html.Label("Nota GAM:", className="fw-bold mb-1"),
+            html.Span(" (opcional)", className="text-muted small"),
+            dbc.Input(
+                id="create-pend-nota-gam",
+                type="text",
+                placeholder="Número da OS/nota no sistema GAM",
+                className="mb-1"
+            ),
+            html.Small("Informe o número da ordem de serviço no sistema GAM, se houver.",
+                      className="text-muted d-block mb-3"),
+
             # Área de alerta
             html.Div(id="create-pend-alert")
         ]),
