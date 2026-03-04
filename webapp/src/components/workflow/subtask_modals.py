@@ -18,6 +18,7 @@ TIPOS_EVENTO_OPTIONS = [
     {"label": "Estudo", "value": "Estudo"},
     {"label": "Encerramento", "value": "Encerramento"},
     {"label": "Trabalho Adicional", "value": "Trabalho Adicional"},
+    {"label": "Lançamento Retroativo", "value": "Lançamento Retroativo"},
 ]
 
 
@@ -78,6 +79,24 @@ def create_subtask_modal():
                     className="text-warning d-block mb-3"
                 ),
             ], id="create-subtask-aprovador-container", style={"display": "none"}),
+
+            # Data retroativa (condicional — apenas Lançamento Retroativo)
+            html.Div([
+                html.Label("Data do Evento:", className="fw-bold mb-1"),
+                html.Span(" *", className="text-danger"),
+                dcc.DatePickerSingle(
+                    id="create-subtask-data-retroativa",
+                    placeholder="Selecione a data",
+                    display_format="DD/MM/YYYY",
+                    first_day_of_week=0,
+                    className="mb-1",
+                    style={"width": "100%"}
+                ),
+                html.Small(
+                    "Informe a data real em que a atividade ocorreu.",
+                    className="text-muted d-block mb-3"
+                ),
+            ], id="create-subtask-data-retroativa-container", style={"display": "none"}),
 
             # Observações (opcional)
             html.Label("Observações:", className="fw-bold mb-1"),
@@ -140,8 +159,8 @@ def add_log_modal():
                 required=True
             ),
 
-            # Horas (opcional — transferido do create-subtask)
-            html.Label("Tempo trabalhado:", className="fw-bold mb-1"),
+            # Duração (opcional — transferido do create-subtask)
+            html.Label("Duração:", className="fw-bold mb-1"),
             html.Span(" (opcional)", className="text-muted small"),
             dbc.InputGroup([
                 dbc.InputGroupText(

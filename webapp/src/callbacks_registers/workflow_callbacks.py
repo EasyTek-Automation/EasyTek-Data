@@ -151,13 +151,14 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                 id={"type": "btn-concluir-subtarefa", "index": hist_id},
                 color="success", size="sm", outline=True
             ))
-        # Botão preencher relatório (todos)
+        # Botão preencher relatório (desabilitado para concluídas)
         if hist_id:
             botoes.append(dbc.Button(
                 html.I(className="fas fa-file-alt"),
                 id={"type": "btn-add-log", "index": hist_id},
                 color="info", size="sm", outline=True,
-                title="Preencher Relatório"
+                title="Preencher Relatório" if not concluido else "Subtarefa concluída",
+                disabled=concluido
             ))
         # Botões editar/excluir apenas nível 3
         if user_level >= 3 and hist_id:

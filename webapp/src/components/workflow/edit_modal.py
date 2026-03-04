@@ -59,62 +59,6 @@ def edit_pendencia_modal():
                 className="mb-3"
             ),
 
-            # Campo: Tipo de Evento (dropdown pré-determinado)
-            html.Label("Tipo de Evento:", className="fw-bold mb-1"),
-            dcc.Dropdown(
-                id="edit-pend-tipo-evento",
-                options=[
-                    {"label": "Análise de Falha", "value": "Análise de Falha"},
-                    {"label": "Aguardando Material", "value": "Aguardando Material"},
-                    {"label": "Aguardando Aprovação", "value": "Aguardando Aprovação"},
-                    {"label": "Manutenção Corretiva", "value": "Manutenção Corretiva"},
-                    {"label": "Manutenção Preventiva", "value": "Manutenção Preventiva"},
-                    {"label": "Revisão de Software", "value": "Revisão de Software"},
-                    {"label": "Teste e Validação", "value": "Teste e Validação"},
-                    {"label": "Em Produção Assistida", "value": "Em Produção Assistida"},
-                    {"label": "Documentação Técnica", "value": "Documentação Técnica"},
-                    {"label": "Treinamento Operacional", "value": "Treinamento Operacional"},
-                    {"label": "Encerramento", "value": "Encerramento"},
-                    {"label": "Trabalho Adicional", "value": "Trabalho Adicional"},
-                ],
-                placeholder="Selecione o tipo de evento",
-                clearable=False,
-                className="mb-3"
-            ),
-            html.Small("Selecione o evento que descreve esta atualização no workflow.",
-                      className="text-muted d-block mb-2"),
-
-            # Campo: Aprovador (aparece quando tipo requer aprovação)
-            html.Div([
-                html.Label("Aprovador (Nível 3):", className="fw-bold mb-1"),
-                html.Span(" *", className="text-danger"),
-                dcc.Dropdown(
-                    id="edit-pend-aprovador-dropdown",
-                    placeholder="Selecione o aprovador",
-                    clearable=False,
-                    searchable=True,
-                    className="mb-1"
-                ),
-                html.Small(
-                    "Este tipo de evento requer aprovação de um usuário nível 3.",
-                    className="text-warning d-block mb-3"
-                ),
-            ], id="edit-pend-aprovador-container", style={"display": "none"}),
-
-            # Campo: Horas trabalhadas (OPCIONAL)
-            html.Label("Horas trabalhadas:", className="fw-bold mb-1"),
-            html.Span(" (opcional)", className="text-muted small"),
-            dbc.Input(
-                id="edit-pend-horas",
-                type="number",
-                min=0,
-                step=0.5,
-                placeholder="Ex: 2.5",
-                className="mb-1"
-            ),
-            html.Small("Informe o tempo gasto nesta subatividade (em horas).",
-                      className="text-muted d-block mb-3"),
-
             # Campo: Nota GAM (opcional)
             html.Label("Nota GAM:", className="fw-bold mb-1"),
             html.Span(" (opcional)", className="text-muted small"),

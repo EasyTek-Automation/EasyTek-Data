@@ -27,10 +27,7 @@ def register_edit_callbacks(app):
             Output("edit-pend-descricao", "value"),
             Output("edit-pend-responsavel", "value"),
             Output("edit-pend-status", "value"),
-            Output("edit-pend-tipo-evento", "value"),
             Output("edit-pend-observacoes", "value"),
-            Output("edit-pend-horas", "value"),
-            Output("edit-pend-aprovador-dropdown", "value"),
             Output("edit-pend-original-data", "data"),
             Output("edit-pend-alert", "children"),
             Output("edit-pend-nota-gam", "value")
@@ -42,12 +39,10 @@ def register_edit_callbacks(app):
         [
             State("user-level-store", "data"),
             State("user-username-store", "data"),
-            State("store-historico", "data")
         ],
         prevent_initial_call=True
     )
-    def toggle_edit_modal(edit_clicks, cancel_clicks,
-                         user_level, username, historico_data):
+    def toggle_edit_modal(edit_clicks, cancel_clicks, user_level, username):
         """Abre/fecha modal de edição."""
         ctx = callback_context
 
@@ -56,34 +51,25 @@ def register_edit_callbacks(app):
 
         trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
-        # Fechar modal e limpar campos apenas no cancelamento
         if "cancel" in trigger_id:
-            return False, "", "", None, None, None, "", None, None, None, "", ""
+            return False, "", "", None, None, "", None, "", ""
 
-        # Verificar se é um clique válido nos botões de editar
-        # (n_clicks deve ser > 0 e não None)
         if "btn-edit-pend" in trigger_id:
-            # Verificar se algum botão foi realmente clicado
             if not any(clicks for clicks in edit_clicks if clicks):
                 raise PreventUpdate
             button_data = json.loads(trigger_id)
             pend_id = button_data["index"]
 
-            # Carregar pendência
             df_pend = carregar_pendencias()
             pend = df_pend[df_pend['id'] == pend_id]
 
             if pend.empty:
-                return False, "", "", None, None, None, "", None, None, None, dbc.Alert(
+                return False, "", "", None, None, "", None, dbc.Alert(
                     "Pendência não encontrada", color="danger"
                 ), ""
 
             pend = pend.iloc[0].to_dict()
 
-            # VALIDAÇÃO RBAC: Qualquer usuário autenticado pode editar
-            # (Apenas criação e exclusão são restritas a nível 3)
-
-            # Popula dados originais
             original_data = {
                 "id": pend['id'],
                 "descricao": pend['descricao'],
@@ -91,51 +77,19 @@ def register_edit_callbacks(app):
                 "status": pend['status']
             }
 
-            # Buscar último tipo de evento do histórico (precarregar dropdown)
-            ultimo_tipo_evento = None
-            if historico_data:
-                import pandas as pd
-                df_hist = pd.DataFrame(historico_data)
-                hist_pend = df_hist[df_hist['pendencia_id'] == pend_id]
-                if not hist_pend.empty:
-                    # Ordenar por data e pegar o último (exceto criação)
-                    hist_pend = hist_pend.sort_values('data', ascending=False)
-                    hist_pend = hist_pend[hist_pend['tipo_evento'] != 'criacao']
-                    if not hist_pend.empty:
-                        ultimo_tipo_evento = hist_pend.iloc[0]['descricao']
-
             return (
-                True,           # Modal abre
+                True,
                 pend['id'],
                 pend['descricao'],
                 pend['responsavel'],
                 pend['status'],
-                ultimo_tipo_evento,  # Precarregar último tipo de evento
                 "",             # Observações sempre vazio ao abrir
-                None,           # Horas sempre vazio ao abrir
-                None,           # Aprovador sempre vazio ao abrir
                 original_data,
                 "",
-                pend.get('nota_gam') or ""  # Nota GAM atual
+                pend.get('nota_gam') or ""
             )
 
         return no_update
-
-
-    # CALLBACK 1.5: Mostrar/Ocultar campo de aprovador baseado no tipo de evento
-    @app.callback(
-        Output("edit-pend-aprovador-container", "style"),
-        Output("edit-pend-aprovador-dropdown", "options"),
-        Input("edit-pend-tipo-evento", "value"),
-        State("user-perfil-store", "data"),
-        prevent_initial_call=True
-    )
-    def toggle_campo_aprovador(tipo_evento, user_perfil):
-        """Mostra campo de aprovador quando tipo de evento requer aprovação."""
-        if tipo_evento in TIPOS_REQUEREM_APROVACAO:
-            aprovadores = get_usuarios_nivel3_por_perfil(user_perfil or "admin")
-            return {"display": "block"}, aprovadores
-        return {"display": "none"}, []
 
 
     # CALLBACK 2: Popular dropdown de responsáveis no modal de edição
@@ -180,10 +134,7 @@ def register_edit_callbacks(app):
             State("edit-pend-descricao", "value"),
             State("edit-pend-responsavel", "value"),
             State("edit-pend-status", "value"),
-            State("edit-pend-tipo-evento", "value"),
             State("edit-pend-observacoes", "value"),
-            State("edit-pend-horas", "value"),
-            State("edit-pend-aprovador-dropdown", "value"),
             State("edit-pend-nota-gam", "value"),
             State("edit-pend-original-data", "data"),
             State("user-level-store", "data"),
@@ -193,8 +144,8 @@ def register_edit_callbacks(app):
         ],
         prevent_initial_call=True
     )
-    def salvar_edicao_pendencia(n_clicks, nova_desc, novo_resp, novo_status, tipo_evento, observacoes,
-                                horas, aprovador, nota_gam, original_data, user_level, user_perfil, username,
+    def salvar_edicao_pendencia(n_clicks, nova_desc, novo_resp, novo_status, observacoes,
+                                nota_gam, original_data, user_level, user_perfil, username,
                                 filtros):
         """Valida e salva edições da pendência."""
         if not n_clicks or not original_data:
@@ -246,17 +197,16 @@ def register_edit_callbacks(app):
                     )
                 # Nível 3 (qualquer, inclusive responsável): pode redesignar (prossegue)
 
-        # VALIDAÇÃO 1: Campos obrigatórios (incluindo tipo_evento e observações)
-        if not all([nova_desc, novo_resp, novo_status, tipo_evento, observacoes]):
+        # VALIDAÇÃO 1: Campos obrigatórios
+        if not all([nova_desc, novo_resp, novo_status, observacoes]):
             campos_faltantes = []
             if not nova_desc: campos_faltantes.append("Descrição")
             if not novo_resp: campos_faltantes.append("Responsável")
             if not novo_status: campos_faltantes.append("Status")
-            if not tipo_evento: campos_faltantes.append("Tipo de Evento")
             if not observacoes or not observacoes.strip(): campos_faltantes.append("Observações")
 
             return (
-                True,  # Modal continua aberto
+                True,
                 dbc.Alert([
                     html.I(className="fas fa-exclamation-triangle me-2"),
                     f"Campos obrigatórios faltando: {', '.join(campos_faltantes)}"
@@ -264,18 +214,7 @@ def register_edit_callbacks(app):
                 no_update, no_update, no_update, no_update
             )
 
-        # VALIDAÇÃO 2: Aprovador obrigatório quando tipo requer aprovação
-        if tipo_evento in TIPOS_REQUEREM_APROVACAO and not aprovador:
-            return (
-                True,  # Modal continua aberto
-                dbc.Alert([
-                    html.I(className="fas fa-exclamation-triangle me-2"),
-                    f"O tipo '{tipo_evento}' requer a seleção de um aprovador (nível 3)."
-                ], color="warning", dismissable=True),
-                no_update, no_update, no_update, no_update
-            )
-
-        # VALIDAÇÃO 3: Departamento (se mudou responsável)
+        # VALIDAÇÃO 2: Departamento (se mudou responsável)
         if novo_resp != original_data["responsavel"]:
             from src.database.connection import get_mongo_connection
             usuarios = get_mongo_connection("usuarios")
@@ -301,9 +240,6 @@ def register_edit_callbacks(app):
                     no_update, no_update, no_update, no_update
                 )
 
-        # Converter horas para float se fornecido
-        horas_valor = float(horas) if horas is not None else None
-
         # EDITAR PENDÊNCIA
         sucesso, mensagem = editar_pendencia(
             pend_id=pend_id,
@@ -314,10 +250,10 @@ def register_edit_callbacks(app):
             responsavel_original=original_data["responsavel"],
             status_original=original_data["status"],
             editado_por=username,
-            tipo_evento=tipo_evento,
+            tipo_evento='Atualização',
             observacoes=observacoes.strip(),
-            horas=horas_valor,
-            aprovador=aprovador if tipo_evento in TIPOS_REQUEREM_APROVACAO else None,
+            horas=None,
+            aprovador=None,
             nota_gam=nota_gam if nota_gam is not None else None
         )
 

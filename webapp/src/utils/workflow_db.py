@@ -14,7 +14,8 @@ TIPOS_REQUEREM_APROVACAO = [
     "Aguardando Aprovação",
     "Em Produção Assistida",
     "Encerramento",
-    "Trabalho Adicional"
+    "Trabalho Adicional",
+    "Lançamento Retroativo"
 ]
 
 
@@ -608,7 +609,7 @@ def rejeitar_tarefa(pend_id, username):
 
 
 def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
-                    editado_por, aprovador=None):
+                    editado_por, aprovador=None, data_retroativa=None):
     """
     Cria nova subtarefa (record_type='subtarefa') no histórico.
 
@@ -620,6 +621,7 @@ def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
         observacoes: Detalhes opcionais
         editado_por: Username de quem está criando
         aprovador: Username do aprovador (opcional)
+        data_retroativa: datetime da data real do evento (Lançamento Retroativo)
 
     Returns:
         tuple: (sucesso: bool, mensagem: str)
@@ -649,7 +651,8 @@ def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
             'status_aprovacao': 'pendente' if aprovador else None,
             'data_aprovacao': None,
             'record_type': 'subtarefa',
-            'subtarefa_id': None
+            'subtarefa_id': None,
+            'data_retroativa': data_retroativa  # None para eventos normais
         }
 
         collection_hist.insert_one(doc)
