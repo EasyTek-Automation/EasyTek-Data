@@ -70,10 +70,10 @@ def float_para_hhmm(horas_float):
 
 
 def hhmm_para_float(texto):
-    """Converte string HH:MM para horas decimal. Ex: '01:30' → 1.5, '2:00' → 2.0"""
+    """Converte string HH:MM (ou decimal) para horas float. Ex: '01:30'→1.5, '1,5'→1.5"""
     if not texto:
         return None
-    texto = str(texto).strip()
+    texto = str(texto).strip().replace(',', '.')
     if ':' in texto:
         partes = texto.split(':', 1)
         try:

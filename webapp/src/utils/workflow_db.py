@@ -111,12 +111,17 @@ def carregar_historico():
             df['data_aprovacao'] = None
 
         # Retrocompat record_type
+        _tipos_sistema = {'criacao', 'atualizacao_workflow', 'aceite', 'rejeicao_aceite'}
         if 'record_type' not in df.columns:
             df['record_type'] = df['tipo_evento'].apply(
-                lambda t: 'criacao' if t == 'criacao' else 'subtarefa'
+                lambda t: 'criacao' if t in _tipos_sistema else 'subtarefa'
             )
         else:
             df['record_type'] = df['record_type'].fillna('subtarefa')
+            # Fix retroativo: editar_pendencia() gravava 'subtarefa' para eventos de sistema
+            if 'tipo_evento' in df.columns:
+                mask = df['record_type'].eq('subtarefa') & df['tipo_evento'].isin(_tipos_sistema)
+                df.loc[mask, 'record_type'] = 'criacao'
 
         # Retrocompat subtarefa_id
         if 'subtarefa_id' not in df.columns:
@@ -325,7 +330,7 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
             'aprovador': aprovador,
             'status_aprovacao': 'pendente' if aprovador else None,
             'data_aprovacao': None,
-            'record_type': 'subtarefa',
+            'record_type': 'criacao',
             'subtarefa_id': None
         }
 

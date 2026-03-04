@@ -10,10 +10,12 @@ TIPOS_EVENTO_OPTIONS = [
     {"label": "Manutenção Corretiva", "value": "Manutenção Corretiva"},
     {"label": "Manutenção Preventiva", "value": "Manutenção Preventiva"},
     {"label": "Revisão de Software", "value": "Revisão de Software"},
+    {"label": "Desenvolvimento de Software", "value": "Desenvolvimento de Software"},
     {"label": "Teste e Validação", "value": "Teste e Validação"},
     {"label": "Em Produção Assistida", "value": "Em Produção Assistida"},
     {"label": "Documentação Técnica", "value": "Documentação Técnica"},
     {"label": "Treinamento Operacional", "value": "Treinamento Operacional"},
+    {"label": "Estudo", "value": "Estudo"},
     {"label": "Encerramento", "value": "Encerramento"},
     {"label": "Trabalho Adicional", "value": "Trabalho Adicional"},
 ]

@@ -44,9 +44,10 @@ def register_subtask_callbacks(app):
         Output("create-subtask-alert", "children", allow_duplicate=True),
         Input({"type": "btn-nova-subtarefa", "index": ALL}, "n_clicks"),
         State("create-subtask-modal", "is_open"),
+        State("user-username-store", "data"),
         prevent_initial_call=True
     )
-    def abrir_create_subtask_modal(n_clicks, is_open):
+    def abrir_create_subtask_modal(n_clicks, is_open, username):
         ctx = callback_context
         if not ctx.triggered or not any(c for c in n_clicks if c):
             raise PreventUpdate
@@ -55,7 +56,7 @@ def register_subtask_callbacks(app):
         id_dict = json.loads(trigger_id_str)
         pend_id = id_dict['index']
 
-        return True, {"pend_id": pend_id, "subtarefa_id": None}, "", None, None, "", None, ""
+        return True, {"pend_id": pend_id, "subtarefa_id": None}, "", None, username or None, "", None, ""
 
     # ==============================================================================
     # CB2: Fechar create-subtask-modal (Cancelar / limpar campos)
@@ -588,3 +589,44 @@ def register_subtask_callbacks(app):
 
         except Exception as e:
             return dbc.Alert(f"Erro durante migração: {e}", color="danger"), False
+
+    # ==============================================================================
+    # CB17: Auto-format campo HH:MM ao perder foco
+    # ==============================================================================
+    app.clientside_callback(
+        """
+        function(n_blur, value) {
+            if (!value) return '';
+            value = String(value).trim().replace(',', '.');
+            // Já está em HH:MM
+            if (/^\\d+:\\d{1,2}$/.test(value)) {
+                var parts = value.split(':');
+                var h = parseInt(parts[0], 10);
+                var m = parseInt(parts[1], 10);
+                if (isNaN(h) || isNaN(m) || m > 59) return '';
+                return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+            }
+            // Número decimal (1.5 ou 1,5)
+            if (/^\\d*\\.?\\d+$/.test(value)) {
+                var hours = parseFloat(value);
+                var h = Math.floor(hours);
+                var m = Math.round((hours - h) * 60);
+                if (m >= 60) { h += 1; m = 0; }
+                return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+            }
+            // 3-4 dígitos sem separador (ex: 130 → 01:30, 0230 → 02:30)
+            if (/^\\d{3,4}$/.test(value)) {
+                var padded = value.padStart(4, '0');
+                var h = parseInt(padded.slice(0, -2), 10);
+                var m = parseInt(padded.slice(-2), 10);
+                if (m > 59) return '';
+                return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
+            }
+            return '';
+        }
+        """,
+        Output("add-log-horas", "value", allow_duplicate=True),
+        Input("add-log-horas", "n_blur"),
+        State("add-log-horas", "value"),
+        prevent_initial_call=True
+    )

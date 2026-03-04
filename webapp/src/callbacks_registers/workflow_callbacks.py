@@ -357,7 +357,8 @@ def _criar_logs_indentados(log_items):
                         className="text-muted"
                     )
                 ], className="d-flex align-items-center mb-1"),
-                html.Small(observacoes, className="fst-italic text-muted d-block ps-3")
+                html.Small(observacoes, className="fst-italic text-muted d-block ps-3",
+                           style={"whiteSpace": "pre-line"})
                 if observacoes else None
             ], className="p-2 mb-1 rounded",
                style={"backgroundColor": "rgba(13,202,240,0.07)",
