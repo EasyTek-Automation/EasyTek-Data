@@ -360,7 +360,7 @@ def criar_painel_filtros():
     ], className="shadow-sm mb-4")
 
 
-def criar_timeline_historico(historico_items, username_atual=None):
+def criar_timeline_historico(historico_items, username_atual=None, mostrar_botoes=True):
     """
     Cria uma timeline visual do histórico da pendência.
 
@@ -435,43 +435,40 @@ def criar_timeline_historico(historico_items, username_atual=None):
                 html.Span(item['alteracoes'], className="text-muted", style={"fontSize": "1.035rem"})
             ], className="mb-2")
 
-        # --- Botões de ação ---
+        # --- Botões de ação (apenas na aba Subtarefas) ---
         botoes = []
-
-        # Botão "Marcar como Concluída" (apenas se não concluído e tem hist_id válido)
-        if not concluido and hist_id:
-            botoes.append(
-                dbc.Button(
-                    [html.I(className="fas fa-check-circle me-1"), "Concluir"],
-                    id={"type": "btn-concluir-subtarefa", "index": hist_id},
-                    color="success",
-                    size="sm",
-                    outline=True,
-                    className="me-1 mt-2"
+        if mostrar_botoes:
+            if not concluido and hist_id:
+                botoes.append(
+                    dbc.Button(
+                        [html.I(className="fas fa-check-circle me-1"), "Concluir"],
+                        id={"type": "btn-concluir-subtarefa", "index": hist_id},
+                        color="success",
+                        size="sm",
+                        outline=True,
+                        className="me-1 mt-2"
+                    )
                 )
-            )
-
-        # Botões Aprovar / Rejeitar (apenas para o aprovador designado, se pendente)
-        if (status_aprovacao == 'pendente' and aprovador and
-                username_atual and username_atual == aprovador and hist_id):
-            botoes.append(
-                dbc.Button(
-                    [html.I(className="fas fa-thumbs-up me-1"), "Aprovar"],
-                    id={"type": "btn-aprovar", "index": hist_id},
-                    color="success",
-                    size="sm",
-                    className="me-1 mt-2"
+            if (status_aprovacao == 'pendente' and aprovador and
+                    username_atual and username_atual == aprovador and hist_id):
+                botoes.append(
+                    dbc.Button(
+                        [html.I(className="fas fa-thumbs-up me-1"), "Aprovar"],
+                        id={"type": "btn-aprovar", "index": hist_id},
+                        color="success",
+                        size="sm",
+                        className="me-1 mt-2"
+                    )
                 )
-            )
-            botoes.append(
-                dbc.Button(
-                    [html.I(className="fas fa-thumbs-down me-1"), "Rejeitar"],
-                    id={"type": "btn-rejeitar", "index": hist_id},
-                    color="danger",
-                    size="sm",
-                    className="mt-2"
+                botoes.append(
+                    dbc.Button(
+                        [html.I(className="fas fa-thumbs-down me-1"), "Rejeitar"],
+                        id={"type": "btn-rejeitar", "index": hist_id},
+                        color="danger",
+                        size="sm",
+                        className="mt-2"
+                    )
                 )
-            )
 
         # Cor da bolinha baseada no status
         bolinha_cor = "bg-success" if concluido else "bg-primary"
@@ -564,22 +561,28 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
     if historico_pendencia:
         barra_horas = criar_barra_horas_inline(historico_pendencia)
 
-    # Badge de progresso de subtarefas (X%)
-    badge_progresso = None
-    if historico_pendencia:
-        sub_reais = [h for h in historico_pendencia
-                     if h.get('tipo_evento', '') != 'criacao']
-        if sub_reais:
-            total_sub = len(sub_reais)
-            concluidas_sub = sum(1 for h in sub_reais if h.get('concluido') is True)
-            pct = int(concluidas_sub / total_sub * 100)
-            cor = "success" if pct == 100 else "primary" if pct >= 50 else "warning"
-            badge_progresso = dbc.Badge(
-                [html.I(className="fas fa-tasks me-1"), f"{pct}%"],
-                color=cor,
-                className="ms-2",
-                title=f"{concluidas_sub}/{total_sub} subtarefas concluídas"
-            )
+    # Célula de progresso dedicada
+    sub_reais = [h for h in (historico_pendencia or [])
+                 if h.get('tipo_evento', '') != 'criacao']
+    if sub_reais:
+        total_sub = len(sub_reais)
+        concluidas_sub = sum(1 for h in sub_reais if h.get('concluido') is True)
+        pct = int(concluidas_sub / total_sub * 100)
+        cor_prog = "success" if pct == 100 else "primary" if pct >= 50 else "warning"
+        td_progresso = html.Td(
+            html.Div([
+                dbc.Progress(value=pct, color=cor_prog,
+                             style={"height": "8px"}, className="mb-1"),
+                html.Small(f"{concluidas_sub}/{total_sub}",
+                           className=f"text-{cor_prog} fw-semibold"),
+            ], style={"minWidth": "80px"}),
+            style={"width": "100px", "verticalAlign": "middle"}
+        )
+    else:
+        td_progresso = html.Td(
+            html.Small("—", className="text-muted"),
+            style={"width": "100px", "textAlign": "center", "verticalAlign": "middle"}
+        )
 
     # Badge de aprovação pendente (se houver)
     badge_aprov = None
@@ -617,8 +620,6 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
                 style={"fontSize": "0.75rem", "fontWeight": "500"}
             )
         )
-    if badge_progresso:
-        desc_content.append(badge_progresso)
     if badge_aceite:
         desc_content.append(badge_aceite)
     if badge_aprov:
@@ -692,6 +693,7 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
         html.Td(desc_content),
         html.Td(responsavel),
         html.Td(criar_badge_status(pendencia['status'])),
+        td_progresso,
         html.Td(data_criacao),
         html.Td(ultima_atualizacao),
         html.Td(botoes_acao, style={"width": "120px", "textAlign": "center"})
@@ -702,13 +704,13 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
         html.Td(
             dbc.Collapse(
                 dbc.Card([
-                    dbc.CardHeader("Histórico da Pendência", className="fw-bold"),
-                    dbc.CardBody(id={"type": "historico-content", "index": index})
+                    dbc.CardBody(id={"type": "historico-content", "index": index},
+                                 className="p-0")
                 ], className="border-0 shadow-sm"),
                 id={"type": "collapse-historico", "index": index},
                 is_open=False
             ),
-            colSpan=8,
+            colSpan=9,
             className="p-0"
         )
     ])
@@ -746,8 +748,9 @@ def criar_tabela_pendencias(df_pendencias, df_historico=None, user_level=1, user
             html.Th("Descrição"),
             html.Th("Responsável", style={"width": "150px"}),
             html.Th("Status", style={"width": "150px"}),
-            html.Th("Criação", style={"width": "120px"}),
-            html.Th("Atualização", style={"width": "120px"}),
+            html.Th("Progresso", style={"width": "100px"}),
+            html.Th("Criação", style={"width": "100px"}),
+            html.Th("Atualização", style={"width": "100px"}),
             html.Th("Ações", style={"width": "120px"})
         ])
     ])

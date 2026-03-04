@@ -27,6 +27,146 @@ from src.pages.workflow.dashboard import (
 # HELPERS
 # ======================================================================================
 
+def criar_checklist_subtarefas(historico_items, username_atual=None):
+    """
+    Visão de checklist das subtarefas (eventos não-criacao).
+    Cada item mostra status visual, meta-info, observações e botões de ação.
+    """
+    sub_items = [h for h in historico_items if h.get('tipo_evento', '') != 'criacao']
+
+    if not sub_items:
+        return html.Div([
+            html.I(className="fas fa-check-square fa-2x text-muted mb-2 d-block"),
+            html.Span("Nenhuma subtarefa registrada.", className="text-muted")
+        ], className="text-center py-4")
+
+    items_html = []
+    for item in sub_items:
+        concluido = item.get('concluido') is True
+        hist_id = item.get('hist_id', '')
+        horas_raw = item.get('horas')
+        aprovador = item.get('aprovador')
+        status_aprovacao = item.get('status_aprovacao')
+        descricao = item.get('descricao', '')
+        editado_por = item.get('editado_por') or item.get('responsavel', '')
+        data = item.get('data', '')
+        observacoes = (item.get('observacoes') or '').strip()
+
+        try:
+            horas_val = float(horas_raw) if horas_raw is not None and str(horas_raw) != 'nan' else None
+        except (ValueError, TypeError):
+            horas_val = None
+
+        # Ícone de status
+        if concluido:
+            icone = html.I(className="fas fa-check-circle text-success",
+                           style={"fontSize": "1.15rem"})
+        elif status_aprovacao == 'pendente':
+            icone = html.I(className="fas fa-hourglass-half text-warning",
+                           style={"fontSize": "1.15rem"})
+        elif status_aprovacao == 'rejeitado':
+            icone = html.I(className="fas fa-times-circle text-danger",
+                           style={"fontSize": "1.15rem"})
+        else:
+            icone = html.I(className="far fa-circle text-secondary",
+                           style={"fontSize": "1.15rem"})
+
+        # Badges de estado
+        badges = []
+        if concluido:
+            badges.append(dbc.Badge("Concluída", color="success", className="me-1"))
+        if status_aprovacao == 'pendente':
+            badges.append(dbc.Badge("Aguard. Aprovação", color="warning", className="me-1"))
+        elif status_aprovacao == 'aprovado':
+            badges.append(dbc.Badge("Aprovado", color="success", className="me-1"))
+        elif status_aprovacao == 'rejeitado':
+            badges.append(dbc.Badge("Rejeitado", color="danger", className="me-1"))
+
+        # Meta info
+        horas_fmt = None
+        if horas_val:
+            horas_fmt = f"{int(horas_val)}h" if horas_val == int(horas_val) else f"{horas_val:.1f}h"
+        meta_partes = [editado_por, data]
+        if horas_fmt:
+            meta_partes.append(html.Span([
+                html.I(className="fas fa-clock me-1 text-info"),
+                horas_fmt
+            ], className="text-info fw-semibold"))
+        if aprovador and not concluido:
+            meta_partes.append(html.Span([
+                html.I(className="fas fa-user-check me-1 text-warning"),
+                f"Aprovador: {aprovador}"
+            ], className="text-warning"))
+
+        meta_children = []
+        for i, p in enumerate(meta_partes):
+            meta_children.append(p)
+            if i < len(meta_partes) - 1:
+                meta_children.append(html.Span(" · ", className="text-muted"))
+
+        # Botões de ação
+        botoes = []
+        if not concluido and hist_id:
+            botoes.append(dbc.Button(
+                [html.I(className="fas fa-check me-1"), "Concluir"],
+                id={"type": "btn-concluir-subtarefa", "index": hist_id},
+                color="success", size="sm", outline=True
+            ))
+        if (status_aprovacao == 'pendente' and aprovador and
+                username_atual and username_atual == aprovador and hist_id):
+            botoes.append(dbc.Button(
+                [html.I(className="fas fa-thumbs-up me-1"), "Aprovar"],
+                id={"type": "btn-aprovar", "index": hist_id},
+                color="success", size="sm", className="me-1"
+            ))
+            botoes.append(dbc.Button(
+                [html.I(className="fas fa-thumbs-down me-1"), "Rejeitar"],
+                id={"type": "btn-rejeitar", "index": hist_id},
+                color="danger", size="sm"
+            ))
+
+        # Borda colorida por estado
+        cor_borda = ("var(--bs-success)" if concluido
+                     else "var(--bs-warning)" if status_aprovacao == 'pendente'
+                     else "var(--bs-danger)" if status_aprovacao == 'rejeitado'
+                     else "var(--bs-primary)")
+
+        item_html = html.Div([
+            html.Div([
+                # Ícone à esquerda
+                html.Div(icone, style={"width": "28px", "flexShrink": "0", "paddingTop": "2px"}),
+                # Conteúdo central
+                html.Div([
+                    html.Div([
+                        html.Span(
+                            descricao,
+                            className="fw-semibold me-2" + (" text-muted" if concluido else ""),
+                            style={"textDecoration": "line-through" if concluido else "none",
+                                   "fontSize": "0.95rem"}
+                        ),
+                        *badges
+                    ], className="d-flex align-items-center flex-wrap mb-1"),
+                    html.Small(meta_children, className="text-muted"),
+                    html.Div(
+                        html.Small(observacoes, className="fst-italic text-muted"),
+                        className="mt-1"
+                    ) if observacoes else None,
+                ], className="flex-grow-1"),
+                # Botões à direita
+                html.Div(
+                    html.Div(botoes, className="d-flex gap-1 flex-wrap"),
+                    className="ms-3 flex-shrink-0"
+                ) if botoes else None,
+            ], className="d-flex align-items-start"),
+        ], className="p-2 mb-2 rounded" + (" opacity-75" if concluido else ""),
+           style={"borderLeft": f"3px solid {cor_borda}",
+                  "backgroundColor": "rgba(0,0,0,0.02)" if concluido else "transparent"})
+
+        items_html.append(item_html)
+
+    return html.Div(items_html, className="p-3")
+
+
 def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None):
     """
     Cria o conteúdo do histórico para uma pendência específica.
@@ -72,9 +212,19 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None):
             'status_aprovacao': _str_or_none(row.get('status_aprovacao')),
         })
 
-    timeline = criar_timeline_historico(historico_items, username_atual)
+    checklist = criar_checklist_subtarefas(historico_items, username_atual)
+    timeline = criar_timeline_historico(historico_items, username_atual, mostrar_botoes=False)
 
-    return html.Div([timeline])
+    # Contagem para labels das abas
+    sub_total = sum(1 for h in historico_items if h.get('tipo_evento', '') != 'criacao')
+    sub_conc = sum(1 for h in historico_items
+                   if h.get('tipo_evento', '') != 'criacao' and h.get('concluido') is True)
+    label_sub = f"Subtarefas ({sub_conc}/{sub_total})" if sub_total else "Subtarefas"
+
+    return dbc.Tabs([
+        dbc.Tab(checklist, label=label_sub, tab_id="tab-subtarefas"),
+        dbc.Tab(timeline, label="Histórico", tab_id="tab-historico"),
+    ], active_tab="tab-subtarefas", className="mt-1")
 
 
 def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite_list=None):
