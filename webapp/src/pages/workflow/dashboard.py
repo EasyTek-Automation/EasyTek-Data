@@ -135,6 +135,8 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
     Returns:
         dbc.Row: Linha com os cards KPI
     """
+    pct_subtarefas_geral = None
+
     if df_pendencias is None or df_pendencias.empty:
         total = em_fila = pendentes = em_andamento = bloqueados = concluidas = 0
         aguardando_aceite = 0
@@ -169,6 +171,21 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
                     (mask_meus & (df_pendencias['status_aceite'] == 'rejeitado')).sum()
                 )
 
+    # Calcular % geral de subtarefas concluídas (excluindo "Em Fila (Planejamento)")
+    if df_historico is not None and not df_historico.empty and df_pendencias is not None and not df_pendencias.empty:
+        ids_ativas = set(df_pendencias[
+            df_pendencias['status'] != 'Em Fila (Planejamento)'
+        ]['id'])
+        col_id = 'pendencia_id' if 'pendencia_id' in df_historico.columns else 'MaintenanceWF_id'
+        mask_ativas = df_historico[col_id].isin(ids_ativas)
+        if 'tipo_evento' in df_historico.columns:
+            mask_ativas = mask_ativas & (df_historico['tipo_evento'] != 'criacao')
+        hist_ativas = df_historico[mask_ativas]
+        if not hist_ativas.empty:
+            total_g = len(hist_ativas)
+            conc_g = int(hist_ativas['concluido'].eq(True).sum())
+            pct_subtarefas_geral = int(conc_g / total_g * 100)
+
     # Calcular aprovações pendentes para o usuário atual
     aguardando_aprovacao = 0
     if df_historico is not None and not df_historico.empty and username_atual:
@@ -192,6 +209,12 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
     def _vsep():
         return html.Div(style={"width": "1px", "backgroundColor": "#dee2e6", "margin": "4px 0"})
 
+    _pct_label = f"{pct_subtarefas_geral}%" if pct_subtarefas_geral is not None else "—"
+    _pct_cor = ("text-success" if pct_subtarefas_geral == 100
+                else "text-primary" if pct_subtarefas_geral and pct_subtarefas_geral >= 50
+                else "text-warning" if pct_subtarefas_geral is not None
+                else "")
+
     status_strip = dbc.Card(
         dbc.CardBody(
             html.Div([
@@ -206,6 +229,8 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
                 _stat("Bloqueados", bloqueados, "text-danger" if bloqueados else ""),
                 _vsep(),
                 _stat("Concluídas", concluidas, "text-success" if concluidas else ""),
+                _vsep(),
+                _stat("Subtarefas ✓", _pct_label, _pct_cor),
             ], className="d-flex align-items-center justify-content-around flex-wrap"),
             className="py-2"
         ),
@@ -532,6 +557,23 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
     if historico_pendencia:
         barra_horas = criar_barra_horas_inline(historico_pendencia)
 
+    # Badge de progresso de subtarefas (X%)
+    badge_progresso = None
+    if historico_pendencia:
+        sub_reais = [h for h in historico_pendencia
+                     if h.get('tipo_evento', '') != 'criacao']
+        if sub_reais:
+            total_sub = len(sub_reais)
+            concluidas_sub = sum(1 for h in sub_reais if h.get('concluido') is True)
+            pct = int(concluidas_sub / total_sub * 100)
+            cor = "success" if pct == 100 else "primary" if pct >= 50 else "warning"
+            badge_progresso = dbc.Badge(
+                [html.I(className="fas fa-tasks me-1"), f"{pct}%"],
+                color=cor,
+                className="ms-2",
+                title=f"{concluidas_sub}/{total_sub} subtarefas concluídas"
+            )
+
     # Badge de aprovação pendente (se houver)
     badge_aprov = None
     if tem_aprovacao_pendente:
@@ -568,6 +610,8 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
                 style={"fontSize": "0.75rem", "fontWeight": "500"}
             )
         )
+    if badge_progresso:
+        desc_content.append(badge_progresso)
     if badge_aceite:
         desc_content.append(badge_aceite)
     if badge_aprov:
