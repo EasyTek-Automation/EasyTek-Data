@@ -206,7 +206,10 @@ def register_subtask_callbacks(app):
             match = df[df['hist_id'] == hist_id]
             if not match.empty:
                 row = match.iloc[0]
-                titulo = row.get('titulo') or row.get('descricao', hist_id) or hist_id
+                _t = row.get('titulo')
+                _d = row.get('descricao')
+                titulo = (str(_t) if _t and str(_t) != 'nan' else None) or \
+                         (str(_d) if _d and str(_d) != 'nan' else None) or hist_id
 
         pend_id = (context or {}).get("pend_id", "")
         novo_context = {"pend_id": pend_id, "subtarefa_id": hist_id}
@@ -328,7 +331,10 @@ def register_subtask_callbacks(app):
             match = df[df['hist_id'] == hist_id]
             if not match.empty:
                 row = match.iloc[0]
-                titulo_val = row.get('titulo') or row.get('descricao', '') or ''
+                _t = row.get('titulo')
+                _d = row.get('descricao')
+                titulo_val = (str(_t) if _t and str(_t) != 'nan' else None) or \
+                             (str(_d) if _d and str(_d) != 'nan' else None) or ''
                 tipo_val = row.get('tipo_evento')
                 obs_val = row.get('observacoes', '') or ''
                 concluido_val = row.get('concluido') is True

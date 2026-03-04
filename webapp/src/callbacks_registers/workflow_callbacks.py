@@ -62,8 +62,11 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
         horas_raw = item.get('horas')
         aprovador = item.get('aprovador')
         status_aprovacao = item.get('status_aprovacao')
-        # titulo tem prioridade; fallback para descricao (retrocompat)
-        titulo = item.get('titulo') or item.get('descricao', '') or ''
+        # titulo tem prioridade; fallback para descricao (retrocompat) — garante str mesmo com NaN
+        _t = item.get('titulo')
+        _d = item.get('descricao')
+        titulo = (str(_t) if _t and str(_t) != 'nan' else None) or \
+                 (str(_d) if _d and str(_d) != 'nan' else None) or ''
         tipo_evento = item.get('tipo_evento', '')
         editado_por = item.get('editado_por') or item.get('responsavel', '')
         data = item.get('data', '')

@@ -90,7 +90,11 @@ def criar_barra_horas_inline(historico_items):
         try:
             if h is not None and str(h) != 'nan' and float(h) > 0:
                 # Para logs: agrupar pelo título da subtarefa pai (descricao); para subtarefas: usar titulo ou descricao
-                desc = item.get('titulo') or item.get('descricao', 'Sem título') or 'Sem título'
+                _titulo = item.get('titulo')
+                _descricao = item.get('descricao')
+                _t = str(_titulo) if _titulo and str(_titulo) != 'nan' else None
+                _d = str(_descricao) if _descricao and str(_descricao) != 'nan' else None
+                desc = _t or _d or 'Sem título'
                 grupos[desc] = grupos.get(desc, 0.0) + float(h)
         except (ValueError, TypeError):
             pass
