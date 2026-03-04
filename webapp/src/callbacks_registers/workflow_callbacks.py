@@ -369,7 +369,8 @@ def _criar_logs_indentados(log_items):
     return html.Div(items)
 
 
-def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite_list=None):
+def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite_list=None,
+                              data_inicio=None, data_fim=None):
     """Aplica filtros ao DataFrame de pendências."""
     df_filtrado = df.copy()
 
@@ -391,6 +392,16 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
             df_filtrado['nota_gam'].astype(str).str.lower().str.contains(busca_lower, na=False)
         )
         df_filtrado = df_filtrado[mask]
+
+    if data_inicio and 'data_criacao' in df_filtrado.columns:
+        from datetime import datetime as _dt
+        dt_inicio = _dt.fromisoformat(data_inicio)
+        df_filtrado = df_filtrado[pd.to_datetime(df_filtrado['data_criacao']) >= dt_inicio]
+
+    if data_fim and 'data_criacao' in df_filtrado.columns:
+        from datetime import datetime as _dt, timedelta
+        dt_fim = _dt.fromisoformat(data_fim) + timedelta(days=1)
+        df_filtrado = df_filtrado[pd.to_datetime(df_filtrado['data_criacao']) < dt_fim]
 
     return df_filtrado
 
@@ -415,7 +426,9 @@ def reconstruir_tabela_com_filtros(df_pendencias, df_historico, filtros, user_le
             filtros.get("responsavel", "todos"),
             filtros.get("status"),
             filtros.get("busca"),
-            filtros.get("status_aceite")
+            filtros.get("status_aceite"),
+            filtros.get("data_inicio"),
+            filtros.get("data_fim"),
         )
     else:
         df_filtrado = df_pendencias
@@ -502,12 +515,14 @@ def register_workflow_callbacks(app):
         State("filtro-status", "value"),
         State("filtro-busca", "value"),
         State("filtro-status-aceite", "value"),
+        State("filtro-data-inicio", "date"),
+        State("filtro-data-fim", "date"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
         prevent_initial_call=True
     )
     def aplicar_filtros(n_clicks, responsavel, status_list, busca, status_aceite_list,
-                        user_level, username_atual):
+                        data_inicio, data_fim, user_level, username_atual):
         """Aplica os filtros selecionados e reconstrói a tabela."""
         if not n_clicks:
             raise PreventUpdate
@@ -521,7 +536,9 @@ def register_workflow_callbacks(app):
             "responsavel": responsavel,
             "status": status_list,
             "busca": busca,
-            "status_aceite": status_aceite_list
+            "status_aceite": status_aceite_list,
+            "data_inicio": data_inicio,
+            "data_fim": data_fim,
         }
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
             df_pendencias, df_historico, filtros, user_level, username_atual
@@ -867,6 +884,8 @@ def register_workflow_callbacks(app):
         Output("filtro-status", "value"),
         Output("filtro-busca", "value"),
         Output("filtro-status-aceite", "value"),
+        Output("filtro-data-inicio", "date"),
+        Output("filtro-data-fim", "date"),
         Output("store-filtros-ativos", "data", allow_duplicate=True),
         Output("container-tabela", "children", allow_duplicate=True),
         Output("store-pendencias", "data", allow_duplicate=True),
@@ -890,8 +909,8 @@ def register_workflow_callbacks(app):
             username_atual=username_atual
         )
         return (
-            "todos", [], "", [],   # resetar UI dos filtros
-            None,                  # limpar store de filtros
+            "todos", [], "", [], None, None,  # resetar UI dos filtros + datas
+            None,                             # limpar store de filtros
             nova_tabela,
             df_pendencias.to_dict('records')
         )

@@ -348,6 +348,8 @@ def register_subtask_callbacks(app):
         Output("edit-subtask-tipo", "value"),
         Output("edit-subtask-obs", "value"),
         Output("edit-subtask-concluido", "value"),
+        Output("edit-subtask-aprovador", "value"),
+        Output("edit-subtask-data-retroativa", "date"),
         Input({"type": "btn-edit-subtarefa", "index": ALL}, "n_clicks"),
         State("store-historico", "data"),
         prevent_initial_call=True
@@ -366,6 +368,8 @@ def register_subtask_callbacks(app):
         tipo_val = None
         obs_val = ""
         concluido_val = False
+        aprovador_val = None
+        data_retro_val = None
 
         if historico_data:
             df = pd.DataFrame(historico_data)
@@ -379,8 +383,42 @@ def register_subtask_callbacks(app):
                 tipo_val = row.get('tipo_evento')
                 obs_val = row.get('observacoes', '') or ''
                 concluido_val = row.get('concluido') is True
+                _aprov = row.get('aprovador')
+                aprovador_val = str(_aprov) if _aprov and str(_aprov) != 'nan' else None
+                dr_raw = row.get('data_retroativa')
+                data_retro_val = str(dr_raw)[:10] if dr_raw and str(dr_raw) != 'nan' else None
 
-        return True, hist_id, titulo_val, tipo_val, obs_val, concluido_val
+        return True, hist_id, titulo_val, tipo_val, obs_val, concluido_val, aprovador_val, data_retro_val
+
+    # ==============================================================================
+    # CB9b: Toggle visibilidade aprovador/data-retroativa no edit modal
+    # ==============================================================================
+    @app.callback(
+        Output("edit-subtask-aprovador-container", "style"),
+        Output("edit-subtask-data-retroativa-container", "style"),
+        Input("edit-subtask-tipo", "value"),
+        prevent_initial_call=True
+    )
+    def toggle_edit_subtask_containers(tipo):
+        show_aprov = tipo in TIPOS_REQUEREM_APROVACAO
+        show_data = tipo == "Lançamento Retroativo"
+        return (
+            {"display": "block"} if show_aprov else {"display": "none"},
+            {"display": "block"} if show_data else {"display": "none"},
+        )
+
+    # ==============================================================================
+    # CB9c: Popular dropdown aprovador no edit modal
+    # ==============================================================================
+    @app.callback(
+        Output("edit-subtask-aprovador", "options"),
+        Input("edit-subtask-modal", "is_open"),
+        State("user-perfil-store", "data"),
+    )
+    def popular_edit_aprovador(is_open, user_perfil):
+        if not is_open:
+            return no_update
+        return get_usuarios_nivel3_por_perfil(user_perfil or "admin")
 
     # ==============================================================================
     # CB10: Fechar edit-subtask-modal (Cancelar)
@@ -412,24 +450,38 @@ def register_subtask_callbacks(app):
         State("edit-subtask-tipo", "value"),
         State("edit-subtask-obs", "value"),
         State("edit-subtask-concluido", "value"),
+        State("edit-subtask-aprovador", "value"),
+        State("edit-subtask-data-retroativa", "date"),
         State("user-username-store", "data"),
         State("user-level-store", "data"),
         State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
     def submeter_edit_subtask(n_clicks, hist_id, titulo, tipo, obs, concluido,
-                              username, user_level, filtros):
+                              aprovador, data_retroativa, username, user_level, filtros):
         if not n_clicks or not hist_id:
             raise PreventUpdate
 
         obs_val = obs.strip() if obs else None
+
+        from datetime import datetime as _dt
+        data_retro_dt = None
+        if tipo == "Lançamento Retroativo" and data_retroativa:
+            try:
+                data_retro_dt = _dt.fromisoformat(data_retroativa)
+            except (ValueError, TypeError):
+                data_retro_dt = None
 
         sucesso, mensagem = editar_subtarefa(
             hist_id=hist_id,
             titulo=titulo.strip() if titulo else None,
             tipo_evento=tipo if tipo else None,
             observacoes=obs_val,
-            concluido=bool(concluido) if concluido is not None else None
+            concluido=bool(concluido) if concluido is not None else None,
+            aprovador=aprovador,
+            update_aprovador=True,
+            data_retroativa=data_retro_dt,
+            update_data_retroativa=True,
         )
 
         from src.pages.workflow.dashboard import carregar_dados_csv

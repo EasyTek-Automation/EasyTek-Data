@@ -166,6 +166,18 @@
     
 }
 
+/* DatePicker full-width nos modais do workflow */
+.SingleDatePicker,
+.SingleDatePickerInput,
+.DateInput {
+    width: 100% !important;
+    display: block !important;
+}
+.DateInput_input {
+    width: 100% !important;
+    box-sizing: border-box !important;
+}
+
 /* Estilo para os ícones dentro dos links do menu dropdown */
 .dropdown-item .menu-icon svg {
     /* Aumenta o tamanho do ícone. '1.2em' significa 1.2 vezes o tamanho da fonte do elemento pai. */

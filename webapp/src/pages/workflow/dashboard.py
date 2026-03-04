@@ -397,7 +397,31 @@ def criar_painel_filtros():
                         multi=True,
                         placeholder="Todos"
                     )
-                ], width=12, md=6, className="mb-3"),
+                ], width=12, md=3, className="mb-3"),
+
+                dbc.Col([
+                    html.Label("De:", className="fw-bold mb-2"),
+                    dcc.DatePickerSingle(
+                        id="filtro-data-inicio",
+                        placeholder="Data inicial",
+                        display_format="DD/MM/YYYY",
+                        first_day_of_week=0,
+                        clearable=True,
+                        className="w-100"
+                    )
+                ], width=12, md=3, className="mb-3"),
+
+                dbc.Col([
+                    html.Label("Até:", className="fw-bold mb-2"),
+                    dcc.DatePickerSingle(
+                        id="filtro-data-fim",
+                        placeholder="Data final",
+                        display_format="DD/MM/YYYY",
+                        first_day_of_week=0,
+                        clearable=True,
+                        className="w-100"
+                    )
+                ], width=12, md=3, className="mb-3"),
 
                 dbc.Col([
                     html.Label("\u00a0", className="fw-bold mb-2 d-block"),

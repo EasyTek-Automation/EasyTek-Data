@@ -717,7 +717,9 @@ def adicionar_log(subtarefa_hist_id, pend_id, observacoes, editado_por, horas=No
         return False, str(e)
 
 
-def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, concluido=None):
+def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, concluido=None,
+                     aprovador=None, update_aprovador=False,
+                     data_retroativa=None, update_data_retroativa=False):
     """
     Edita campos de uma subtarefa existente.
 
@@ -727,6 +729,10 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
         tipo_evento: Novo tipo de evento (ou None para não alterar)
         observacoes: Novas observações (ou None para não alterar)
         concluido: Novo status de conclusão (ou None para não alterar)
+        aprovador: Novo aprovador (ou None para remover)
+        update_aprovador: Se True, grava o campo aprovador mesmo que seja None
+        data_retroativa: datetime da data real do evento (ou None para remover)
+        update_data_retroativa: Se True, grava o campo data_retroativa mesmo que seja None
 
     Returns:
         tuple: (sucesso: bool, mensagem: str)
@@ -744,6 +750,15 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
             updates['observacoes'] = observacoes
         if concluido is not None:
             updates['concluido'] = concluido
+
+        if update_aprovador:
+            updates['aprovador'] = aprovador
+            updates['status_aprovacao'] = 'pendente' if aprovador else None
+
+        if update_data_retroativa:
+            updates['data_retroativa'] = data_retroativa
+            if data_retroativa:
+                updates['data'] = data_retroativa  # data retroativa passa a ser a data principal
 
         if not updates:
             return False, "Nenhum campo para atualizar"

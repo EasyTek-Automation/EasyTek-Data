@@ -236,6 +236,41 @@ def edit_subtask_modal():
                 className="mb-3"
             ),
 
+            # Aprovador (condicional)
+            html.Div([
+                html.Label("Aprovador (Nível 3):", className="fw-bold mb-1"),
+                html.Span(" *", className="text-danger"),
+                dcc.Dropdown(
+                    id="edit-subtask-aprovador",
+                    placeholder="Selecione o aprovador",
+                    clearable=True,
+                    searchable=True,
+                    className="mb-1"
+                ),
+                html.Small(
+                    "Este tipo requer aprovação de um usuário nível 3.",
+                    className="text-warning d-block mb-3"
+                ),
+            ], id="edit-subtask-aprovador-container", style={"display": "none"}),
+
+            # Data retroativa (condicional)
+            html.Div([
+                html.Label("Data do Evento:", className="fw-bold mb-1"),
+                html.Span(" *", className="text-danger"),
+                dcc.DatePickerSingle(
+                    id="edit-subtask-data-retroativa",
+                    placeholder="Selecione a data",
+                    display_format="DD/MM/YYYY",
+                    first_day_of_week=0,
+                    className="mb-1",
+                    style={"width": "100%"}
+                ),
+                html.Small(
+                    "Informe a data real em que a atividade ocorreu.",
+                    className="text-muted d-block mb-3"
+                ),
+            ], id="edit-subtask-data-retroativa-container", style={"display": "none"}),
+
             # Observações
             html.Label("Observações:", className="fw-bold mb-1"),
             html.Span(" (opcional)", className="text-muted small"),
