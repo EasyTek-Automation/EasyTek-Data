@@ -19,7 +19,8 @@ from src.pages.workflow.dashboard import (
     carregar_dados_csv,
     criar_tabela_pendencias,
     criar_cards_kpi,
-    criar_timeline_historico
+    criar_timeline_historico,
+    float_para_hhmm
 )
 
 
@@ -116,19 +117,14 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
         elif status_aprovacao == 'rejeitado':
             badges.append(dbc.Badge("Rejeitado", color="danger", className="me-1"))
         if n_logs > 0:
-            # Mostrar total de horas dos relatórios se houver
-            horas_label = ""
-            if horas_logs > 0:
-                horas_label = f" · {int(horas_logs)}h" if horas_logs == int(horas_logs) else f" · {horas_logs:.1f}h"
+            horas_label = f" · {float_para_hhmm(horas_logs)}" if horas_logs > 0 else ""
             badges.append(dbc.Badge(
                 [html.I(className="fas fa-file-alt me-1"), f"{n_logs} relatório(s){horas_label}"],
                 color="info", className="me-1"
             ))
 
         # Meta info (horas legado na subtarefa — retrocompat)
-        horas_fmt = None
-        if horas_val:
-            horas_fmt = f"{int(horas_val)}h" if horas_val == int(horas_val) else f"{horas_val:.1f}h"
+        horas_fmt = float_para_hhmm(horas_val) if horas_val else None
         meta_partes = [editado_por, data]
         if horas_fmt:
             meta_partes.append(html.Span([

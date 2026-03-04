@@ -53,6 +53,43 @@ def carregar_dados_csv():
 # COMPONENTES DE UI
 # ======================================================================================
 
+def float_para_hhmm(horas_float):
+    """Converte horas decimal para string HH:MM. Ex: 1.5 → '01:30', 2.0 → '02:00'"""
+    if horas_float is None:
+        return ""
+    try:
+        horas_float = float(horas_float)
+    except (ValueError, TypeError):
+        return ""
+    horas = int(horas_float)
+    minutos = round((horas_float - horas) * 60)
+    if minutos >= 60:
+        horas += 1
+        minutos = 0
+    return f"{horas:02d}:{minutos:02d}"
+
+
+def hhmm_para_float(texto):
+    """Converte string HH:MM para horas decimal. Ex: '01:30' → 1.5, '2:00' → 2.0"""
+    if not texto:
+        return None
+    texto = str(texto).strip()
+    if ':' in texto:
+        partes = texto.split(':', 1)
+        try:
+            h = int(partes[0]) if partes[0].strip() else 0
+            m = int(partes[1]) if len(partes) > 1 and partes[1].strip() else 0
+            if m > 59:
+                return None
+            return h + m / 60
+        except (ValueError, IndexError):
+            return None
+    try:
+        return float(texto)
+    except (ValueError, TypeError):
+        return None
+
+
 def criar_badge_status(status):
     """Cria um badge colorido para o status."""
     cores = {
@@ -81,21 +118,29 @@ def criar_barra_horas_inline(historico_items):
     """
     PALETA = ['primary', 'success', 'info', 'warning', 'danger', 'secondary']
 
-    # Agrupar por título/tipo e somar horas (apenas subtarefas e logs, excluindo criacao)
+    # Índice de subtarefas por hist_id (para lookup do tipo_evento dos logs)
+    subtarefa_por_id = {
+        item.get('hist_id'): item
+        for item in historico_items
+        if item.get('record_type', 'subtarefa') == 'subtarefa'
+    }
+
+    # Agrupar por tipo_evento e somar horas (subtarefas + logs, excluindo criacao)
     grupos = {}
     for item in historico_items:
-        if item.get('record_type', 'subtarefa') == 'criacao':
+        rt = item.get('record_type', 'subtarefa')
+        if rt == 'criacao':
             continue
         h = item.get('horas')
         try:
             if h is not None and str(h) != 'nan' and float(h) > 0:
-                # Para logs: agrupar pelo título da subtarefa pai (descricao); para subtarefas: usar titulo ou descricao
-                _titulo = item.get('titulo')
-                _descricao = item.get('descricao')
-                _t = str(_titulo) if _titulo and str(_titulo) != 'nan' else None
-                _d = str(_descricao) if _descricao and str(_descricao) != 'nan' else None
-                desc = _t or _d or 'Sem título'
-                grupos[desc] = grupos.get(desc, 0.0) + float(h)
+                if rt == 'log':
+                    # Herdar tipo_evento da subtarefa pai
+                    parent = subtarefa_por_id.get(item.get('subtarefa_id'))
+                    tipo = (parent.get('tipo_evento') if parent else None) or 'Relatório'
+                else:
+                    tipo = item.get('tipo_evento') or 'Sem Tipo'
+                grupos[tipo] = grupos.get(tipo, 0.0) + float(h)
         except (ValueError, TypeError):
             pass
 
@@ -111,7 +156,7 @@ def criar_barra_horas_inline(historico_items):
         cor = PALETA[i % len(PALETA)]
         pct = horas_soma / total * 100
         desc_curta = desc if len(desc) <= 20 else desc[:17] + "..."
-        horas_fmt = f"{int(horas_soma)}h" if horas_soma == int(horas_soma) else f"{horas_soma:.1f}h"
+        horas_fmt = float_para_hhmm(horas_soma)
 
         bars.append(dbc.Progress(
             value=pct,
@@ -412,7 +457,7 @@ def criar_timeline_historico(historico_items, username_atual=None, mostrar_botoe
 
         if horas is not None and horas > 0:
             badges.append(dbc.Badge(
-                [html.I(className="fas fa-clock me-1"), f"{horas}h"],
+                [html.I(className="fas fa-clock me-1"), float_para_hhmm(horas)],
                 color="info",
                 className="me-1"
             ))
@@ -501,8 +546,8 @@ def criar_timeline_historico(historico_items, username_atual=None, mostrar_botoe
                         style={"width": "12px", "height": "12px", "flexShrink": "0"}
                     ),
                     html.Div(
-                        className="bg-secondary" if not is_last else "",
-                        style={"width": "2px", "height": "100%"} if not is_last else {}
+                        className="bg-danger" if not is_last else "",
+                        style={"width": "2px", "flexGrow": 1, "minHeight": "30px"} if not is_last else {}
                     )
                 ], style={
                     "display": "flex", "flexDirection": "column", "alignItems": "center",

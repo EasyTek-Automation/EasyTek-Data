@@ -24,6 +24,7 @@ from src.utils.workflow_db import (
     TIPOS_REQUEREM_APROVACAO
 )
 from src.callbacks_registers.workflow_callbacks import reconstruir_tabela_com_filtros
+from src.pages.workflow.dashboard import hhmm_para_float
 
 
 def register_subtask_callbacks(app):
@@ -35,6 +36,12 @@ def register_subtask_callbacks(app):
     @app.callback(
         Output("create-subtask-modal", "is_open"),
         Output("store-subtask-context", "data"),
+        Output("create-subtask-titulo", "value", allow_duplicate=True),
+        Output("create-subtask-tipo", "value", allow_duplicate=True),
+        Output("create-subtask-responsavel", "value", allow_duplicate=True),
+        Output("create-subtask-obs", "value", allow_duplicate=True),
+        Output("create-subtask-aprovador", "value", allow_duplicate=True),
+        Output("create-subtask-alert", "children", allow_duplicate=True),
         Input({"type": "btn-nova-subtarefa", "index": ALL}, "n_clicks"),
         State("create-subtask-modal", "is_open"),
         prevent_initial_call=True
@@ -48,7 +55,7 @@ def register_subtask_callbacks(app):
         id_dict = json.loads(trigger_id_str)
         pend_id = id_dict['index']
 
-        return True, {"pend_id": pend_id, "subtarefa_id": None}
+        return True, {"pend_id": pend_id, "subtarefa_id": None}, "", None, None, "", None, ""
 
     # ==============================================================================
     # CB2: Fechar create-subtask-modal (Cancelar / limpar campos)
@@ -185,6 +192,9 @@ def register_subtask_callbacks(app):
         Output("add-log-modal", "is_open"),
         Output("store-subtask-context", "data", allow_duplicate=True),
         Output("add-log-subtarefa-titulo", "children"),
+        Output("add-log-obs", "value", allow_duplicate=True),
+        Output("add-log-horas", "value", allow_duplicate=True),
+        Output("add-log-alert", "children", allow_duplicate=True),
         Input({"type": "btn-add-log", "index": ALL}, "n_clicks"),
         State("store-historico", "data"),
         State("store-subtask-context", "data"),
@@ -214,7 +224,7 @@ def register_subtask_callbacks(app):
         pend_id = (context or {}).get("pend_id", "")
         novo_context = {"pend_id": pend_id, "subtarefa_id": hist_id}
 
-        return True, novo_context, titulo
+        return True, novo_context, titulo, "", "", ""
 
     # ==============================================================================
     # CB7: Fechar add-log-modal (Cancelar)
@@ -230,7 +240,7 @@ def register_subtask_callbacks(app):
     def fechar_add_log_modal(n_clicks):
         if not n_clicks:
             raise PreventUpdate
-        return False, "", None, ""
+        return False, "", "", ""
 
     # ==============================================================================
     # CB8: Submeter novo log
@@ -267,7 +277,7 @@ def register_subtask_callbacks(app):
                     dbc.Alert("O relatório não pode estar vazio.", color="warning"),
                     no_update, no_update, no_update, no_update)
 
-        horas_val = float(horas) if horas is not None else None
+        horas_val = hhmm_para_float(horas) if horas else None
         sucesso, mensagem = adicionar_log(
             subtarefa_hist_id=subtarefa_id,
             pend_id=pend_id,

@@ -139,16 +139,33 @@ def add_log_modal():
             ),
 
             # Horas (opcional — transferido do create-subtask)
-            html.Label("Horas trabalhadas:", className="fw-bold mb-1"),
+            html.Label("Tempo trabalhado:", className="fw-bold mb-1"),
             html.Span(" (opcional)", className="text-muted small"),
-            dbc.Input(
-                id="add-log-horas",
-                type="number",
-                min=0,
-                step=0.5,
-                placeholder="Ex: 2.5",
-                className="mb-3"
-            ),
+            dbc.InputGroup([
+                dbc.InputGroupText(
+                    html.I(className="fas fa-hourglass-half",
+                           style={"color": "var(--bs-info)", "fontSize": "0.9rem"}),
+                    style={"backgroundColor": "transparent"}
+                ),
+                dbc.Input(
+                    id="add-log-horas",
+                    type="text",
+                    placeholder="00:00",
+                    maxLength=5,
+                    autocomplete="off",
+                    style={
+                        "fontFamily": "monospace",
+                        "fontWeight": "600",
+                        "letterSpacing": "0.12em",
+                        "fontSize": "1.05rem"
+                    }
+                ),
+                dbc.InputGroupText(
+                    "hh:mm",
+                    style={"fontSize": "0.75rem", "color": "var(--bs-secondary)",
+                           "backgroundColor": "transparent"}
+                ),
+            ], className="mb-3"),
 
             # Alerta
             html.Div(id="add-log-alert")
