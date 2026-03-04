@@ -571,6 +571,12 @@ def criar_timeline_historico(historico_items, username_atual=None, mostrar_botoe
                     html.Small([
                         html.Span(item.get('editado_por', item['responsavel']),
                                   className="text-muted me-3"),
+                        html.Span([
+                            html.I(className="fas fa-calendar-alt me-1"),
+                            item['data'],
+                        ], className="text-warning fw-semibold me-3",
+                           title="Data retroativa — informada manualmente")
+                        if item.get('is_retroativo') else
                         html.Span(item['data'], className="text-muted me-3"),
                         (html.Span([
                             html.I(className="fas fa-user-check me-1 text-warning"),
