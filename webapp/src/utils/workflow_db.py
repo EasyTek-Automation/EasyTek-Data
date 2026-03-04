@@ -88,7 +88,8 @@ def carregar_historico():
             return pd.DataFrame(columns=[
                 'hist_id', 'MaintenanceWF_id', 'descricao', 'data', 'responsavel',
                 'tipo_evento', 'editado_por', 'observacoes', 'alteracoes',
-                'horas', 'concluido', 'aprovador', 'status_aprovacao', 'data_aprovacao'
+                'horas', 'concluido', 'aprovador', 'status_aprovacao', 'data_aprovacao',
+                'record_type', 'subtarefa_id'
             ])
 
         # Converter _id para string e remover campo _id original
@@ -109,6 +110,18 @@ def carregar_historico():
         if 'data_aprovacao' not in df.columns:
             df['data_aprovacao'] = None
 
+        # Retrocompat record_type
+        if 'record_type' not in df.columns:
+            df['record_type'] = df['tipo_evento'].apply(
+                lambda t: 'criacao' if t == 'criacao' else 'subtarefa'
+            )
+        else:
+            df['record_type'] = df['record_type'].fillna('subtarefa')
+
+        # Retrocompat subtarefa_id
+        if 'subtarefa_id' not in df.columns:
+            df['subtarefa_id'] = None
+
         # Converter datas
         if 'data' in df.columns:
             df['data'] = pd.to_datetime(df['data'])
@@ -120,7 +133,8 @@ def carregar_historico():
         return pd.DataFrame(columns=[
             'hist_id', 'MaintenanceWF_id', 'descricao', 'data', 'responsavel',
             'tipo_evento', 'editado_por', 'observacoes', 'alteracoes',
-            'horas', 'concluido', 'aprovador', 'status_aprovacao', 'data_aprovacao'
+            'horas', 'concluido', 'aprovador', 'status_aprovacao', 'data_aprovacao',
+            'record_type', 'subtarefa_id'
         ])
 
 
@@ -209,7 +223,9 @@ def criar_pendencia(descricao, responsavel, status, criado_por, criado_por_perfi
             'concluido': False,
             'aprovador': None,
             'status_aprovacao': None,
-            'data_aprovacao': None
+            'data_aprovacao': None,
+            'record_type': 'criacao',
+            'subtarefa_id': None
         }
 
         collection_hist = get_mongo_connection(COLLECTION_HISTORICO)
@@ -308,7 +324,9 @@ def editar_pendencia(pend_id, nova_descricao, novo_responsavel, novo_status,
             'concluido': False,
             'aprovador': aprovador,
             'status_aprovacao': 'pendente' if aprovador else None,
-            'data_aprovacao': None
+            'data_aprovacao': None,
+            'record_type': 'subtarefa',
+            'subtarefa_id': None
         }
 
         collection_hist.insert_one(nova_entrada_historico)
@@ -509,7 +527,9 @@ def aceitar_tarefa(pend_id, username):
             'concluido': False,
             'aprovador': None,
             'status_aprovacao': None,
-            'data_aprovacao': None
+            'data_aprovacao': None,
+            'record_type': 'criacao',
+            'subtarefa_id': None
         })
 
         return True, "Tarefa aceita com sucesso"
@@ -570,11 +590,188 @@ def rejeitar_tarefa(pend_id, username):
             'concluido': False,
             'aprovador': None,
             'status_aprovacao': None,
-            'data_aprovacao': None
+            'data_aprovacao': None,
+            'record_type': 'criacao',
+            'subtarefa_id': None
         })
 
         return True, "Tarefa rejeitada. Solicite redesignação a um usuário nível 3."
 
     except Exception as e:
         print(f"Erro ao rejeitar tarefa: {e}")
+        return False, str(e)
+
+
+def criar_subtarefa(pend_id, descricao, responsavel, horas, observacoes,
+                    editado_por, aprovador=None):
+    """
+    Cria nova subtarefa (record_type='subtarefa') no histórico.
+
+    Args:
+        pend_id: ID da pendência
+        descricao: Tipo/título da subtarefa
+        responsavel: Username do responsável
+        horas: Horas estimadas/gastas (float ou None)
+        observacoes: Detalhes obrigatórios
+        editado_por: Username de quem está criando
+        aprovador: Username do aprovador (opcional)
+
+    Returns:
+        tuple: (sucesso: bool, mensagem: str)
+    """
+    try:
+        collection_pend = get_mongo_connection(COLLECTION_PENDENCIAS)
+        collection_hist = get_mongo_connection(COLLECTION_HISTORICO)
+        agora = datetime.now()
+
+        pendencia = collection_pend.find_one({'id': pend_id})
+        if not pendencia:
+            return False, "Pendência não encontrada"
+
+        doc = {
+            'MaintenanceWF_id': pend_id,
+            'descricao': descricao,
+            'data': agora,
+            'responsavel': responsavel,
+            'tipo_evento': descricao,
+            'editado_por': editado_por,
+            'observacoes': observacoes,
+            'alteracoes': '',
+            'horas': horas,
+            'concluido': False,
+            'aprovador': aprovador,
+            'status_aprovacao': 'pendente' if aprovador else None,
+            'data_aprovacao': None,
+            'record_type': 'subtarefa',
+            'subtarefa_id': None
+        }
+
+        collection_hist.insert_one(doc)
+        collection_pend.update_one(
+            {'id': pend_id},
+            {'$set': {'ultima_atualizacao': agora}}
+        )
+
+        return True, "Subtarefa criada com sucesso"
+
+    except Exception as e:
+        return False, str(e)
+
+
+def adicionar_log(subtarefa_hist_id, pend_id, observacoes, editado_por):
+    """
+    Adiciona log (relatório) a uma subtarefa existente.
+
+    Args:
+        subtarefa_hist_id: hist_id da subtarefa pai
+        pend_id: ID da pendência
+        observacoes: Texto do relatório (obrigatório)
+        editado_por: Username de quem está registrando
+
+    Returns:
+        tuple: (sucesso: bool, mensagem: str)
+    """
+    try:
+        collection_hist = get_mongo_connection(COLLECTION_HISTORICO)
+        collection_pend = get_mongo_connection(COLLECTION_PENDENCIAS)
+        agora = datetime.now()
+
+        doc = {
+            'MaintenanceWF_id': pend_id,
+            'descricao': 'Relatório',
+            'data': agora,
+            'responsavel': editado_por,
+            'tipo_evento': 'log',
+            'editado_por': editado_por,
+            'observacoes': observacoes,
+            'alteracoes': '',
+            'horas': None,
+            'concluido': False,
+            'aprovador': None,
+            'status_aprovacao': None,
+            'data_aprovacao': None,
+            'record_type': 'log',
+            'subtarefa_id': subtarefa_hist_id
+        }
+
+        collection_hist.insert_one(doc)
+        collection_pend.update_one(
+            {'id': pend_id},
+            {'$set': {'ultima_atualizacao': agora}}
+        )
+
+        return True, "Relatório adicionado com sucesso"
+
+    except Exception as e:
+        return False, str(e)
+
+
+def editar_subtarefa(hist_id, descricao=None, horas=None, observacoes=None, concluido=None):
+    """
+    Edita campos de uma subtarefa existente.
+
+    Args:
+        hist_id: ObjectId string da subtarefa
+        descricao: Novo título/tipo (ou None para não alterar)
+        horas: Novas horas (ou None para não alterar)
+        observacoes: Novas observações (ou None para não alterar)
+        concluido: Novo status de conclusão (ou None para não alterar)
+
+    Returns:
+        tuple: (sucesso: bool, mensagem: str)
+    """
+    try:
+        collection = get_mongo_connection(COLLECTION_HISTORICO)
+
+        updates = {}
+        if descricao is not None:
+            updates['descricao'] = descricao
+            updates['tipo_evento'] = descricao
+        if horas is not None:
+            updates['horas'] = horas
+        if observacoes is not None:
+            updates['observacoes'] = observacoes
+        if concluido is not None:
+            updates['concluido'] = concluido
+
+        if not updates:
+            return False, "Nenhum campo para atualizar"
+
+        result = collection.update_one(
+            {'_id': ObjectId(hist_id)},
+            {'$set': updates}
+        )
+
+        if result.matched_count == 0:
+            return False, "Subtarefa não encontrada"
+
+        return True, "Subtarefa atualizada com sucesso"
+
+    except Exception as e:
+        return False, str(e)
+
+
+def deletar_subtarefa(hist_id):
+    """
+    Deleta uma subtarefa e todos os seus logs.
+
+    Args:
+        hist_id: ObjectId string da subtarefa
+
+    Returns:
+        tuple: (sucesso: bool, mensagem: str)
+    """
+    try:
+        collection = get_mongo_connection(COLLECTION_HISTORICO)
+
+        result = collection.delete_one({'_id': ObjectId(hist_id)})
+        if result.deleted_count == 0:
+            return False, "Subtarefa não encontrada"
+
+        # Deletar logs vinculados
+        collection.delete_many({'subtarefa_id': hist_id})
+
+        return True, "Subtarefa e seus logs foram removidos"
+
+    except Exception as e:
         return False, str(e)

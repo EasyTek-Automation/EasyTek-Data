@@ -27,18 +27,33 @@ from src.pages.workflow.dashboard import (
 # HELPERS
 # ======================================================================================
 
-def criar_checklist_subtarefas(historico_items, username_atual=None):
+def criar_checklist_subtarefas(historico_items, username_atual=None,
+                               user_level=1, pend_id=None):
     """
-    Visão de checklist das subtarefas (eventos não-criacao).
-    Cada item mostra status visual, meta-info, observações e botões de ação.
+    Visão de checklist das subtarefas (record_type='subtarefa').
+    Cada item mostra status visual, meta-info, observações, contagem de logs e botões de ação.
     """
-    sub_items = [h for h in historico_items if h.get('tipo_evento', '') != 'criacao']
+    sub_items = [h for h in historico_items if h.get('record_type', 'subtarefa') == 'subtarefa']
+
+    botao_nova = html.Div(
+        dbc.Button(
+            [html.I(className="fas fa-plus me-1"), "Nova Subtarefa"],
+            id={"type": "btn-nova-subtarefa", "index": pend_id or ""},
+            color="success",
+            size="sm",
+            outline=True
+        ),
+        className="px-3 pt-3"
+    ) if pend_id else html.Div()
 
     if not sub_items:
         return html.Div([
-            html.I(className="fas fa-check-square fa-2x text-muted mb-2 d-block"),
-            html.Span("Nenhuma subtarefa registrada.", className="text-muted")
-        ], className="text-center py-4")
+            botao_nova,
+            html.Div([
+                html.I(className="fas fa-check-square fa-2x text-muted mb-2 d-block"),
+                html.Span("Nenhuma subtarefa registrada.", className="text-muted")
+            ], className="text-center py-4")
+        ])
 
     items_html = []
     for item in sub_items:
@@ -51,6 +66,10 @@ def criar_checklist_subtarefas(historico_items, username_atual=None):
         editado_por = item.get('editado_por') or item.get('responsavel', '')
         data = item.get('data', '')
         observacoes = (item.get('observacoes') or '').strip()
+
+        # Contar logs vinculados a esta subtarefa
+        n_logs = len([h for h in historico_items
+                      if h.get('record_type') == 'log' and h.get('subtarefa_id') == hist_id])
 
         try:
             horas_val = float(horas_raw) if horas_raw is not None and str(horas_raw) != 'nan' else None
@@ -81,6 +100,11 @@ def criar_checklist_subtarefas(historico_items, username_atual=None):
             badges.append(dbc.Badge("Aprovado", color="success", className="me-1"))
         elif status_aprovacao == 'rejeitado':
             badges.append(dbc.Badge("Rejeitado", color="danger", className="me-1"))
+        if n_logs > 0:
+            badges.append(dbc.Badge(
+                [html.I(className="fas fa-file-alt me-1"), f"{n_logs} relatório(s)"],
+                color="info", className="me-1"
+            ))
 
         # Meta info
         horas_fmt = None
@@ -111,6 +135,28 @@ def criar_checklist_subtarefas(historico_items, username_atual=None):
                 [html.I(className="fas fa-check me-1"), "Concluir"],
                 id={"type": "btn-concluir-subtarefa", "index": hist_id},
                 color="success", size="sm", outline=True
+            ))
+        # Botão preencher relatório (todos)
+        if hist_id:
+            botoes.append(dbc.Button(
+                html.I(className="fas fa-file-alt"),
+                id={"type": "btn-add-log", "index": hist_id},
+                color="info", size="sm", outline=True,
+                title="Preencher Relatório"
+            ))
+        # Botões editar/excluir apenas nível 3
+        if user_level >= 3 and hist_id:
+            botoes.append(dbc.Button(
+                html.I(className="fas fa-pencil-alt"),
+                id={"type": "btn-edit-subtarefa", "index": hist_id},
+                color="warning", size="sm", outline=True,
+                title="Editar Subtarefa"
+            ))
+            botoes.append(dbc.Button(
+                html.I(className="fas fa-trash"),
+                id={"type": "btn-delete-subtarefa", "index": hist_id},
+                color="danger", size="sm", outline=True,
+                title="Excluir Subtarefa"
             ))
         if (status_aprovacao == 'pendente' and aprovador and
                 username_atual and username_atual == aprovador and hist_id):
@@ -164,10 +210,10 @@ def criar_checklist_subtarefas(historico_items, username_atual=None):
 
         items_html.append(item_html)
 
-    return html.Div(items_html, className="p-3")
+    return html.Div([botao_nova, html.Div(items_html, className="p-3")])
 
 
-def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None):
+def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, user_level=1):
     """
     Cria o conteúdo do histórico para uma pendência específica.
 
@@ -175,26 +221,24 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None):
         pendencia_id: ID da pendência
         df_historico: DataFrame com todo o histórico
         username_atual: Username do usuário logado (para botões de aprovação)
+        user_level: Nível do usuário (para botões editar/excluir em subtarefas)
 
     Returns:
-        html.Div: Timeline do histórico + gráfico de horas
+        dbc.Tabs: Abas de Subtarefas e Histórico
     """
     historico_pendencia = df_historico[df_historico['pendencia_id'] == pendencia_id].copy()
     historico_pendencia = historico_pendencia.sort_values('data')
 
     historico_items = []
     for _, row in historico_pendencia.iterrows():
-        # Normalizar horas: None/NaN → None, valor numérico válido → float
         horas_raw = row.get('horas')
         try:
             horas_val = float(horas_raw) if horas_raw is not None and str(horas_raw) != 'nan' else None
         except (ValueError, TypeError):
             horas_val = None
 
-        # Normalizar concluido: apenas bool True conta como concluído
         concluido_val = row.get('concluido') is True
 
-        # Normalizar strings (None/NaN → None)
         def _str_or_none(v):
             return str(v) if v is not None and str(v) != 'nan' else None
 
@@ -210,21 +254,99 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None):
             'concluido': concluido_val,
             'aprovador': _str_or_none(row.get('aprovador')),
             'status_aprovacao': _str_or_none(row.get('status_aprovacao')),
+            'record_type': row.get('record_type', 'subtarefa') or 'subtarefa',
+            'subtarefa_id': _str_or_none(row.get('subtarefa_id')),
         })
 
-    checklist = criar_checklist_subtarefas(historico_items, username_atual)
-    timeline = criar_timeline_historico(historico_items, username_atual, mostrar_botoes=False)
+    checklist = criar_checklist_subtarefas(
+        historico_items, username_atual,
+        user_level=user_level, pend_id=pendencia_id
+    )
+
+    # --- View hierárquica para aba Histórico ---
+    historico_view = _criar_historico_hierarquico(historico_items, username_atual)
 
     # Contagem para labels das abas
-    sub_total = sum(1 for h in historico_items if h.get('tipo_evento', '') != 'criacao')
+    sub_total = sum(1 for h in historico_items if h.get('record_type', 'subtarefa') == 'subtarefa')
     sub_conc = sum(1 for h in historico_items
-                   if h.get('tipo_evento', '') != 'criacao' and h.get('concluido') is True)
+                   if h.get('record_type', 'subtarefa') == 'subtarefa' and h.get('concluido') is True)
     label_sub = f"Subtarefas ({sub_conc}/{sub_total})" if sub_total else "Subtarefas"
 
     return dbc.Tabs([
         dbc.Tab(checklist, label=label_sub, tab_id="tab-subtarefas"),
-        dbc.Tab(timeline, label="Histórico", tab_id="tab-historico"),
+        dbc.Tab(historico_view, label="Histórico", tab_id="tab-historico"),
     ], active_tab="tab-subtarefas", className="mt-1")
+
+
+def _criar_historico_hierarquico(historico_items, username_atual=None):
+    """
+    Cria view hierárquica do histórico:
+    - Registros de criação/aceite/rejeição no topo
+    - Subtarefas com seus logs indentados abaixo
+    """
+    from src.pages.workflow.dashboard import criar_timeline_historico
+
+    if not historico_items:
+        return html.Div("Nenhum histórico disponível.", className="text-muted p-3")
+
+    # Separar por tipo
+    criacao_items = [h for h in historico_items if h.get('record_type') == 'criacao']
+    subtarefa_items = [h for h in historico_items if h.get('record_type') == 'subtarefa']
+    log_items = [h for h in historico_items if h.get('record_type') == 'log']
+
+    conteudo = []
+
+    # Registros de criação/sistema
+    if criacao_items:
+        conteudo.append(criar_timeline_historico(criacao_items, username_atual, mostrar_botoes=False))
+
+    # Subtarefas com seus logs
+    for sub in subtarefa_items:
+        sub_hist_id = sub.get('hist_id', '')
+        logs_da_sub = [h for h in log_items if h.get('subtarefa_id') == sub_hist_id]
+
+        conteudo.append(
+            html.Div([
+                # Card da subtarefa
+                criar_timeline_historico([sub], username_atual, mostrar_botoes=False),
+                # Logs indentados
+                html.Div(
+                    _criar_logs_indentados(logs_da_sub),
+                    className="ms-4 border-start ps-2"
+                ) if logs_da_sub else html.Div()
+            ])
+        )
+
+    return html.Div(conteudo)
+
+
+def _criar_logs_indentados(log_items):
+    """Renderiza logs como cards pequenos indentados."""
+    if not log_items:
+        return html.Div()
+
+    items = []
+    for log in log_items:
+        observacoes = (log.get('observacoes') or '').strip()
+        items.append(
+            html.Div([
+                html.Div([
+                    html.I(className="fas fa-file-alt text-info me-2",
+                           style={"fontSize": "0.85rem"}),
+                    html.Span("Relatório", className="fw-semibold me-2",
+                              style={"fontSize": "0.85rem"}),
+                    html.Small(
+                        [log.get('editado_por', ''), " · ", log.get('data', '')],
+                        className="text-muted"
+                    )
+                ], className="d-flex align-items-center mb-1"),
+                html.Small(observacoes, className="fst-italic text-muted d-block ps-3")
+                if observacoes else None
+            ], className="p-2 mb-1 rounded",
+               style={"backgroundColor": "rgba(13,202,240,0.07)",
+                      "borderLeft": "2px solid var(--bs-info)"})
+        )
+    return html.Div(items)
 
 
 def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite_list=None):
@@ -338,7 +460,10 @@ def register_workflow_callbacks(app):
         chevron_class = "fas fa-chevron-down" if new_is_open else "fas fa-chevron-right"
 
         if new_is_open:
-            conteudo_historico = criar_conteudo_historico(pendencia_id, df_historico, username_atual)
+            conteudo_historico = criar_conteudo_historico(
+                pendencia_id, df_historico, username_atual,
+                user_level=user_level or 1
+            )
         else:
             conteudo_historico = html.Div()
 

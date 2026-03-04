@@ -13,6 +13,12 @@ from flask_login import current_user
 
 from src.components.workflow.create_modal import create_pendencia_modal
 from src.components.workflow.edit_modal import edit_pendencia_modal, delete_confirm_modal
+from src.components.workflow.subtask_modals import (
+    create_subtask_modal,
+    add_log_modal,
+    edit_subtask_modal,
+    delete_subtask_confirm_modal
+)
 
 
 # ======================================================================================
@@ -825,6 +831,43 @@ def concluir_subtarefa_modal():
 
 
 # ======================================================================================
+# MODAL DE MIGRAÇÃO
+# ======================================================================================
+
+def _migration_modal():
+    """Modal de migração de record_type (visível apenas para nível 3)."""
+    return dbc.Modal([
+        dbc.ModalHeader(dbc.ModalTitle([
+            html.I(className="fas fa-database me-2 text-warning"),
+            "Migração de Histórico"
+        ])),
+        dbc.ModalBody([
+            html.P([
+                "Esta operação adiciona o campo ",
+                html.Code("record_type"),
+                " a documentos antigos em ",
+                html.Code("MaintenanceHistory_workflow"),
+                " que ainda não possuem esse campo."
+            ]),
+            html.P([
+                html.Strong("Idempotente:"),
+                " documentos já migrados não são alterados. Seguro executar múltiplas vezes."
+            ], className="text-muted small"),
+            html.Div(id="migration-result")
+        ]),
+        dbc.ModalFooter([
+            dbc.Button("Fechar", id="btn-close-migration",
+                       color="secondary", outline=True, className="me-2"),
+            dbc.Button(
+                [html.I(className="fas fa-play me-2"), "Executar Migração"],
+                id="btn-run-migration",
+                color="warning"
+            )
+        ])
+    ], id="migration-modal", is_open=False, centered=True)
+
+
+# ======================================================================================
 # LAYOUT PRINCIPAL
 # ======================================================================================
 
@@ -855,11 +898,23 @@ def layout():
         # Store para filtros ativos (preserva filtros durante ações)
         dcc.Store(id="store-filtros-ativos"),
 
-        # Modais
+        # Store para contexto de subtarefa (pend_id + subtarefa_id)
+        dcc.Store(id="store-subtask-context", storage_type="memory"),
+
+        # Modais de pendência
         create_pendencia_modal(),
         edit_pendencia_modal(),
         delete_confirm_modal(),
         concluir_subtarefa_modal(),
+
+        # Modais de subtarefa
+        create_subtask_modal(),
+        add_log_modal(),
+        edit_subtask_modal(),
+        delete_subtask_confirm_modal(),
+
+        # Modal de migração de histórico (nível 3)
+        _migration_modal(),
 
         # Header
         dbc.Row([
@@ -886,7 +941,14 @@ def layout():
                     dbc.Button([
                         html.I(className="fas fa-download me-2"),
                         "Exportar"
-                    ], id="btn-export", color="secondary", outline=True, disabled=True)
+                    ], id="btn-export", color="secondary", outline=True, disabled=True),
+
+                    dbc.Button([
+                        html.I(className="fas fa-database me-2"),
+                        "Migrar Histórico"
+                    ], id="btn-open-migration", color="warning", outline=True,
+                       style={"display": "inline-block" if current_user.is_authenticated and current_user.level == 3 else "none"},
+                       title="Migração de dados — atualiza record_type em registros antigos"),
                 ], className="w-100")
             ], width=12, md=6, className="text-end")
         ], className="mb-4 align-items-center"),
