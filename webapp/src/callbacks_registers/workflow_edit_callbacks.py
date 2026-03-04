@@ -37,7 +37,6 @@ def register_edit_callbacks(app):
         [
             Input({"type": "btn-edit-pend", "index": ALL}, "n_clicks"),
             Input("edit-pend-cancel-btn", "n_clicks"),
-            Input("edit-pend-submit-btn", "n_clicks")
         ],
         [
             State("user-level-store", "data"),
@@ -46,7 +45,7 @@ def register_edit_callbacks(app):
         ],
         prevent_initial_call=True
     )
-    def toggle_edit_modal(edit_clicks, cancel_clicks, submit_clicks,
+    def toggle_edit_modal(edit_clicks, cancel_clicks,
                          user_level, username, historico_data):
         """Abre/fecha modal de edição."""
         ctx = callback_context
@@ -56,8 +55,8 @@ def register_edit_callbacks(app):
 
         trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
-        # Fechar modal (limpar todos os campos)
-        if "cancel" in trigger_id or "submit" in trigger_id:
+        # Fechar modal e limpar campos apenas no cancelamento
+        if "cancel" in trigger_id:
             return False, "", "", None, None, None, "", None, None, None, "", ""
 
         # Verificar se é um clique válido nos botões de editar
