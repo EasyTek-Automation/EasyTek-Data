@@ -13,6 +13,7 @@ from src.utils.workflow_db import (
     deletar_pendencia,
     TIPOS_REQUEREM_APROVACAO
 )
+from src.callbacks_registers.workflow_callbacks import reconstruir_tabela_com_filtros
 
 
 def register_edit_callbacks(app):
@@ -187,12 +188,14 @@ def register_edit_callbacks(app):
             State("edit-pend-original-data", "data"),
             State("user-level-store", "data"),
             State("user-perfil-store", "data"),
-            State("user-username-store", "data")
+            State("user-username-store", "data"),
+            State("store-filtros-ativos", "data")
         ],
         prevent_initial_call=True
     )
     def salvar_edicao_pendencia(n_clicks, nova_desc, novo_resp, novo_status, tipo_evento, observacoes,
-                                horas, aprovador, nota_gam, original_data, user_level, user_perfil, username):
+                                horas, aprovador, nota_gam, original_data, user_level, user_perfil, username,
+                                filtros):
         """Valida e salva edições da pendência."""
         if not n_clicks or not original_data:
             return no_update, no_update, no_update, no_update, no_update, no_update
@@ -320,11 +323,11 @@ def register_edit_callbacks(app):
 
         if sucesso:
             # Recarregar tabela E histórico
-            from src.pages.workflow.dashboard import carregar_dados_csv, criar_tabela_pendencias
+            from src.pages.workflow.dashboard import carregar_dados_csv
             df_pend, df_hist = carregar_dados_csv()
-            nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
-                                                  user_level=user_level or 1,
-                                                  username_atual=username)
+            nova_tabela, store_data = reconstruir_tabela_com_filtros(
+                df_pend, df_hist, filtros, user_level, username
+            )
 
             return (
                 False,  # Fechar modal
@@ -334,7 +337,7 @@ def register_edit_callbacks(app):
                     mensagem
                 ], color="success", dismissable=True, duration=7000),
                 nova_tabela,
-                df_pend.to_dict('records'),
+                store_data,
                 df_hist.to_dict('records')  # Atualizar histórico também
             )
         else:
@@ -413,9 +416,10 @@ def register_edit_callbacks(app):
         ],
         Input("delete-confirm-submit-btn", "n_clicks"),
         State("edit-pend-id-display", "children"),
+        State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
-    def deletar_pendencia_callback(n_clicks, pend_id):
+    def deletar_pendencia_callback(n_clicks, pend_id, filtros):
         """Deleta a pendência após confirmação."""
         if not n_clicks:
             return no_update, no_update, no_update, no_update, no_update, no_update
@@ -424,16 +428,14 @@ def register_edit_callbacks(app):
         sucesso, mensagem = deletar_pendencia(pend_id)
 
         if sucesso:
-            # Recarregar tabela e histórico
-            from src.pages.workflow.dashboard import carregar_dados_csv, criar_tabela_pendencias
-            from src.database.connection import get_mongo_connection as _get_mc
+            from src.pages.workflow.dashboard import carregar_dados_csv
             from flask_login import current_user as _cu
             df_pend, df_hist = carregar_dados_csv()
             _ul = _cu.level if _cu.is_authenticated else 1
             _un = _cu.username if _cu.is_authenticated else None
-            nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
-                                                  user_level=_ul,
-                                                  username_atual=_un)
+            nova_tabela, store_data = reconstruir_tabela_com_filtros(
+                df_pend, df_hist, filtros, _ul, _un
+            )
 
             return (
                 False,  # Fechar modal de edição
@@ -443,7 +445,7 @@ def register_edit_callbacks(app):
                     mensagem
                 ], color="success", dismissable=True, duration=7000),
                 nova_tabela,
-                df_pend.to_dict('records') if df_pend is not None else [],
+                store_data,
                 df_hist.to_dict('records') if df_hist is not None else []
             )
         else:

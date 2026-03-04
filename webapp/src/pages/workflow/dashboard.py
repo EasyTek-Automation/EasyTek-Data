@@ -341,12 +341,19 @@ def criar_painel_filtros():
 
                 dbc.Col([
                     html.Label("\u00a0", className="fw-bold mb-2 d-block"),
-                    dbc.Button(
-                        "Aplicar Filtros",
-                        id="btn-aplicar-filtros",
-                        color="primary",
-                        className="w-100"
-                    )
+                    dbc.ButtonGroup([
+                        dbc.Button(
+                            "Aplicar Filtros",
+                            id="btn-aplicar-filtros",
+                            color="primary",
+                        ),
+                        dbc.Button(
+                            [html.I(className="fas fa-times me-1"), "Limpar"],
+                            id="btn-limpar-filtros",
+                            color="secondary",
+                            outline=True,
+                        ),
+                    ], className="w-100")
                 ], width=12, md=3)
             ])
         ])
@@ -841,6 +848,9 @@ def layout():
 
         # Store para hist_id pendente de confirmação de conclusão
         dcc.Store(id="store-subtarefa-concluir-pending"),
+
+        # Store para filtros ativos (preserva filtros durante ações)
+        dcc.Store(id="store-filtros-ativos"),
 
         # Modais
         create_pendencia_modal(),

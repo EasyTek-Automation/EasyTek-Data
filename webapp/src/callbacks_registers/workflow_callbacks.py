@@ -103,6 +103,40 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
     return df_filtrado
 
 
+def reconstruir_tabela_com_filtros(df_pendencias, df_historico, filtros, user_level, username):
+    """
+    Reconstrói a tabela aplicando os filtros ativos do store.
+
+    Args:
+        df_pendencias: DataFrame completo de pendências (já recarregado do banco)
+        df_historico: DataFrame de histórico
+        filtros: dict com chaves responsavel/status/busca/status_aceite, ou None
+        user_level: nível do usuário
+        username: username do usuário
+
+    Returns:
+        tuple: (tabela_html, store_pendencias_data)
+    """
+    if filtros:
+        df_filtrado = aplicar_filtros_dataframe(
+            df_pendencias,
+            filtros.get("responsavel", "todos"),
+            filtros.get("status"),
+            filtros.get("busca"),
+            filtros.get("status_aceite")
+        )
+    else:
+        df_filtrado = df_pendencias
+
+    nova_tabela = criar_tabela_pendencias(
+        df_filtrado, df_historico,
+        user_level=user_level or 1,
+        username_atual=username
+    )
+    store_data = df_filtrado.to_dict('records') if df_filtrado is not None else []
+    return nova_tabela, store_data
+
+
 # ======================================================================================
 # REGISTRO DE CALLBACKS
 # ======================================================================================
@@ -167,6 +201,7 @@ def register_workflow_callbacks(app):
     @app.callback(
         Output("container-tabela", "children"),
         Output("store-pendencias", "data"),
+        Output("store-filtros-ativos", "data"),
         Input("btn-aplicar-filtros", "n_clicks"),
         State("filtro-responsavel", "value"),
         State("filtro-status", "value"),
@@ -185,16 +220,18 @@ def register_workflow_callbacks(app):
         df_pendencias, df_historico = carregar_dados_csv()
 
         if df_pendencias is None or df_pendencias.empty:
-            return html.Div("Erro ao carregar dados.", className="text-danger"), []
+            return html.Div("Erro ao carregar dados.", className="text-danger"), [], None
 
-        df_filtrado = aplicar_filtros_dataframe(
-            df_pendencias, responsavel, status_list, busca, status_aceite_list
+        filtros = {
+            "responsavel": responsavel,
+            "status": status_list,
+            "busca": busca,
+            "status_aceite": status_aceite_list
+        }
+        nova_tabela, store_data = reconstruir_tabela_com_filtros(
+            df_pendencias, df_historico, filtros, user_level, username_atual
         )
-        nova_tabela = criar_tabela_pendencias(df_filtrado, df_historico,
-                                              user_level=user_level or 1,
-                                              username_atual=username_atual)
-
-        return nova_tabela, df_filtrado.to_dict('records')
+        return nova_tabela, store_data, filtros
 
 
     # ==================================================================================
@@ -207,10 +244,11 @@ def register_workflow_callbacks(app):
         Input("btn-refresh", "n_clicks"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
+        State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
-    def refresh_dados(n_clicks, user_level, username_atual):
-        """Recarrega os dados e reconstrói a tabela."""
+    def refresh_dados(n_clicks, user_level, username_atual, filtros):
+        """Recarrega os dados e reconstrói a tabela preservando filtros ativos."""
         if not n_clicks:
             raise PreventUpdate
 
@@ -219,15 +257,10 @@ def register_workflow_callbacks(app):
         if df_pendencias is None or df_historico is None:
             return html.Div("Erro ao carregar dados.", className="text-danger"), [], []
 
-        nova_tabela = criar_tabela_pendencias(df_pendencias, df_historico,
-                                              user_level=user_level or 1,
-                                              username_atual=username_atual)
-
-        return (
-            nova_tabela,
-            df_pendencias.to_dict('records'),
-            df_historico.to_dict('records')
+        nova_tabela, store_data = reconstruir_tabela_com_filtros(
+            df_pendencias, df_historico, filtros, user_level, username_atual
         )
+        return nova_tabela, store_data, df_historico.to_dict('records')
 
 
     # ==================================================================================
@@ -338,9 +371,10 @@ def register_workflow_callbacks(app):
         State("store-subtarefa-concluir-pending", "data"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
+        State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
-    def confirmar_concluir_subtarefa(n_clicks, hist_id, user_level, username_atual):
+    def confirmar_concluir_subtarefa(n_clicks, hist_id, user_level, username_atual, filtros):
         """Marca a subatividade como concluída após confirmação."""
         if not n_clicks or not hist_id:
             raise PreventUpdate
@@ -350,9 +384,9 @@ def register_workflow_callbacks(app):
         sucesso = marcar_subtarefa_concluida(hist_id)
 
         df_pend, df_hist = carregar_dados_csv()
-        nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
-                                              user_level=user_level or 1,
-                                              username_atual=username_atual)
+        nova_tabela, store_data = reconstruir_tabela_com_filtros(
+            df_pend, df_hist, filtros, user_level, username_atual
+        )
 
         if sucesso:
             alerta = dbc.Alert([
@@ -367,7 +401,7 @@ def register_workflow_callbacks(app):
 
         return (
             nova_tabela,
-            df_pend.to_dict('records') if df_pend is not None else [],
+            store_data,
             df_hist.to_dict('records') if df_hist is not None else [],
             alerta,
             False  # Fechar modal
@@ -385,9 +419,10 @@ def register_workflow_callbacks(app):
         Input({"type": "btn-aprovar", "index": ALL}, "n_clicks"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
+        State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
-    def aprovar_subtarefa(n_clicks, user_level, username_atual):
+    def aprovar_subtarefa(n_clicks, user_level, username_atual, filtros):
         """Aprova uma subatividade pendente de aprovação."""
         ctx = callback_context
         if not ctx.triggered or not any(c for c in n_clicks if c):
@@ -401,9 +436,9 @@ def register_workflow_callbacks(app):
 
         sucesso = aprovar_ou_rejeitar(hist_id, 'aprovado')
         df_pend, df_hist = carregar_dados_csv()
-        nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
-                                              user_level=user_level or 1,
-                                              username_atual=username_atual)
+        nova_tabela, store_data = reconstruir_tabela_com_filtros(
+            df_pend, df_hist, filtros, user_level, username_atual
+        )
 
         if sucesso:
             alerta = dbc.Alert([
@@ -418,7 +453,7 @@ def register_workflow_callbacks(app):
 
         return (
             nova_tabela,
-            df_pend.to_dict('records') if df_pend is not None else [],
+            store_data,
             df_hist.to_dict('records') if df_hist is not None else [],
             alerta
         )
@@ -435,9 +470,10 @@ def register_workflow_callbacks(app):
         Input({"type": "btn-rejeitar", "index": ALL}, "n_clicks"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
+        State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
-    def rejeitar_subtarefa(n_clicks, user_level, username_atual):
+    def rejeitar_subtarefa(n_clicks, user_level, username_atual, filtros):
         """Rejeita uma subatividade pendente de aprovação."""
         ctx = callback_context
         if not ctx.triggered or not any(c for c in n_clicks if c):
@@ -451,9 +487,9 @@ def register_workflow_callbacks(app):
 
         sucesso = aprovar_ou_rejeitar(hist_id, 'rejeitado')
         df_pend, df_hist = carregar_dados_csv()
-        nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
-                                              user_level=user_level or 1,
-                                              username_atual=username_atual)
+        nova_tabela, store_data = reconstruir_tabela_com_filtros(
+            df_pend, df_hist, filtros, user_level, username_atual
+        )
 
         if sucesso:
             alerta = dbc.Alert([
@@ -468,7 +504,7 @@ def register_workflow_callbacks(app):
 
         return (
             nova_tabela,
-            df_pend.to_dict('records') if df_pend is not None else [],
+            store_data,
             df_hist.to_dict('records') if df_hist is not None else [],
             alerta
         )
@@ -486,9 +522,10 @@ def register_workflow_callbacks(app):
         Input({"type": "btn-aceitar-tarefa", "index": ALL}, "n_clicks"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
+        State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
-    def aceitar_tarefa_callback(n_clicks, user_level, username_atual):
+    def aceitar_tarefa_callback(n_clicks, user_level, username_atual, filtros):
         """Aceita uma tarefa designada ao responsável."""
         ctx = callback_context
         if not ctx.triggered or not any(c for c in n_clicks if c):
@@ -502,9 +539,9 @@ def register_workflow_callbacks(app):
 
         sucesso, mensagem = _aceitar(pend_id, username_atual or '')
         df_pend, df_hist = carregar_dados_csv()
-        nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
-                                              user_level=user_level or 1,
-                                              username_atual=username_atual)
+        nova_tabela, store_data = reconstruir_tabela_com_filtros(
+            df_pend, df_hist, filtros, user_level, username_atual
+        )
         novos_kpis = criar_cards_kpi(df_pend, df_hist, username_atual)
 
         if sucesso:
@@ -520,10 +557,48 @@ def register_workflow_callbacks(app):
 
         return (
             nova_tabela,
-            df_pend.to_dict('records') if df_pend is not None else [],
+            store_data,
             df_hist.to_dict('records') if df_hist is not None else [],
             alerta,
             novos_kpis
+        )
+
+
+    # ==================================================================================
+    # CALLBACK 12: Limpar filtros
+    # ==================================================================================
+    @app.callback(
+        Output("filtro-responsavel", "value"),
+        Output("filtro-status", "value"),
+        Output("filtro-busca", "value"),
+        Output("filtro-status-aceite", "value"),
+        Output("store-filtros-ativos", "data", allow_duplicate=True),
+        Output("container-tabela", "children", allow_duplicate=True),
+        Output("store-pendencias", "data", allow_duplicate=True),
+        Input("btn-limpar-filtros", "n_clicks"),
+        State("user-level-store", "data"),
+        State("user-username-store", "data"),
+        prevent_initial_call=True
+    )
+    def limpar_filtros(n_clicks, user_level, username_atual):
+        """Limpa todos os filtros e reexibe todas as pendências."""
+        if not n_clicks:
+            raise PreventUpdate
+
+        df_pendencias, df_historico = carregar_dados_csv()
+        if df_pendencias is None:
+            raise PreventUpdate
+
+        nova_tabela = criar_tabela_pendencias(
+            df_pendencias, df_historico,
+            user_level=user_level or 1,
+            username_atual=username_atual
+        )
+        return (
+            "todos", [], "", [],   # resetar UI dos filtros
+            None,                  # limpar store de filtros
+            nova_tabela,
+            df_pendencias.to_dict('records')
         )
 
 
@@ -539,9 +614,10 @@ def register_workflow_callbacks(app):
         Input({"type": "btn-rejeitar-tarefa-aceite", "index": ALL}, "n_clicks"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
+        State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
-    def rejeitar_tarefa_aceite_callback(n_clicks, user_level, username_atual):
+    def rejeitar_tarefa_aceite_callback(n_clicks, user_level, username_atual, filtros):
         """Rejeita a designação de uma tarefa (responsável recusa)."""
         ctx = callback_context
         if not ctx.triggered or not any(c for c in n_clicks if c):
@@ -555,9 +631,9 @@ def register_workflow_callbacks(app):
 
         sucesso, mensagem = _rejeitar(pend_id, username_atual or '')
         df_pend, df_hist = carregar_dados_csv()
-        nova_tabela = criar_tabela_pendencias(df_pend, df_hist,
-                                              user_level=user_level or 1,
-                                              username_atual=username_atual)
+        nova_tabela, store_data = reconstruir_tabela_com_filtros(
+            df_pend, df_hist, filtros, user_level, username_atual
+        )
         novos_kpis = criar_cards_kpi(df_pend, df_hist, username_atual)
 
         if sucesso:
@@ -573,7 +649,7 @@ def register_workflow_callbacks(app):
 
         return (
             nova_tabela,
-            df_pend.to_dict('records') if df_pend is not None else [],
+            store_data,
             df_hist.to_dict('records') if df_hist is not None else [],
             alerta,
             novos_kpis
