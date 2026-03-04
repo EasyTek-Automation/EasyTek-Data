@@ -62,14 +62,22 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
         horas_raw = item.get('horas')
         aprovador = item.get('aprovador')
         status_aprovacao = item.get('status_aprovacao')
-        descricao = item.get('descricao', '')
+        # titulo tem prioridade; fallback para descricao (retrocompat)
+        titulo = item.get('titulo') or item.get('descricao', '') or ''
+        tipo_evento = item.get('tipo_evento', '')
         editado_por = item.get('editado_por') or item.get('responsavel', '')
         data = item.get('data', '')
         observacoes = (item.get('observacoes') or '').strip()
 
-        # Contar logs vinculados a esta subtarefa
-        n_logs = len([h for h in historico_items
-                      if h.get('record_type') == 'log' and h.get('subtarefa_id') == hist_id])
+        # Contar logs vinculados a esta subtarefa e somar horas dos logs
+        logs_da_sub = [h for h in historico_items
+                       if h.get('record_type') == 'log' and h.get('subtarefa_id') == hist_id]
+        n_logs = len(logs_da_sub)
+        horas_logs = sum(
+            float(h.get('horas') or 0)
+            for h in logs_da_sub
+            if h.get('horas') is not None and str(h.get('horas')) != 'nan'
+        )
 
         try:
             horas_val = float(horas_raw) if horas_raw is not None and str(horas_raw) != 'nan' else None
@@ -92,6 +100,10 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
 
         # Badges de estado
         badges = []
+        # Tipo de evento como badge primário (categoria)
+        if tipo_evento and tipo_evento not in ('criacao', 'log', 'atualizacao_workflow'):
+            badges.append(dbc.Badge(tipo_evento, color="secondary", className="me-1",
+                                    style={"fontWeight": "400"}))
         if concluido:
             badges.append(dbc.Badge("Concluída", color="success", className="me-1"))
         if status_aprovacao == 'pendente':
@@ -101,12 +113,16 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
         elif status_aprovacao == 'rejeitado':
             badges.append(dbc.Badge("Rejeitado", color="danger", className="me-1"))
         if n_logs > 0:
+            # Mostrar total de horas dos relatórios se houver
+            horas_label = ""
+            if horas_logs > 0:
+                horas_label = f" · {int(horas_logs)}h" if horas_logs == int(horas_logs) else f" · {horas_logs:.1f}h"
             badges.append(dbc.Badge(
-                [html.I(className="fas fa-file-alt me-1"), f"{n_logs} relatório(s)"],
+                [html.I(className="fas fa-file-alt me-1"), f"{n_logs} relatório(s){horas_label}"],
                 color="info", className="me-1"
             ))
 
-        # Meta info
+        # Meta info (horas legado na subtarefa — retrocompat)
         horas_fmt = None
         if horas_val:
             horas_fmt = f"{int(horas_val)}h" if horas_val == int(horas_val) else f"{horas_val:.1f}h"
@@ -185,7 +201,7 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                 html.Div([
                     html.Div([
                         html.Span(
-                            descricao,
+                            titulo,
                             className="fw-semibold me-2" + (" text-muted" if concluido else ""),
                             style={"textDecoration": "line-through" if concluido else "none",
                                    "fontSize": "0.95rem"}
@@ -244,6 +260,7 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
 
         historico_items.append({
             'hist_id': row.get('hist_id', ''),
+            'titulo': _str_or_none(row.get('titulo')) or row['descricao'],
             'descricao': row['descricao'],
             'observacoes': row.get('observacoes', '') or '',
             'alteracoes': row.get('alteracoes', '') or '',
@@ -254,6 +271,7 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
             'concluido': concluido_val,
             'aprovador': _str_or_none(row.get('aprovador')),
             'status_aprovacao': _str_or_none(row.get('status_aprovacao')),
+            'tipo_evento': _str_or_none(row.get('tipo_evento')) or '',
             'record_type': row.get('record_type', 'subtarefa') or 'subtarefa',
             'subtarefa_id': _str_or_none(row.get('subtarefa_id')),
         })

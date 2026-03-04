@@ -55,9 +55,9 @@ def register_subtask_callbacks(app):
     # ==============================================================================
     @app.callback(
         Output("create-subtask-modal", "is_open", allow_duplicate=True),
+        Output("create-subtask-titulo", "value"),
         Output("create-subtask-tipo", "value"),
         Output("create-subtask-responsavel", "value"),
-        Output("create-subtask-horas", "value"),
         Output("create-subtask-obs", "value"),
         Output("create-subtask-aprovador", "value"),
         Output("create-subtask-alert", "children"),
@@ -67,7 +67,7 @@ def register_subtask_callbacks(app):
     def fechar_create_subtask_modal(n_clicks):
         if not n_clicks:
             raise PreventUpdate
-        return False, None, None, None, "", None, ""
+        return False, "", None, None, "", None, ""
 
     # ==============================================================================
     # CB3: Mostrar/ocultar campo aprovador no create-subtask-modal
@@ -109,9 +109,9 @@ def register_subtask_callbacks(app):
         Output("store-pendencias", "data", allow_duplicate=True),
         Output("store-historico", "data", allow_duplicate=True),
         Input("create-subtask-submit-btn", "n_clicks"),
+        State("create-subtask-titulo", "value"),
         State("create-subtask-tipo", "value"),
         State("create-subtask-responsavel", "value"),
-        State("create-subtask-horas", "value"),
         State("create-subtask-obs", "value"),
         State("create-subtask-aprovador", "value"),
         State("store-subtask-context", "data"),
@@ -120,7 +120,7 @@ def register_subtask_callbacks(app):
         State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
-    def submeter_create_subtask(n_clicks, tipo, responsavel, horas, obs, aprovador,
+    def submeter_create_subtask(n_clicks, titulo, tipo, responsavel, obs, aprovador,
                                 context, username, user_level, filtros):
         if not n_clicks:
             raise PreventUpdate
@@ -130,6 +130,10 @@ def register_subtask_callbacks(app):
             raise PreventUpdate
 
         # Validações
+        if not titulo or not titulo.strip():
+            return (True,
+                    dbc.Alert("O título é obrigatório.", color="warning"),
+                    no_update, no_update, no_update, no_update)
         if not tipo:
             return (True,
                     dbc.Alert("Selecione o tipo de evento.", color="warning"),
@@ -138,22 +142,17 @@ def register_subtask_callbacks(app):
             return (True,
                     dbc.Alert("Selecione o responsável.", color="warning"),
                     no_update, no_update, no_update, no_update)
-        if not obs or not obs.strip():
-            return (True,
-                    dbc.Alert("Observações são obrigatórias.", color="warning"),
-                    no_update, no_update, no_update, no_update)
         if tipo in TIPOS_REQUEREM_APROVACAO and not aprovador:
             return (True,
                     dbc.Alert(f"O tipo '{tipo}' requer aprovador.", color="warning"),
                     no_update, no_update, no_update, no_update)
 
-        horas_val = float(horas) if horas is not None else None
         sucesso, mensagem = criar_subtarefa(
             pend_id=pend_id,
-            descricao=tipo,
+            titulo=titulo.strip(),
+            tipo_evento=tipo,
             responsavel=responsavel,
-            horas=horas_val,
-            observacoes=obs.strip(),
+            observacoes=obs.strip() if obs else '',
             editado_por=username or '',
             aprovador=aprovador if tipo in TIPOS_REQUEREM_APROVACAO else None
         )
@@ -206,7 +205,8 @@ def register_subtask_callbacks(app):
             df = pd.DataFrame(historico_data)
             match = df[df['hist_id'] == hist_id]
             if not match.empty:
-                titulo = match.iloc[0].get('descricao', hist_id)
+                row = match.iloc[0]
+                titulo = row.get('titulo') or row.get('descricao', hist_id) or hist_id
 
         pend_id = (context or {}).get("pend_id", "")
         novo_context = {"pend_id": pend_id, "subtarefa_id": hist_id}
@@ -219,6 +219,7 @@ def register_subtask_callbacks(app):
     @app.callback(
         Output("add-log-modal", "is_open", allow_duplicate=True),
         Output("add-log-obs", "value"),
+        Output("add-log-horas", "value"),
         Output("add-log-alert", "children"),
         Input("add-log-cancel-btn", "n_clicks"),
         prevent_initial_call=True
@@ -226,7 +227,7 @@ def register_subtask_callbacks(app):
     def fechar_add_log_modal(n_clicks):
         if not n_clicks:
             raise PreventUpdate
-        return False, "", ""
+        return False, "", None, ""
 
     # ==============================================================================
     # CB8: Submeter novo log
@@ -240,13 +241,14 @@ def register_subtask_callbacks(app):
         Output("store-historico", "data", allow_duplicate=True),
         Input("add-log-submit-btn", "n_clicks"),
         State("add-log-obs", "value"),
+        State("add-log-horas", "value"),
         State("store-subtask-context", "data"),
         State("user-username-store", "data"),
         State("user-level-store", "data"),
         State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
-    def submeter_add_log(n_clicks, obs, context, username, user_level, filtros):
+    def submeter_add_log(n_clicks, obs, horas, context, username, user_level, filtros):
         if not n_clicks:
             raise PreventUpdate
 
@@ -262,11 +264,13 @@ def register_subtask_callbacks(app):
                     dbc.Alert("O relatório não pode estar vazio.", color="warning"),
                     no_update, no_update, no_update, no_update)
 
+        horas_val = float(horas) if horas is not None else None
         sucesso, mensagem = adicionar_log(
             subtarefa_hist_id=subtarefa_id,
             pend_id=pend_id,
             observacoes=obs.strip(),
-            editado_por=username or ''
+            editado_por=username or '',
+            horas=horas_val
         )
 
         from src.pages.workflow.dashboard import carregar_dados_csv
@@ -296,8 +300,8 @@ def register_subtask_callbacks(app):
     @app.callback(
         Output("edit-subtask-modal", "is_open"),
         Output("edit-subtask-hist-id", "data"),
+        Output("edit-subtask-titulo", "value"),
         Output("edit-subtask-tipo", "value"),
-        Output("edit-subtask-horas", "value"),
         Output("edit-subtask-obs", "value"),
         Output("edit-subtask-concluido", "value"),
         Input({"type": "btn-edit-subtarefa", "index": ALL}, "n_clicks"),
@@ -314,8 +318,8 @@ def register_subtask_callbacks(app):
         hist_id = id_dict['index']
 
         # Buscar dados da subtarefa
+        titulo_val = ""
         tipo_val = None
-        horas_val = None
         obs_val = ""
         concluido_val = False
 
@@ -324,16 +328,12 @@ def register_subtask_callbacks(app):
             match = df[df['hist_id'] == hist_id]
             if not match.empty:
                 row = match.iloc[0]
-                tipo_val = row.get('descricao')
-                horas_raw = row.get('horas')
-                try:
-                    horas_val = float(horas_raw) if horas_raw is not None and str(horas_raw) != 'nan' else None
-                except (ValueError, TypeError):
-                    horas_val = None
+                titulo_val = row.get('titulo') or row.get('descricao', '') or ''
+                tipo_val = row.get('tipo_evento')
                 obs_val = row.get('observacoes', '') or ''
                 concluido_val = row.get('concluido') is True
 
-        return True, hist_id, tipo_val, horas_val, obs_val, concluido_val
+        return True, hist_id, titulo_val, tipo_val, obs_val, concluido_val
 
     # ==============================================================================
     # CB10: Fechar edit-subtask-modal (Cancelar)
@@ -361,8 +361,8 @@ def register_subtask_callbacks(app):
         Output("store-historico", "data", allow_duplicate=True),
         Input("edit-subtask-submit-btn", "n_clicks"),
         State("edit-subtask-hist-id", "data"),
+        State("edit-subtask-titulo", "value"),
         State("edit-subtask-tipo", "value"),
-        State("edit-subtask-horas", "value"),
         State("edit-subtask-obs", "value"),
         State("edit-subtask-concluido", "value"),
         State("user-username-store", "data"),
@@ -370,18 +370,17 @@ def register_subtask_callbacks(app):
         State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
-    def submeter_edit_subtask(n_clicks, hist_id, tipo, horas, obs, concluido,
+    def submeter_edit_subtask(n_clicks, hist_id, titulo, tipo, obs, concluido,
                               username, user_level, filtros):
         if not n_clicks or not hist_id:
             raise PreventUpdate
 
-        horas_val = float(horas) if horas is not None else None
         obs_val = obs.strip() if obs else None
 
         sucesso, mensagem = editar_subtarefa(
             hist_id=hist_id,
-            descricao=tipo if tipo else None,
-            horas=horas_val,
+            titulo=titulo.strip() if titulo else None,
+            tipo_evento=tipo if tipo else None,
             observacoes=obs_val,
             concluido=bool(concluido) if concluido is not None else None
         )

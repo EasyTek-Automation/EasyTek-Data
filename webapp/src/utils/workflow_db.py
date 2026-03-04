@@ -602,17 +602,17 @@ def rejeitar_tarefa(pend_id, username):
         return False, str(e)
 
 
-def criar_subtarefa(pend_id, descricao, responsavel, horas, observacoes,
+def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
                     editado_por, aprovador=None):
     """
     Cria nova subtarefa (record_type='subtarefa') no histórico.
 
     Args:
         pend_id: ID da pendência
-        descricao: Tipo/título da subtarefa
+        titulo: Título livre da subtarefa
+        tipo_evento: Categoria/tipo do evento (dropdown)
         responsavel: Username do responsável
-        horas: Horas estimadas/gastas (float ou None)
-        observacoes: Detalhes obrigatórios
+        observacoes: Detalhes opcionais
         editado_por: Username de quem está criando
         aprovador: Username do aprovador (opcional)
 
@@ -630,14 +630,15 @@ def criar_subtarefa(pend_id, descricao, responsavel, horas, observacoes,
 
         doc = {
             'MaintenanceWF_id': pend_id,
-            'descricao': descricao,
+            'titulo': titulo,
+            'descricao': titulo,  # mantido para retrocompat de display
             'data': agora,
             'responsavel': responsavel,
-            'tipo_evento': descricao,
+            'tipo_evento': tipo_evento,
             'editado_por': editado_por,
-            'observacoes': observacoes,
+            'observacoes': observacoes or '',
             'alteracoes': '',
-            'horas': horas,
+            'horas': None,  # horas registradas nos logs/relatórios
             'concluido': False,
             'aprovador': aprovador,
             'status_aprovacao': 'pendente' if aprovador else None,
@@ -658,7 +659,7 @@ def criar_subtarefa(pend_id, descricao, responsavel, horas, observacoes,
         return False, str(e)
 
 
-def adicionar_log(subtarefa_hist_id, pend_id, observacoes, editado_por):
+def adicionar_log(subtarefa_hist_id, pend_id, observacoes, editado_por, horas=None):
     """
     Adiciona log (relatório) a uma subtarefa existente.
 
@@ -667,6 +668,7 @@ def adicionar_log(subtarefa_hist_id, pend_id, observacoes, editado_por):
         pend_id: ID da pendência
         observacoes: Texto do relatório (obrigatório)
         editado_por: Username de quem está registrando
+        horas: Horas trabalhadas neste relatório (opcional)
 
     Returns:
         tuple: (sucesso: bool, mensagem: str)
@@ -685,7 +687,7 @@ def adicionar_log(subtarefa_hist_id, pend_id, observacoes, editado_por):
             'editado_por': editado_por,
             'observacoes': observacoes,
             'alteracoes': '',
-            'horas': None,
+            'horas': horas,
             'concluido': False,
             'aprovador': None,
             'status_aprovacao': None,
@@ -706,14 +708,14 @@ def adicionar_log(subtarefa_hist_id, pend_id, observacoes, editado_por):
         return False, str(e)
 
 
-def editar_subtarefa(hist_id, descricao=None, horas=None, observacoes=None, concluido=None):
+def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, concluido=None):
     """
     Edita campos de uma subtarefa existente.
 
     Args:
         hist_id: ObjectId string da subtarefa
-        descricao: Novo título/tipo (ou None para não alterar)
-        horas: Novas horas (ou None para não alterar)
+        titulo: Novo título livre (ou None para não alterar)
+        tipo_evento: Novo tipo de evento (ou None para não alterar)
         observacoes: Novas observações (ou None para não alterar)
         concluido: Novo status de conclusão (ou None para não alterar)
 
@@ -724,11 +726,11 @@ def editar_subtarefa(hist_id, descricao=None, horas=None, observacoes=None, conc
         collection = get_mongo_connection(COLLECTION_HISTORICO)
 
         updates = {}
-        if descricao is not None:
-            updates['descricao'] = descricao
-            updates['tipo_evento'] = descricao
-        if horas is not None:
-            updates['horas'] = horas
+        if titulo is not None:
+            updates['titulo'] = titulo
+            updates['descricao'] = titulo  # mantém retrocompat
+        if tipo_evento is not None:
+            updates['tipo_evento'] = tipo_evento
         if observacoes is not None:
             updates['observacoes'] = observacoes
         if concluido is not None:

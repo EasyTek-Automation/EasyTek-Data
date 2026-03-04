@@ -81,13 +81,16 @@ def criar_barra_horas_inline(historico_items):
     """
     PALETA = ['primary', 'success', 'info', 'warning', 'danger', 'secondary']
 
-    # Agrupar por tipo de evento (descricao) e somar horas
+    # Agrupar por título/tipo e somar horas (apenas subtarefas e logs, excluindo criacao)
     grupos = {}
     for item in historico_items:
+        if item.get('record_type', 'subtarefa') == 'criacao':
+            continue
         h = item.get('horas')
         try:
             if h is not None and str(h) != 'nan' and float(h) > 0:
-                desc = item.get('descricao', 'Sem descrição') or 'Sem descrição'
+                # Para logs: agrupar pelo título da subtarefa pai (descricao); para subtarefas: usar titulo ou descricao
+                desc = item.get('titulo') or item.get('descricao', 'Sem título') or 'Sem título'
                 grupos[desc] = grupos.get(desc, 0.0) + float(h)
         except (ValueError, TypeError):
             pass
@@ -184,7 +187,9 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
         ]['id'])
         col_id = 'pendencia_id' if 'pendencia_id' in df_historico.columns else 'MaintenanceWF_id'
         mask_ativas = df_historico[col_id].isin(ids_ativas)
-        if 'tipo_evento' in df_historico.columns:
+        if 'record_type' in df_historico.columns:
+            mask_ativas = mask_ativas & (df_historico['record_type'] == 'subtarefa')
+        elif 'tipo_evento' in df_historico.columns:
             mask_ativas = mask_ativas & (df_historico['tipo_evento'] != 'criacao')
         hist_ativas = df_historico[mask_ativas]
         if not hist_ativas.empty:
@@ -567,9 +572,9 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
     if historico_pendencia:
         barra_horas = criar_barra_horas_inline(historico_pendencia)
 
-    # Célula de progresso dedicada
+    # Célula de progresso dedicada (apenas subtarefas, excluindo logs e registros de criação)
     sub_reais = [h for h in (historico_pendencia or [])
-                 if h.get('tipo_evento', '') != 'criacao']
+                 if h.get('record_type', 'subtarefa') == 'subtarefa']
     if sub_reais:
         total_sub = len(sub_reais)
         concluidas_sub = sum(1 for h in sub_reais if h.get('concluido') is True)

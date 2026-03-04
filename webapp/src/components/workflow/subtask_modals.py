@@ -28,7 +28,17 @@ def create_subtask_modal():
         ])),
 
         dbc.ModalBody([
-            # Tipo de evento
+            # Título (personalizável, obrigatório)
+            html.Label("Título:", className="fw-bold mb-1"),
+            html.Span(" *", className="text-danger"),
+            dbc.Input(
+                id="create-subtask-titulo",
+                type="text",
+                placeholder="Ex: Verificar rolamento do motor A",
+                className="mb-3"
+            ),
+
+            # Tipo de evento (categoria, obrigatório)
             html.Label("Tipo de Evento:", className="fw-bold mb-1"),
             html.Span(" *", className="text-danger"),
             dcc.Dropdown(
@@ -67,27 +77,14 @@ def create_subtask_modal():
                 ),
             ], id="create-subtask-aprovador-container", style={"display": "none"}),
 
-            # Horas (opcional)
-            html.Label("Horas trabalhadas:", className="fw-bold mb-1"),
-            html.Span(" (opcional)", className="text-muted small"),
-            dbc.Input(
-                id="create-subtask-horas",
-                type="number",
-                min=0,
-                step=0.5,
-                placeholder="Ex: 2.5",
-                className="mb-3"
-            ),
-
-            # Observações (obrigatório)
+            # Observações (opcional)
             html.Label("Observações:", className="fw-bold mb-1"),
-            html.Span(" *", className="text-danger"),
+            html.Span(" (opcional)", className="text-muted small"),
             dbc.Textarea(
                 id="create-subtask-obs",
-                placeholder="Descreva o trabalho a ser realizado...",
+                placeholder="Informações adicionais sobre esta subtarefa...",
                 rows=3,
-                className="mb-3",
-                required=True
+                className="mb-3"
             ),
 
             # Alerta
@@ -125,12 +122,12 @@ def add_log_modal():
                 html.Small("Subtarefa:", className="text-muted"),
                 html.Div(
                     id="add-log-subtarefa-titulo",
-                    className="fw-semibold mb-3"
+                    className="fw-semibold"
                 )
             ], className="p-2 mb-3 rounded",
                style={"backgroundColor": "rgba(0,0,0,0.04)", "borderLeft": "3px solid var(--bs-primary)"}),
 
-            # Observações (obrigatório)
+            # Relatório (obrigatório)
             html.Label("Relatório:", className="fw-bold mb-1"),
             html.Span(" *", className="text-danger"),
             dbc.Textarea(
@@ -139,6 +136,18 @@ def add_log_modal():
                 rows=4,
                 className="mb-3",
                 required=True
+            ),
+
+            # Horas (opcional — transferido do create-subtask)
+            html.Label("Horas trabalhadas:", className="fw-bold mb-1"),
+            html.Span(" (opcional)", className="text-muted small"),
+            dbc.Input(
+                id="add-log-horas",
+                type="number",
+                min=0,
+                step=0.5,
+                placeholder="Ex: 2.5",
+                className="mb-3"
             ),
 
             # Alerta
@@ -171,7 +180,16 @@ def edit_subtask_modal():
         ])),
 
         dbc.ModalBody([
-            # Tipo de evento
+            # Título personalizável
+            html.Label("Título:", className="fw-bold mb-1"),
+            dbc.Input(
+                id="edit-subtask-titulo",
+                type="text",
+                placeholder="Título da subtarefa...",
+                className="mb-3"
+            ),
+
+            # Tipo de evento (categoria)
             html.Label("Tipo de Evento:", className="fw-bold mb-1"),
             dcc.Dropdown(
                 id="edit-subtask-tipo",
@@ -180,20 +198,9 @@ def edit_subtask_modal():
                 className="mb-3"
             ),
 
-            # Horas
-            html.Label("Horas trabalhadas:", className="fw-bold mb-1"),
-            html.Span(" (opcional)", className="text-muted small"),
-            dbc.Input(
-                id="edit-subtask-horas",
-                type="number",
-                min=0,
-                step=0.5,
-                placeholder="Ex: 2.5",
-                className="mb-3"
-            ),
-
             # Observações
             html.Label("Observações:", className="fw-bold mb-1"),
+            html.Span(" (opcional)", className="text-muted small"),
             dbc.Textarea(
                 id="edit-subtask-obs",
                 placeholder="Observações...",
