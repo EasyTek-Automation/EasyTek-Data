@@ -684,6 +684,9 @@ def criar_tabela_pendencias(df_pendencias, df_historico=None, user_level=1, user
             html.H5("Nenhuma pendência encontrada", className="text-muted")
         ], className="text-center py-5")
 
+    # Resetar índice para garantir 0, 1, 2... independente de filtros aplicados
+    df_pendencias = df_pendencias.reset_index(drop=True)
+
     # Cabeçalho da tabela
     thead = html.Thead([
         html.Tr([
