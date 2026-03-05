@@ -15,7 +15,7 @@ Códigos de avaria considerados: 201, S201, 202, S202, 203, S203, 204, S204, 205
 """
 
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Optional
 import logging
 from src.database.connection import get_mongo_connection
@@ -161,13 +161,16 @@ def fetch_zpp_production_data(start_date: datetime, end_date: datetime) -> pd.Da
         # IMPORTANTE: Usar constante fixa, não nome dinâmico
         collection = get_mongo_connection(ZPP_PRODUCAO_COLLECTION)
 
-        # Buscar TODOS os registros processados no range de datas solicitado
+        # Buscar registros cujo INÍCIO ou FIM intersecta o período solicitado.
+        # Registros boundary (ex: início 30/01, fim 02/02) têm fininotif fora do mês
+        # mas ffinnotif dentro — precisam ser incluídos para o MONTH_BOUNDARY_RULE="fim".
+        # Estratégia: ampliar janela de busca 31 dias para trás em fininotif,
+        # mas exigir que ffinnotif >= start_date para não trazer dados de meses anteriores.
+        one_month_before = start_date - timedelta(days=31)
         query = {
             "_processed": True,
-            "fininotif": {
-                "$gte": start_date,
-                "$lte": end_date
-            }
+            "fininotif": {"$gte": one_month_before, "$lte": end_date},
+            "ffinnotif": {"$gte": start_date},
         }
 
         # Buscar documentos com AMBAS as datas
