@@ -417,7 +417,7 @@ else:
              not in existing_cache]
 ```
 
-#### Alternativa: Usar Upsert
+#### Alternativa A: Usar Upsert
 
 ```python
 # Opção mais simples: usar bulk_write com upsert
@@ -444,6 +444,108 @@ for record in records:
 result = collection.bulk_write(operations, ordered=False)
 logger.info(f"Inseridos: {result.upserted_count}, Duplicatas: {len(operations) - result.upserted_count}")
 ```
+
+#### Alternativa B: Delete + Reinsert (preferida para correções/extornos)
+
+**Contexto**: Quando uma planilha é re-enviada com valores corrigidos (ex: extornos mensais no ZPP),
+o comportamento atual ignora os registros duplicados. A estratégia delete+reinsert resolve isso
+mantendo a performance de `insert_many` e sem a complexidade de update campo a campo.
+
+**Funcionamento**:
+1. Identifica quais registros do arquivo já existem no MongoDB (pela chave natural)
+2. **Deleta** esses registros existentes (em lote)
+3. **Reinsere** todos os registros do arquivo normalmente via `insert_many`
+
+```python
+def _replace_duplicates(self, collection, records: list, file_type: str) -> tuple[int, int]:
+    """
+    Para registros duplicados: deleta os existentes e reinsere os novos.
+    Registros novos (sem duplicata) são inseridos normalmente.
+
+    Returns:
+        (inserted_count, replaced_count)
+    """
+    if file_type == 'zppprd':
+        ordens = [r['ordem'] for r in records if r.get('ordem') is not None]
+        existing_ordens = set(
+            doc['ordem'] for doc in collection.find(
+                {'ordem': {'$in': ordens}}, {'ordem': 1}
+            )
+        )
+        duplicates = [r for r in records if r.get('ordem') in existing_ordens]
+        new_records = [r for r in records if r.get('ordem') not in existing_ordens]
+
+        if duplicates:
+            # Salvar backup em memória para rollback
+            backup = list(collection.find({'ordem': {'$in': list(existing_ordens)}}))
+            try:
+                collection.delete_many({'ordem': {'$in': list(existing_ordens)}})
+                collection.insert_many(duplicates, ordered=False)
+            except Exception as e:
+                logger.error(f"Erro ao substituir duplicatas, revertendo: {e}")
+                collection.insert_many(backup, ordered=False)
+                raise
+
+    else:  # paradas
+        keys_to_check = [
+            {
+                'centro_de_trabalho': r['centro_de_trabalho'],
+                'inicio_execucao': r['inicio_execucao'],
+                'inicio_real_hora': r['inicio_real_hora'],
+                'ordem': r['ordem']
+            }
+            for r in records
+            if all(k in r for k in ['centro_de_trabalho', 'inicio_execucao', 'inicio_real_hora', 'ordem'])
+        ]
+        existing_keys = set()
+        for doc in collection.find({'$or': keys_to_check}, {
+            'centro_de_trabalho': 1, 'inicio_execucao': 1, 'inicio_real_hora': 1, 'ordem': 1
+        }):
+            existing_keys.add(
+                f"{doc.get('centro_de_trabalho')}|{doc.get('inicio_execucao')}|"
+                f"{doc.get('inicio_real_hora')}|{doc.get('ordem')}"
+            )
+
+        def record_key(r):
+            return f"{r.get('centro_de_trabalho')}|{r.get('inicio_execucao')}|{r.get('inicio_real_hora')}|{r.get('ordem')}"
+
+        duplicates = [r for r in records if record_key(r) in existing_keys]
+        new_records = [r for r in records if record_key(r) not in existing_keys]
+
+        if duplicates:
+            backup = list(collection.find({'$or': keys_to_check}))
+            try:
+                collection.delete_many({'$or': keys_to_check})
+                collection.insert_many(duplicates, ordered=False)
+            except Exception as e:
+                logger.error(f"Erro ao substituir duplicatas, revertendo: {e}")
+                collection.insert_many(backup, ordered=False)
+                raise
+
+    replaced = len(duplicates) if 'duplicates' in dir() else 0
+    if new_records:
+        collection.insert_many(new_records, ordered=False)
+
+    return len(new_records), replaced
+```
+
+**Comparação das estratégias de duplicata**:
+
+| Cenário | Skip (atual) | Upsert | Delete+Reinsert |
+|---|---|---|---|
+| Primeiro upload | Insere tudo | Insere tudo | Insere tudo |
+| Re-upload sem mudanças | Skip (no-op) | Atualiza (no-op efetivo) | Deleta+reinsere |
+| Re-upload com extorno | **Ignora — bug** | Atualiza campos | Deleta+reinsere corretamente |
+| Performance | Mais rápido | Mais lento (1 op/registro) | Rápido (delete em lote + insert_many) |
+| Atomicidade | Segura | Segura por registro | Risco: delete ok → insert falha → usa backup em memória |
+| Sem mudanças em arquivo parcial | Insert novos apenas | Update existentes + insert novos | Deleta afetados + reinsere |
+
+**Trade-off principal**: delete+reinsert não é atômico nativamente. A mitigação via backup em memória
+cobre falhas de insert, mas o backup pode ser grande se o arquivo tiver muitos duplicados. Para
+volumes típicos do ZPP (< 5.000 registros/planilha), isso é aceitável.
+
+**Estimativa de implementação**: 3-4 horas
+**Recomendação**: Substituir a lógica de skip atual por `_replace_duplicates` no loop de lotes em `processor.py`.
 
 #### Benefícios
 

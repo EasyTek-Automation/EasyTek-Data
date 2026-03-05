@@ -521,12 +521,12 @@ def register_maintenance_kpi_callbacks(app):
         target_style = {"fontSize": "0.65em", "color": "#6c757d", "fontWeight": "normal"}
 
         mtbf_display = [
-            f"{mtbf_avg:.1f} h",
-            html.Span(f" / {general_target['mtbf']:.1f} h", style=target_style)
+            f"{mtbf_avg:.2f} h",
+            html.Span(f" / {general_target['mtbf']:.2f} h", style=target_style)
         ]
         mttr_display = [
-            f"{mttr_avg_minutes:.1f} min",
-            html.Span(f" / {mttr_target_minutes:.1f} min", style=target_style)
+            f"{mttr_avg_minutes:.2f} min",
+            html.Span(f" / {mttr_target_minutes:.2f} min", style=target_style)
         ]
         breakdown_display = [
             f"{breakdown_avg:.2f} %",
