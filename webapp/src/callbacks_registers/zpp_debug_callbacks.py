@@ -26,6 +26,9 @@ def _fmt_val(v, field, date_fmt):
         return ""
     if field in DATETIME_FIELDS and isinstance(v, datetime):
         return v.strftime(date_fmt)
+    # Float que representa inteiro (ex: 4500012345.0 → "4500012345")
+    if isinstance(v, float) and v == int(v):
+        return str(int(v))
     return str(v).strip()
 
 
@@ -80,7 +83,7 @@ def _fmt_date_in_doc(doc, date_fmt):
 
 
 def _result_component(only_mongo, only_sheet, total_mongo, total_sheet,
-                      key_fields, date_fmt, display_fields):
+                      key_fields, date_fmt, display_fields, sample_mongo_keys=None):
     """Monta o componente de resultado."""
     common = total_mongo - len(only_mongo)
 
@@ -106,7 +109,24 @@ def _result_component(only_mongo, only_sheet, total_mongo, total_sheet,
         ]), className="text-center shadow-sm"), xs=6, md=3),
     ], className="g-2 mb-4")
 
-    blocks = [summary]
+    # Amostra de chaves do Mongo (para conferir formato)
+    if sample_mongo_keys:
+        sample_items = [html.Li(html.Code(k), style={"marginBottom": "2px"})
+                        for k in list(sample_mongo_keys)[:10]]
+        blocks_pre = [summary, dbc.Card([
+            dbc.CardHeader([
+                html.I(className="bi bi-eye me-2"),
+                html.Strong("Amostra de chaves geradas do MongoDB (primeiras 10)"),
+                html.Small(" — confira se o formato bate com o que você colou", className="text-muted ms-2"),
+            ]),
+            dbc.CardBody(html.Ul(sample_items,
+                                 style={"fontFamily": "monospace", "fontSize": "0.82rem",
+                                        "paddingLeft": "1.2rem", "marginBottom": 0}))
+        ], className="shadow-sm mb-3")]
+    else:
+        blocks_pre = [summary]
+
+    blocks = blocks_pre
 
     # Tabela: apenas no Mongo
     if only_mongo:
@@ -253,6 +273,7 @@ def register_zpp_debug_callbacks(app):
             key_fields=fields,
             date_fmt=date_fmt,
             display_fields=PROD_DISPLAY_FIELDS,
+            sample_mongo_keys=mongo_keys,
         )
 
     # ── Comparação Paradas ───────────────────────────────────────────
@@ -296,4 +317,5 @@ def register_zpp_debug_callbacks(app):
             key_fields=fields,
             date_fmt=date_fmt,
             display_fields=PAR_DISPLAY_FIELDS,
+            sample_mongo_keys=mongo_keys,
         )
