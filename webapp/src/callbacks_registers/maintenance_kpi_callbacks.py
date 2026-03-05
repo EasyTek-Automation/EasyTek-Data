@@ -950,7 +950,6 @@ def register_maintenance_kpi_callbacks(app):
             Output("raw-data-summary-cards", "children"),
             Output("raw-data-table-container", "children"),
         Output("raw-data-motivos-table", "children"),
-        Output("raw-data-duplicates-table", "children"),
         ],
         [
             Input("store-indicator-filters", "data"),
@@ -973,7 +972,7 @@ def register_maintenance_kpi_callbacks(app):
         )
 
         if not stored_data or not stored_data.get("has_data", False):
-            return [_empty, _empty, _empty, _empty, _empty, _empty]
+            return [_empty, _empty, _empty, _empty, _empty]
 
         data = stored_data["data"]
         names = stored_data.get("names", {})
@@ -1035,7 +1034,7 @@ def register_maintenance_kpi_callbacks(app):
             })
 
         if not rows:
-            return [_empty, _empty, _empty, _empty, _empty, _empty]
+            return [_empty, _empty, _empty, _empty, _empty]
 
         # ── Totais da planta ─────────────────────────────────────
         # Somar os valores brutos (não os já arredondados) para máxima precisão
@@ -1390,87 +1389,12 @@ def register_maintenance_kpi_callbacks(app):
                 )
                 motivos_component = dbc.Card([dbc.CardBody(motivos_table)], className="shadow-sm")
 
-        # ── Tabela de ordens duplicadas ───────────────────────────
-        from src.utils.zpp_kpi_calculator import fetch_duplicate_orders
-
-        def _dup_table(rows, columns, title):
-            if not rows:
-                return dbc.Alert(
-                    [html.I(className="bi bi-check-circle me-2"), f"{title}: nenhuma ordem duplicada encontrada."],
-                    color="success", className="py-2"
-                )
-            tbl = dash_table.DataTable(
-                columns=columns,
-                data=rows,
-                sort_action="native",
-                page_size=20,
-                style_table={"overflowX": "auto"},
-                style_cell={
-                    "textAlign": "center",
-                    "padding": "6px 12px",
-                    "fontFamily": "inherit",
-                    "fontSize": "0.82rem",
-                    "borderBottom": "1px solid #dee2e6",
-                },
-                style_cell_conditional=[
-                    {"if": {"column_id": "ordem"}, "textAlign": "left", "fontWeight": "600"},
-                ],
-                style_header={
-                    "backgroundColor": "#fff3cd",
-                    "fontWeight": "bold",
-                    "borderBottom": "2px solid #ffc107",
-                    "fontSize": "0.78rem",
-                    "textAlign": "center",
-                },
-                style_data_conditional=[
-                    {"if": {"row_index": "odd"}, "backgroundColor": "#fafafa"},
-                ],
-            )
-            return dbc.Card([
-                dbc.CardHeader([
-                    html.I(className="bi bi-exclamation-triangle-fill me-2", style={"color": "#ffc107"}),
-                    html.Strong(f"{title} — {len(rows)} registro(s) duplicado(s)")
-                ]),
-                dbc.CardBody(tbl, style={"padding": "0.5rem"}),
-            ], className="shadow-sm mb-3")
-
-        try:
-            dup_data = fetch_duplicate_orders()
-        except Exception:
-            dup_data = {"producao": [], "paradas": []}
-
-        prod_cols = [
-            {"name": "Ordem",       "id": "ordem"},
-            {"name": "Qtd",         "id": "qtd_duplicatas", "type": "numeric"},
-            {"name": "Equipamento", "id": "pto_trab"},
-            {"name": "Início",      "id": "fininotif"},
-            {"name": "Fim",         "id": "ffinnotif"},
-            {"name": "Horas Ativ.", "id": "horasact",    "type": "numeric", "format": {"specifier": ".3f"}},
-            {"name": "Processado",  "id": "_processed"},
-        ]
-        par_cols = [
-            {"name": "Ordem",           "id": "ordem"},
-            {"name": "Qtd",             "id": "qtd_duplicatas",     "type": "numeric"},
-            {"name": "Equipamento",     "id": "centro_de_trabalho"},
-            {"name": "Início",          "id": "inicio_execucao"},
-            {"name": "Fim",             "id": "fim_execucao"},
-            {"name": "Causa",           "id": "causa_do_desvio"},
-            {"name": "Duração (min)",   "id": "duration_min",       "type": "numeric", "format": {"specifier": ".1f"}},
-            {"name": "Processado",      "id": "_processed"},
-        ]
-
-        duplicates_component = html.Div([
-            _dup_table(dup_data["producao"], prod_cols, "ZPP_Producao"),
-            _dup_table(dup_data["paradas"],  par_cols,  "ZPP_Paradas"),
-        ])
-
         return [
             coverage_div,
             debug_table,
             summary_cards,
             dbc.Card([dbc.CardBody(table)], className="shadow-sm"),
             motivos_component,
-            duplicates_component,
         ]
 
     # ============================================================
