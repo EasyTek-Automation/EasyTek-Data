@@ -296,38 +296,39 @@ class ZPPProcessor:
 
         logger.info(f"  Total: {total_records:,} registros")
 
-        # ── Passo 4a: backup + delete dos registros que serão substituídos ──
+        # ── Passo 4a: determinar intervalo de datas da planilha ─────────────
+        # Produção: campo fininotif | Paradas: campo inicio_execucao
+        date_field = 'fininotif' if file_type == 'zppprd' else 'inicio_execucao'
+
+        dates = [r[date_field] for r in records if r.get(date_field) is not None]
+        if not dates:
+            logger.error(f"  [X] Nenhuma data válida no campo '{date_field}' — abortando")
+            raise ValueError(f"Campo '{date_field}' ausente ou nulo em todos os registros")
+
+        min_date = min(dates)
+        max_date = max(dates)
+
+        # Expandir para cobrir os meses completos (início do primeiro mês → fim do último mês)
+        from calendar import monthrange
+        range_start = min_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        last_day = monthrange(max_date.year, max_date.month)[1]
+        range_end = max_date.replace(day=last_day, hour=23, minute=59, second=59, microsecond=999999)
+
+        logger.info(f"  Intervalo da planilha: {range_start.strftime('%d/%m/%Y')} "
+                    f"→ {range_end.strftime('%d/%m/%Y')}")
+
+        # ── Passo 4b: backup + delete de TODOS os registros do Mongo no intervalo
         backup = []
         try:
-            if file_type == 'zppprd':
-                ordens = [r['ordem'] for r in records if r.get('ordem') is not None]
-                if ordens:
-                    backup = list(collection.find({'ordem': {'$in': ordens}}))
-                    if backup:
-                        collection.delete_many({'ordem': {'$in': ordens}})
-                        replaced_count = len(backup)
-                        logger.info(f"  [OK] {replaced_count} registros substituídos (backup em memória)")
-            else:
-                keys_to_delete = [
-                    {
-                        'centro_de_trabalho': r['centro_de_trabalho'],
-                        'inicio_execucao':    r['inicio_execucao'],
-                        'inicio_real_hora':   r['inicio_real_hora'],
-                        'ordem':              r['ordem'],
-                    }
-                    for r in records
-                    if all(r.get(k) is not None
-                           for k in ('centro_de_trabalho', 'inicio_execucao', 'inicio_real_hora', 'ordem'))
-                ]
-                if keys_to_delete:
-                    backup = list(collection.find({'$or': keys_to_delete}))
-                    if backup:
-                        collection.delete_many({'$or': keys_to_delete})
-                        replaced_count = len(backup)
-                        logger.info(f"  [OK] {replaced_count} registros substituídos (backup em memória)")
+            date_query = {date_field: {'$gte': range_start, '$lte': range_end}}
+            backup = list(collection.find(date_query))
+            replaced_count = len(backup)
 
-            if not replaced_count:
-                logger.info("  Nenhum registro existente para substituir — inserção pura")
+            if replaced_count:
+                collection.delete_many(date_query)
+                logger.info(f"  [OK] {replaced_count} registros removidos do Mongo (período coberto pela planilha)")
+            else:
+                logger.info("  Nenhum registro existente no período — inserção pura")
 
         except Exception as e:
             logger.error(f"  [X] Erro na etapa de backup/delete: {e}")
