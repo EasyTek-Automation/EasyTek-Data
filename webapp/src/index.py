@@ -34,7 +34,7 @@ from src.pages.energy import overview as energy_overview, config as energy_confi
 from src.pages.production import states
 
 # Manutenção
-from src.pages.maintenance import alarms, procedures, indicators, config as maintenance_config, zpp_processor
+from src.pages.maintenance import alarms, procedures, indicators, config as maintenance_config, zpp_processor, zpp_debug
 
 # Workflow
 from src.pages.workflow import dashboard as workflow_dashboard
@@ -75,6 +75,7 @@ ROUTES = {
     "/maintenance/alarms": alarms.layout,
     "/maintenance/procedures": procedures.layout,
     "/maintenance/zpp-processor": zpp_processor.layout,
+    "/maintenance/zpp-debug": zpp_debug.layout,
 
     # Workflow
     "/workflow/dashboard": workflow_dashboard.layout,

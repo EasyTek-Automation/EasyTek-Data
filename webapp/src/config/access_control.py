@@ -138,6 +138,12 @@ ROUTE_ACCESS = {
         "min_level": 2,  # Nível 2+ (avançado)
         "description": "Processamento de Planilhas ZPP"
     },
+    "/maintenance/zpp-debug": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 2,
+        "description": "Debug ZPP — Comparador MongoDB vs Planilha"
+    },
 
     # ========================================
     # PRODUÇÃO
