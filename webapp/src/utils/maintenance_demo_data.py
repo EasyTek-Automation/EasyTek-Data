@@ -439,19 +439,29 @@ def calculate_kpi_averages(data: Dict[str, List[Dict]],
         if not filtered_months:
             continue
 
-        # Calcular média de cada KPI para este equipamento (filtrando valores None)
-        mtbf_values = [m["mtbf"] for m in filtered_months if m["mtbf"] is not None]
-        mttr_values = [m["mttr"] for m in filtered_months if m["mttr"] is not None]
-        breakdown_values = [m["breakdown_rate"] for m in filtered_months if m["breakdown_rate"] is not None]
+        # Calcular KPIs somando totais brutos (mesmo método da tabela de detalhamento)
+        tot_fail   = sum(m.get("num_failures", 0) for m in filtered_months)
+        tot_act_h  = sum(m.get("total_active_hours", 0.0) for m in filtered_months)
+        tot_bd_min = sum(m.get("total_breakdown_minutes", 0.0) for m in filtered_months)
+        tot_bd_h   = tot_bd_min / 60.0
 
-        mtbf_avg = sum(mtbf_values) / len(mtbf_values) if mtbf_values else None
-        mttr_avg = sum(mttr_values) / len(mttr_values) if mttr_values else None
-        breakdown_avg = sum(breakdown_values) / len(breakdown_values) if breakdown_values else None
+        if tot_fail > 0 and tot_act_h > 0:
+            mtbf_eq = (tot_act_h - tot_bd_h) / tot_fail
+            mttr_eq = (tot_bd_min / tot_fail) / 60.0  # em horas
+            bd_rate_eq = (tot_bd_h / tot_act_h) * 100
+        elif tot_act_h > 0:
+            mtbf_eq = tot_act_h
+            mttr_eq = 0.0
+            bd_rate_eq = 0.0
+        else:
+            mtbf_eq = None
+            mttr_eq = None
+            bd_rate_eq = None
 
         by_equipment[eq_id] = {
-            "mtbf": round(mtbf_avg, 1) if mtbf_avg is not None else None,
-            "mttr": round(mttr_avg, 1) if mttr_avg is not None else None,
-            "breakdown_rate": round(breakdown_avg, 1) if breakdown_avg is not None else None
+            "mtbf": round(mtbf_eq, 3) if mtbf_eq is not None else None,
+            "mttr": round(mttr_eq, 4) if mttr_eq is not None else None,
+            "breakdown_rate": round(bd_rate_eq, 3) if bd_rate_eq is not None else None
         }
 
     # Calcular médias gerais usando VALORES MENSAIS
@@ -474,33 +484,43 @@ def calculate_kpi_averages(data: Dict[str, List[Dict]],
     else:
         monthly_values = None
 
-    # Calcular médias gerais
-    if monthly_values:
-        mtbf_vals = [m["mtbf"] for m in monthly_values.values() if m["mtbf"] is not None]
-        mttr_vals = [m["mttr"] for m in monthly_values.values() if m["mttr"] is not None]
-        breakdown_vals = [m["breakdown_rate"] for m in monthly_values.values() if m["breakdown_rate"] is not None]
+    # Calcular totais gerais somando os brutos de todos equipamentos (mesmo método da tabela)
+    all_months = []
+    for eq_id in equipment_filter:
+        if eq_id not in data:
+            continue
+        if year_months:
+            all_months += [m for m in data[eq_id] if m.get("year_month") in year_months]
+        else:
+            all_months += [m for m in data[eq_id] if m["month"] in (month_filter or [])]
 
-        mtbf_general = sum(mtbf_vals) / len(mtbf_vals) if mtbf_vals else 0.0
-        mttr_general = sum(mttr_vals) / len(mttr_vals) if mttr_vals else 0.0
-        breakdown_general = sum(breakdown_vals) / len(breakdown_vals) if breakdown_vals else 0.0
-    elif by_equipment:
-        # Fallback: Média das médias dos equipamentos
-        mtbf_vals = [eq["mtbf"] for eq in by_equipment.values() if eq["mtbf"] is not None]
-        mttr_vals = [eq["mttr"] for eq in by_equipment.values() if eq["mttr"] is not None]
-        breakdown_vals = [eq["breakdown_rate"] for eq in by_equipment.values() if eq["breakdown_rate"] is not None]
+    if all_months:
+        g_fail   = sum(m.get("num_failures", 0) for m in all_months)
+        g_act_h  = sum(m.get("total_active_hours", 0.0) for m in all_months)
+        g_bd_min = sum(m.get("total_breakdown_minutes", 0.0) for m in all_months)
+        g_bd_h   = g_bd_min / 60.0
 
-        mtbf_general = sum(mtbf_vals) / len(mtbf_vals) if mtbf_vals else 0.0
-        mttr_general = sum(mttr_vals) / len(mttr_vals) if mttr_vals else 0.0
-        breakdown_general = sum(breakdown_vals) / len(breakdown_vals) if breakdown_vals else 0.0
+        if g_fail > 0 and g_act_h > 0:
+            mtbf_general = (g_act_h - g_bd_h) / g_fail
+            mttr_general = (g_bd_min / g_fail) / 60.0  # em horas
+            breakdown_general = (g_bd_h / g_act_h) * 100
+        elif g_act_h > 0:
+            mtbf_general = g_act_h
+            mttr_general = 0.0
+            breakdown_general = 0.0
+        else:
+            mtbf_general = 0.0
+            mttr_general = 0.0
+            breakdown_general = 0.0
     else:
         mtbf_general = 0.0
         mttr_general = 0.0
         breakdown_general = 0.0
 
     return {
-        "mtbf": round(mtbf_general, 1),
+        "mtbf": round(mtbf_general, 3),
         "mttr": round(mttr_general, 4),  # MTTR em horas
-        "breakdown_rate": round(breakdown_general, 2),
+        "breakdown_rate": round(breakdown_general, 3),
         "by_equipment": by_equipment
     }
 
