@@ -949,6 +949,7 @@ def register_maintenance_kpi_callbacks(app):
             Output("raw-data-monthly-debug", "children"),
             Output("raw-data-summary-cards", "children"),
             Output("raw-data-table-container", "children"),
+        Output("raw-data-motivos-table", "children"),
         ],
         [
             Input("store-indicator-filters", "data"),
@@ -971,7 +972,7 @@ def register_maintenance_kpi_callbacks(app):
         )
 
         if not stored_data or not stored_data.get("has_data", False):
-            return [_empty, _empty, _empty, _empty]
+            return [_empty, _empty, _empty, _empty, _empty]
 
         data = stored_data["data"]
         names = stored_data.get("names", {})
@@ -1033,7 +1034,7 @@ def register_maintenance_kpi_callbacks(app):
             })
 
         if not rows:
-            return [_empty, _empty, _empty, _empty]
+            return [_empty, _empty, _empty, _empty, _empty]
 
         # ── Totais da planta ─────────────────────────────────────
         # Somar os valores brutos (não os já arredondados) para máxima precisão
@@ -1304,11 +1305,96 @@ def register_maintenance_kpi_callbacks(app):
             ], style={"padding": "0.75rem 1rem"})
         ], className="shadow-sm mb-3 border-start border-primary border-3")
 
+        # ── Tabela por motivo de parada ───────────────────────────
+        from src.utils.zpp_kpi_calculator import aggregate_breakdown_by_cause
+        from datetime import datetime as _dt2
+
+        motivos_component = _empty
+        period_start = stored_data.get("period_start")
+        period_end   = stored_data.get("period_end")
+        if period_start and period_end:
+            try:
+                ps = _dt2.fromisoformat(period_start)
+                pe = _dt2.fromisoformat(period_end)
+                motivos_data = aggregate_breakdown_by_cause(ps, pe)
+            except Exception:
+                motivos_data = []
+
+            if motivos_data:
+                # Totais para percentual
+                total_count = sum(r["count"] for r in motivos_data)
+                total_min   = sum(r["total_min"] for r in motivos_data)
+
+                motivos_rows = []
+                for r in motivos_data:
+                    pct_count = r["count"] / total_count * 100 if total_count else 0
+                    pct_min   = r["total_min"] / total_min * 100 if total_min else 0
+                    motivos_rows.append({
+                        "motivo":     r["motivo"],
+                        "count":      r["count"],
+                        "pct_count":  round(pct_count, 1),
+                        "total_min":  r["total_min"],
+                        "pct_min":    round(pct_min, 1),
+                        "total_h":    r["total_h"],
+                    })
+
+                # Linha de total
+                motivos_rows.append({
+                    "motivo":    "TOTAL",
+                    "count":     total_count,
+                    "pct_count": 100.0,
+                    "total_min": round(total_min, 1),
+                    "pct_min":   100.0,
+                    "total_h":   round(total_min / 60.0, 3),
+                })
+
+                motivos_table = dash_table.DataTable(
+                    columns=[
+                        {"name": "Motivo",          "id": "motivo"},
+                        {"name": "Qtd. Paradas",     "id": "count",     "type": "numeric"},
+                        {"name": "% Qtd",           "id": "pct_count", "type": "numeric", "format": {"specifier": ".1f"}},
+                        {"name": "Tempo (min)",      "id": "total_min", "type": "numeric", "format": {"specifier": ".1f"}},
+                        {"name": "% Tempo",         "id": "pct_min",   "type": "numeric", "format": {"specifier": ".1f"}},
+                        {"name": "Tempo (h)",        "id": "total_h",   "type": "numeric", "format": {"specifier": ".3f"}},
+                    ],
+                    data=motivos_rows,
+                    sort_action="native",
+                    style_table={"overflowX": "auto"},
+                    style_cell={
+                        "textAlign": "center",
+                        "padding": "8px 14px",
+                        "fontFamily": "inherit",
+                        "fontSize": "0.85rem",
+                        "borderBottom": "1px solid #dee2e6",
+                    },
+                    style_cell_conditional=[
+                        {"if": {"column_id": "motivo"}, "textAlign": "left", "fontWeight": "500", "minWidth": "100px"},
+                    ],
+                    style_header={
+                        "backgroundColor": "#f8f9fa",
+                        "fontWeight": "bold",
+                        "borderBottom": "2px solid #dee2e6",
+                        "fontSize": "0.8rem",
+                        "textAlign": "center",
+                    },
+                    style_data_conditional=[
+                        {
+                            "if": {"filter_query": '{motivo} = "TOTAL"'},
+                            "backgroundColor": "#e9ecef",
+                            "fontWeight": "bold",
+                            "borderTop": "2px solid #6c757d",
+                        },
+                        {"if": {"row_index": "odd"}, "backgroundColor": "#fafafa"},
+                    ],
+                )
+                motivos_component = dbc.Card([dbc.CardBody(motivos_table)], className="shadow-sm")
+
         return [
             coverage_div,
             debug_table,
             summary_cards,
-            dbc.Card([dbc.CardBody(table)], className="shadow-sm")
+            dbc.Card([dbc.CardBody(table)], className="shadow-sm"),
+            motivos_component,
         ]
 
     # ============================================================

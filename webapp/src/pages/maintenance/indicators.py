@@ -634,6 +634,13 @@ def layout():
                         ], className="mt-3 mb-3"),
                         html.Div(id="raw-data-summary-cards", className="mb-4"),
 
+                        # Tabela por motivo de parada
+                        html.H5([
+                            html.I(className="bi bi-list-ul me-2"),
+                            "Motivos de Parada"
+                        ], className="mt-3 mb-3"),
+                        html.Div(id="raw-data-motivos-table", className="mb-4"),
+
                         # Tabela detalhada por equipamento
                         html.H5([
                             html.I(className="bi bi-table me-2"),

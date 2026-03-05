@@ -460,6 +460,38 @@ def fetch_zpp_breakdown_data(start_date: datetime, end_date: datetime,
         return pd.DataFrame(columns=["linea", "date", "year", "month", "year_month", "motivo", "duracao_min", "boundary_case"])
 
 
+def aggregate_breakdown_by_cause(start_date: datetime, end_date: datetime,
+                                  breakdown_codes: Optional[List[str]] = None) -> List[Dict]:
+    """
+    Agrega eventos de parada por código de motivo (causa_do_desvio).
+
+    Returns:
+        Lista de dicts [{motivo, count, total_min, total_h}] ordenada por total_min desc.
+    """
+    df = fetch_zpp_breakdown_data(start_date, end_date, breakdown_codes=breakdown_codes)
+
+    if df.empty:
+        return []
+
+    grouped = (
+        df.groupby("motivo")
+        .agg(count=("duracao_min", "count"), total_min=("duracao_min", "sum"))
+        .reset_index()
+        .sort_values("total_min", ascending=False)
+    )
+    grouped["total_h"] = grouped["total_min"] / 60.0
+
+    return [
+        {
+            "motivo": row["motivo"],
+            "count": int(row["count"]),
+            "total_min": round(float(row["total_min"]), 1),
+            "total_h": round(float(row["total_h"]), 3),
+        }
+        for _, row in grouped.iterrows()
+    ]
+
+
 # ==================== FUNÇÕES DE CÁLCULO DE KPIs ====================
 
 def calculate_monthly_kpis(production_df: pd.DataFrame, breakdown_df: pd.DataFrame) -> Dict:
