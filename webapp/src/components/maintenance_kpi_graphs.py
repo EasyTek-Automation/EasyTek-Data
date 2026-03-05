@@ -470,7 +470,8 @@ def _calculate_sunburst_averages(labels: List[str],
                                   categories_dict: Dict[str, List[str]],
                                   data_by_equipment: Dict[str, float],
                                   unit: str,
-                                  plant_average: float = None) -> List[str]:
+                                  plant_average: float = None,
+                                  decimals: int = 1) -> List[str]:
     """
     Calcula médias para cada nível do sunburst ao invés de mostrar somas.
 
@@ -502,27 +503,24 @@ def _calculate_sunburst_averages(labels: List[str],
         plant_average = total_sum / total_equipment_count if total_equipment_count > 0 else 0
 
     for i, (label, parent, value) in enumerate(zip(labels, parents, values)):
+        fmt = f".{decimals}f"
         if parent == "":
             # Nível 0: Planta (raiz)
-            # Mostrar MÉDIA DA PLANTA (média dos valores mensais)
-            custom_text.append(f"Média: {plant_average:.1f}{unit}")
+            custom_text.append(f"Média: {plant_average:{fmt}}{unit}")
 
         elif parent == "Planta":
             # Nível 1: Categoria
-            # Média dos equipamentos nesta categoria
             cat_name = label
-            # Contar quantos equipamentos desta categoria têm dados (excluir None)
             num_equipments = len([
                 eq for eq in categories_dict.get(cat_name, [])
                 if eq in data_by_equipment and data_by_equipment[eq] is not None
             ])
             avg = value / num_equipments if (num_equipments > 0 and value is not None) else 0
-            custom_text.append(f"Média: {avg:.1f}{unit}")
+            custom_text.append(f"Média: {avg:{fmt}}{unit}")
 
         else:
             # Nível 2: Equipamento individual
-            # Mostrar valor absoluto (não faz sentido média de 1 item)
-            custom_text.append(f"{value:.1f}{unit}")
+            custom_text.append(f"{value:{fmt}}{unit}")
 
     return custom_text
 
@@ -640,7 +638,7 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
     else:  # Taxa de Avaria
         text_display = 'label+text'
         if show_average:
-            custom_text = _calculate_sunburst_averages(labels, parents, values, categories_dict, data_by_equipment, "%", plant_average=plant_average)
+            custom_text = _calculate_sunburst_averages(labels, parents, values, categories_dict, data_by_equipment, "%", plant_average=plant_average, decimals=2)
         else:
             custom_text = [f"{v:.2f}%" for v in values]
 
