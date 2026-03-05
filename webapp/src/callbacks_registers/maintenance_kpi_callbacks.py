@@ -1000,6 +1000,7 @@ def register_maintenance_kpi_callbacks(app):
                 continue
 
             tot_fail = sum(m.get("num_failures", 0) for m in monthly_list)
+            tot_orders = sum(m.get("num_orders", 0) for m in monthly_list)
             tot_act_h = sum(m.get("total_active_hours", 0.0) for m in monthly_list)
             tot_bd_min = sum(m.get("total_breakdown_minutes", 0.0) for m in monthly_list)
             tot_bd_h = tot_bd_min / 60.0
@@ -1020,15 +1021,15 @@ def register_maintenance_kpi_callbacks(app):
             rows.append({
                 "eq_id": eq_id,
                 "equipamento": names.get(eq_id, eq_id),
-                "categoria": eq_category.get(eq_id, "—"),
+                "num_ordens": tot_orders,
                 "num_paradas": tot_fail,
                 "avaria_min": round(tot_bd_min, 1),
-                "avaria_h": round(tot_bd_h, 2),
-                "atividade_h": round(tot_act_h, 2),
-                "uptime_h": round(tot_up_h, 2),
-                "mtbf_h": round(mtbf, 1) if mtbf is not None else None,
-                "mttr_min": round(mttr_min, 1) if mttr_min is not None else None,
-                "taxa_avaria": round(bd_rate, 2) if bd_rate is not None else None,
+                "avaria_h": round(tot_bd_h, 3),
+                "atividade_h": round(tot_act_h, 3),
+                "uptime_h": round(tot_up_h, 3),
+                "mtbf_h": round(mtbf, 3) if mtbf is not None else None,
+                "mttr_min": round(mttr_min, 3) if mttr_min is not None else None,
+                "taxa_avaria": round(bd_rate, 3) if bd_rate is not None else None,
             })
 
         if not rows:
@@ -1036,14 +1037,15 @@ def register_maintenance_kpi_callbacks(app):
 
         # ── Totais da planta ─────────────────────────────────────
         # Somar os valores brutos (não os já arredondados) para máxima precisão
+        p_orders = sum(r["num_ordens"]   for r in rows)
         p_fail   = sum(r["num_paradas"]  for r in rows)
         p_act_h  = sum(r["atividade_h"]  for r in rows)
         p_bd_min = sum(r["avaria_min"]   for r in rows)
         p_bd_h   = p_bd_min / 60.0
         p_up_h   = sum(r["uptime_h"]     for r in rows)
-        p_bd_rate = round(p_bd_h / p_act_h * 100, 2) if p_act_h > 0 else None
-        p_mtbf    = round((p_act_h - p_bd_h) / p_fail, 1) if p_fail > 0 else (round(p_act_h, 1) if p_act_h > 0 else None)
-        p_mttr    = round(p_bd_min / p_fail, 1) if p_fail > 0 else 0.0
+        p_bd_rate = round(p_bd_h / p_act_h * 100, 3) if p_act_h > 0 else None
+        p_mtbf    = round((p_act_h - p_bd_h) / p_fail, 3) if p_fail > 0 else (round(p_act_h, 3) if p_act_h > 0 else None)
+        p_mttr    = round(p_bd_min / p_fail, 3) if p_fail > 0 else 0.0
 
         def _fv(v, dec=1):
             """Formata float para string ou '—' se None."""
@@ -1069,18 +1071,18 @@ def register_maintenance_kpi_callbacks(app):
             _stat_card("bi-hourglass-split",         "Avaria (h)",      f"{p_bd_h:.2f}",           "#fd7e14"),
             _stat_card("bi-lightning-charge-fill",   "Atividade (h)",   f"{p_act_h:.2f}",          "#0d6efd"),
             _stat_card("bi-arrow-up-circle-fill",    "Uptime (h)",      f"{p_up_h:.2f}",           "#198754"),
-            _stat_card("bi-clock-history",           "MTBF (h)",        _fv(p_mtbf, 1),            "#20c997"),
-            _stat_card("bi-tools",                   "MTTR (min)",      _fv(p_mttr, 1),            "#6f42c1"),
-            _stat_card("bi-graph-down",              "Taxa Avaria (%)", _fv(p_bd_rate, 2),         "#ffc107"),
+            _stat_card("bi-clock-history",           "MTBF (h)",        _fv(p_mtbf, 3),            "#20c997"),
+            _stat_card("bi-tools",                   "MTTR (min)",      _fv(p_mttr, 3),            "#6f42c1"),
+            _stat_card("bi-graph-down",              "Taxa Avaria (%)", _fv(p_bd_rate, 3),         "#ffc107"),
         ], className="g-2")
 
         # ── Tabela por equipamento ────────────────────────────────
         # Guardar valores como números para que o sort nativo funcione corretamente
         table_data = []
-        for r in sorted(rows, key=lambda x: (x["categoria"], x["equipamento"])):
+        for r in sorted(rows, key=lambda x: x["equipamento"]):
             table_data.append({
                 "equipamento":  r["equipamento"],
-                "categoria":    r["categoria"],
+                "num_ordens":   r["num_ordens"],
                 "num_paradas":  r["num_paradas"],
                 "avaria_min":   r["avaria_min"],
                 "avaria_h":     r["avaria_h"],
@@ -1094,12 +1096,12 @@ def register_maintenance_kpi_callbacks(app):
         # Linha de total da planta (sempre ao final)
         table_data.append({
             "equipamento":  "TOTAL DA PLANTA",
-            "categoria":    "—",
+            "num_ordens":   p_orders,
             "num_paradas":  p_fail,
             "avaria_min":   round(p_bd_min, 1),
-            "avaria_h":     round(p_bd_h, 2),
-            "atividade_h":  round(p_act_h, 2),
-            "uptime_h":     round(p_up_h, 2),
+            "avaria_h":     round(p_bd_h, 3),
+            "atividade_h":  round(p_act_h, 3),
+            "uptime_h":     round(p_up_h, 3),
             "mtbf_h":       p_mtbf,
             "mttr_min":     p_mttr,
             "taxa_avaria":  p_bd_rate,
@@ -1114,15 +1116,15 @@ def register_maintenance_kpi_callbacks(app):
 
         columns = [
             {"name": "Equipamento",     "id": "equipamento"},
-            {"name": "Categoria",       "id": "categoria"},
+            _col("Nº Ordens",       "num_ordens",   0),
             _col("Nº Paradas",      "num_paradas",  0),
             _col("Avaria (min)",    "avaria_min",   1),
-            _col("Avaria (h)",      "avaria_h",     2),
-            _col("Atividade (h)",   "atividade_h",  2),
-            _col("Uptime (h)",      "uptime_h",     2),
-            _col("MTBF (h)",        "mtbf_h",       1),
-            _col("MTTR (min)",      "mttr_min",     1),
-            _col("Taxa Avaria (%)", "taxa_avaria",  2),
+            _col("Avaria (h)",      "avaria_h",     3),
+            _col("Atividade (h)",   "atividade_h",  3),
+            _col("Uptime (h)",      "uptime_h",     3),
+            _col("MTBF (h)",        "mtbf_h",       3),
+            _col("MTTR (min)",      "mttr_min",     3),
+            _col("Taxa Avaria (%)", "taxa_avaria",  3),
         ]
 
         table = dash_table.DataTable(
@@ -1139,7 +1141,6 @@ def register_maintenance_kpi_callbacks(app):
             },
             style_cell_conditional=[
                 {"if": {"column_id": "equipamento"}, "textAlign": "left", "fontWeight": "500", "minWidth": "130px"},
-                {"if": {"column_id": "categoria"},   "textAlign": "left", "minWidth": "110px"},
             ],
             style_header={
                 "backgroundColor": "#f8f9fa",

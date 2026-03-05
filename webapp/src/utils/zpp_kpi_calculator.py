@@ -563,6 +563,7 @@ def calculate_monthly_kpis(production_df: pd.DataFrame, breakdown_df: pd.DataFra
                 "month": month,
                 "year_month": f"{target_year}-{month:02d}" if target_year is not None else f"????-{month:02d}",
                 "num_failures": int(num_failures),
+                "num_orders": int(len(prod_month)),
                 "total_active_hours": round(total_active_hours, 4),
                 "total_breakdown_minutes": round(total_breakdown_minutes, 4),
                 "total_breakdown_hours": round(total_breakdown_hours, 4),
