@@ -634,6 +634,18 @@ def layout():
                         ], className="mt-3 mb-3"),
                         html.Div(id="raw-data-summary-cards", className="mb-4"),
 
+                        # Tabela de ordens duplicadas
+                        html.H5([
+                            html.I(className="bi bi-exclamation-triangle me-2"),
+                            "Ordens Duplicadas"
+                        ], className="mt-3 mb-1"),
+                        html.P(
+                            "Registros cujo campo 'ordem' aparece mais de uma vez na collection. "
+                            "Varredura completa (sem filtro de data).",
+                            className="text-muted small mb-3"
+                        ),
+                        html.Div(id="raw-data-duplicates-table", className="mb-4"),
+
                         # Tabela por motivo de parada
                         html.H5([
                             html.I(className="bi bi-list-ul me-2"),
