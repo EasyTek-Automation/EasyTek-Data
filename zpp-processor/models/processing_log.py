@@ -45,7 +45,8 @@ def create_file_entry(
     collection_name: str,
     uploaded_rows: int,
     status: str = "success",
-    error_message: Optional[str] = None
+    error_message: Optional[str] = None,
+    replaced_rows: int = 0
 ) -> Dict:
     """
     Cria uma entrada de arquivo processado
@@ -57,6 +58,7 @@ def create_file_entry(
         uploaded_rows: Número de registros inseridos
         status: "success" ou "failed"
         error_message: Mensagem de erro (se houver)
+        replaced_rows: Número de registros substituídos (delete+reinsert)
 
     Returns:
         Dicionário representando arquivo processado
@@ -66,6 +68,7 @@ def create_file_entry(
         "type": file_type,
         "collection_name": collection_name,
         "uploaded_rows": uploaded_rows,
+        "replaced_rows": replaced_rows,
         "status": status
     }
 

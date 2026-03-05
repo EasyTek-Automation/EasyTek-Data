@@ -285,91 +285,88 @@ class ZPPProcessor:
             logger.info(f"  [OK] Removidos {records_removed:,} registros EMBAL")
         logger.info(f"  [OK] {records_after:,} registros para upload\n")
 
-        # 4. Upload ao MongoDB
-        logger.info("Etapa 4/5: Upload ao MongoDB...")
+        # 4. Upload ao MongoDB (modo replace: delete + reinsert)
+        logger.info("Etapa 4/5: Upload ao MongoDB (modo substituição)...")
         collection = self.db[collection_name]
 
         records = df_prepared.to_dict('records')
         total_records = len(records)
-        total_batches = (total_records - 1) // batch_size + 1
         total_inserted = 0
-        failed_inserts = 0
+        replaced_count = 0
 
         logger.info(f"  Total: {total_records:,} registros")
+
+        # ── Passo 4a: backup + delete dos registros que serão substituídos ──
+        backup = []
+        try:
+            if file_type == 'zppprd':
+                ordens = [r['ordem'] for r in records if r.get('ordem') is not None]
+                if ordens:
+                    backup = list(collection.find({'ordem': {'$in': ordens}}))
+                    if backup:
+                        collection.delete_many({'ordem': {'$in': ordens}})
+                        replaced_count = len(backup)
+                        logger.info(f"  [OK] {replaced_count} registros substituídos (backup em memória)")
+            else:
+                keys_to_delete = [
+                    {
+                        'centro_de_trabalho': r['centro_de_trabalho'],
+                        'inicio_execucao':    r['inicio_execucao'],
+                        'inicio_real_hora':   r['inicio_real_hora'],
+                        'ordem':              r['ordem'],
+                    }
+                    for r in records
+                    if all(r.get(k) is not None
+                           for k in ('centro_de_trabalho', 'inicio_execucao', 'inicio_real_hora', 'ordem'))
+                ]
+                if keys_to_delete:
+                    backup = list(collection.find({'$or': keys_to_delete}))
+                    if backup:
+                        collection.delete_many({'$or': keys_to_delete})
+                        replaced_count = len(backup)
+                        logger.info(f"  [OK] {replaced_count} registros substituídos (backup em memória)")
+
+            if not replaced_count:
+                logger.info("  Nenhum registro existente para substituir — inserção pura")
+
+        except Exception as e:
+            logger.error(f"  [X] Erro na etapa de backup/delete: {e}")
+            raise
+
+        # ── Passo 4b: inserir todos os registros em lotes ───────────────────
+        total_batches = (total_records - 1) // batch_size + 1 if total_records else 0
         logger.info(f"  Lotes: {total_batches}")
 
-        # Upload em lotes com verificação de duplicatas
-        for i in range(0, total_records, batch_size):
-            batch = records[i:i + batch_size]
-            batch_num = i // batch_size + 1
+        try:
+            for i in range(0, total_records, batch_size):
+                batch = records[i:i + batch_size]
+                batch_num = i // batch_size + 1
 
-            # Verificação de duplicatas
-            if file_type == 'zppprd':
-                ordens_to_check = [r['ordem'] for r in batch if r.get('ordem') is not None]
-                if ordens_to_check:
-                    existing = set(doc['ordem'] for doc in collection.find(
-                        {'ordem': {'$in': ordens_to_check}},
-                        {'ordem': 1}
-                    ))
-                    batch = [r for r in batch if r.get('ordem') is None or r['ordem'] not in existing]
-                    skipped = len(ordens_to_check) - len([r for r in batch if r.get('ordem') in ordens_to_check])
-                    if skipped > 0:
-                        failed_inserts += skipped
-            else:
-                # Paradas: verificar por combinação
-                keys_to_check = []
-                for r in batch:
-                    if all(k in r for k in ['centro_de_trabalho', 'inicio_execucao', 'inicio_real_hora', 'ordem']):
-                        keys_to_check.append({
-                            'centro_de_trabalho': r['centro_de_trabalho'],
-                            'inicio_execucao': r['inicio_execucao'],
-                            'inicio_real_hora': r['inicio_real_hora'],
-                            'ordem': r['ordem']
-                        })
-
-                if keys_to_check:
-                    existing_keys = set()
-                    existing_docs = collection.find({'$or': keys_to_check}, {
-                        'centro_de_trabalho': 1, 'inicio_execucao': 1, 'inicio_real_hora': 1, 'ordem': 1
-                    })
-                    for doc in existing_docs:
-                        key = f"{doc.get('centro_de_trabalho')}|{doc.get('inicio_execucao')}|{doc.get('inicio_real_hora')}|{doc.get('ordem')}"
-                        existing_keys.add(key)
-
-                    original_len = len(batch)
-                    batch = [r for r in batch if
-                             f"{r.get('centro_de_trabalho')}|{r.get('inicio_execucao')}|{r.get('inicio_real_hora')}|{r.get('ordem')}" not in existing_keys]
-                    skipped = original_len - len(batch)
-                    if skipped > 0:
-                        failed_inserts += skipped
-
-            # Se lote vazio, pular
-            if not batch:
-                logger.info(f"  -> Lote {batch_num:>3}/{total_batches}: PULADO (duplicados)")
-                continue
-
-            try:
                 result = collection.insert_many(batch, ordered=False)
                 total_inserted += len(result.inserted_ids)
 
                 percent = ((i + len(batch)) / total_records) * 100
                 logger.info(f"  -> Lote {batch_num:>3}/{total_batches}: "
-                          f"{total_inserted:>6}/{total_records} ({percent:>5.1f}%)")
+                            f"{total_inserted:>6}/{total_records} ({percent:>5.1f}%)")
 
-            except Exception as e:
-                logger.error(f"  [X] Erro no lote {batch_num}: {e}")
-                # Inserção individual
-                for record in batch:
-                    try:
-                        collection.insert_one(record)
-                        total_inserted += 1
-                    except:
-                        failed_inserts += 1
+        except Exception as e:
+            logger.error(f"  [X] Erro no upload: {e}")
 
-        if failed_inserts > 0:
-            logger.warning(f"  [!] {failed_inserts} duplicatas ignoradas")
+            # ── Rollback: restaurar backup ───────────────────────────────────
+            if backup:
+                logger.warning(f"  [!] Iniciando rollback — restaurando {len(backup)} registros...")
+                try:
+                    for doc in backup:
+                        doc.pop('_id', None)
+                    collection.insert_many(backup, ordered=False)
+                    logger.info(f"  [OK] Rollback concluído — dados originais restaurados")
+                except Exception as restore_err:
+                    logger.error(f"  [XX] Falha no rollback: {restore_err}")
+                    logger.error(f"  [XX] ATENÇÃO: dados podem estar inconsistentes na collection {collection_name}")
+            raise
 
-        logger.info(f"  [OK] Upload concluído: {total_inserted:,} documentos\n")
+        logger.info(f"  [OK] Upload concluído: {total_inserted:,} inseridos, "
+                    f"{replaced_count:,} substituídos\n")
 
         # 5. Criar índices
         logger.info("Etapa 5/5: Configurando índices...")
@@ -392,7 +389,8 @@ class ZPPProcessor:
             collection_name=collection_name,
             uploaded_rows=total_inserted,
             status='success' if total_inserted > 0 else 'failed',
-            error_message=None if total_inserted > 0 else 'Nenhum registro inserido'
+            error_message=None if total_inserted > 0 else 'Nenhum registro inserido',
+            replaced_rows=replaced_count
         )
 
     def process_directory(self, directory: Path, batch_size: int = 1000,
