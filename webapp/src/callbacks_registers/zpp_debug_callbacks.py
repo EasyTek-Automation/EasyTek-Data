@@ -29,19 +29,28 @@ def _fmt_val(v, field, date_fmt):
     return str(v).strip()
 
 
-def _build_mongo_index(collection_name, key_fields, date_fmt, display_fields):
+def _build_mongo_index(collection_name, key_fields, date_fmt, display_fields,
+                       month=None, year=None, date_field=None):
     """
-    Busca todos os documentos da collection e constrói:
-      - key_to_doc: {chave_composta: doc_dict}  (para lookup dos registros extras)
-      - keyset: set de chaves compostas
+    Busca documentos da collection (com filtro de mês/ano se fornecido) e constrói
+    key_to_doc: {chave_composta: doc_dict}.
     """
     from src.database.connection import get_mongo_connection
+    from calendar import monthrange
 
     col = get_mongo_connection(collection_name)
     projection = {f: 1 for f in set(key_fields + display_fields)}
     projection["_id"] = 0
 
-    docs = list(col.find({}, projection))
+    query = {}
+    if month and year and date_field:
+        last_day = monthrange(year, month)[1]
+        query[date_field] = {
+            "$gte": datetime(year, month, 1),
+            "$lte": datetime(year, month, last_day, 23, 59, 59),
+        }
+
+    docs = list(col.find(query, projection))
 
     key_to_doc = {}
     for doc in docs:
@@ -210,10 +219,12 @@ def register_zpp_debug_callbacks(app):
         Input("btn-debug-compare-prod", "n_clicks"),
         [State("debug-fields-prod", "value"),
          State("debug-date-fmt-prod", "value"),
-         State("debug-textarea-prod", "value")],
+         State("debug-textarea-prod", "value"),
+         State("debug-month-prod", "value"),
+         State("debug-year-prod", "value")],
         prevent_initial_call=True,
     )
-    def compare_producao(n_clicks, fields, date_fmt, pasted):
+    def compare_producao(n_clicks, fields, date_fmt, pasted, month, year):
         if not fields:
             return dbc.Alert("Selecione pelo menos um campo.", color="warning")
         if not pasted or not pasted.strip():
@@ -223,7 +234,10 @@ def register_zpp_debug_callbacks(app):
         pasted_keys = _parse_pasted(pasted)
 
         try:
-            key_to_doc = _build_mongo_index("ZPP_Producao", fields, date_fmt, PROD_DISPLAY_FIELDS)
+            key_to_doc = _build_mongo_index(
+                "ZPP_Producao", fields, date_fmt, PROD_DISPLAY_FIELDS,
+                month=month, year=year, date_field="fininotif"
+            )
         except Exception as e:
             return dbc.Alert(f"Erro ao consultar MongoDB: {e}", color="danger")
 
@@ -248,10 +262,12 @@ def register_zpp_debug_callbacks(app):
         Input("btn-debug-compare-par", "n_clicks"),
         [State("debug-fields-par", "value"),
          State("debug-date-fmt-par", "value"),
-         State("debug-textarea-par", "value")],
+         State("debug-textarea-par", "value"),
+         State("debug-month-par", "value"),
+         State("debug-year-par", "value")],
         prevent_initial_call=True,
     )
-    def compare_paradas(n_clicks, fields, date_fmt, pasted):
+    def compare_paradas(n_clicks, fields, date_fmt, pasted, month, year):
         if not fields:
             return dbc.Alert("Selecione pelo menos um campo.", color="warning")
         if not pasted or not pasted.strip():
@@ -261,7 +277,10 @@ def register_zpp_debug_callbacks(app):
         pasted_keys = _parse_pasted(pasted)
 
         try:
-            key_to_doc = _build_mongo_index("ZPP_Paradas", fields, date_fmt, PAR_DISPLAY_FIELDS)
+            key_to_doc = _build_mongo_index(
+                "ZPP_Paradas", fields, date_fmt, PAR_DISPLAY_FIELDS,
+                month=month, year=year, date_field="inicio_execucao"
+            )
         except Exception as e:
             return dbc.Alert(f"Erro ao consultar MongoDB: {e}", color="danger")
 

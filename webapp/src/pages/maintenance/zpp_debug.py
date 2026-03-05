@@ -35,11 +35,26 @@ DATE_FORMATS = [
 ]
 
 
+MONTHS = [
+    {"label": "Janeiro",   "value": 1},  {"label": "Fevereiro", "value": 2},
+    {"label": "Março",     "value": 3},  {"label": "Abril",     "value": 4},
+    {"label": "Maio",      "value": 5},  {"label": "Junho",     "value": 6},
+    {"label": "Julho",     "value": 7},  {"label": "Agosto",    "value": 8},
+    {"label": "Setembro",  "value": 9},  {"label": "Outubro",   "value": 10},
+    {"label": "Novembro",  "value": 11}, {"label": "Dezembro",  "value": 12},
+]
+
+import datetime as _dt
+_now = _dt.datetime.now()
+YEARS = [{"label": str(y), "value": y} for y in range(2024, _now.year + 2)]
+
+
 def _tab_content(fields, default_fields, fields_id, date_fmt_id,
-                 textarea_id, formula_id, btn_id, result_id):
+                 textarea_id, formula_id, btn_id, result_id,
+                 month_id, year_id):
     return html.Div([
         dbc.Row([
-            # Coluna esquerda: campos + formato
+            # Coluna esquerda: campos + formato + filtro de data
             dbc.Col([
                 dbc.Card([
                     dbc.CardHeader([html.I(className="bi bi-key me-2"), html.Strong("Campos da chave")]),
@@ -59,6 +74,24 @@ def _tab_content(fields, default_fields, fields_id, date_fmt_id,
                             clearable=False,
                             style={"fontSize": "0.82rem"},
                         ),
+                        html.Hr(className="my-2"),
+                        html.Small("Filtro de período (Mongo):", className="text-muted d-block mb-1"),
+                        dbc.Row([
+                            dbc.Col(dcc.Dropdown(
+                                id=month_id,
+                                options=MONTHS,
+                                value=_now.month,
+                                clearable=False,
+                                style={"fontSize": "0.82rem"},
+                            ), width=7),
+                            dbc.Col(dcc.Dropdown(
+                                id=year_id,
+                                options=YEARS,
+                                value=_now.year,
+                                clearable=False,
+                                style={"fontSize": "0.82rem"},
+                            ), width=5),
+                        ], className="g-1"),
                     ])
                 ], className="shadow-sm h-100")
             ], md=4),
@@ -121,6 +154,7 @@ def layout():
                         fields_id="debug-fields-prod", date_fmt_id="debug-date-fmt-prod",
                         textarea_id="debug-textarea-prod", formula_id="debug-formula-prod",
                         btn_id="btn-debug-compare-prod", result_id="debug-result-prod",
+                        month_id="debug-month-prod", year_id="debug-year-prod",
                     )),
             dbc.Tab(label="ZPP_Paradas", tab_id="tab-debug-par",
                     children=_tab_content(
@@ -128,6 +162,7 @@ def layout():
                         fields_id="debug-fields-par", date_fmt_id="debug-date-fmt-par",
                         textarea_id="debug-textarea-par", formula_id="debug-formula-par",
                         btn_id="btn-debug-compare-par", result_id="debug-result-par",
+                        month_id="debug-month-par", year_id="debug-year-par",
                     )),
         ]),
 
