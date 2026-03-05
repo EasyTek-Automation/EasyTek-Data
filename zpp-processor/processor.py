@@ -297,8 +297,9 @@ class ZPPProcessor:
         logger.info(f"  Total: {total_records:,} registros")
 
         # ── Passo 4a: determinar intervalo de datas da planilha ─────────────
-        # Produção: campo fininotif | Paradas: campo inicio_execucao
-        date_field = 'fininotif' if file_type == 'zppprd' else 'inicio_execucao'
+        # Produção: campo ffinnotif (data FIM) — alinha com MONTH_BOUNDARY_RULE="fim"
+        # Paradas: campo inicio_execucao
+        date_field = 'ffinnotif' if file_type == 'zppprd' else 'inicio_execucao'
 
         dates = [r[date_field] for r in records if r.get(date_field) is not None]
         if not dates:
