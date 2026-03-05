@@ -308,11 +308,9 @@ class ZPPProcessor:
         min_date = min(dates)
         max_date = max(dates)
 
-        # Expandir para cobrir os meses completos (início do primeiro mês → fim do último mês)
-        from calendar import monthrange
-        range_start = min_date.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        last_day = monthrange(max_date.year, max_date.month)[1]
-        range_end = max_date.replace(day=last_day, hour=23, minute=59, second=59, microsecond=999999)
+        # Usar as datas exatas da planilha — sem expandir para mês completo
+        range_start = min_date.replace(hour=0, minute=0, second=0, microsecond=0)
+        range_end   = max_date.replace(hour=23, minute=59, second=59, microsecond=999999)
 
         logger.info(f"  Intervalo da planilha: {range_start.strftime('%d/%m/%Y')} "
                     f"→ {range_end.strftime('%d/%m/%Y')}")
