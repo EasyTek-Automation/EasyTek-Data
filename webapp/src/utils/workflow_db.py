@@ -619,7 +619,7 @@ def rejeitar_tarefa(pend_id, username):
 
 def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
                     editado_por, aprovador=None, data_retroativa=None,
-                    is_retroativo=False, responsavel_retroativo=None):
+                    is_retroativo=False, responsavel_retroativo=None, aprovador_retroativo=None):
     """
     Cria nova subtarefa (record_type='subtarefa') no histórico.
 
@@ -668,6 +668,7 @@ def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
             'data_retroativa': data_retroativa,
             'is_retroativo': bool(is_retroativo),
             'responsavel_retroativo': responsavel_retroativo if is_retroativo else None,
+            'aprovador_retroativo': aprovador_retroativo if is_retroativo else None,
         }
 
         collection_hist.insert_one(doc)
@@ -734,7 +735,8 @@ def adicionar_log(subtarefa_hist_id, pend_id, observacoes, editado_por, horas=No
 def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, concluido=None,
                      aprovador=None, update_aprovador=False,
                      data_retroativa=None, update_data_retroativa=False,
-                     is_retroativo=None, responsavel_retroativo=None, update_retroativo=False):
+                     is_retroativo=None, responsavel_retroativo=None, aprovador_retroativo=None,
+                     update_retroativo=False):
     """
     Edita campos de uma subtarefa existente.
 
@@ -781,6 +783,7 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
         if update_retroativo:
             updates['is_retroativo'] = bool(is_retroativo)
             updates['responsavel_retroativo'] = responsavel_retroativo if is_retroativo else None
+            updates['aprovador_retroativo'] = aprovador_retroativo if is_retroativo else None
 
         if not updates:
             return False, "Nenhum campo para atualizar"

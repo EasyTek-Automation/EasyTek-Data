@@ -101,7 +101,7 @@ def create_subtask_modal():
                     html.I(className="fas fa-history me-2"),
                     html.Strong("Lançamento Retroativo"),
                     html.Br(),
-                    html.Small("Informe quem registrou e a data real da ocorrência.")
+                    html.Small("Informe quem registrou, o aprovador e a data real da ocorrência.")
                 ], color="info", className="py-2 mb-3"),
 
                 dbc.Row([
@@ -113,7 +113,7 @@ def create_subtask_modal():
                             placeholder="Quem está registrando...",
                             clearable=False,
                             searchable=True,
-                            className="mb-1"
+                            className="mb-2"
                         ),
                     ], md=6),
                     dbc.Col([
@@ -128,7 +128,20 @@ def create_subtask_modal():
                         ),
                     ], md=6),
                 ]),
-                html.Div(className="mb-2"),
+                dbc.Row([
+                    dbc.Col([
+                        html.Label("Aprovador do Lançamento (Nível 3):", className="fw-bold mb-1"),
+                        html.Span(" *", className="text-danger"),
+                        dcc.Dropdown(
+                            id="create-subtask-aprovador-retroativo",
+                            placeholder="Selecione o aprovador...",
+                            clearable=False,
+                            searchable=True,
+                            className="mb-2"
+                        ),
+                    ], md=12),
+                ]),
+                html.Div(className="mb-1"),
             ], id="create-subtask-retroativo-container", style={"display": "none"}),
 
             html.Hr(className="my-3"),
@@ -309,7 +322,7 @@ def edit_subtask_modal():
                     html.I(className="fas fa-history me-2"),
                     html.Strong("Lançamento Retroativo"),
                     html.Br(),
-                    html.Small("Informe quem registrou e a data real da ocorrência.")
+                    html.Small("Informe quem registrou, o aprovador e a data real da ocorrência.")
                 ], color="info", className="py-2 mb-3"),
 
                 dbc.Row([
@@ -321,7 +334,7 @@ def edit_subtask_modal():
                             placeholder="Quem está registrando...",
                             clearable=False,
                             searchable=True,
-                            className="mb-1"
+                            className="mb-2"
                         ),
                     ], md=6),
                     dbc.Col([
@@ -336,7 +349,20 @@ def edit_subtask_modal():
                         ),
                     ], md=6),
                 ]),
-                html.Div(className="mb-2"),
+                dbc.Row([
+                    dbc.Col([
+                        html.Label("Aprovador do Lançamento (Nível 3):", className="fw-bold mb-1"),
+                        html.Span(" *", className="text-danger"),
+                        dcc.Dropdown(
+                            id="edit-subtask-aprovador-retroativo",
+                            placeholder="Selecione o aprovador...",
+                            clearable=False,
+                            searchable=True,
+                            className="mb-2"
+                        ),
+                    ], md=12),
+                ]),
+                html.Div(className="mb-1"),
             ], id="edit-subtask-retroativo-container", style={"display": "none"}),
 
             html.Hr(className="my-3"),
