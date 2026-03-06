@@ -559,6 +559,10 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
     # Converter MTTR de horas para minutos (filtrar None)
     if kpi_name == "MTTR":
         data_by_equipment = {k: v * 60 if v is not None else None for k, v in data_by_equipment.items()}
+        if target_values:
+            target_values = {k: v * 60 if v is not None else None for k, v in target_values.items()}
+        if plant_target is not None:
+            plant_target = plant_target * 60
 
     # Determinar unidade
     if kpi_name == "MTBF":
