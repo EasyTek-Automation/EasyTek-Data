@@ -2,7 +2,7 @@
 import dash_bootstrap_components as dbc
 from dash import html, dcc
 
-# Opções de tipo de evento (mesmas do modal de edição de pendência)
+# Opções de tipo de evento — "Lançamento Retroativo" é um campo separado (switch)
 TIPOS_EVENTO_OPTIONS = [
     {"label": "Análise de Falha", "value": "Análise de Falha"},
     {"label": "Aguardando Material", "value": "Aguardando Material"},
@@ -18,7 +18,6 @@ TIPOS_EVENTO_OPTIONS = [
     {"label": "Estudo", "value": "Estudo"},
     {"label": "Encerramento", "value": "Encerramento"},
     {"label": "Trabalho Adicional", "value": "Trabalho Adicional"},
-    {"label": "Lançamento Retroativo", "value": "Lançamento Retroativo"},
 ]
 
 
@@ -31,7 +30,7 @@ def create_subtask_modal():
         ])),
 
         dbc.ModalBody([
-            # Título (personalizável, obrigatório)
+            # Título
             html.Label("Título:", className="fw-bold mb-1"),
             html.Span(" *", className="text-danger"),
             dbc.Input(
@@ -41,7 +40,7 @@ def create_subtask_modal():
                 className="mb-3"
             ),
 
-            # Tipo de evento (categoria, obrigatório)
+            # Tipo de evento
             html.Label("Tipo de Evento:", className="fw-bold mb-1"),
             html.Span(" *", className="text-danger"),
             dcc.Dropdown(
@@ -52,7 +51,7 @@ def create_subtask_modal():
                 className="mb-3"
             ),
 
-            # Responsável
+            # Responsável pela execução
             html.Label("Responsável:", className="fw-bold mb-1"),
             html.Span(" *", className="text-danger"),
             dcc.Dropdown(
@@ -63,8 +62,15 @@ def create_subtask_modal():
                 className="mb-3"
             ),
 
-            # Aprovador (condicional)
+            # Aprovador (condicional — aparece quando tipo requer aprovação)
             html.Div([
+                html.Hr(className="my-2"),
+                dbc.Alert([
+                    html.I(className="fas fa-user-check me-2"),
+                    html.Strong("Aprovação Necessária"),
+                    html.Br(),
+                    html.Small("Este tipo de evento requer aprovação de um usuário nível 3.")
+                ], color="warning", className="py-2 mb-2"),
                 html.Label("Aprovador (Nível 3):", className="fw-bold mb-1"),
                 html.Span(" *", className="text-danger"),
                 dcc.Dropdown(
@@ -74,31 +80,60 @@ def create_subtask_modal():
                     searchable=True,
                     className="mb-1"
                 ),
-                html.Small(
-                    "Este tipo de evento requer aprovação de um usuário nível 3.",
-                    className="text-warning d-block mb-3"
-                ),
             ], id="create-subtask-aprovador-container", style={"display": "none"}),
 
-            # Data retroativa (condicional — apenas Lançamento Retroativo)
-            html.Div([
-                html.Label("Data do Evento:", className="fw-bold mb-1"),
-                html.Span(" *", className="text-danger"),
-                dcc.DatePickerSingle(
-                    id="create-subtask-data-retroativa",
-                    placeholder="Selecione a data",
-                    display_format="DD/MM/YYYY",
-                    first_day_of_week=0,
-                    className="mb-1",
-                    style={"width": "100%"}
-                ),
-                html.Small(
-                    "Informe a data real em que a atividade ocorreu.",
-                    className="text-muted d-block mb-3"
-                ),
-            ], id="create-subtask-data-retroativa-container", style={"display": "none"}),
+            # Separador e switch de Lançamento Retroativo
+            html.Hr(className="my-3"),
+            dbc.Switch(
+                id="create-subtask-is-retroativo",
+                label="Lançamento Retroativo",
+                value=False,
+                className="mb-2"
+            ),
+            html.Small(
+                "Marque se esta atividade já ocorreu e está sendo registrada com atraso.",
+                className="text-muted d-block mb-2"
+            ),
 
-            # Observações (opcional)
+            # Seção retroativo (condicional — aparece quando switch ON)
+            html.Div([
+                dbc.Alert([
+                    html.I(className="fas fa-history me-2"),
+                    html.Strong("Lançamento Retroativo"),
+                    html.Br(),
+                    html.Small("Informe quem registrou e a data real da ocorrência.")
+                ], color="info", className="py-2 mb-3"),
+
+                dbc.Row([
+                    dbc.Col([
+                        html.Label("Responsável pelo Lançamento:", className="fw-bold mb-1"),
+                        html.Span(" *", className="text-danger"),
+                        dcc.Dropdown(
+                            id="create-subtask-responsavel-retroativo",
+                            placeholder="Quem está registrando...",
+                            clearable=False,
+                            searchable=True,
+                            className="mb-1"
+                        ),
+                    ], md=6),
+                    dbc.Col([
+                        html.Label("Data da Ocorrência:", className="fw-bold mb-1"),
+                        html.Span(" *", className="text-danger"),
+                        dcc.DatePickerSingle(
+                            id="create-subtask-data-retroativa",
+                            placeholder="DD/MM/AAAA",
+                            display_format="DD/MM/YYYY",
+                            first_day_of_week=0,
+                            style={"width": "100%"}
+                        ),
+                    ], md=6),
+                ]),
+                html.Div(className="mb-2"),
+            ], id="create-subtask-retroativo-container", style={"display": "none"}),
+
+            html.Hr(className="my-3"),
+
+            # Observações
             html.Label("Observações:", className="fw-bold mb-1"),
             html.Span(" (opcional)", className="text-muted small"),
             dbc.Textarea(
@@ -108,7 +143,6 @@ def create_subtask_modal():
                 className="mb-3"
             ),
 
-            # Alerta
             html.Div(id="create-subtask-alert")
         ]),
 
@@ -218,7 +252,7 @@ def edit_subtask_modal():
         ])),
 
         dbc.ModalBody([
-            # Título personalizável
+            # Título
             html.Label("Título:", className="fw-bold mb-1"),
             dbc.Input(
                 id="edit-subtask-titulo",
@@ -227,7 +261,7 @@ def edit_subtask_modal():
                 className="mb-3"
             ),
 
-            # Tipo de evento (categoria)
+            # Tipo de evento
             html.Label("Tipo de Evento:", className="fw-bold mb-1"),
             dcc.Dropdown(
                 id="edit-subtask-tipo",
@@ -236,8 +270,15 @@ def edit_subtask_modal():
                 className="mb-3"
             ),
 
-            # Aprovador (condicional)
+            # Aprovador (condicional — aparece quando tipo requer aprovação)
             html.Div([
+                html.Hr(className="my-2"),
+                dbc.Alert([
+                    html.I(className="fas fa-user-check me-2"),
+                    html.Strong("Aprovação Necessária"),
+                    html.Br(),
+                    html.Small("Este tipo de evento requer aprovação de um usuário nível 3.")
+                ], color="warning", className="py-2 mb-2"),
                 html.Label("Aprovador (Nível 3):", className="fw-bold mb-1"),
                 html.Span(" *", className="text-danger"),
                 dcc.Dropdown(
@@ -247,29 +288,58 @@ def edit_subtask_modal():
                     searchable=True,
                     className="mb-1"
                 ),
-                html.Small(
-                    "Este tipo requer aprovação de um usuário nível 3.",
-                    className="text-warning d-block mb-3"
-                ),
             ], id="edit-subtask-aprovador-container", style={"display": "none"}),
 
-            # Data retroativa (condicional)
+            # Switch Lançamento Retroativo
+            html.Hr(className="my-3"),
+            dbc.Switch(
+                id="edit-subtask-is-retroativo",
+                label="Lançamento Retroativo",
+                value=False,
+                className="mb-2"
+            ),
+            html.Small(
+                "Marque se esta atividade já ocorreu e está sendo registrada com atraso.",
+                className="text-muted d-block mb-2"
+            ),
+
+            # Seção retroativo (condicional)
             html.Div([
-                html.Label("Data do Evento:", className="fw-bold mb-1"),
-                html.Span(" *", className="text-danger"),
-                dcc.DatePickerSingle(
-                    id="edit-subtask-data-retroativa",
-                    placeholder="Selecione a data",
-                    display_format="DD/MM/YYYY",
-                    first_day_of_week=0,
-                    className="mb-1",
-                    style={"width": "100%"}
-                ),
-                html.Small(
-                    "Informe a data real em que a atividade ocorreu.",
-                    className="text-muted d-block mb-3"
-                ),
-            ], id="edit-subtask-data-retroativa-container", style={"display": "none"}),
+                dbc.Alert([
+                    html.I(className="fas fa-history me-2"),
+                    html.Strong("Lançamento Retroativo"),
+                    html.Br(),
+                    html.Small("Informe quem registrou e a data real da ocorrência.")
+                ], color="info", className="py-2 mb-3"),
+
+                dbc.Row([
+                    dbc.Col([
+                        html.Label("Responsável pelo Lançamento:", className="fw-bold mb-1"),
+                        html.Span(" *", className="text-danger"),
+                        dcc.Dropdown(
+                            id="edit-subtask-responsavel-retroativo",
+                            placeholder="Quem está registrando...",
+                            clearable=False,
+                            searchable=True,
+                            className="mb-1"
+                        ),
+                    ], md=6),
+                    dbc.Col([
+                        html.Label("Data da Ocorrência:", className="fw-bold mb-1"),
+                        html.Span(" *", className="text-danger"),
+                        dcc.DatePickerSingle(
+                            id="edit-subtask-data-retroativa",
+                            placeholder="DD/MM/AAAA",
+                            display_format="DD/MM/YYYY",
+                            first_day_of_week=0,
+                            style={"width": "100%"}
+                        ),
+                    ], md=6),
+                ]),
+                html.Div(className="mb-2"),
+            ], id="edit-subtask-retroativo-container", style={"display": "none"}),
+
+            html.Hr(className="my-3"),
 
             # Observações
             html.Label("Observações:", className="fw-bold mb-1"),
@@ -288,10 +358,7 @@ def edit_subtask_modal():
                 className="mb-3"
             ),
 
-            # Alerta
             html.Div(id="edit-subtask-alert"),
-
-            # Store para hist_id sendo editado
             dcc.Store(id="edit-subtask-hist-id")
         ]),
 

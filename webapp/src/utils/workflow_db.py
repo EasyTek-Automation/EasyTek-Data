@@ -15,7 +15,6 @@ TIPOS_REQUEREM_APROVACAO = [
     "Em Produção Assistida",
     "Encerramento",
     "Trabalho Adicional",
-    "Lançamento Retroativo"
 ]
 
 
@@ -127,6 +126,16 @@ def carregar_historico():
         # Retrocompat subtarefa_id
         if 'subtarefa_id' not in df.columns:
             df['subtarefa_id'] = None
+
+        # Retrocompat is_retroativo e responsavel_retroativo (campos novos)
+        if 'is_retroativo' not in df.columns:
+            # Registros antigos com tipo_evento == "Lançamento Retroativo" são retroativos
+            if 'tipo_evento' in df.columns:
+                df['is_retroativo'] = df['tipo_evento'] == 'Lançamento Retroativo'
+            else:
+                df['is_retroativo'] = False
+        if 'responsavel_retroativo' not in df.columns:
+            df['responsavel_retroativo'] = None
 
         # Converter datas
         if 'data' in df.columns:
@@ -609,7 +618,8 @@ def rejeitar_tarefa(pend_id, username):
 
 
 def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
-                    editado_por, aprovador=None, data_retroativa=None):
+                    editado_por, aprovador=None, data_retroativa=None,
+                    is_retroativo=False, responsavel_retroativo=None):
     """
     Cria nova subtarefa (record_type='subtarefa') no histórico.
 
@@ -617,11 +627,13 @@ def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
         pend_id: ID da pendência
         titulo: Título livre da subtarefa
         tipo_evento: Categoria/tipo do evento (dropdown)
-        responsavel: Username do responsável
+        responsavel: Username do responsável pela execução
         observacoes: Detalhes opcionais
         editado_por: Username de quem está criando
-        aprovador: Username do aprovador (opcional)
-        data_retroativa: datetime da data real do evento (Lançamento Retroativo)
+        aprovador: Username do aprovador (para tipos que requerem aprovação)
+        data_retroativa: datetime da data real do evento (quando is_retroativo=True)
+        is_retroativo: Se True, o lançamento é retroativo
+        responsavel_retroativo: Username de quem fez o lançamento retroativo
 
     Returns:
         tuple: (sucesso: bool, mensagem: str)
@@ -653,7 +665,9 @@ def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
             'data_aprovacao': None,
             'record_type': 'subtarefa',
             'subtarefa_id': None,
-            'data_retroativa': data_retroativa  # None para eventos normais
+            'data_retroativa': data_retroativa,
+            'is_retroativo': bool(is_retroativo),
+            'responsavel_retroativo': responsavel_retroativo if is_retroativo else None,
         }
 
         collection_hist.insert_one(doc)
@@ -719,7 +733,8 @@ def adicionar_log(subtarefa_hist_id, pend_id, observacoes, editado_por, horas=No
 
 def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, concluido=None,
                      aprovador=None, update_aprovador=False,
-                     data_retroativa=None, update_data_retroativa=False):
+                     data_retroativa=None, update_data_retroativa=False,
+                     is_retroativo=None, responsavel_retroativo=None, update_retroativo=False):
     """
     Edita campos de uma subtarefa existente.
 
@@ -733,6 +748,9 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
         update_aprovador: Se True, grava o campo aprovador mesmo que seja None
         data_retroativa: datetime da data real do evento (ou None para remover)
         update_data_retroativa: Se True, grava o campo data_retroativa mesmo que seja None
+        is_retroativo: bool indicando se é lançamento retroativo (ou None para não alterar)
+        responsavel_retroativo: Username do responsável pelo lançamento retroativo
+        update_retroativo: Se True, grava is_retroativo e responsavel_retroativo
 
     Returns:
         tuple: (sucesso: bool, mensagem: str)
@@ -759,6 +777,10 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
             updates['data_retroativa'] = data_retroativa
             if data_retroativa:
                 updates['data'] = data_retroativa  # data retroativa passa a ser a data principal
+
+        if update_retroativo:
+            updates['is_retroativo'] = bool(is_retroativo)
+            updates['responsavel_retroativo'] = responsavel_retroativo if is_retroativo else None
 
         if not updates:
             return False, "Nenhum campo para atualizar"

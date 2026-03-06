@@ -43,6 +43,8 @@ def register_subtask_callbacks(app):
         Output("create-subtask-aprovador", "value", allow_duplicate=True),
         Output("create-subtask-data-retroativa", "date", allow_duplicate=True),
         Output("create-subtask-alert", "children", allow_duplicate=True),
+        Output("create-subtask-is-retroativo", "value", allow_duplicate=True),
+        Output("create-subtask-responsavel-retroativo", "value", allow_duplicate=True),
         Input({"type": "btn-nova-subtarefa", "index": ALL}, "n_clicks"),
         State("create-subtask-modal", "is_open"),
         State("user-username-store", "data"),
@@ -57,7 +59,7 @@ def register_subtask_callbacks(app):
         id_dict = json.loads(trigger_id_str)
         pend_id = id_dict['index']
 
-        return True, {"pend_id": pend_id, "subtarefa_id": None}, "", None, username or None, "", None, None, ""
+        return True, {"pend_id": pend_id, "subtarefa_id": None}, "", None, username or None, "", None, None, "", False, None
 
     # ==============================================================================
     # CB2: Fechar create-subtask-modal (Cancelar / limpar campos)
@@ -71,13 +73,15 @@ def register_subtask_callbacks(app):
         Output("create-subtask-aprovador", "value"),
         Output("create-subtask-data-retroativa", "date"),
         Output("create-subtask-alert", "children"),
+        Output("create-subtask-is-retroativo", "value"),
+        Output("create-subtask-responsavel-retroativo", "value"),
         Input("create-subtask-cancel-btn", "n_clicks"),
         prevent_initial_call=True
     )
     def fechar_create_subtask_modal(n_clicks):
         if not n_clicks:
             raise PreventUpdate
-        return False, "", None, None, "", None, None, ""
+        return False, "", None, None, "", None, None, "", False, None
 
     # ==============================================================================
     # CB3: Mostrar/ocultar campo aprovador no create-subtask-modal
@@ -96,17 +100,30 @@ def register_subtask_callbacks(app):
         return {"display": "none"}, []
 
     # ==============================================================================
-    # CB3b: Mostrar/ocultar date picker para Lançamento Retroativo
+    # CB3b: Mostrar/ocultar seção retroativo ao ligar/desligar o switch
     # ==============================================================================
     @app.callback(
-        Output("create-subtask-data-retroativa-container", "style"),
-        Input("create-subtask-tipo", "value"),
+        Output("create-subtask-retroativo-container", "style"),
+        Input("create-subtask-is-retroativo", "value"),
         prevent_initial_call=True
     )
-    def toggle_data_retroativa(tipo):
-        if tipo == "Lançamento Retroativo":
+    def toggle_retroativo_create(is_retroativo):
+        if is_retroativo:
             return {"display": "block"}
         return {"display": "none"}
+
+    # ==============================================================================
+    # CB3c: Popular dropdown responsavel-retroativo (create modal)
+    # ==============================================================================
+    @app.callback(
+        Output("create-subtask-responsavel-retroativo", "options"),
+        Input("create-subtask-modal", "is_open"),
+        State("user-perfil-store", "data")
+    )
+    def popular_responsavel_retroativo_create(is_open, user_perfil):
+        if not is_open:
+            return no_update
+        return get_usuarios_por_perfil(user_perfil or "admin")
 
     # ==============================================================================
     # CB4: Popular dropdown de responsáveis no create-subtask-modal
@@ -138,6 +155,8 @@ def register_subtask_callbacks(app):
         State("create-subtask-obs", "value"),
         State("create-subtask-aprovador", "value"),
         State("create-subtask-data-retroativa", "date"),
+        State("create-subtask-is-retroativo", "value"),
+        State("create-subtask-responsavel-retroativo", "value"),
         State("store-subtask-context", "data"),
         State("user-username-store", "data"),
         State("user-level-store", "data"),
@@ -145,7 +164,8 @@ def register_subtask_callbacks(app):
         prevent_initial_call=True
     )
     def submeter_create_subtask(n_clicks, titulo, tipo, responsavel, obs, aprovador,
-                                data_retroativa, context, username, user_level, filtros):
+                                data_retroativa, is_retroativo, responsavel_retroativo,
+                                context, username, user_level, filtros):
         if not n_clicks:
             raise PreventUpdate
 
@@ -170,15 +190,19 @@ def register_subtask_callbacks(app):
             return (True,
                     dbc.Alert(f"O tipo '{tipo}' requer aprovador.", color="warning"),
                     no_update, no_update, no_update, no_update)
-        if tipo == "Lançamento Retroativo" and not data_retroativa:
+        if is_retroativo and not data_retroativa:
             return (True,
-                    dbc.Alert("Informe a data do evento retroativo.", color="warning"),
+                    dbc.Alert("Informe a data da ocorrência para o lançamento retroativo.", color="warning"),
+                    no_update, no_update, no_update, no_update)
+        if is_retroativo and not responsavel_retroativo:
+            return (True,
+                    dbc.Alert("Informe o responsável pelo lançamento retroativo.", color="warning"),
                     no_update, no_update, no_update, no_update)
 
         # Converter data_retroativa de string ISO para datetime
         from datetime import datetime as _dt
         data_retro_dt = None
-        if data_retroativa:
+        if is_retroativo and data_retroativa:
             try:
                 data_retro_dt = _dt.fromisoformat(data_retroativa)
             except (ValueError, TypeError):
@@ -192,7 +216,9 @@ def register_subtask_callbacks(app):
             observacoes=obs.strip() if obs else '',
             editado_por=username or '',
             aprovador=aprovador if tipo in TIPOS_REQUEREM_APROVACAO else None,
-            data_retroativa=data_retro_dt
+            data_retroativa=data_retro_dt,
+            is_retroativo=bool(is_retroativo),
+            responsavel_retroativo=responsavel_retroativo if is_retroativo else None,
         )
 
         from src.pages.workflow.dashboard import carregar_dados_csv
@@ -350,6 +376,8 @@ def register_subtask_callbacks(app):
         Output("edit-subtask-concluido", "value"),
         Output("edit-subtask-aprovador", "value"),
         Output("edit-subtask-data-retroativa", "date"),
+        Output("edit-subtask-is-retroativo", "value"),
+        Output("edit-subtask-responsavel-retroativo", "value"),
         Input({"type": "btn-edit-subtarefa", "index": ALL}, "n_clicks"),
         State("store-historico", "data"),
         prevent_initial_call=True
@@ -363,13 +391,14 @@ def register_subtask_callbacks(app):
         id_dict = json.loads(trigger_id_str)
         hist_id = id_dict['index']
 
-        # Buscar dados da subtarefa
         titulo_val = ""
         tipo_val = None
         obs_val = ""
         concluido_val = False
         aprovador_val = None
         data_retro_val = None
+        is_retro_val = False
+        resp_retro_val = None
 
         if historico_data:
             df = pd.DataFrame(historico_data)
@@ -387,25 +416,51 @@ def register_subtask_callbacks(app):
                 aprovador_val = str(_aprov) if _aprov and str(_aprov) != 'nan' else None
                 dr_raw = row.get('data_retroativa')
                 data_retro_val = str(dr_raw)[:10] if dr_raw and str(dr_raw) != 'nan' else None
+                # Retrocompat: is_retroativo pode vir do campo novo ou do tipo_evento antigo
+                is_retro_val = bool(row.get('is_retroativo')) or (tipo_val == 'Lançamento Retroativo')
+                _rr = row.get('responsavel_retroativo')
+                resp_retro_val = str(_rr) if _rr and str(_rr) != 'nan' else None
 
-        return True, hist_id, titulo_val, tipo_val, obs_val, concluido_val, aprovador_val, data_retro_val
+        return True, hist_id, titulo_val, tipo_val, obs_val, concluido_val, aprovador_val, data_retro_val, is_retro_val, resp_retro_val
 
     # ==============================================================================
-    # CB9b: Toggle visibilidade aprovador/data-retroativa no edit modal
+    # CB9b: Toggle visibilidade aprovador no edit modal (por tipo de evento)
     # ==============================================================================
     @app.callback(
         Output("edit-subtask-aprovador-container", "style"),
-        Output("edit-subtask-data-retroativa-container", "style"),
         Input("edit-subtask-tipo", "value"),
         prevent_initial_call=True
     )
-    def toggle_edit_subtask_containers(tipo):
-        show_aprov = tipo in TIPOS_REQUEREM_APROVACAO
-        show_data = tipo == "Lançamento Retroativo"
-        return (
-            {"display": "block"} if show_aprov else {"display": "none"},
-            {"display": "block"} if show_data else {"display": "none"},
-        )
+    def toggle_edit_aprovador_container(tipo):
+        if tipo in TIPOS_REQUEREM_APROVACAO:
+            return {"display": "block"}
+        return {"display": "none"}
+
+    # ==============================================================================
+    # CB9b2: Toggle visibilidade seção retroativo no edit modal (por switch)
+    # ==============================================================================
+    @app.callback(
+        Output("edit-subtask-retroativo-container", "style"),
+        Input("edit-subtask-is-retroativo", "value"),
+        prevent_initial_call=True
+    )
+    def toggle_edit_retroativo_container(is_retroativo):
+        if is_retroativo:
+            return {"display": "block"}
+        return {"display": "none"}
+
+    # ==============================================================================
+    # CB9b3: Popular dropdown responsavel-retroativo no edit modal
+    # ==============================================================================
+    @app.callback(
+        Output("edit-subtask-responsavel-retroativo", "options"),
+        Input("edit-subtask-modal", "is_open"),
+        State("user-perfil-store", "data"),
+    )
+    def popular_responsavel_retroativo_edit(is_open, user_perfil):
+        if not is_open:
+            return no_update
+        return get_usuarios_por_perfil(user_perfil or "admin")
 
     # ==============================================================================
     # CB9c: Popular dropdown aprovador no edit modal
@@ -452,13 +507,16 @@ def register_subtask_callbacks(app):
         State("edit-subtask-concluido", "value"),
         State("edit-subtask-aprovador", "value"),
         State("edit-subtask-data-retroativa", "date"),
+        State("edit-subtask-is-retroativo", "value"),
+        State("edit-subtask-responsavel-retroativo", "value"),
         State("user-username-store", "data"),
         State("user-level-store", "data"),
         State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
     def submeter_edit_subtask(n_clicks, hist_id, titulo, tipo, obs, concluido,
-                              aprovador, data_retroativa, username, user_level, filtros):
+                              aprovador, data_retroativa, is_retroativo, responsavel_retroativo,
+                              username, user_level, filtros):
         if not n_clicks or not hist_id:
             raise PreventUpdate
 
@@ -466,7 +524,7 @@ def register_subtask_callbacks(app):
 
         from datetime import datetime as _dt
         data_retro_dt = None
-        if tipo == "Lançamento Retroativo" and data_retroativa:
+        if is_retroativo and data_retroativa:
             try:
                 data_retro_dt = _dt.fromisoformat(data_retroativa)
             except (ValueError, TypeError):
@@ -482,6 +540,9 @@ def register_subtask_callbacks(app):
             update_aprovador=True,
             data_retroativa=data_retro_dt,
             update_data_retroativa=True,
+            is_retroativo=bool(is_retroativo),
+            responsavel_retroativo=responsavel_retroativo if is_retroativo else None,
+            update_retroativo=True,
         )
 
         from src.pages.workflow.dashboard import carregar_dados_csv
