@@ -573,9 +573,6 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
     values = [0]  # Será calculado como soma das categorias
     colors = ['#6c757d']  # Cor neutra para o centro (Planta)
 
-    # Usar meta da planta se disponível, senão usar target_values individuais
-    use_plant_target = plant_target is not None
-
     # Adicionar categorias (anel 1) - cor neutra
     for cat_name, eq_list in categories_dict.items():
         labels.append(cat_name)
@@ -602,14 +599,12 @@ def create_kpi_sunburst_chart(data_by_equipment: Dict[str, float],
                 values.append(eq_value)
 
                 # Determinar cor baseada em performance (sistema de 3 cores)
-                if use_plant_target:
-                    # Usar meta geral da planta
-                    target = plant_target
-                elif target_values and eq_id in target_values:
-                    # Usar meta individual do equipamento
+                # Prioridade: meta individual do equipamento → meta geral da planta → cor neutra
+                if target_values and eq_id in target_values and target_values[eq_id] is not None:
                     target = target_values[eq_id]
+                elif plant_target is not None:
+                    target = plant_target
                 else:
-                    # Sem meta definida - usar cor neutra
                     colors.append('#6c757d')
                     continue
 
