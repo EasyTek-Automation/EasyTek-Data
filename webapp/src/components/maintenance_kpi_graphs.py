@@ -428,11 +428,14 @@ def create_kpi_bar_chart(equipment_ids: List[str],
                 # Se falhar o polyfit, ignora a tendência
                 pass
 
-    # Calcular teto do eixo Y com 20% de folga acima do maior valor (para os labels não serem cortados)
+    # Calcular teto do eixo Y com 30% de folga acima do maior valor (para os labels não serem cortados)
     valid_values = [v for v in values if v is not None]
     if valid_values:
         y_max = max(valid_values)
-        y_ceiling = y_max * 1.20 if y_max > 0 else 1.0
+        # Inclui reference_value no cálculo para que a linha de meta nunca fique cortada
+        if reference_value is not None:
+            y_max = max(y_max, reference_value)
+        y_ceiling = y_max * 1.30 if y_max > 0 else 1.0
     else:
         y_ceiling = None
 
@@ -911,10 +914,22 @@ def create_kpi_line_chart(months_list: List[int],
     else:
         unit = "%"
 
+    # Calcular teto do eixo Y com 30% de folga para os labels outside não serem cortados
+    all_y = [v for v in values if v is not None]
+    if avg_values is not None:
+        all_y += [v for v in avg_values if v is not None]
+    if target_value is not None:
+        all_y.append(target_value)
+    y_ceiling = max(all_y) * 1.30 if all_y else None
+
     fig.update_layout(
         template=template,
         xaxis=dict(title="Mês"),
-        yaxis=dict(title=f"{kpi_name} ({unit})", rangemode='tozero'),
+        yaxis=dict(
+            title=f"{kpi_name} ({unit})",
+            rangemode='tozero',
+            range=[0, y_ceiling] if y_ceiling is not None else None
+        ),
         hovermode='x unified',
         legend=dict(
             orientation="h",
