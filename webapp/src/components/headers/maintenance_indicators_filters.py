@@ -28,12 +28,12 @@ def create_maintenance_indicators_filters():
     return html.Div([
         dbc.Row([
             # Coluna 1: Vazia (espaço)
-            dbc.Col([], width=4),
+            dbc.Col([], width=2),
 
             # Coluna 2: Vazia (espaço)
-            dbc.Col([], width=4),
+            dbc.Col([], width=2),
 
-            # Coluna 3: Conteúdo dos filtros (4 colunas de largura)
+            # Coluna 3: Conteúdo dos filtros (8 colunas de largura para dar espaço ao date picker)
             dbc.Col([
                 # Tipo de Período
                 html.Div([
@@ -151,7 +151,8 @@ def create_maintenance_indicators_filters():
                         display_format="DD/MM/YYYY",
                         start_date_placeholder_text="Data Início",
                         end_date_placeholder_text="Data Fim",
-                        style={"fontSize": "0.85rem"}
+                        style={"fontSize": "0.85rem", "width": "100%"},
+                        className="w-100"
                     )
                 ], id="div-date-range", style={"display": "none"}, className="mb-3"),
 
@@ -180,7 +181,7 @@ def create_maintenance_indicators_filters():
                 # Footer "Powered By"
                 create_dropdown_footer()
 
-            ], width=4)  # Terceira coluna: 4/12
+            ], width=8)  # Terceira coluna: 8/12
 
         ], className="g-0")
 
