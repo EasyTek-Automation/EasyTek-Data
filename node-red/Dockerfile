@@ -1,5 +1,5 @@
 # Usar a imagem oficial do Node-RED como base
-FROM nodered/node-red:latest
+FROM nodered/node-red:4.1.7
 
 # Copiar os arquivos de configuração e fluxo para o diretório de dados da imagem
 # Esta é a etapa que estava faltando.
