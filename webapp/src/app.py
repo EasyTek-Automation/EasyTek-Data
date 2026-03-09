@@ -5,7 +5,11 @@ import dash_bootstrap_components as dbc
 from flask import Flask, send_from_directory, abort, request
 from flask_login import LoginManager
 import os
+import time
+import logging
+import json
 from pathlib import Path
+from logging.handlers import RotatingFileHandler
 from dash_bootstrap_templates import load_figure_template
 
 # --- Constantes ---
@@ -89,6 +93,51 @@ login_manager.login_view = '/login'
 # --- Registro da API REST ---
 from src.api import api_bp
 server.register_blueprint(api_bp)
+
+
+# --- Middleware de Medição de Performance (ativar com MEASURE_CALLBACKS=1) ---
+if os.getenv("MEASURE_CALLBACKS") == "1":
+    Path("logs").mkdir(exist_ok=True)
+
+    _timing_logger = logging.getLogger("callback_timing")
+    _timing_logger.setLevel(logging.INFO)
+    _timing_logger.propagate = False  # não poluir o log geral
+
+    _timing_handler = RotatingFileHandler(
+        Path("logs") / "callback_timing.log",
+        maxBytes=5 * 1024 * 1024,
+        backupCount=3,
+        encoding="utf-8"
+    )
+    _timing_handler.setFormatter(logging.Formatter("%(asctime)s %(message)s", datefmt="%H:%M:%S"))
+    _timing_logger.addHandler(_timing_handler)
+
+    @server.before_request
+    def _start_timer():
+        request._start_time = time.perf_counter()
+
+    @server.after_request
+    def _log_timing(response):
+        if request.path != "/_dash-update-component":
+            return response
+
+        duration_ms = (time.perf_counter() - request._start_time) * 1000
+
+        # Extrair nome do callback do corpo da requisição
+        callback_name = "desconhecido"
+        try:
+            body = request.get_json(silent=True, force=True) or {}
+            output = body.get("output") or body.get("outputs", "")
+            if isinstance(output, dict):
+                output = str(output)
+            # Pegar só o ID do componente, sem o tipo de propriedade
+            callback_name = output.split("..")[0] if ".." in output else output[:60]
+        except Exception:
+            pass
+
+        nivel = "🟢" if duration_ms < 300 else "🟡" if duration_ms < 1000 else "🔴"
+        _timing_logger.info(f"{nivel} {duration_ms:7.1f}ms  {callback_name}")
+        return response
 
 
 # --- Registro do Middleware de Detecção Mobile ---
