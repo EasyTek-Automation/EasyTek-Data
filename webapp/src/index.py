@@ -158,7 +158,7 @@ app.layout = html.Div([
     dcc.Location(id='logout-url', refresh=True),
     
     # Store para estado da sidebar (precisa estar aqui para o callback funcionar)
-    dcc.Store(id="sidebar-state", storage_type="session", data="collapsed"),
+    dcc.Store(id="sidebar-state", storage_type="local", data="collapsed"),
     
     html.Div(
         id='loading-overlay',
