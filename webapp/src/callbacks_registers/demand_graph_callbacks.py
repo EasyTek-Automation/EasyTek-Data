@@ -3,7 +3,7 @@ Demand Graph Callbacks
 Callbacks para os gráficos de demanda temporal (kW e kVA)
 """
 
-from dash import Input, Output
+from dash import Input, Output, State
 from datetime import datetime
 import pytz
 import pandas as pd
@@ -26,15 +26,17 @@ def register_demand_callbacks(app, collection_energia):
 
     @app.callback(
         Output('demand-graph-transversais', 'figure'),
+        Input('btn-apply-energy-filters', 'n_clicks'),
         [
-            Input('store-start-date', 'data'),
-            Input('store-end-date', 'data'),
-            Input('store-start-hour', 'data'),
-            Input('store-end-hour', 'data'),
-            Input('machine-dropdown-group1', 'value')
-        ]
+            State('store-start-date', 'data'),
+            State('store-end-date', 'data'),
+            State('store-start-hour', 'data'),
+            State('store-end-hour', 'data'),
+            State('machine-dropdown-group1', 'value'),
+        ],
+        prevent_initial_call=False,
     )
-    def update_demand_transversais(start_date, end_date, start_hour, end_hour, selected_machines):
+    def update_demand_transversais(n_clicks, start_date, end_date, start_hour, end_hour, selected_machines):
         """
         Atualiza gráfico de demanda temporal - Transversais
 
@@ -177,15 +179,17 @@ def register_demand_callbacks(app, collection_energia):
 
     @app.callback(
         Output('demand-graph-longitudinais', 'figure'),
+        Input('btn-apply-energy-filters', 'n_clicks'),
         [
-            Input('store-start-date', 'data'),
-            Input('store-end-date', 'data'),
-            Input('store-start-hour', 'data'),
-            Input('store-end-hour', 'data'),
-            Input('machine-dropdown-group2', 'value')
-        ]
+            State('store-start-date', 'data'),
+            State('store-end-date', 'data'),
+            State('store-start-hour', 'data'),
+            State('store-end-hour', 'data'),
+            State('machine-dropdown-group2', 'value'),
+        ],
+        prevent_initial_call=False,
     )
-    def update_demand_longitudinais(start_date, end_date, start_hour, end_hour, selected_machines):
+    def update_demand_longitudinais(n_clicks, start_date, end_date, start_hour, end_hour, selected_machines):
         """
         Atualiza gráfico de demanda temporal - Longitudinais
 

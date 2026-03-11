@@ -146,6 +146,15 @@ def create_energy_filters():
             ], md=4, className="filter-column", style={"paddingLeft": "20px"}),
         ], className="g-0"),
 
+        dbc.Row([
+            dbc.Col([
+                dbc.Button([
+                    html.I(className="bi bi-play-fill me-2"),
+                    "Aplicar Filtros"
+                ], id="btn-apply-energy-filters", color="primary", size="sm"),
+            ], className="d-flex justify-content-center mt-3"),
+        ], className="g-0"),
+
         # Footer "Powered By"
         create_dropdown_footer()
     ], style={"padding": "20px 25px", "minWidth": "900px"}, id="dashboard-filters-content")

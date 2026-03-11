@@ -159,4 +159,7 @@ def layout():
             ], md=12, className="mb-3"),
         ]),
 
+        # Intervalo específico da página SE03 (substitui o global interval-component)
+        dcc.Interval(id="se03-tel-interval", interval=10 * 1000, n_intervals=0, disabled=False),
+
     ], fluid=True, className="p-4")

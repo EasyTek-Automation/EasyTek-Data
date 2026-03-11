@@ -506,9 +506,24 @@ def create_se03_telemetry_sidebar():
 
         html.Hr(className="my-3"),
 
+        html.Label("Frequência de Atualização", className="fw-semibold small mb-1"),
+        dcc.RadioItems(
+            id="se03-tel-interval-sel",
+            options=[
+                {"label": "10 segundos", "value": 10_000},
+                {"label": "1 minuto",    "value": 60_000},
+                {"label": "5 minutos",   "value": 300_000},
+            ],
+            value=10_000,
+            labelStyle={"display": "block", "fontSize": "0.82rem", "marginBottom": "4px"},
+            inputStyle={"marginRight": "6px"},
+        ),
+
+        html.Hr(className="my-3"),
+
         html.Small([
             html.I(className="bi bi-info-circle me-1"),
-            "Atualização automática a cada 10 segundos.",
+            "Atualização automática conforme frequência selecionada.",
         ], className="text-muted d-block", style={"fontSize": "0.7rem"}),
 
     ], style={"padding": "10px"})

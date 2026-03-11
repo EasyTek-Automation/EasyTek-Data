@@ -100,20 +100,21 @@ def register_energygraph_callbacks(app, collection_energia):
     # ========== CALLBACK PARA BUSCAR DADOS DE ENERGIA (UNIFICADO) ========== #
     @app.callback(
         Output("stored-energy-data", "data"),
+        Input("btn-apply-energy-filters", "n_clicks"),
         [
-            Input("interval-component", "n_intervals"),
-            Input("store-start-date", "data"),
-            Input("store-end-date", "data"),
-            Input("store-start-hour", "data"),
-            Input("store-end-hour", "data"),
-            Input("machine-dropdown-group1", "value"),
-            Input("machine-dropdown-group2", "value"),
+            State("store-start-date", "data"),
+            State("store-end-date", "data"),
+            State("store-start-hour", "data"),
+            State("store-end-hour", "data"),
+            State("machine-dropdown-group1", "value"),
+            State("machine-dropdown-group2", "value"),
         ],
+        prevent_initial_call=False,
     )
-    def fetch_energy_data(n_intervals, start_date, end_date, start_hour, end_hour, group1, group2):
+    def fetch_energy_data(n_clicks, start_date, end_date, start_hour, end_hour, group1, group2):
         t0 = time.perf_counter()
         logger.debug(
-            f"[FETCH] interval={n_intervals} start={start_date} {start_hour} end={end_date} {end_hour} "
+            f"[FETCH] n_clicks={n_clicks} start={start_date} {start_hour} end={end_date} {end_hour} "
             f"group1={group1} group2={group2}"
         )
 

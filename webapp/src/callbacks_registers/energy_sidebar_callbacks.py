@@ -10,7 +10,7 @@ Funcionalidades:
 - Atualiza automaticamente a cada 10 segundos via interval-component
 """
 
-from dash import Input, Output
+from dash import Input, Output, State
 from dash.exceptions import PreventUpdate
 from src.components.sidebars.energy_sidebar import (
     create_se03_cost_sidebar_with_groups,
@@ -42,12 +42,12 @@ def register_energy_sidebar_callbacks(app):
     @app.callback(
         Output("sidebar-dynamic-content", "children", allow_duplicate=True),
         [
-            Input("url", "pathname"),
             Input("energy-tabs", "active_tab")
         ],
+        State("url", "pathname"),
         prevent_initial_call='initial_duplicate'
     )
-    def update_sidebar_layout_for_tab(pathname, active_tab):
+    def update_sidebar_layout_for_tab(active_tab, pathname):
         """
         Atualiza o layout da sidebar quando a página é energia E quando a tab muda.
 
@@ -132,20 +132,21 @@ def register_energy_sidebar_callbacks(app):
             Output("se03-total-custo-demanda", "children"),
             Output("se03-total-custo-final", "children"),
         ],
+        Input("btn-apply-energy-filters", "n_clicks"),
         [
-            Input("energy-tabs", "active_tab"),
-            Input("interval-component", "n_intervals"),  # Auto-refresh a cada 10s
-            Input("store-start-date", "data"),  # Filtro de data início
-            Input("store-end-date", "data"),    # Filtro de data fim
-            Input("store-start-hour", "data"),  # Filtro de hora início
-            Input("store-end-hour", "data"),    # Filtro de hora fim
-            Input("machine-dropdown-group1", "value"),  # Equipamentos Transversais
-            Input("machine-dropdown-group2", "value"),  # Equipamentos Longitudinais
+            State("energy-tabs", "active_tab"),
+            State("store-start-date", "data"),
+            State("store-end-date", "data"),
+            State("store-start-hour", "data"),
+            State("store-end-hour", "data"),
+            State("machine-dropdown-group1", "value"),
+            State("machine-dropdown-group2", "value"),
         ],
         prevent_initial_call=False
     )
     def calculate_se03_costs_by_groups(
-        active_tab, n_intervals, start_date, end_date, start_hour, end_hour,
+        n_clicks,
+        active_tab, start_date, end_date, start_hour, end_hour,
         group1_equipment, group2_equipment
     ):
         """

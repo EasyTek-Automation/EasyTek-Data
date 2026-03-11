@@ -8,7 +8,7 @@ KPI cards e gráficos de tendência.
 
 from datetime import datetime, timedelta, timezone
 
-from dash import Input, Output, html, no_update
+from dash import Input, Output, State, html, no_update
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
@@ -118,17 +118,13 @@ def register_se03_telemetry_callbacks(app, collection):
 
     @app.callback(
         Output("store-se03-telemetry", "data"),
-        Input("interval-component", "n_intervals"),
-        Input("se03-tel-machine-sel", "value"),
-        Input("se03-tel-window", "value"),
-        Input("url", "pathname"),
+        Input("se03-tel-interval", "n_intervals"),  # Intervalo específico da página SE03
+        Input("se03-tel-machine-sel", "value"),      # Input: reage imediatamente à seleção
+        Input("se03-tel-window", "value"),           # Input: reage imediatamente à janela
         prevent_initial_call=True,
     )
-    def fetch_se03_telemetry(n_intervals, machines, window_min, pathname):
-        """Busca dados de telemetria apenas quando na página SE03."""
-        if pathname != "/utilities/energy/se03":
-            raise PreventUpdate
-
+    def fetch_se03_telemetry(n_intervals, machines, window_min):
+        """Busca dados de telemetria. Intervalo específico garante execução apenas na página SE03."""
         if collection is None:
             return None
 
@@ -322,3 +318,13 @@ def register_se03_telemetry_callbacks(app, collection):
             xaxis=dict(title="Hora"),
         )
         return fig
+
+    # ── Callback 5: Atualizar período do intervalo ───────────────────────────
+    @app.callback(
+        Output("se03-tel-interval", "interval"),
+        Input("se03-tel-interval-sel", "value"),
+        prevent_initial_call=True,
+    )
+    def update_interval_period(value):
+        """Atualiza o período do intervalo de atualização da telemetria."""
+        return value or 10_000

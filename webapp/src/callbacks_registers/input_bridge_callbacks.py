@@ -1,6 +1,6 @@
 # callbacks/input_bridge_callbacks.py
 import dash
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 import logging
 from datetime import datetime, timedelta
 
@@ -24,7 +24,7 @@ def register_input_bridge_callbacks(app):
             Input('date-picker-range', 'end_date'),
             Input('start-hour', 'value'),
             Input('end-hour', 'value'),
-            Input('url', 'pathname')  # Para saber qual página está ativa
+            State('url', 'pathname')  # Para saber qual página está ativa (State: URL não dispara o callback)
         ]
     )
     def update_global_stores(start_date, end_date, start_hour, end_hour, pathname):
