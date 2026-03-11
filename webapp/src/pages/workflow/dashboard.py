@@ -930,43 +930,6 @@ def concluir_subtarefa_modal():
 
 
 # ======================================================================================
-# MODAL DE MIGRAÇÃO
-# ======================================================================================
-
-def _migration_modal():
-    """Modal de migração de record_type (visível apenas para nível 3)."""
-    return dbc.Modal([
-        dbc.ModalHeader(dbc.ModalTitle([
-            html.I(className="fas fa-database me-2 text-warning"),
-            "Migração de Histórico"
-        ])),
-        dbc.ModalBody([
-            html.P([
-                "Esta operação adiciona o campo ",
-                html.Code("record_type"),
-                " a documentos antigos em ",
-                html.Code("MaintenanceHistory_workflow"),
-                " que ainda não possuem esse campo."
-            ]),
-            html.P([
-                html.Strong("Idempotente:"),
-                " documentos já migrados não são alterados. Seguro executar múltiplas vezes."
-            ], className="text-muted small"),
-            html.Div(id="migration-result")
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("Fechar", id="btn-close-migration",
-                       color="secondary", outline=True, className="me-2"),
-            dbc.Button(
-                [html.I(className="fas fa-play me-2"), "Executar Migração"],
-                id="btn-run-migration",
-                color="warning"
-            )
-        ])
-    ], id="migration-modal", is_open=False, centered=True)
-
-
-# ======================================================================================
 # LAYOUT PRINCIPAL
 # ======================================================================================
 
@@ -1012,9 +975,6 @@ def layout():
         edit_subtask_modal(),
         delete_subtask_confirm_modal(),
 
-        # Modal de migração de histórico (nível 3)
-        _migration_modal(),
-
         # Header
         dbc.Row([
             dbc.Col([
@@ -1042,12 +1002,6 @@ def layout():
                         "Exportar"
                     ], id="btn-export", color="secondary", outline=True, disabled=True),
 
-                    dbc.Button([
-                        html.I(className="fas fa-database me-2"),
-                        "Migrar Histórico"
-                    ], id="btn-open-migration", color="warning", outline=True,
-                       style={"display": "inline-block" if current_user.is_authenticated and current_user.level == 3 else "none"},
-                       title="Migração de dados — atualiza record_type em registros antigos"),
                 ], className="w-100")
             ], width=12, md=6, className="text-end")
         ], className="mb-4 align-items-center"),
