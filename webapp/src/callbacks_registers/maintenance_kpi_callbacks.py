@@ -1837,7 +1837,8 @@ def register_maintenance_kpi_callbacks(app):
                 create_no_data_figure("linha", template),
                 create_no_data_figure("linha", template),
                 create_no_data_figure("comparacao", template),
-                create_no_data_figure("heatmap", template)
+                create_no_data_figure("heatmap", template),
+                None,
             ]
 
         data = stored_data["data"]

@@ -541,6 +541,29 @@ When user navigates:
 
 ## Important Development Notes
 
+### Botão "Aplicar Filtros" — Regra Obrigatória de UX
+
+**SEMPRE** que adicionar um novo botão "Aplicar Filtros" a qualquer página, ele deve fechar o mega menu de filtros (`filters-dropdown-menu`) ao ser clicado.
+
+**Como implementar**:
+1. Dê ao botão um `id` descritivo (ex: `btn-apply-minhapage-filters`)
+2. Adicione esse `id` como novo `Input` no callback `close_filters_menu_on_apply` em `callbacks_registers/main_layout_callbacks.py`:
+   ```python
+   @app.callback(
+       Output("filters-dropdown-menu", "is_open"),
+       [
+           Input("btn-apply-energy-filters", "n_clicks"),
+           Input("btn-apply-indicator-filters", "n_clicks"),
+           Input("btn-apply-minhapage-filters", "n_clicks"),  # ← adicionar aqui
+       ],
+       prevent_initial_call=True,
+   )
+   def close_filters_menu_on_apply(*_):
+       return False
+   ```
+
+**Motivo**: Sem isso, o mega menu fica aberto após o clique, degradando a experiência do usuário — o conteúdo atualizado fica ocluído pelo dropdown.
+
 ### Adding New Pages
 
 1. Create page module in appropriate `pages/` subdirectory with `layout` function/variable

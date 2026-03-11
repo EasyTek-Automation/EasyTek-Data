@@ -16,7 +16,19 @@ def register_main_layout_callbacks(app):
     """
 
     @app.callback(
-        [Output("sidebar-column", "style"), 
+        Output("filters-dropdown-menu", "is_open"),
+        [
+            Input("btn-apply-energy-filters", "n_clicks"),
+            Input("btn-apply-indicator-filters", "n_clicks"),
+        ],
+        prevent_initial_call=True,
+    )
+    def close_filters_menu_on_apply(*_):
+        """Fecha o mega menu de filtros ao clicar em qualquer botão 'Aplicar Filtros'."""
+        return False
+
+    @app.callback(
+        [Output("sidebar-column", "style"),
          Output("content-column", "style"), 
          Output("sidebar-content", "style"), 
          Output("collapse-sidebar-btn", "children"), 
