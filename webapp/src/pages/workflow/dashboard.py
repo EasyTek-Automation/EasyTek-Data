@@ -294,7 +294,7 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
             ], className="d-flex align-items-center justify-content-around flex-wrap"),
             className="py-2"
         ),
-        className="shadow-sm mb-3"
+        className="shadow-sm mb-3 workflow-kpi-strip"
     )
 
     # --- Cards de ação pessoal ---
@@ -316,32 +316,32 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
             icone="fas fa-inbox",
             cor_valor="text-secondary" if aguardando_aceite else None,
             borda="secondary" if aguardando_aceite else None
-        ), width=True, className="mb-3"),
+        ), width=True, className="mb-2"),
         dbc.Col(_card(
             "Aguard. Aprovação", aguardando_aprovacao,
             icone="fas fa-clock",
             cor_valor="text-warning" if aguardando_aprovacao else None,
             borda="warning" if aguardando_aprovacao else None
-        ), width=True, className="mb-3"),
+        ), width=True, className="mb-2"),
         dbc.Col(_card(
             "Abertas por Mim", abertos_por_mim,
             icone="fas fa-folder-open"
-        ), width=True, className="mb-3"),
+        ), width=True, className="mb-2"),
         dbc.Col(_card(
             "Abertas — Aceitas", abertos_aceitos,
             icone="fas fa-check-circle",
             cor_valor="text-success" if abertos_aceitos else None,
             borda="success" if abertos_aceitos else None
-        ), width=True, className="mb-3"),
+        ), width=True, className="mb-2"),
         dbc.Col(_card(
             "Abertas — Rejeitadas", abertos_rejeitados,
             icone="fas fa-times-circle",
             cor_valor="text-danger" if abertos_rejeitados else None,
             borda="danger" if abertos_rejeitados else None
-        ), width=True, className="mb-3"),
-    ])
+        ), width=True, className="mb-2"),
+    ], className="workflow-kpi-cards")
 
-    return html.Div([status_strip, cards_pessoais], className="mb-4")
+    return html.Div([status_strip, cards_pessoais], className="mb-3")
 
 
 def criar_painel_filtros():
@@ -441,7 +441,7 @@ def criar_painel_filtros():
                 ], width=12, md=3)
             ])
         ])
-    ], className="shadow-sm mb-4")
+    ], className="shadow-sm mb-3 workflow-filters")
 
 
 def criar_timeline_historico(historico_items, username_atual=None, mostrar_botoes=True):
@@ -795,8 +795,8 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
             dbc.Collapse(
                 dbc.Card([
                     dbc.CardBody(id={"type": "historico-content", "index": index},
-                                 className="p-0")
-                ], className="border-0 shadow-sm"),
+                                 className="p-0 workflow-subtask-panel")
+                ], className="border-0"),
                 id={"type": "collapse-historico", "index": index},
                 is_open=False
             ),
@@ -866,11 +866,12 @@ def criar_tabela_pendencias(df_pendencias, df_historico=None, user_level=1, user
 
     return dbc.Table(
         [thead, tbody],
-        bordered=True,
+        bordered=False,
         hover=True,
         responsive=True,
         striped=True,
-        className="mb-0"
+        className="mb-0 workflow-table",
+        style={"borderTop": "1px solid var(--bs-border-color)"}
     )
 
 
@@ -1006,7 +1007,7 @@ def layout():
                 html.H2([
                     html.I(className="fas fa-project-diagram me-2"),
                     "Workflow Dashboard"
-                ], className="mb-0")
+                ], className="mb-0 workflow-page-title")
             ], width=12, md=6),
 
             dbc.Col([
@@ -1063,4 +1064,4 @@ def layout():
             ], className="p-0")
         ], className="shadow-sm")
 
-    ], fluid=True, className="px-4 py-4")
+    ], fluid=True, className="px-4 py-3 workflow-page")

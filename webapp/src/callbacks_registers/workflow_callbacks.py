@@ -182,13 +182,14 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
             if i < len(meta_partes) - 1:
                 meta_children.append(html.Span(" · ", className="text-muted"))
 
-        # Botões de ação
+        # Botões de ação (ícone-apenas para máxima densidade)
         botoes = []
         if not concluido and hist_id:
             botoes.append(dbc.Button(
-                [html.I(className="fas fa-check me-1"), "Concluir"],
+                html.I(className="fas fa-check"),
                 id={"type": "btn-concluir-subtarefa", "index": hist_id},
-                color="success", size="sm", outline=True
+                color="success", size="sm", outline=True,
+                title="Concluir subtarefa"
             ))
         if hist_id:
             botoes.append(dbc.Button(
@@ -214,14 +215,16 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
         if (status_aprovacao == 'pendente' and aprovador and
                 username_atual and username_atual == aprovador and hist_id):
             botoes.append(dbc.Button(
-                [html.I(className="fas fa-thumbs-up me-1"), "Aprovar"],
+                html.I(className="fas fa-thumbs-up"),
                 id={"type": "btn-aprovar", "index": hist_id},
-                color="success", size="sm", className="me-1"
+                color="success", size="sm", outline=True,
+                title="Aprovar"
             ))
             botoes.append(dbc.Button(
-                [html.I(className="fas fa-thumbs-down me-1"), "Rejeitar"],
+                html.I(className="fas fa-thumbs-down"),
                 id={"type": "btn-rejeitar", "index": hist_id},
-                color="danger", size="sm"
+                color="danger", size="sm", outline=True,
+                title="Rejeitar"
             ))
 
         cor_borda = ("var(--bs-success)" if concluido

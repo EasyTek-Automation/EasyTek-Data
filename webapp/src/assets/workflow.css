@@ -1,0 +1,160 @@
+/* ================================================================
+   Workflow Dashboard — Compact / High-density Styles
+   Inspirado no visual do ClickUp: fontes menores, linhas justas,
+   botões de ação como ícones, menos padding em cards e filtros.
+   ================================================================ */
+
+/* --- Base font-size da página ---
+   Bootstrap usa 1rem = 16px. Aqui reduzimos para ~13.5px no contexto
+   do workflow. Isso afeta todo o texto, badges e labels da área.
+   ----------------------------------------------------------------- */
+.workflow-page {
+    font-size: 13.5px;
+}
+
+/* Cascata para elementos filhos que definem font-size explicitamente */
+.workflow-page td,
+.workflow-page th,
+.workflow-page .form-control,
+.workflow-page .form-select,
+.workflow-page .form-label,
+.workflow-page .input-group-text,
+.workflow-page .dropdown-menu {
+    font-size: 13.5px;
+}
+
+/* --- Cabeçalho da página --- */
+.workflow-page .workflow-page-title {
+    font-size: 1.4rem;
+}
+
+/* --- KPI Strip (barra de status total/fila/andamento/etc.) --- */
+.workflow-kpi-strip .card-body {
+    padding: 6px 0 !important;
+}
+
+.workflow-kpi-strip .fs-3 {
+    font-size: 1.4rem !important;
+    line-height: 1.2;
+}
+
+.workflow-kpi-strip small {
+    font-size: 11px;
+}
+
+/* --- KPI Cards pessoais (Aguard. Aceite, Aprovação, etc.) --- */
+.workflow-kpi-cards .card-body {
+    padding: 8px 14px !important;
+}
+
+.workflow-kpi-cards h4 {
+    font-size: 1.25rem !important;
+    margin-bottom: 0 !important;
+}
+
+.workflow-kpi-cards h6 {
+    font-size: 11px !important;
+    margin-bottom: 4px !important;
+}
+
+.workflow-kpi-cards .mb-3 {
+    margin-bottom: 6px !important;
+}
+
+/* --- Painel de filtros --- */
+.workflow-filters .card-body {
+    padding: 10px 14px !important;
+}
+
+.workflow-filters .fw-bold,
+.workflow-filters .form-label {
+    font-size: 12px;
+    margin-bottom: 3px !important;
+}
+
+.workflow-filters .mb-3 {
+    margin-bottom: 8px !important;
+}
+
+/* --- Tabela principal de pendências --- */
+.workflow-table td,
+.workflow-table th {
+    padding: 5px 10px !important;
+    vertical-align: middle;
+    line-height: 1.35;
+}
+
+.workflow-table th {
+    font-size: 11.5px !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--bs-secondary);
+    padding-top: 8px !important;
+    padding-bottom: 8px !important;
+    white-space: nowrap;
+}
+
+/* Botões de ação na linha da tabela */
+.workflow-table .btn-sm {
+    padding: 2px 6px;
+    font-size: 12px;
+    line-height: 1.4;
+}
+
+/* Badge de status */
+.workflow-table .badge {
+    font-size: 11px;
+    padding: 2px 7px;
+    line-height: 1.4;
+}
+
+/* Barra de horas inline na célula de descrição */
+.workflow-table .progress {
+    height: 8px !important;
+}
+
+/* Progresso de subtarefas */
+.workflow-table .progress[style*="height: 8px"] {
+    margin-bottom: 2px;
+}
+
+/* --- Painel expandido (subtarefas) --- */
+.workflow-subtask-panel {
+    font-size: 13px;
+    background-color: transparent;
+}
+
+.workflow-subtask-panel .badge {
+    font-size: 11px;
+    padding: 2px 6px;
+}
+
+.workflow-subtask-panel .btn-sm {
+    padding: 2px 5px;
+    font-size: 12px;
+}
+
+/* Linha de subtarefa */
+.workflow-subtask-item {
+    transition: background-color 0.1s ease;
+}
+
+.workflow-subtask-item:hover {
+    background-color: rgba(0, 0, 0, 0.025) !important;
+}
+
+/* Animação de colapso mais rápida */
+.workflow-page .collapsing {
+    transition-duration: 0.15s !important;
+}
+
+/* --- Seção "Linha do tempo do sistema" --- */
+.workflow-subtask-panel details summary {
+    user-select: none;
+    outline: none;
+}
+
+.workflow-subtask-panel details summary::-webkit-details-marker {
+    display: none;
+}
