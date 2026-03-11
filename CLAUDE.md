@@ -539,6 +539,31 @@ When user navigates:
 6. Build main layout with header, sidebar, content
 7. Load dynamic sidebar content based on resolved route
 
+## Registrar Dívida Técnica
+
+Quando o usuário disser **"Crie essa dívida técnica"** (ou variações como "registra essa dívida", "documenta como dívida técnica"), execute os seguintes passos:
+
+1. **Criar arquivo detalhado** em `.dev-docs/technical-debt/` seguindo o padrão dos arquivos existentes:
+   - Nome descritivo em kebab-case (ex: `callbacks-client-side.md`)
+   - Cabeçalho com Data, Prioridade, Impacto, Módulo, Status
+   - Para cada item: O que faz, Problema, Solução, Arquivos afetados, Estimativa, Frequência/Impacto
+   - Seção "Como implementar" com exemplos de código quando aplicável
+   - Tabela de ordem de execução recomendada
+
+2. **Atualizar `.dev-docs/technical-debt/README.md`**:
+   - Adicionar linha na tabela de Status Geral (atualizar contadores)
+   - Adicionar itens na seção de prioridade correta (🔴 Alta / 🟡 Média / 🟢 Baixa)
+   - Adicionar link na seção "📚 Arquivos Detalhados"
+
+3. **Prioridades**:
+   - 🔴 Alta: impacto em segurança, robustez ou bugs em produção
+   - 🟡 Média: performance, manutenibilidade, código duplicado
+   - 🟢 Baixa: nice-to-have, melhorias incrementais de UX/performance
+
+Não é necessário perguntar confirmação — executar diretamente.
+
+---
+
 ## Important Development Notes
 
 ### Botão "Aplicar Filtros" — Regra Obrigatória de UX

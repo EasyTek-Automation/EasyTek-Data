@@ -15,8 +15,9 @@
 |--------|-------|---------|----------|----------|--------------|
 | **ZPP Processing** | 9 | 3 | 3 | 3 | 0 |
 | **Webapp (KPI)** | 4 | 0 | 0 | 0 | 4 |
+| **Webapp (Callbacks UI)** | 4 | 0 | 0 | 4 | 0 |
 | Event Gateway | - | - | - | - | - |
-| **TOTAL** | **13** | **3** | **3** | **3** | **4** |
+| **TOTAL** | **17** | **3** | **3** | **7** | **4** |
 
 ---
 
@@ -65,6 +66,24 @@ Melhorias de código e performance.
 ### 🟢 Baixa Prioridade
 
 Nice-to-have, funcionalidades extras.
+
+#### Webapp — Callbacks UI-only
+
+10. **[toggle_sidebar](./callbacks-client-side.md#1-toggle_sidebar--main_layout_callbackspy-)**
+    Sidebar usa servidor para calcular estilos CSS estáticos
+    `callbacks_registers/main_layout_callbacks.py`
+
+11. **[toggle_alarm_filters](./callbacks-client-side.md#2-toggle_alarm_filters--alarms_callbackspy-)**
+    `return not is_open` no servidor
+    `callbacks_registers/alarms_callbacks.py`
+
+12. **[toggle_folder](./callbacks-client-side.md#3-toggle_folder--procedures_collapse_callbackspy-)**
+    Toggle de collapse de pasta em procedimentos
+    `callbacks_registers/procedures_collapse_callbacks.py`
+
+13. **[toggle_error_details](./callbacks-client-side.md#4-toggle_error_details--database_error_callbackspy-)**
+    `return not is_open` no servidor
+    `callbacks_registers/database_error_callbacks.py`
 
 #### ZPP Processing
 
@@ -136,6 +155,7 @@ Nice-to-have, funcionalidades extras.
 - **[performance-indicators-kpi.md](./performance-indicators-kpi.md)** - Performance página indicadores
 - **[indicadores-botao-atualizar.md](./indicadores-botao-atualizar.md)** - Semântica do botão Atualizar
 - **[refatoracao-arquivos.md](./refatoracao-arquivos.md)** - Refatorações arquiteturais
+- **[callbacks-client-side.md](./callbacks-client-side.md)** - Callbacks UI-only que devem ser convertidos para clientside_callback
 
 ---
 
