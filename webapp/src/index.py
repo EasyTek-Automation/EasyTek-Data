@@ -250,75 +250,84 @@ def route_and_prepare_content(pathname, sidebar_state):
 def _build_main_layout(pathname, page_content, sidebar_state):
     """
     Constrói o layout principal com header, sidebar e conteúdo.
-    
-    Args:
-        pathname (str): Rota atual
-        page_content: Conteúdo da página
-        sidebar_state (str): Estado da sidebar ("expanded" ou "collapsed")
-        
-    Returns:
-        html.Div: Layout completo
+
+    A sidebar é um overlay fixo (position: fixed) que desliza sobre o conteúdo —
+    não empurra/encolhe a área de conteúdo. Um layer semi-transparente (sidebar-overlay)
+    aparece entre o conteúdo e a sidebar; clicar nele fecha a sidebar.
     """
-    # Definir estilos baseado no estado da sidebar
+    _SIDEBAR_W = "280px"
+
     if sidebar_state == "expanded":
         sidebar_col_style = {
-            "width": "25%", "height": "100%", 
-            "transition": "width 0.5s ease", 
-            "padding": "8px", "overflow": "hidden"
+            "position": "fixed", "top": "60px", "left": "0", "bottom": "0",
+            "width": _SIDEBAR_W, "zIndex": 901,
+            "transform": "translateX(0)",
+            "transition": "transform 0.3s ease",
+            "overflowY": "auto",
         }
-        content_col_style = {
-            "width": "75%", "height": "100%", 
-            "transition": "width 0.5s ease", 
-            "overflowY": "auto"
+        overlay_style = {
+            "position": "fixed", "top": "60px", "left": "0",
+            "right": "0", "bottom": "0",
+            "backgroundColor": "rgba(255,255,255,0.55)",
+            "backdropFilter": "blur(2px)",
+            "WebkitBackdropFilter": "blur(2px)",
+            "zIndex": 900, "cursor": "pointer",
+            "visibility": "visible", "opacity": 1,
+            "transition": "opacity 0.3s ease",
         }
-        sidebar_content_style = {
-            "height": "100%", "visibility": "visible", "opacity": 1, 
-            "overflowY": "auto", 
-            "transition": "opacity 0.3s ease, visibility 0s linear 0.5s"
-        }
-    else:  # collapsed ou None
+    else:
         sidebar_col_style = {
-            "width": "0%", "height": "100%", 
-            "transition": "width 0.5s ease", 
-            "padding": "8px", "overflow": "hidden"
+            "position": "fixed", "top": "60px", "left": "0", "bottom": "0",
+            "width": _SIDEBAR_W, "zIndex": 901,
+            "transform": f"translateX(-{_SIDEBAR_W})",
+            "transition": "transform 0.3s ease",
+            "overflowY": "auto",
         }
-        content_col_style = {
-            "width": "100%", "height": "100%", 
-            "transition": "width 0.5s ease", 
-            "overflowY": "auto"
+        overlay_style = {
+            "position": "fixed", "top": "60px", "left": "0",
+            "right": "0", "bottom": "0",
+            "backgroundColor": "rgba(255,255,255,0.55)",
+            "backdropFilter": "blur(2px)",
+            "WebkitBackdropFilter": "blur(2px)",
+            "zIndex": 900, "cursor": "pointer",
+            "visibility": "hidden", "opacity": 0,
+            "transition": "opacity 0.3s ease, visibility 0s linear 0.3s",
         }
-        sidebar_content_style = {
-            "height": "100%", "visibility": "hidden", "opacity": 0, 
-            "overflow": "hidden", 
-            "transition": "opacity 0.2s ease, visibility 0s linear 0.2s"
-        }
+
+    # Sidebar card sempre visível — o slide é controlado via transform no container
+    sidebar_content_style = {
+        "height": "100%", "visibility": "visible", "opacity": 1, "overflowY": "auto",
+    }
 
     return html.Div([
         *stores.app_stores,
         header.create_header(pathname, current_user),
-        html.Div([
-            html.Div(
-                [sidebar.create_sidebar_layout(app, pathname, sidebar_content_style)], 
-                id="sidebar-column", 
-                style=sidebar_col_style
-            ),
-            html.Div(
-                [html.Div(page_content)],
-                id="content-column",
-                style=content_col_style
-            ),
-        ], id="main-container", style={
-            "position": "fixed", "top": "60px", "left": 0, "right": 0, 
-            "bottom": 0, "display": "flex", "flexDirection": "row", 
-            "gap": "10px"
-        }),
+
+        # Sidebar — overlay fixo, desliza sobre o conteúdo
+        html.Div(
+            [sidebar.create_sidebar_layout(app, pathname, sidebar_content_style)],
+            id="sidebar-column",
+            style=sidebar_col_style
+        ),
+
+        # Overlay — layer clicável entre conteúdo e sidebar
+        html.Div(id="sidebar-overlay", n_clicks=0, style=overlay_style),
+
+        # Conteúdo — sempre full-width, não se move
+        html.Div(
+            html.Div(page_content),
+            id="content-column",
+            style={
+                "position": "fixed", "top": "60px", "left": "0",
+                "right": "0", "bottom": "0",
+                "overflowY": "auto", "zIndex": 1,
+            }
+        ),
+
         dbc.Toast(
-            id="toast-mqtt-status", 
-            header="Status da Publicação MQTT", 
-            is_open=False, 
-            dismissable=True, 
-            duration=4000, 
-            icon="info", 
+            id="toast-mqtt-status",
+            header="Status da Publicação MQTT",
+            is_open=False, dismissable=True, duration=4000, icon="info",
             style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999}
         ),
         dcc.Interval(id='interval-component', interval=10 * 1000, n_intervals=0, disabled=False),
