@@ -23,6 +23,7 @@ from src.callbacks_registers.sp_callback import register_sp_callback
 from src.callbacks_registers.tempgraph_callback import register_tempgraph_callbacks
 from src.callbacks_registers.hourlyconsumption_callback import register_hourlyconsumption_callbacks
 from src.callbacks_registers.sidebar_content_callback import register_sidebar_content_callback
+from src.callbacks_registers.sidebar_toggle_callback import register_sidebar_toggle_callback
 from src.callbacks_registers.home_callbacks import register_home_callbacks
 from src.callbacks_registers.alarms_callbacks import register_alarms_callbacks
 from src.callbacks_registers.create_user_callbacks import register_create_user_callbacks
@@ -91,6 +92,7 @@ def register_callbacks(app):
     register_tempgraph_callbacks(app, collection_temp)
     register_hourlyconsumption_callbacks(app, collection_consumo)
     register_sidebar_content_callback(app)
+    register_sidebar_toggle_callback(app)
     register_home_callbacks(app)
     register_alarms_callbacks(app)
     register_create_user_callbacks(app)
