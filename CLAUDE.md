@@ -543,14 +543,14 @@ When user navigates:
 
 Quando o usuário disser **"Crie essa dívida técnica"** (ou variações como "registra essa dívida", "documenta como dívida técnica"), execute os seguintes passos:
 
-1. **Criar arquivo detalhado** em `.dev-docs/technical-debt/` seguindo o padrão dos arquivos existentes:
+1. **Criar arquivo detalhado** em `E:\Projetos Python\AMG\.dev-docs\technical-debt\` seguindo o padrão dos arquivos existentes:
    - Nome descritivo em kebab-case (ex: `callbacks-client-side.md`)
    - Cabeçalho com Data, Prioridade, Impacto, Módulo, Status
    - Para cada item: O que faz, Problema, Solução, Arquivos afetados, Estimativa, Frequência/Impacto
    - Seção "Como implementar" com exemplos de código quando aplicável
    - Tabela de ordem de execução recomendada
 
-2. **Atualizar `.dev-docs/technical-debt/README.md`**:
+2. **Atualizar `E:\Projetos Python\AMG\.dev-docs\technical-debt\README.md`**:
    - Adicionar linha na tabela de Status Geral (atualizar contadores)
    - Adicionar itens na seção de prioridade correta (🔴 Alta / 🟡 Média / 🟢 Baixa)
    - Adicionar link na seção "📚 Arquivos Detalhados"
