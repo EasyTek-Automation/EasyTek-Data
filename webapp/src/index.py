@@ -311,7 +311,7 @@ def _build_main_layout(pathname, page_content, sidebar_state):
         ),
 
         # Overlay — layer clicável entre conteúdo e sidebar
-        html.Div(id="sidebar-overlay", n_clicks=0, style=overlay_style),
+        html.Div(id="sidebar-overlay", style=overlay_style),
 
         # Conteúdo — sempre full-width, não se move
         html.Div(

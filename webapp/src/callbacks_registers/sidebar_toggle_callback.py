@@ -75,6 +75,8 @@ def register_sidebar_toggle_callback(app):
         prevent_initial_call=True
     )
     def toggle_sidebar(btn_clicks, overlay_clicks, current_state):
+        if not btn_clicks and not overlay_clicks:
+            raise PreventUpdate
         ctx = callback_context
         if not ctx.triggered:
             raise PreventUpdate
