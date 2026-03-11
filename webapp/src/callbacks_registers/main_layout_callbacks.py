@@ -17,14 +17,20 @@ def register_main_layout_callbacks(app):
 
     @app.callback(
         Output("filters-dropdown-menu", "is_open"),
-        [
-            Input("btn-apply-energy-filters", "n_clicks"),
-            Input("btn-apply-indicator-filters", "n_clicks"),
-        ],
+        Input("btn-apply-energy-filters", "n_clicks"),
         prevent_initial_call=True,
     )
-    def close_filters_menu_on_apply(*_):
-        """Fecha o mega menu de filtros ao clicar em qualquer botão 'Aplicar Filtros'."""
+    def close_filters_menu_on_apply_energy(_):
+        """Fecha o mega menu ao clicar em Aplicar Filtros na página de energia."""
+        return False
+
+    @app.callback(
+        Output("filters-dropdown-menu", "is_open", allow_duplicate=True),
+        Input("btn-apply-indicator-filters", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def close_filters_menu_on_apply_indicators(_):
+        """Fecha o mega menu ao clicar em Aplicar Filtros na página de indicadores."""
         return False
 
     @app.callback(

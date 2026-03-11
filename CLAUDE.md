@@ -547,20 +547,18 @@ When user navigates:
 
 **Como implementar**:
 1. Dê ao botão um `id` descritivo (ex: `btn-apply-minhapage-filters`)
-2. Adicione esse `id` como novo `Input` no callback `close_filters_menu_on_apply` em `callbacks_registers/main_layout_callbacks.py`:
+2. Adicione um novo callback separado em `callbacks_registers/main_layout_callbacks.py`:
    ```python
    @app.callback(
-       Output("filters-dropdown-menu", "is_open"),
-       [
-           Input("btn-apply-energy-filters", "n_clicks"),
-           Input("btn-apply-indicator-filters", "n_clicks"),
-           Input("btn-apply-minhapage-filters", "n_clicks"),  # ← adicionar aqui
-       ],
+       Output("filters-dropdown-menu", "is_open", allow_duplicate=True),
+       Input("btn-apply-minhapage-filters", "n_clicks"),
        prevent_initial_call=True,
    )
-   def close_filters_menu_on_apply(*_):
+   def close_filters_menu_on_apply_minhapage(_):
        return False
    ```
+
+**IMPORTANTE**: Cada botão deve ter seu **próprio callback separado** com `allow_duplicate=True` no Output. Nunca agrupe múltiplos `btn-apply-*` como Inputs no mesmo callback — cada botão é page-specific e não existe no DOM de outras páginas, causando `ReferenceError` no Dash 3.x.
 
 **Motivo**: Sem isso, o mega menu fica aberto após o clique, degradando a experiência do usuário — o conteúdo atualizado fica ocluído pelo dropdown.
 
