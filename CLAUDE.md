@@ -546,19 +546,10 @@ When user navigates:
 **SEMPRE** que adicionar um novo botão "Aplicar Filtros" a qualquer página, ele deve fechar o mega menu de filtros (`filters-dropdown-menu`) ao ser clicado.
 
 **Como implementar**:
-1. Dê ao botão um `id` descritivo (ex: `btn-apply-minhapage-filters`)
-2. Adicione um novo callback separado em `callbacks_registers/main_layout_callbacks.py`:
-   ```python
-   @app.callback(
-       Output("filters-dropdown-menu", "is_open", allow_duplicate=True),
-       Input("btn-apply-minhapage-filters", "n_clicks"),
-       prevent_initial_call=True,
-   )
-   def close_filters_menu_on_apply_minhapage(_):
-       return False
-   ```
+1. Dê ao botão um `id` que comece com `btn-apply-` (ex: `btn-apply-minhapage-filters`)
+2. Nenhum código adicional é necessário — o fechamento do menu é tratado por `assets/close_megamenu_on_apply.js`, que detecta automaticamente qualquer clique em elemento com `id` começando por `btn-apply-`.
 
-**IMPORTANTE**: Cada botão deve ter seu **próprio callback separado** com `allow_duplicate=True` no Output. Nunca agrupe múltiplos `btn-apply-*` como Inputs no mesmo callback — cada botão é page-specific e não existe no DOM de outras páginas, causando `ReferenceError` no Dash 3.x.
+**Por que JavaScript e não callback Dash**: fechar um dropdown é puramente UI (client-side). Usar callback Dash geraria um round-trip desnecessário ao servidor Python. Além disso, registrar `Output("filters-dropdown-menu", "is_open")` em um callback com Input page-specific bloqueia o prop no Dash 3.x, impedindo o menu de abrir em páginas onde o botão não existe no DOM.
 
 **Motivo**: Sem isso, o mega menu fica aberto após o clique, degradando a experiência do usuário — o conteúdo atualizado fica ocluído pelo dropdown.
 
