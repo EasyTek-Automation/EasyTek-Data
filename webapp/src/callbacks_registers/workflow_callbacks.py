@@ -30,11 +30,11 @@ from src.pages.workflow.dashboard import (
 def criar_checklist_subtarefas(historico_items, username_atual=None,
                                user_level=1, pend_id=None):
     """
-    View unificada de subtarefas com logs inline abaixo de cada uma (estilo ClickUp).
+    View unificada de subtarefas (estilo ClickUp).
 
-    - Eventos de sistema (criação/aceite/rejeição) aparecem numa seção colapsável no topo.
-    - Cada subtarefa exibe seus relatórios/logs inline, colapsáveis via html.Details.
-    - Não há abas separadas.
+    Cada subtarefa tem seu próprio expand/collapse (dbc.Collapse + btn pattern-matching).
+    Quando expandida, exibe: meta info, observações e logs como sub-itens.
+    Eventos de sistema ficam numa seção colapsável no topo.
     """
     sub_items = [h for h in historico_items if h.get('record_type', 'subtarefa') == 'subtarefa']
     log_items_all = [h for h in historico_items if h.get('record_type') == 'log']
@@ -94,7 +94,7 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
             ], className="text-center py-4")
         ])
 
-    # --- Lista de subtarefas com logs inline ---
+    # --- Lista de subtarefas com collapse individual ---
     items_html = []
     for item in sub_items:
         concluido = item.get('concluido') is True
@@ -128,17 +128,17 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
 
         # Ícone de status
         if concluido:
-            icone = html.I(className="fas fa-check-circle text-success",
-                           style={"fontSize": "1.15rem"})
+            icone_status = html.I(className="fas fa-check-circle text-success",
+                                  style={"fontSize": "1.1rem"})
         elif status_aprovacao == 'pendente':
-            icone = html.I(className="fas fa-hourglass-half text-warning",
-                           style={"fontSize": "1.15rem"})
+            icone_status = html.I(className="fas fa-hourglass-half text-warning",
+                                  style={"fontSize": "1.1rem"})
         elif status_aprovacao == 'rejeitado':
-            icone = html.I(className="fas fa-times-circle text-danger",
-                           style={"fontSize": "1.15rem"})
+            icone_status = html.I(className="fas fa-times-circle text-danger",
+                                  style={"fontSize": "1.1rem"})
         else:
-            icone = html.I(className="far fa-circle text-secondary",
-                           style={"fontSize": "1.15rem"})
+            icone_status = html.I(className="far fa-circle text-secondary",
+                                  style={"fontSize": "1.1rem"})
 
         # Badges
         badges = []
@@ -153,14 +153,22 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
             badges.append(dbc.Badge("Aprovado", color="success", className="me-1"))
         elif status_aprovacao == 'rejeitado':
             badges.append(dbc.Badge("Rejeitado", color="danger", className="me-1"))
+        if n_logs > 0:
+            horas_logs_fmt = float_para_hhmm(horas_logs) if horas_logs > 0 else ""
+            n_label = f"{n_logs} rel."
+            if horas_logs_fmt:
+                n_label += f" · {horas_logs_fmt}"
+            badges.append(dbc.Badge(
+                [html.I(className="fas fa-file-alt me-1"), n_label],
+                color="info", className="me-1"
+            ))
 
         # Meta info
         horas_fmt = float_para_hhmm(horas_val) if horas_val else None
         meta_partes = [editado_por, data]
         if horas_fmt:
             meta_partes.append(html.Span([
-                html.I(className="fas fa-clock me-1 text-info"),
-                horas_fmt
+                html.I(className="fas fa-clock me-1 text-info"), horas_fmt
             ], className="text-info fw-semibold"))
         if aprovador and not concluido:
             meta_partes.append(html.Span([
@@ -221,87 +229,90 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                      else "var(--bs-danger)" if status_aprovacao == 'rejeitado'
                      else "var(--bs-primary)")
 
-        # --- Logs inline abaixo da subtarefa ---
-        logs_section = None
-        if logs_da_sub:
-            horas_logs_fmt = float_para_hhmm(horas_logs) if horas_logs > 0 else ""
-            n_label = f"{n_logs} relatório{'s' if n_logs != 1 else ''}"
-            if horas_logs_fmt:
-                n_label += f" · {horas_logs_fmt}"
+        # --- Conteúdo do collapse: meta + obs + logs como sub-itens ---
+        corpo_collapse = []
+        corpo_collapse.append(
+            html.Small(meta_children, className="text-muted d-block mb-2")
+        )
+        if observacoes:
+            corpo_collapse.append(
+                html.Small(observacoes, className="fst-italic text-muted d-block mb-2",
+                           style={"whiteSpace": "pre-line"})
+            )
+        # Logs como sub-itens
+        for log in logs_da_sub:
+            obs_log = (log.get('observacoes') or '').strip()
+            horas_log_raw = log.get('horas')
+            try:
+                h_log = float(horas_log_raw) if horas_log_raw is not None and str(horas_log_raw) != 'nan' else None
+            except (ValueError, TypeError):
+                h_log = None
+            horas_log_fmt = float_para_hhmm(h_log) if h_log else None
 
-            logs_items_html = []
-            for log in logs_da_sub:
-                obs_log = (log.get('observacoes') or '').strip()
-                horas_log_raw = log.get('horas')
-                try:
-                    h_log = float(horas_log_raw) if horas_log_raw is not None and str(horas_log_raw) != 'nan' else None
-                except (ValueError, TypeError):
-                    h_log = None
-                horas_log_fmt = float_para_hhmm(h_log) if h_log else None
-
-                log_meta = [
-                    html.I(className="fas fa-file-alt text-info me-2",
-                           style={"fontSize": "0.85rem"}),
-                    html.Span("Relatório", className="fw-semibold me-2",
-                              style={"fontSize": "0.85rem"}),
-                    html.Span(log.get('editado_por', ''), className="text-muted me-1"),
-                    html.Span(f"· {log.get('data', '')}", className="text-muted"),
+            log_meta = [
+                html.I(className="fas fa-file-alt text-info me-2",
+                       style={"fontSize": "0.82rem"}),
+                html.Span("Relatório", className="fw-semibold me-2",
+                          style={"fontSize": "0.82rem"}),
+                html.Span(log.get('editado_por', ''), className="text-muted me-1"),
+                html.Span(f"· {log.get('data', '')}", className="text-muted"),
+            ]
+            if horas_log_fmt:
+                log_meta += [
+                    html.Span(" · ", className="text-muted"),
+                    html.I(className="fas fa-clock me-1 text-info"),
+                    html.Span(horas_log_fmt, className="text-info fw-semibold"),
                 ]
-                if horas_log_fmt:
-                    log_meta += [
-                        html.Span(" · ", className="text-muted"),
-                        html.I(className="fas fa-clock me-1 text-info"),
-                        html.Span(horas_log_fmt, className="text-info fw-semibold"),
-                    ]
 
-                logs_items_html.append(html.Div([
-                    html.Div(log_meta, className="d-flex align-items-center mb-1 flex-wrap"),
-                    html.Small(obs_log, className="fst-italic text-muted d-block ps-4",
-                               style={"whiteSpace": "pre-line"}) if obs_log else None
-                ], className="p-2 mb-1 rounded",
-                   style={"backgroundColor": "rgba(13,202,240,0.07)",
-                          "borderLeft": "2px solid var(--bs-info)"}))
+            corpo_collapse.append(html.Div([
+                html.Div(log_meta, className="d-flex align-items-center mb-1 flex-wrap"),
+                html.Small(obs_log, className="fst-italic text-muted d-block ps-4",
+                           style={"whiteSpace": "pre-line"}) if obs_log else None
+            ], className="p-2 mb-1 rounded",
+               style={"backgroundColor": "rgba(13,202,240,0.07)",
+                      "borderLeft": "2px solid var(--bs-info)"}))
 
-            logs_section = html.Details([
-                html.Summary(
-                    [html.I(className="fas fa-file-alt text-info me-1"),
-                     html.Span(n_label, className="text-info")],
-                    style={"cursor": "pointer", "fontSize": "0.83rem",
-                           "outline": "none", "userSelect": "none"}
-                ),
-                html.Div(logs_items_html, className="mt-2"),
-            ], className="ms-5 mt-2",
-               style={"borderLeft": "2px dashed rgba(13,202,240,0.3)",
-                      "paddingLeft": "12px"})
-
+        # Subtarefa com collapse
+        tem_corpo = bool(meta_children or observacoes or logs_da_sub)
         item_html = html.Div([
+            # Linha do cabeçalho: chevron | status | título+badges | botões
             html.Div([
-                html.Div(icone, style={"width": "28px", "flexShrink": "0", "paddingTop": "2px"}),
+                dbc.Button(
+                    html.I(className="fas fa-chevron-right",
+                           id={"type": "chevron-subtask", "index": hist_id}),
+                    id={"type": "btn-expand-subtask", "index": hist_id},
+                    color="link", size="sm",
+                    className="p-0 me-1 text-muted text-decoration-none",
+                    style={"visibility": "visible" if tem_corpo else "hidden"}
+                ),
+                html.Div(icone_status,
+                         style={"width": "22px", "flexShrink": "0"}),
                 html.Div([
-                    html.Div([
-                        html.Span(
-                            titulo,
-                            className="fw-semibold me-2" + (" text-muted" if concluido else ""),
-                            style={"textDecoration": "line-through" if concluido else "none",
-                                   "fontSize": "0.95rem"}
-                        ),
-                        *badges
-                    ], className="d-flex align-items-center flex-wrap mb-1"),
-                    html.Small(meta_children, className="text-muted"),
-                    html.Div(
-                        html.Small(observacoes, className="fst-italic text-muted"),
-                        className="mt-1"
-                    ) if observacoes else None,
-                ], className="flex-grow-1"),
+                    html.Span(
+                        titulo,
+                        className="fw-semibold me-2" + (" text-muted" if concluido else ""),
+                        style={"textDecoration": "line-through" if concluido else "none",
+                               "fontSize": "0.93rem"}
+                    ),
+                    *badges
+                ], className="flex-grow-1 d-flex align-items-center flex-wrap ms-2"),
                 html.Div(
                     html.Div(botoes, className="d-flex gap-1 flex-wrap"),
-                    className="ms-3 flex-shrink-0"
+                    className="ms-2 flex-shrink-0"
                 ) if botoes else None,
-            ], className="d-flex align-items-start"),
-            logs_section or html.Div(),
-        ], className="p-2 mb-3 rounded" + (" opacity-75" if concluido else ""),
+            ], className="d-flex align-items-center"),
+
+            # Corpo colapsável
+            dbc.Collapse(
+                html.Div(corpo_collapse, className="ms-4 mt-2 ps-2",
+                         style={"borderLeft": "2px solid rgba(0,0,0,0.08)"}),
+                id={"type": "collapse-subtask", "index": hist_id},
+                is_open=False
+            ) if tem_corpo else html.Div(),
+
+        ], className="py-2 px-2 mb-1 rounded" + (" opacity-75" if concluido else ""),
            style={"borderLeft": f"3px solid {cor_borda}",
-                  "backgroundColor": "rgba(0,0,0,0.02)" if concluido else "transparent"})
+                  "backgroundColor": "rgba(0,0,0,0.015)" if concluido else "transparent"})
 
         items_html.append(item_html)
 
@@ -443,6 +454,23 @@ def reconstruir_tabela_com_filtros(df_pendencias, df_historico, filtros, user_le
 
 def register_workflow_callbacks(app):
     """Registra todos os callbacks do módulo Workflow."""
+
+    # ==================================================================================
+    # CALLBACK 0: Expand/Colapso individual de subtarefa (Pattern-Matching)
+    # ==================================================================================
+    @app.callback(
+        Output({"type": "collapse-subtask", "index": MATCH}, "is_open"),
+        Output({"type": "chevron-subtask", "index": MATCH}, "className"),
+        Input({"type": "btn-expand-subtask", "index": MATCH}, "n_clicks"),
+        State({"type": "collapse-subtask", "index": MATCH}, "is_open"),
+        prevent_initial_call=True
+    )
+    def toggle_subtask_collapse(n_clicks, is_open):
+        if not n_clicks:
+            raise PreventUpdate
+        new_open = not is_open
+        chevron = "fas fa-chevron-down" if new_open else "fas fa-chevron-right"
+        return new_open, chevron
 
     # ==================================================================================
     # CALLBACK 1: Expansão/Colapso de linha individual (Pattern-Matching)

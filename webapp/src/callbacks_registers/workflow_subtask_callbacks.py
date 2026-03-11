@@ -290,6 +290,17 @@ def register_subtask_callbacks(app):
                          (str(_d) if _d and str(_d) != 'nan' else None) or hist_id
 
         pend_id = (context or {}).get("pend_id", "")
+
+        # Se pend_id não está no contexto, busca a partir do historico_data
+        if not pend_id and historico_data:
+            df_h = pd.DataFrame(historico_data)
+            col_id = 'pendencia_id' if 'pendencia_id' in df_h.columns else 'MaintenanceWF_id'
+            match_sub = df_h[df_h['hist_id'] == hist_id]
+            if not match_sub.empty:
+                val = match_sub.iloc[0].get(col_id)
+                if val and str(val) != 'nan':
+                    pend_id = str(val)
+
         novo_context = {"pend_id": pend_id, "subtarefa_id": hist_id}
 
         return True, novo_context, titulo, "", "", ""
