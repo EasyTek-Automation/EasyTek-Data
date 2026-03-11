@@ -326,15 +326,50 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
     ])
 
 
-def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, user_level=1):
+def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, user_level=1,
+                             filtros=None):
     """
     Cria o conteúdo expandido de uma pendência — view unificada sem abas.
 
     Subtarefas são listadas com seus relatórios/logs inline abaixo (colapsáveis).
     Eventos de sistema (criação/aceite/rejeição) ficam numa seção colapsável no topo.
+
+    Quando filtros['tipo_data'] == 'subtarefa' e há datas definidas, exibe apenas as
+    subtarefas do período (logs órfãos e eventos de criação são sempre mantidos).
     """
+    from datetime import datetime as _dt, timedelta
+
     historico_pendencia = df_historico[df_historico['pendencia_id'] == pendencia_id].copy()
     historico_pendencia = historico_pendencia.sort_values('data')
+
+    # Filtrar subtarefas pelo período quando o filtro de data é por subtarefa
+    if (filtros and filtros.get('tipo_data') == 'subtarefa'
+            and (filtros.get('data_inicio') or filtros.get('data_fim'))):
+        data_inicio = filtros.get('data_inicio')
+        data_fim = filtros.get('data_fim')
+
+        # Subtarefas que passam o filtro de data
+        mask_sub = historico_pendencia['record_type'].fillna('subtarefa') == 'subtarefa'
+        df_subs = historico_pendencia[mask_sub].copy()
+        if data_inicio:
+            df_subs = df_subs[df_subs['data'] >= _dt.fromisoformat(data_inicio)]
+        if data_fim:
+            df_subs = df_subs[df_subs['data'] < _dt.fromisoformat(data_fim) + timedelta(days=1)]
+        hist_ids_validos = set(df_subs['hist_id'].dropna().astype(str).tolist())
+
+        def _manter(row):
+            rt = row.get('record_type') or 'subtarefa'
+            if rt == 'criacao':
+                return True
+            if rt == 'subtarefa':
+                return str(row.get('hist_id', '')) in hist_ids_validos
+            if rt == 'log':
+                return str(row.get('subtarefa_id', '')) in hist_ids_validos
+            return True
+
+        historico_pendencia = historico_pendencia[
+            historico_pendencia.apply(_manter, axis=1)
+        ]
 
     historico_items = []
     for _, row in historico_pendencia.iterrows():
@@ -509,10 +544,11 @@ def register_workflow_callbacks(app):
         State("store-historico", "data"),
         State("user-username-store", "data"),
         State("user-level-store", "data"),
+        State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
     def toggle_linha_historico(n_clicks, is_open, pendencias_data, historico_data,
-                               username_atual, user_level):
+                               username_atual, user_level, filtros_ativos):
         """Expande/colapsa uma linha individual e carrega o histórico."""
         if not n_clicks:
             raise PreventUpdate
@@ -542,7 +578,8 @@ def register_workflow_callbacks(app):
         if new_is_open:
             conteudo_historico = criar_conteudo_historico(
                 pendencia_id, df_historico, username_atual,
-                user_level=user_level or 1
+                user_level=user_level or 1,
+                filtros=filtros_ativos
             )
         else:
             conteudo_historico = html.Div()
