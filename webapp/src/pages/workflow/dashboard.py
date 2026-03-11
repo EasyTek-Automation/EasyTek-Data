@@ -400,6 +400,20 @@ def criar_painel_filtros():
                 ], width=12, md=3, className="mb-3"),
 
                 dbc.Col([
+                    html.Label("Data de:", className="fw-bold mb-2"),
+                    dbc.RadioItems(
+                        id="filtro-tipo-data",
+                        options=[
+                            {"label": "Tarefa", "value": "tarefa"},
+                            {"label": "Subtarefa", "value": "subtarefa"},
+                        ],
+                        value="tarefa",
+                        inline=True,
+                        className="mt-1"
+                    )
+                ], width=12, md=2, className="mb-3"),
+
+                dbc.Col([
                     html.Label("De:", className="fw-bold mb-2"),
                     dcc.DatePickerSingle(
                         id="filtro-data-inicio",
@@ -409,7 +423,7 @@ def criar_painel_filtros():
                         clearable=True,
                         className="w-100"
                     )
-                ], width=12, md=3, className="mb-3"),
+                ], width=12, md=2, className="mb-3"),
 
                 dbc.Col([
                     html.Label("Até:", className="fw-bold mb-2"),
@@ -421,7 +435,7 @@ def criar_painel_filtros():
                         clearable=True,
                         className="w-100"
                     )
-                ], width=12, md=3, className="mb-3"),
+                ], width=12, md=2, className="mb-3"),
 
                 dbc.Col([
                     html.Label("\u00a0", className="fw-bold mb-2 d-block"),
