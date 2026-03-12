@@ -27,12 +27,16 @@ from src.pages.workflow.dashboard import (
 # HELPERS
 # ======================================================================================
 
+_BRT = pd.Timedelta(hours=-3)
+
+
 def _fmt_data_str(valor):
-    """Converte qualquer valor de data (datetime, Timestamp, NaT, numpy.datetime64, None) para string formatada."""
+    """Converte timestamp UTC para string no fuso BRT (UTC-3).
+    Aceita datetime, pd.Timestamp, numpy.datetime64, NaT e None."""
     if valor is None:
         return ''
     try:
-        ts = pd.Timestamp(valor)
+        ts = pd.Timestamp(valor) + _BRT
         if pd.isna(ts):
             return ''
         return ts.strftime('%d/%m/%Y %H:%M')
@@ -682,7 +686,7 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
             'data': (row['data'].strftime("%d/%m/%Y")
                      if (bool(row.get('is_retroativo')) or
                          _str_or_none(row.get('tipo_evento')) == 'Lançamento Retroativo')
-                     else row['data'].strftime("%d/%m/%Y %H:%M")),
+                     else _fmt_data_str(row['data'])),
             'is_retroativo': (bool(row.get('is_retroativo')) or
                               _str_or_none(row.get('tipo_evento')) == 'Lançamento Retroativo'),
             'horas': horas_val,
@@ -706,17 +710,9 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
             'status_validacao_gestor': _str_or_none(row.get('status_validacao_gestor')),
             'nota_devolucao': _str_or_none(row.get('nota_devolucao')),
             'devolvido_por': _str_or_none(row.get('devolvido_por')),
-            'data_devolucao': (row['data_devolucao'].strftime("%d/%m/%Y %H:%M")
-                               if row.get('data_devolucao') is not None
-                               and str(row.get('data_devolucao')) != 'nan'
-                               and hasattr(row.get('data_devolucao'), 'strftime')
-                               else None),
+            'data_devolucao': _fmt_data_str(row.get('data_devolucao')) or None,
             'validado_por': _str_or_none(row.get('validado_por')),
-            'data_validacao': (row['data_validacao'].strftime("%d/%m/%Y %H:%M")
-                               if row.get('data_validacao') is not None
-                               and str(row.get('data_validacao')) != 'nan'
-                               and hasattr(row.get('data_validacao'), 'strftime')
-                               else None),
+            'data_validacao': _fmt_data_str(row.get('data_validacao')) or None,
             'historico_validacao': _processar_historico_validacao(row.get('historico_validacao')),
         })
 
