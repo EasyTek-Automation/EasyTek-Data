@@ -18,7 +18,7 @@ from src.utils.workflow_db import (
     criar_subtarefa,
     adicionar_log,
     editar_subtarefa,
-    editar_horas_log,
+    editar_log,
     deletar_subtarefa,
     get_usuarios_por_perfil,
     get_usuarios_nivel3_por_perfil,
@@ -725,7 +725,7 @@ def register_subtask_callbacks(app):
     )
 
     # ==============================================================================
-    # CB15b: Auto-format campo HH:MM ao perder foco (edit-log-horas-modal)
+    # CB15b: Auto-format campo HH:MM ao perder foco (edit-log-modal)
     # ==============================================================================
     app.clientside_callback(
         _HHMM_JS,
@@ -736,18 +736,19 @@ def register_subtask_callbacks(app):
     )
 
     # ==============================================================================
-    # CB16: Abrir edit-log-horas-modal ao clicar btn-edit-log-horas
+    # CB16: Abrir edit-log-modal ao clicar btn-edit-log
     # ==============================================================================
     @app.callback(
-        Output("edit-log-horas-modal", "is_open"),
-        Output("edit-log-horas-hist-id", "data"),
+        Output("edit-log-modal", "is_open"),
+        Output("edit-log-hist-id", "data"),
+        Output("edit-log-obs", "value", allow_duplicate=True),
         Output("edit-log-horas-input", "value", allow_duplicate=True),
-        Output("edit-log-horas-alert", "children", allow_duplicate=True),
-        Input({"type": "btn-edit-log-horas", "index": ALL}, "n_clicks"),
+        Output("edit-log-alert", "children", allow_duplicate=True),
+        Input({"type": "btn-edit-log", "index": ALL}, "n_clicks"),
         State("store-historico", "data"),
         prevent_initial_call=True
     )
-    def abrir_edit_log_horas_modal(n_clicks, historico_data):
+    def abrir_edit_log_modal(n_clicks, historico_data):
         ctx = callback_context
         if not ctx.triggered or not any(c for c in n_clicks if c):
             raise PreventUpdate
@@ -756,12 +757,16 @@ def register_subtask_callbacks(app):
         id_dict = json.loads(trigger_id_str)
         hist_id = id_dict['index']
 
+        obs_atual = ""
         horas_atual = ""
         if historico_data:
             df = pd.DataFrame(historico_data)
             match = df[df['hist_id'] == hist_id]
             if not match.empty:
-                h_raw = match.iloc[0].get('horas')
+                row = match.iloc[0]
+                obs_val = row.get('observacoes')
+                obs_atual = str(obs_val) if obs_val and str(obs_val) != 'nan' else ""
+                h_raw = row.get('horas')
                 try:
                     h_val = float(h_raw) if h_raw is not None and str(h_raw) != 'nan' else None
                 except (ValueError, TypeError):
@@ -770,51 +775,53 @@ def register_subtask_callbacks(app):
                     from src.pages.workflow.dashboard import float_para_hhmm
                     horas_atual = float_para_hhmm(h_val)
 
-        return True, hist_id, horas_atual, ""
+        return True, hist_id, obs_atual, horas_atual, ""
 
     # ==============================================================================
-    # CB17: Fechar edit-log-horas-modal (Cancelar)
+    # CB17: Fechar edit-log-modal (Cancelar)
     # ==============================================================================
     @app.callback(
-        Output("edit-log-horas-modal", "is_open", allow_duplicate=True),
-        Output("edit-log-horas-alert", "children"),
-        Input("edit-log-horas-cancel-btn", "n_clicks"),
+        Output("edit-log-modal", "is_open", allow_duplicate=True),
+        Output("edit-log-alert", "children"),
+        Input("edit-log-cancel-btn", "n_clicks"),
         prevent_initial_call=True
     )
-    def fechar_edit_log_horas_modal(n_clicks):
+    def fechar_edit_log_modal(n_clicks):
         if not n_clicks:
             raise PreventUpdate
         return False, ""
 
     # ==============================================================================
-    # CB18: Salvar horas editadas do log
+    # CB18: Salvar relatório editado (texto + horas)
     # ==============================================================================
     @app.callback(
-        Output("edit-log-horas-modal", "is_open", allow_duplicate=True),
-        Output("edit-log-horas-alert", "children", allow_duplicate=True),
+        Output("edit-log-modal", "is_open", allow_duplicate=True),
+        Output("edit-log-alert", "children", allow_duplicate=True),
         Output("alert-container-workflow", "children", allow_duplicate=True),
         Output("container-tabela", "children", allow_duplicate=True),
         Output("store-pendencias", "data", allow_duplicate=True),
         Output("store-historico", "data", allow_duplicate=True),
-        Input("edit-log-horas-submit-btn", "n_clicks"),
-        State("edit-log-horas-hist-id", "data"),
+        Input("edit-log-submit-btn", "n_clicks"),
+        State("edit-log-hist-id", "data"),
+        State("edit-log-obs", "value"),
         State("edit-log-horas-input", "value"),
         State("user-username-store", "data"),
         State("user-level-store", "data"),
         State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
-    def salvar_edit_log_horas(n_clicks, hist_id, horas, username, user_level, filtros):
+    def salvar_edit_log(n_clicks, hist_id, obs, horas, username, user_level, filtros):
         if not n_clicks or not hist_id:
             raise PreventUpdate
 
-        horas_val = hhmm_para_float(horas) if horas else None
-        if horas_val is None:
+        if not obs or not obs.strip():
             return (True,
-                    dbc.Alert("Informe um valor válido no formato HH:MM.", color="warning"),
+                    dbc.Alert("O relatório não pode estar vazio.", color="warning"),
                     no_update, no_update, no_update, no_update)
 
-        sucesso, mensagem = editar_horas_log(hist_id, horas_val)
+        horas_val = hhmm_para_float(horas) if horas else None
+
+        sucesso, mensagem = editar_log(hist_id, horas_val, obs.strip())
 
         from src.pages.workflow.dashboard import carregar_dados_csv
         df_pend, df_hist = carregar_dados_csv()

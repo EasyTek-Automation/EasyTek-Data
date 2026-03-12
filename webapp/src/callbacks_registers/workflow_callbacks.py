@@ -268,12 +268,12 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                     html.Span(horas_log_fmt, className="text-info fw-semibold me-1"),
                     dbc.Button(
                         html.I(className="fas fa-pencil-alt"),
-                        id={"type": "btn-edit-log-horas", "index": log_hist_id},
+                        id={"type": "btn-edit-log", "index": log_hist_id},
                         color="link",
                         size="sm",
                         className="p-0 text-info",
                         style={"fontSize": "0.72rem", "verticalAlign": "middle"},
-                        title="Editar horas"
+                        title="Editar relatório"
                     ),
                 ]
 

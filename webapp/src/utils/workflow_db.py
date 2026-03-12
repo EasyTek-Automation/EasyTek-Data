@@ -802,13 +802,14 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
         return False, str(e)
 
 
-def editar_horas_log(hist_id, horas):
+def editar_log(hist_id, horas, observacoes):
     """
-    Atualiza o campo 'horas' de um log (relatório) existente.
+    Atualiza horas e texto de um log (relatório) existente.
 
     Args:
         hist_id: ObjectId string do log
         horas: Valor float das horas (ou None para remover)
+        observacoes: Texto do relatório (obrigatório)
 
     Returns:
         tuple: (sucesso: bool, mensagem: str)
@@ -817,11 +818,11 @@ def editar_horas_log(hist_id, horas):
         collection = get_mongo_connection(COLLECTION_HISTORICO)
         result = collection.update_one(
             {'_id': ObjectId(hist_id)},
-            {'$set': {'horas': horas}}
+            {'$set': {'horas': horas, 'observacoes': observacoes}}
         )
         if result.matched_count == 0:
             return False, "Relatório não encontrado"
-        return True, "Horas atualizadas com sucesso"
+        return True, "Relatório atualizado com sucesso"
     except Exception as e:
         return False, str(e)
 

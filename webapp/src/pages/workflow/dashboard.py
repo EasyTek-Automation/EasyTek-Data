@@ -17,7 +17,7 @@ from src.components.workflow.subtask_modals import (
     create_subtask_modal,
     add_log_modal,
     edit_subtask_modal,
-    edit_log_horas_modal,
+    edit_log_modal,
     delete_subtask_confirm_modal
 )
 
@@ -974,7 +974,7 @@ def layout():
         create_subtask_modal(),
         add_log_modal(),
         edit_subtask_modal(),
-        edit_log_horas_modal(),
+        edit_log_modal(),
         delete_subtask_confirm_modal(),
 
         # Header

@@ -405,16 +405,28 @@ def edit_subtask_modal():
     ], id="edit-subtask-modal", is_open=False, centered=True)
 
 
-def edit_log_horas_modal():
-    """Modal simples para editar as horas de um relatório (log)."""
+def edit_log_modal():
+    """Modal para editar um relatório (log): texto e horas."""
     return dbc.Modal([
         dbc.ModalHeader(dbc.ModalTitle([
-            html.I(className="fas fa-clock me-2"),
-            "Editar Horas do Relatório"
+            html.I(className="fas fa-file-alt me-2"),
+            "Editar Relatório"
         ])),
 
         dbc.ModalBody([
+            # Relatório (obrigatório)
+            html.Label("Relatório:", className="fw-bold mb-1"),
+            html.Span(" *", className="text-danger"),
+            dbc.Textarea(
+                id="edit-log-obs",
+                placeholder="Descreva o que foi feito, resultados, próximos passos...",
+                rows=4,
+                className="mb-3",
+            ),
+
+            # Duração (opcional)
             html.Label("Duração:", className="fw-bold mb-1"),
+            html.Span(" (opcional)", className="text-muted small"),
             dbc.InputGroup([
                 dbc.InputGroupText(
                     html.I(className="fas fa-hourglass-half",
@@ -441,25 +453,25 @@ def edit_log_horas_modal():
                 ),
             ], className="mb-3"),
 
-            html.Div(id="edit-log-horas-alert"),
-            dcc.Store(id="edit-log-horas-hist-id"),
+            html.Div(id="edit-log-alert"),
+            dcc.Store(id="edit-log-hist-id"),
         ]),
 
         dbc.ModalFooter([
             dbc.Button(
                 "Cancelar",
-                id="edit-log-horas-cancel-btn",
+                id="edit-log-cancel-btn",
                 color="secondary",
                 outline=True,
                 className="me-2"
             ),
             dbc.Button(
                 [html.I(className="fas fa-save me-2"), "Salvar"],
-                id="edit-log-horas-submit-btn",
+                id="edit-log-submit-btn",
                 color="primary"
             )
         ])
-    ], id="edit-log-horas-modal", is_open=False, centered=True)
+    ], id="edit-log-modal", is_open=False, size="lg", centered=True)
 
 
 def delete_subtask_confirm_modal():
