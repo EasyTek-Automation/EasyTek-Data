@@ -274,14 +274,31 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):  # n
             concluidas_ativ = int(df_ativ['concluido'].eq(True).sum())
         em_andamento_ativ = total_ativ - concluidas_ativ
 
-        # Somar horas usando checagem robusta (igual a criar_barra_horas_inline)
-        for _, row in df_ativ.iterrows():
-            h = row.get('horas') if hasattr(row, 'get') else row['horas'] if 'horas' in row.index else None
+        # Índice de subtarefas por hist_id (para herdar concluido nos logs)
+        subtarefa_por_id = {}
+        if 'record_type' in df_historico.columns and 'hist_id' in df_historico.columns:
+            for _, r in df_ativ.iterrows():
+                hid = r.get('hist_id') if hasattr(r, 'get') else (r['hist_id'] if 'hist_id' in r.index else None)
+                if hid:
+                    subtarefa_por_id[hid] = r
+
+        # Somar horas de subtarefas + logs (excluindo criacao)
+        for _, row in df_historico.iterrows():
+            rt = row.get('record_type', 'subtarefa') if hasattr(row, 'get') else (row['record_type'] if 'record_type' in row.index else 'subtarefa')
+            if rt == 'criacao':
+                continue
+            h = row.get('horas') if hasattr(row, 'get') else (row['horas'] if 'horas' in row.index else None)
             try:
                 if h is not None and str(h) != 'nan' and float(h) > 0:
                     horas_total += float(h)
-                    concluido = row.get('concluido') if hasattr(row, 'get') else (row['concluido'] if 'concluido' in row.index else False)
-                    if concluido is True:
+                    if rt == 'log':
+                        parent_id = row.get('subtarefa_id') if hasattr(row, 'get') else (row['subtarefa_id'] if 'subtarefa_id' in row.index else None)
+                        parent = subtarefa_por_id.get(parent_id)
+                        concluido = (parent.get('concluido') if hasattr(parent, 'get') else parent['concluido'] if parent is not None and 'concluido' in parent.index else False) is True if parent is not None else False
+                    else:
+                        concluido = row.get('concluido') if hasattr(row, 'get') else (row['concluido'] if 'concluido' in row.index else False)
+                        concluido = concluido is True
+                    if concluido:
                         horas_concluidas += float(h)
             except (ValueError, TypeError):
                 pass

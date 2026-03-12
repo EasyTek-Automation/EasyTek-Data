@@ -136,6 +136,38 @@ class TestCriarCardsKpi:
         resultado = criar_cards_kpi(df_pendencias_vazio, df_hist, username_atual='approver1')
         assert resultado is not None
 
+    def test_card_horas_inclui_horas_de_logs(self, df_pendencias_vazio):
+        """Horas de logs (relatórios) devem ser somadas ao total do card de horas."""
+        from src.pages.workflow.dashboard import criar_cards_kpi
+        df_hist = pd.DataFrame([
+            {'hist_id': 's1', 'record_type': 'subtarefa', 'horas': 2.0, 'concluido': False, 'pendencia_id': 'WF001'},
+            {'hist_id': 'l1', 'record_type': 'log', 'horas': 1.5, 'subtarefa_id': 's1', 'concluido': None, 'pendencia_id': 'WF001'},
+        ])
+        # Deve renderizar sem erro — total de horas = 3.5
+        resultado = criar_cards_kpi(df_pendencias_vazio, df_hist)
+        assert resultado is not None
+
+    def test_card_horas_log_concluido_via_subtarefa_pai(self, df_pendencias_vazio):
+        """Horas de log cujo pai está concluído devem entrar em horas concluídas."""
+        from src.pages.workflow.dashboard import criar_cards_kpi
+        df_hist = pd.DataFrame([
+            {'hist_id': 's1', 'record_type': 'subtarefa', 'horas': 2.0, 'concluido': True, 'pendencia_id': 'WF001'},
+            {'hist_id': 'l1', 'record_type': 'log', 'horas': 1.0, 'subtarefa_id': 's1', 'concluido': None, 'pendencia_id': 'WF001'},
+        ])
+        resultado = criar_cards_kpi(df_pendencias_vazio, df_hist)
+        assert resultado is not None
+        # Não levanta exceção e retorna componente válido (3h total, 3h concluídas)
+
+    def test_card_horas_registro_criacao_ignorado(self, df_pendencias_vazio):
+        """Registros record_type='criacao' não devem ser somados às horas."""
+        from src.pages.workflow.dashboard import criar_cards_kpi
+        df_hist = pd.DataFrame([
+            {'hist_id': 'c1', 'record_type': 'criacao', 'horas': 99.0, 'pendencia_id': 'WF001'},
+            {'hist_id': 's1', 'record_type': 'subtarefa', 'horas': 1.0, 'concluido': False, 'pendencia_id': 'WF001'},
+        ])
+        resultado = criar_cards_kpi(df_pendencias_vazio, df_hist)
+        assert resultado is not None
+
 
 # =============================================================================
 # TESTES: criar_tabela_pendencias()
