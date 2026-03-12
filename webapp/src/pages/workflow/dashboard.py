@@ -320,7 +320,7 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):  # n
         'secondary': 'var(--bs-secondary)',
     }
 
-    def _barra(segmentos, altura=26):
+    def _barra(segmentos, altura=26, formatter=None):
         """segmentos: list of (valor_numerico, cor_key, label_tooltip)"""
         total_v = sum(v for v, _, _ in segmentos if v > 0)
         if total_v == 0:
@@ -334,8 +334,9 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):  # n
             if valor <= 0:
                 continue
             pct = valor / total_v * 100
+            label_display = (formatter(valor) if formatter else str(valor)) if pct > 9 else ""
             segs.append(html.Div(
-                str(valor) if pct > 9 else "",
+                label_display,
                 title=f"{label}: {valor}",
                 style={
                     "width": f"{pct}%",
@@ -542,7 +543,7 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):  # n
             _barra([
                 (horas_concluidas, 'success',   'Concluídas'),
                 (horas_pend,       'secondary', 'Pendentes'),
-            ]),
+            ], formatter=lambda v: f"{v:.2f}h"),
 
             _legenda([
                 ('success',   'Concluídas', horas_conc_fmt),
