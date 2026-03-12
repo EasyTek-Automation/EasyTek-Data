@@ -178,7 +178,7 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                 "●",
                 title=f"Prioridade: {_LABEL_PRIO.get(prioridade, 'Normal')}",
                 style={"color": _COR_PRIO.get(prioridade, _COR_PRIO["normal"]),
-                       "fontSize": "1.6rem", "lineHeight": "1", "cursor": "pointer"},
+                       "fontSize": "3.5rem", "lineHeight": "1", "cursor": "pointer"},
             ),
             size="sm",
             direction="down",
@@ -190,16 +190,16 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
         # Ícone de status
         if concluido:
             icone_status = html.I(className="fas fa-check-circle text-success",
-                                  style={"fontSize": "1.0rem"})
+                                  style={"fontSize": "0.7rem"})
         elif status_aprovacao == 'pendente':
             icone_status = html.I(className="fas fa-hourglass-half text-warning",
-                                  style={"fontSize": "1.0rem"})
+                                  style={"fontSize": "0.7rem"})
         elif status_aprovacao == 'rejeitado':
             icone_status = html.I(className="fas fa-times-circle text-danger",
-                                  style={"fontSize": "1.0rem"})
+                                  style={"fontSize": "0.7rem"})
         else:
             icone_status = html.I(className="far fa-circle text-secondary",
-                                  style={"fontSize": "1.0rem"})
+                                  style={"fontSize": "0.7rem"})
 
         # Badges
         badges = []
