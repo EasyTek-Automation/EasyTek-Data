@@ -214,7 +214,7 @@ def criar_barra_horas_inline(historico_items):
     ], className="mt-1 mb-1")
 
 
-def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
+def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):  # noqa: E501
     """
     Cria o dashboard KPI do workflow com cards visuais.
 
