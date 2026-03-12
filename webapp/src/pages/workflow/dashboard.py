@@ -434,13 +434,13 @@ def criar_painel_filtros():
 
                 dbc.Col([
                     html.Label("Data de:", className="fw-bold mb-2"),
-                    dbc.RadioItems(
+                    dbc.Checklist(
                         id="filtro-tipo-data",
                         options=[
                             {"label": "Demanda", "value": "tarefa"},
                             {"label": "Atividade", "value": "subtarefa"},
                         ],
-                        value="tarefa",
+                        value=["tarefa", "subtarefa"],
                         inline=True,
                         className="mt-1"
                     )

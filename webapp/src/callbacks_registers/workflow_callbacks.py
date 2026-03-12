@@ -365,8 +365,10 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
     historico_pendencia = df_historico[df_historico['pendencia_id'] == pendencia_id].copy()
     historico_pendencia = historico_pendencia.sort_values('data')
 
-    # Filtrar subtarefas pelo período quando o filtro de data é por subtarefa
-    if (filtros and filtros.get('tipo_data') == 'subtarefa'
+    # Filtrar subtarefas pelo período quando o filtro inclui atividades
+    _tipos_filtro = filtros.get('tipo_data') if filtros else None
+    _tipos_filtro = _tipos_filtro if isinstance(_tipos_filtro, list) else ([_tipos_filtro] if _tipos_filtro else [])
+    if (filtros and 'subtarefa' in _tipos_filtro
             and (filtros.get('data_inicio') or filtros.get('data_fim'))):
         data_inicio = filtros.get('data_inicio')
         data_fim = filtros.get('data_fim')
@@ -465,8 +467,22 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
         df_filtrado = df_filtrado[mask]
 
     if (data_inicio or data_fim):
-        if tipo_data == "subtarefa" and df_historico is not None and not df_historico.empty:
-            # Filtra tarefas que possuem subtarefas no período informado
+        # tipo_data pode ser string (legado) ou lista de strings
+        tipos = tipo_data if isinstance(tipo_data, list) else ([tipo_data] if tipo_data else [])
+        usar_tarefa   = "tarefa"    in tipos
+        usar_subtarefa = "subtarefa" in tipos
+
+        ids_tarefa = ids_subtarefa = None
+
+        if usar_tarefa and 'data_criacao' in df_filtrado.columns:
+            mask = pd.Series([True] * len(df_filtrado), index=df_filtrado.index)
+            if data_inicio:
+                mask &= pd.to_datetime(df_filtrado['data_criacao']) >= _dt.fromisoformat(data_inicio)
+            if data_fim:
+                mask &= pd.to_datetime(df_filtrado['data_criacao']) < _dt.fromisoformat(data_fim) + timedelta(days=1)
+            ids_tarefa = set(df_filtrado[mask]['id'].astype(str).tolist())
+
+        if usar_subtarefa and df_historico is not None and not df_historico.empty:
             df_h = df_historico.copy()
             df_h['record_type'] = df_h['record_type'].fillna('subtarefa')
             df_h = df_h[df_h['record_type'] == 'subtarefa']
@@ -477,18 +493,12 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
                 df_h = df_h[df_h['_data_sub'] < _dt.fromisoformat(data_fim) + timedelta(days=1)]
             col_id = 'pendencia_id' if 'pendencia_id' in df_h.columns else 'MaintenanceWF_id'
             if col_id in df_h.columns:
-                task_ids = df_h[col_id].dropna().astype(str).unique().tolist()
-                df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(task_ids)]
-        else:
-            # Comportamento padrão: filtra pela data de criação da tarefa
-            if data_inicio and 'data_criacao' in df_filtrado.columns:
-                df_filtrado = df_filtrado[
-                    pd.to_datetime(df_filtrado['data_criacao']) >= _dt.fromisoformat(data_inicio)
-                ]
-            if data_fim and 'data_criacao' in df_filtrado.columns:
-                df_filtrado = df_filtrado[
-                    pd.to_datetime(df_filtrado['data_criacao']) < _dt.fromisoformat(data_fim) + timedelta(days=1)
-                ]
+                ids_subtarefa = set(df_h[col_id].dropna().astype(str).unique().tolist())
+
+        # Combinar: OR entre os tipos selecionados (união)
+        if ids_tarefa is not None or ids_subtarefa is not None:
+            ids_validos = (ids_tarefa or set()) | (ids_subtarefa or set())
+            df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_validos)]
 
     return df_filtrado
 
@@ -661,7 +671,7 @@ def register_workflow_callbacks(app):
             "status": status_list,
             "busca": busca,
             "status_aceite": status_aceite_list,
-            "tipo_data": tipo_data or "tarefa",
+            "tipo_data": tipo_data if tipo_data else ["tarefa", "subtarefa"],
             "data_inicio": data_inicio,
             "data_fim": data_fim,
         }
@@ -1035,7 +1045,7 @@ def register_workflow_callbacks(app):
             username_atual=username_atual
         )
         return (
-            "todos", [], "", [], "tarefa", None, None,  # resetar UI dos filtros + datas
+            "todos", [], "", [], ["tarefa", "subtarefa"], None, None,  # resetar UI dos filtros + datas
             None,                                        # limpar store de filtros
             nova_tabela,
             df_pendencias.to_dict('records')
