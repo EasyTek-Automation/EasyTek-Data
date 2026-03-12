@@ -953,6 +953,17 @@ class TestValidarAtividade:
         assert updates.get('status_validacao_gestor') == 'aprovado'
         assert updates.get('validado_por') == 'gestor1'
 
+    def test_push_historico_validacao(self):
+        mock, oid = self._make_mock()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import validar_atividade
+            validar_atividade(oid, 'gestor1')
+        push = mock.update_one.call_args[0][1]['$push']
+        entrada = push['historico_validacao']
+        assert entrada['tipo'] == 'validacao'
+        assert entrada['por'] == 'gestor1'
+        assert entrada['nota'] is None
+
     def test_retorna_false_em_erro(self):
         mock, oid = self._make_mock()
         mock.update_one.side_effect = Exception("DB error")
@@ -988,6 +999,17 @@ class TestDevolverAtividade:
         assert updates.get('nota_devolucao') == 'Revisar medição'
         assert updates.get('concluido') is False
         assert updates.get('devolvido_por') == 'gestor1'
+
+    def test_push_historico_validacao(self):
+        mock, oid = self._make_mock()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import devolver_atividade
+            devolver_atividade(oid, 'Revisar medição', 'gestor1')
+        push = mock.update_one.call_args[0][1]['$push']
+        entrada = push['historico_validacao']
+        assert entrada['tipo'] == 'devolucao'
+        assert entrada['por'] == 'gestor1'
+        assert entrada['nota'] == 'Revisar medição'
 
     def test_retorna_false_em_erro(self):
         mock, oid = self._make_mock()

@@ -153,6 +153,14 @@ def carregar_historico():
                 lambda c: 'aprovado' if c is True else None
             )
 
+        # Retrocompat historico_validacao
+        if 'historico_validacao' not in df.columns:
+            df['historico_validacao'] = [[] for _ in range(len(df))]
+        else:
+            df['historico_validacao'] = df['historico_validacao'].apply(
+                lambda x: x if isinstance(x, list) else []
+            )
+
         # Retrocompat is_retroativo e responsavel_retroativo (campos novos)
         if 'is_retroativo' not in df.columns:
             # Registros antigos com tipo_evento == "Lançamento Retroativo" são retroativos
@@ -509,13 +517,24 @@ def validar_atividade(hist_id_str, validado_por):
     """
     try:
         collection = get_mongo_connection(COLLECTION_HISTORICO)
+        agora = datetime.now()
         result = collection.update_one(
             {'_id': ObjectId(hist_id_str)},
-            {'$set': {
-                'status_validacao_gestor': 'aprovado',
-                'validado_por': validado_por,
-                'data_validacao': datetime.now(),
-            }}
+            {
+                '$set': {
+                    'status_validacao_gestor': 'aprovado',
+                    'validado_por': validado_por,
+                    'data_validacao': agora,
+                },
+                '$push': {
+                    'historico_validacao': {
+                        'tipo': 'validacao',
+                        'por': validado_por,
+                        'data': agora,
+                        'nota': None,
+                    }
+                },
+            }
         )
         return result.modified_count > 0
     except Exception as e:
@@ -540,15 +559,26 @@ def devolver_atividade(hist_id_str, nota_devolucao, devolvido_por):
     """
     try:
         collection = get_mongo_connection(COLLECTION_HISTORICO)
+        agora = datetime.now()
         result = collection.update_one(
             {'_id': ObjectId(hist_id_str)},
-            {'$set': {
-                'status_validacao_gestor': 'devolvido',
-                'nota_devolucao': nota_devolucao,
-                'devolvido_por': devolvido_por,
-                'data_devolucao': datetime.now(),
-                'concluido': False,
-            }}
+            {
+                '$set': {
+                    'status_validacao_gestor': 'devolvido',
+                    'nota_devolucao': nota_devolucao,
+                    'devolvido_por': devolvido_por,
+                    'data_devolucao': agora,
+                    'concluido': False,
+                },
+                '$push': {
+                    'historico_validacao': {
+                        'tipo': 'devolucao',
+                        'por': devolvido_por,
+                        'data': agora,
+                        'nota': nota_devolucao,
+                    }
+                },
+            }
         )
         return result.modified_count > 0
     except Exception as e:

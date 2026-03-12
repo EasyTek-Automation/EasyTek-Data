@@ -139,6 +139,7 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
         nota_devolucao = item.get('nota_devolucao')
         devolvido_por = item.get('devolvido_por')
         validado_por = item.get('validado_por')
+        historico_validacao = item.get('historico_validacao') or []
 
         _t = item.get('titulo')
         _d = item.get('descricao')
@@ -354,29 +355,63 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                 html.Div(observacoes, className="fst-italic text-muted d-block mb-2",
                          style={"whiteSpace": "pre-line", "fontSize": "0.93rem"})
             )
-        if status_validacao_gestor == 'aprovado' and validado_por:
-            corpo_collapse.append(
-                html.Div([
-                    html.I(className="fas fa-user-check text-success me-2"),
-                    html.Span("Validado por: ", className="fw-semibold text-success me-1"),
-                    html.Span(validado_por, className="text-success"),
-                ], className="p-2 mb-2 rounded",
-                   style={"backgroundColor": "rgba(25,135,84,0.08)",
-                          "borderLeft": "3px solid var(--bs-success)",
-                          "fontSize": "0.93rem"})
-            )
-        if status_validacao_gestor == 'devolvido' and nota_devolucao:
-            corpo_collapse.append(
-                html.Div([
-                    html.I(className="fas fa-undo text-danger me-2"),
-                    html.Span("Devolvida: ", className="fw-semibold text-danger me-1"),
-                    html.Span(nota_devolucao, className="text-danger"),
-                    html.Span(f" · {devolvido_por}", className="text-muted ms-2") if devolvido_por else None,
-                ], className="p-2 mb-2 rounded",
-                   style={"backgroundColor": "rgba(220,53,69,0.08)",
-                          "borderLeft": "3px solid var(--bs-danger)",
-                          "fontSize": "0.93rem"})
-            )
+        if historico_validacao:
+            for hv in historico_validacao:
+                hv_tipo = hv.get('tipo')
+                hv_por = hv.get('por')
+                hv_nota = hv.get('nota')
+                hv_data = hv.get('data')
+                hv_data_fmt = hv_data.strftime("%d/%m/%Y %H:%M") if hasattr(hv_data, 'strftime') else ''
+                if hv_tipo == 'validacao':
+                    corpo_collapse.append(
+                        html.Div([
+                            html.I(className="fas fa-user-check text-success me-2"),
+                            html.Span("Validado por: ", className="fw-semibold text-success me-1"),
+                            html.Span(hv_por or '', className="text-success"),
+                            html.Span(f" · {hv_data_fmt}", className="text-muted ms-2") if hv_data_fmt else None,
+                        ], className="p-2 mb-1 rounded",
+                           style={"backgroundColor": "rgba(25,135,84,0.08)",
+                                  "borderLeft": "3px solid var(--bs-success)",
+                                  "fontSize": "0.93rem"})
+                    )
+                elif hv_tipo == 'devolucao':
+                    corpo_collapse.append(
+                        html.Div([
+                            html.I(className="fas fa-undo text-danger me-2"),
+                            html.Span("Devolvida: ", className="fw-semibold text-danger me-1"),
+                            html.Span(hv_nota or '', className="text-danger"),
+                            html.Span(f" · {hv_por}", className="text-muted ms-2") if hv_por else None,
+                            html.Span(f" · {hv_data_fmt}", className="text-muted ms-1") if hv_data_fmt else None,
+                        ], className="p-2 mb-1 rounded",
+                           style={"backgroundColor": "rgba(220,53,69,0.08)",
+                                  "borderLeft": "3px solid var(--bs-danger)",
+                                  "fontSize": "0.93rem"})
+                    )
+        else:
+            # Fallback para documentos antigos sem historico_validacao
+            if status_validacao_gestor == 'aprovado' and validado_por:
+                corpo_collapse.append(
+                    html.Div([
+                        html.I(className="fas fa-user-check text-success me-2"),
+                        html.Span("Validado por: ", className="fw-semibold text-success me-1"),
+                        html.Span(validado_por, className="text-success"),
+                    ], className="p-2 mb-1 rounded",
+                       style={"backgroundColor": "rgba(25,135,84,0.08)",
+                              "borderLeft": "3px solid var(--bs-success)",
+                              "fontSize": "0.93rem"})
+                )
+            if status_validacao_gestor == 'devolvido' and nota_devolucao:
+                corpo_collapse.append(
+                    html.Div([
+                        html.I(className="fas fa-undo text-danger me-2"),
+                        html.Span("Devolvida: ", className="fw-semibold text-danger me-1"),
+                        html.Span(nota_devolucao, className="text-danger"),
+                        html.Span(f" · {devolvido_por}", className="text-muted ms-2") if devolvido_por else None,
+                    ], className="p-2 mb-1 rounded",
+                       style={"backgroundColor": "rgba(220,53,69,0.08)",
+                              "borderLeft": "3px solid var(--bs-danger)",
+                              "fontSize": "0.93rem"})
+                )
         # Logs como sub-itens
         for log in logs_da_sub:
             obs_log = (log.get('observacoes') or '').strip()
@@ -636,6 +671,7 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
             'nota_devolucao': _str_or_none(row.get('nota_devolucao')),
             'devolvido_por': _str_or_none(row.get('devolvido_por')),
             'validado_por': _str_or_none(row.get('validado_por')),
+            'historico_validacao': row.get('historico_validacao') if isinstance(row.get('historico_validacao'), list) else [],
         })
 
     return criar_checklist_subtarefas(
