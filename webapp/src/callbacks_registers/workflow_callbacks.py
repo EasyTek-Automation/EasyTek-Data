@@ -247,12 +247,13 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
         # --- Conteúdo do collapse: meta + obs + logs como sub-itens ---
         corpo_collapse = []
         corpo_collapse.append(
-            html.Small(meta_children, className="text-muted d-block mb-2")
+            html.Div(meta_children, className="text-muted d-block mb-2",
+                     style={"fontSize": "0.93rem"})
         )
         if observacoes:
             corpo_collapse.append(
-                html.Small(observacoes, className="fst-italic text-muted d-block mb-2",
-                           style={"whiteSpace": "pre-line"})
+                html.Div(observacoes, className="fst-italic text-muted d-block mb-2",
+                         style={"whiteSpace": "pre-line", "fontSize": "0.93rem"})
             )
         # Logs como sub-itens
         for log in logs_da_sub:
@@ -266,9 +267,9 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
 
             log_meta = [
                 html.I(className="fas fa-file-alt text-info me-2",
-                       style={"fontSize": "0.82rem"}),
+                       style={"fontSize": "0.93rem"}),
                 html.Span("Relatório", className="fw-semibold me-2",
-                          style={"fontSize": "0.82rem"}),
+                          style={"fontSize": "0.93rem"}),
                 html.Span(log.get('editado_por', ''), className="text-muted me-1"),
                 html.Span(f"· {log.get('data', '')}", className="text-muted"),
             ]
@@ -284,15 +285,15 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                         color="link",
                         size="sm",
                         className="p-0 text-info",
-                        style={"fontSize": "0.72rem", "verticalAlign": "middle"},
+                        style={"fontSize": "0.85rem", "verticalAlign": "middle"},
                         title="Editar relatório"
                     ),
                 ]
 
             corpo_collapse.append(html.Div([
                 html.Div(log_meta, className="d-flex align-items-center mb-1 flex-wrap"),
-                html.Small(obs_log, className="fst-italic text-muted d-block ps-4",
-                           style={"whiteSpace": "pre-line"}) if obs_log else None
+                html.Div(obs_log, className="fst-italic text-muted d-block ps-4",
+                         style={"whiteSpace": "pre-line", "fontSize": "0.93rem"}) if obs_log else None
             ], className="p-2 mb-1 rounded",
                style={"backgroundColor": "rgba(13,202,240,0.07)",
                       "borderLeft": "2px solid var(--bs-info)"}))
@@ -317,7 +318,7 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                         titulo,
                         className="fw-semibold me-2" + (" text-muted" if concluido else ""),
                         style={"textDecoration": "line-through" if concluido else "none",
-                               "fontSize": "0.93rem"}
+                               "fontSize": "1.02rem"}
                     ),
                     *badges
                 ], className="flex-grow-1 d-flex align-items-center flex-wrap ms-2"),

@@ -181,7 +181,7 @@ def criar_barra_horas_inline(historico_items):
     return html.Div([
         dbc.Progress(
             bars,
-            style={"height": "22px"},
+            style={"height": "33px"},
             className="mb-1"
         ),
         html.Div(legenda, className="d-flex flex-wrap")
@@ -840,7 +840,7 @@ def criar_tabela_pendencias(df_pendencias, df_historico=None, user_level=1, user
     if df_pendencias is None or df_pendencias.empty:
         return html.Div([
             html.I(className="fas fa-inbox fa-3x text-muted mb-3"),
-            html.H5("Nenhuma pendência encontrada", className="text-muted")
+            html.H5("Nenhuma demanda encontrada", className="text-muted")
         ], className="text-center py-5")
 
     # Resetar índice para garantir 0, 1, 2... independente de filtros aplicados
@@ -981,7 +981,7 @@ def layout():
             dbc.Col([
                 html.H2([
                     html.I(className="fas fa-project-diagram me-2"),
-                    "Workflow Dashboard"
+                    "Demandas"
                 ], className="mb-0 workflow-page-title")
             ], width=12, md=6),
 
@@ -989,7 +989,7 @@ def layout():
                 dbc.ButtonGroup([
                     dbc.Button([
                         html.I(className="fas fa-plus-circle me-2"),
-                        "Novo Workflow"
+                        "Nova Demanda"
                     ], id="btn-nova-pendencia", color="success", outline=True,
                        style={"display": "inline-block" if current_user.is_authenticated and current_user.level == 3 else "none"}),
 

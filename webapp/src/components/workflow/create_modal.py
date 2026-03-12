@@ -21,7 +21,7 @@ def create_pendencia_modal():
             html.Label("Descrição:", className="fw-bold mb-1"),
             dbc.Textarea(
                 id="create-pend-descricao",
-                placeholder="Descreva a pendência detalhadamente...",
+                placeholder="Descreva a demanda detalhadamente...",
                 className="mb-3",
                 rows=4,
                 required=True
@@ -77,7 +77,7 @@ def create_pendencia_modal():
                 className="me-2"
             ),
             dbc.Button(
-                [html.I(className="fas fa-check-circle me-2"), "Criar Pendência"],
+                [html.I(className="fas fa-check-circle me-2"), "Criar Demanda"],
                 id="create-pend-submit-btn",
                 color="success"
             )

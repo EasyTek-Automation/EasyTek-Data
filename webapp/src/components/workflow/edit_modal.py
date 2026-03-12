@@ -13,7 +13,7 @@ def edit_pendencia_modal():
     return dbc.Modal([
         dbc.ModalHeader(dbc.ModalTitle([
             html.I(className="fas fa-edit me-2"),
-            "Editar Pendência"
+            "Editar Demanda"
         ])),
 
         dbc.ModalBody([
@@ -27,7 +27,7 @@ def edit_pendencia_modal():
             html.Label("Descrição:", className="fw-bold mb-1"),
             dbc.Textarea(
                 id="edit-pend-descricao",
-                placeholder="Descrição da pendência...",
+                placeholder="Descrição da demanda...",
                 className="mb-3",
                 rows=4,
                 required=True
@@ -131,14 +131,14 @@ def delete_confirm_modal():
         ])),
 
         dbc.ModalBody([
-            html.H5("Tem certeza que deseja deletar esta pendência?", className="mb-3"),
+            html.H5("Tem certeza que deseja deletar esta demanda?", className="mb-3"),
             html.P([
                 "Esta ação é ",
                 html.Strong("irreversível", className="text-danger"),
                 " e irá remover:"
             ]),
             html.Ul([
-                html.Li("A pendência e todos os seus dados"),
+                html.Li("A demanda e todos os seus dados"),
                 html.Li("Todo o histórico de atualizações"),
             ]),
             html.Div([
