@@ -405,6 +405,63 @@ def edit_subtask_modal():
     ], id="edit-subtask-modal", is_open=False, centered=True)
 
 
+def edit_log_horas_modal():
+    """Modal simples para editar as horas de um relatório (log)."""
+    return dbc.Modal([
+        dbc.ModalHeader(dbc.ModalTitle([
+            html.I(className="fas fa-clock me-2"),
+            "Editar Horas do Relatório"
+        ])),
+
+        dbc.ModalBody([
+            html.Label("Duração:", className="fw-bold mb-1"),
+            dbc.InputGroup([
+                dbc.InputGroupText(
+                    html.I(className="fas fa-hourglass-half",
+                           style={"color": "var(--bs-info)", "fontSize": "0.9rem"}),
+                    style={"backgroundColor": "transparent"}
+                ),
+                dbc.Input(
+                    id="edit-log-horas-input",
+                    type="text",
+                    placeholder="00:00",
+                    maxLength=5,
+                    autocomplete="off",
+                    style={
+                        "fontFamily": "monospace",
+                        "fontWeight": "600",
+                        "letterSpacing": "0.12em",
+                        "fontSize": "1.05rem"
+                    }
+                ),
+                dbc.InputGroupText(
+                    "hh:mm",
+                    style={"fontSize": "0.75rem", "color": "var(--bs-secondary)",
+                           "backgroundColor": "transparent"}
+                ),
+            ], className="mb-3"),
+
+            html.Div(id="edit-log-horas-alert"),
+            dcc.Store(id="edit-log-horas-hist-id"),
+        ]),
+
+        dbc.ModalFooter([
+            dbc.Button(
+                "Cancelar",
+                id="edit-log-horas-cancel-btn",
+                color="secondary",
+                outline=True,
+                className="me-2"
+            ),
+            dbc.Button(
+                [html.I(className="fas fa-save me-2"), "Salvar"],
+                id="edit-log-horas-submit-btn",
+                color="primary"
+            )
+        ])
+    ], id="edit-log-horas-modal", is_open=False, centered=True)
+
+
 def delete_subtask_confirm_modal():
     """Modal de confirmação para exclusão de subtarefa."""
     return dbc.Modal([

@@ -18,6 +18,7 @@ from src.utils.workflow_db import (
     criar_subtarefa,
     adicionar_log,
     editar_subtarefa,
+    editar_horas_log,
     deletar_subtarefa,
     get_usuarios_por_perfil,
     get_usuarios_nivel3_por_perfil,
@@ -685,14 +686,12 @@ def register_subtask_callbacks(app):
             )
 
     # ==============================================================================
-    # CB15: Auto-format campo HH:MM ao perder foco
+    # CB15: Auto-format campo HH:MM ao perder foco (add-log-modal)
     # ==============================================================================
-    app.clientside_callback(
-        """
+    _HHMM_JS = """
         function(n_blur, value) {
             if (!value) return '';
             value = String(value).trim().replace(',', '.');
-            // Já está em HH:MM
             if (/^\\d+:\\d{1,2}$/.test(value)) {
                 var parts = value.split(':');
                 var h = parseInt(parts[0], 10);
@@ -700,7 +699,6 @@ def register_subtask_callbacks(app):
                 if (isNaN(h) || isNaN(m) || m > 59) return '';
                 return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
             }
-            // Número decimal (1.5 ou 1,5)
             if (/^\\d*\\.?\\d+$/.test(value)) {
                 var hours = parseFloat(value);
                 var h = Math.floor(hours);
@@ -708,7 +706,6 @@ def register_subtask_callbacks(app):
                 if (m >= 60) { h += 1; m = 0; }
                 return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0');
             }
-            // 3-4 dígitos sem separador (ex: 130 → 01:30, 0230 → 02:30)
             if (/^\\d{3,4}$/.test(value)) {
                 var padded = value.padStart(4, '0');
                 var h = parseInt(padded.slice(0, -2), 10);
@@ -718,9 +715,124 @@ def register_subtask_callbacks(app):
             }
             return '';
         }
-        """,
+        """
+    app.clientside_callback(
+        _HHMM_JS,
         Output("add-log-horas", "value", allow_duplicate=True),
         Input("add-log-horas", "n_blur"),
         State("add-log-horas", "value"),
         prevent_initial_call=True
     )
+
+    # ==============================================================================
+    # CB15b: Auto-format campo HH:MM ao perder foco (edit-log-horas-modal)
+    # ==============================================================================
+    app.clientside_callback(
+        _HHMM_JS,
+        Output("edit-log-horas-input", "value", allow_duplicate=True),
+        Input("edit-log-horas-input", "n_blur"),
+        State("edit-log-horas-input", "value"),
+        prevent_initial_call=True
+    )
+
+    # ==============================================================================
+    # CB16: Abrir edit-log-horas-modal ao clicar btn-edit-log-horas
+    # ==============================================================================
+    @app.callback(
+        Output("edit-log-horas-modal", "is_open"),
+        Output("edit-log-horas-hist-id", "data"),
+        Output("edit-log-horas-input", "value", allow_duplicate=True),
+        Output("edit-log-horas-alert", "children", allow_duplicate=True),
+        Input({"type": "btn-edit-log-horas", "index": ALL}, "n_clicks"),
+        State("store-historico", "data"),
+        prevent_initial_call=True
+    )
+    def abrir_edit_log_horas_modal(n_clicks, historico_data):
+        ctx = callback_context
+        if not ctx.triggered or not any(c for c in n_clicks if c):
+            raise PreventUpdate
+
+        trigger_id_str = ctx.triggered[0]['prop_id'].split('.')[0]
+        id_dict = json.loads(trigger_id_str)
+        hist_id = id_dict['index']
+
+        horas_atual = ""
+        if historico_data:
+            df = pd.DataFrame(historico_data)
+            match = df[df['hist_id'] == hist_id]
+            if not match.empty:
+                h_raw = match.iloc[0].get('horas')
+                try:
+                    h_val = float(h_raw) if h_raw is not None and str(h_raw) != 'nan' else None
+                except (ValueError, TypeError):
+                    h_val = None
+                if h_val:
+                    from src.pages.workflow.dashboard import float_para_hhmm
+                    horas_atual = float_para_hhmm(h_val)
+
+        return True, hist_id, horas_atual, ""
+
+    # ==============================================================================
+    # CB17: Fechar edit-log-horas-modal (Cancelar)
+    # ==============================================================================
+    @app.callback(
+        Output("edit-log-horas-modal", "is_open", allow_duplicate=True),
+        Output("edit-log-horas-alert", "children"),
+        Input("edit-log-horas-cancel-btn", "n_clicks"),
+        prevent_initial_call=True
+    )
+    def fechar_edit_log_horas_modal(n_clicks):
+        if not n_clicks:
+            raise PreventUpdate
+        return False, ""
+
+    # ==============================================================================
+    # CB18: Salvar horas editadas do log
+    # ==============================================================================
+    @app.callback(
+        Output("edit-log-horas-modal", "is_open", allow_duplicate=True),
+        Output("edit-log-horas-alert", "children", allow_duplicate=True),
+        Output("alert-container-workflow", "children", allow_duplicate=True),
+        Output("container-tabela", "children", allow_duplicate=True),
+        Output("store-pendencias", "data", allow_duplicate=True),
+        Output("store-historico", "data", allow_duplicate=True),
+        Input("edit-log-horas-submit-btn", "n_clicks"),
+        State("edit-log-horas-hist-id", "data"),
+        State("edit-log-horas-input", "value"),
+        State("user-username-store", "data"),
+        State("user-level-store", "data"),
+        State("store-filtros-ativos", "data"),
+        prevent_initial_call=True
+    )
+    def salvar_edit_log_horas(n_clicks, hist_id, horas, username, user_level, filtros):
+        if not n_clicks or not hist_id:
+            raise PreventUpdate
+
+        horas_val = hhmm_para_float(horas) if horas else None
+        if horas_val is None:
+            return (True,
+                    dbc.Alert("Informe um valor válido no formato HH:MM.", color="warning"),
+                    no_update, no_update, no_update, no_update)
+
+        sucesso, mensagem = editar_horas_log(hist_id, horas_val)
+
+        from src.pages.workflow.dashboard import carregar_dados_csv
+        df_pend, df_hist = carregar_dados_csv()
+        nova_tabela, store_data = reconstruir_tabela_com_filtros(
+            df_pend, df_hist, filtros, user_level, username
+        )
+
+        if sucesso:
+            return (
+                False, "",
+                dbc.Alert([html.I(className="fas fa-check-circle me-2"), mensagem],
+                          color="success", dismissable=True, duration=5000),
+                nova_tabela, store_data,
+                df_hist.to_dict('records') if df_hist is not None else []
+            )
+        else:
+            return (
+                True,
+                dbc.Alert(f"Erro: {mensagem}", color="danger"),
+                no_update, no_update, no_update, no_update
+            )
