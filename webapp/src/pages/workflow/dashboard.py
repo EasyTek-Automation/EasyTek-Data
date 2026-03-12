@@ -274,11 +274,17 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):  # n
             concluidas_ativ = int(df_ativ['concluido'].eq(True).sum())
         em_andamento_ativ = total_ativ - concluidas_ativ
 
-        if 'horas' in df_ativ.columns:
-            h_num = pd.to_numeric(df_ativ['horas'], errors='coerce')
-            horas_total = float(h_num.sum())
-            if 'concluido' in df_ativ.columns:
-                horas_concluidas = float(h_num[df_ativ['concluido'].eq(True)].sum())
+        # Somar horas usando checagem robusta (igual a criar_barra_horas_inline)
+        for _, row in df_ativ.iterrows():
+            h = row.get('horas') if hasattr(row, 'get') else row['horas'] if 'horas' in row.index else None
+            try:
+                if h is not None and str(h) != 'nan' and float(h) > 0:
+                    horas_total += float(h)
+                    concluido = row.get('concluido') if hasattr(row, 'get') else (row['concluido'] if 'concluido' in row.index else False)
+                    if concluido is True:
+                        horas_concluidas += float(h)
+            except (ValueError, TypeError):
+                pass
 
         if username_atual and 'aprovador' in df_historico.columns and 'status_aprovacao' in df_historico.columns:
             mask = (
