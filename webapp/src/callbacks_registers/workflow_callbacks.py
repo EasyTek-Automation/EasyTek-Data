@@ -27,6 +27,46 @@ from src.pages.workflow.dashboard import (
 # HELPERS
 # ======================================================================================
 
+def _fmt_data_str(valor):
+    """Converte qualquer valor de data (datetime, Timestamp, NaT, str, None) para string formatada."""
+    if valor is None:
+        return ''
+    try:
+        import pandas as _pd
+        if valor is _pd.NaT:
+            return ''
+    except Exception:
+        pass
+    try:
+        return valor.strftime('%d/%m/%Y %H:%M')
+    except Exception:
+        try:
+            s = str(valor)
+            return s if s not in ('NaT', 'nan', 'None', '') else ''
+        except Exception:
+            return ''
+
+
+def _processar_historico_validacao(raw):
+    """
+    Recebe o campo historico_validacao do MongoDB (lista de dicts com datetimes brutos)
+    e retorna lista de dicts com 'data_fmt' já como string formatada.
+    """
+    if not isinstance(raw, list):
+        return []
+    resultado = []
+    for hv in raw:
+        if not isinstance(hv, dict):
+            continue
+        resultado.append({
+            'tipo': hv.get('tipo', ''),
+            'por': hv.get('por') or '',
+            'nota': hv.get('nota') or '',
+            'data_fmt': _fmt_data_str(hv.get('data')),
+        })
+    return resultado
+
+
 def criar_checklist_subtarefas(historico_items, username_atual=None,
                                user_level=1, pend_id=None,
                                data_criacao=None, ultima_atualizacao=None):
@@ -360,10 +400,9 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
         if historico_validacao:
             for hv in historico_validacao:
                 hv_tipo = hv.get('tipo')
-                hv_por = hv.get('por')
-                hv_nota = hv.get('nota')
-                hv_data = hv.get('data')
-                hv_data_fmt = hv_data.strftime("%d/%m/%Y %H:%M") if hasattr(hv_data, 'strftime') else ''
+                hv_por = hv.get('por') or ''
+                hv_nota = hv.get('nota') or ''
+                hv_data_fmt = hv.get('data_fmt') or ''
                 if hv_tipo == 'validacao':
                     corpo_collapse.append(
                         html.Div([
@@ -685,7 +724,7 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
                                and str(row.get('data_validacao')) != 'nan'
                                and hasattr(row.get('data_validacao'), 'strftime')
                                else None),
-            'historico_validacao': row.get('historico_validacao') if isinstance(row.get('historico_validacao'), list) else [],
+            'historico_validacao': _processar_historico_validacao(row.get('historico_validacao')),
         })
 
     return criar_checklist_subtarefas(
