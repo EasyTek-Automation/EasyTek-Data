@@ -563,3 +563,143 @@ class TestAceitarRejeitarTarefa:
             from src.utils.workflow_db import rejeitar_tarefa
             rejeitar_tarefa('AMG_WF001', 'user1')
         assert mock_hist.insert_one.called
+
+
+# =============================================================================
+# TESTES: prioridade em carregar_historico (retrocompat)
+# =============================================================================
+
+class TestCarregarHistoricoPrioridade:
+    """Testa retrocompatibilidade do campo prioridade em carregar_historico."""
+
+    def _docs_sem_prioridade(self):
+        from bson import ObjectId
+        return [
+            {'_id': ObjectId(), 'MaintenanceWF_id': 'WF001', 'descricao': 'Ativ',
+             'data': datetime.now(), 'responsavel': 'u1', 'tipo_evento': 'Manutenção Corretiva',
+             'editado_por': 'u1', 'observacoes': '', 'alteracoes': '',
+             'horas': None, 'concluido': False, 'aprovador': None,
+             'status_aprovacao': None, 'data_aprovacao': None,
+             'record_type': 'subtarefa', 'subtarefa_id': None},
+        ]
+
+    def test_documentos_sem_prioridade_recebem_normal(self):
+        """Atividades sem campo prioridade devem receber 'normal' por retrocompat."""
+        docs = self._docs_sem_prioridade()
+        mock_col = make_collection_mock(docs)
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock_col):
+            from src.utils.workflow_db import carregar_historico
+            df = carregar_historico()
+        assert 'prioridade' in df.columns
+        assert df['prioridade'].iloc[0] == 'normal'
+
+    def test_prioridade_existente_preservada(self):
+        """Atividades com prioridade 'alta' devem manter o valor."""
+        docs = self._docs_sem_prioridade()
+        docs[0]['prioridade'] = 'alta'
+        mock_col = make_collection_mock(docs)
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock_col):
+            from src.utils.workflow_db import carregar_historico
+            df = carregar_historico()
+        assert df['prioridade'].iloc[0] == 'alta'
+
+    def test_prioridade_none_recebe_normal(self):
+        """Atividades com prioridade=None devem receber 'normal'."""
+        docs = self._docs_sem_prioridade()
+        docs[0]['prioridade'] = None
+        mock_col = make_collection_mock(docs)
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock_col):
+            from src.utils.workflow_db import carregar_historico
+            df = carregar_historico()
+        assert df['prioridade'].iloc[0] == 'normal'
+
+
+# =============================================================================
+# TESTES: prioridade em criar_subtarefa
+# =============================================================================
+
+class TestCriarSubtarefaPrioridade:
+    """Testa que criar_subtarefa salva prioridade corretamente."""
+
+    def _make_mocks(self):
+        from bson import ObjectId
+        mock_pend = make_collection_mock([{
+            '_id': ObjectId(), 'id': 'WF001', 'descricao': 'Demanda',
+            'responsavel': 'u1', 'status': 'Em Andamento',
+        }])
+        mock_hist = make_collection_mock()
+        return mock_pend, mock_hist
+
+    def _side_effect(self, mock_pend, mock_hist):
+        from src.utils.workflow_db import COLLECTION_PENDENCIAS, COLLECTION_HISTORICO
+        def _se(col_name):
+            return mock_pend if col_name == COLLECTION_PENDENCIAS else mock_hist
+        return _se
+
+    def test_prioridade_padrao_e_normal(self):
+        """Sem informar prioridade, deve gravar 'normal'."""
+        mock_pend, mock_hist = self._make_mocks()
+        with patch('src.utils.workflow_db.get_mongo_connection',
+                   side_effect=self._side_effect(mock_pend, mock_hist)):
+            from src.utils.workflow_db import criar_subtarefa
+            criar_subtarefa('WF001', 'Título', 'Análise de Falha', 'u1', '', 'u1')
+        doc = mock_hist.insert_one.call_args[0][0]
+        assert doc.get('prioridade') == 'normal'
+
+    def test_prioridade_alta_salva_corretamente(self):
+        """Passando prioridade='alta', deve gravar 'alta'."""
+        mock_pend, mock_hist = self._make_mocks()
+        with patch('src.utils.workflow_db.get_mongo_connection',
+                   side_effect=self._side_effect(mock_pend, mock_hist)):
+            from src.utils.workflow_db import criar_subtarefa
+            criar_subtarefa('WF001', 'Título', 'Análise de Falha', 'u1', '', 'u1',
+                            prioridade='alta')
+        doc = mock_hist.insert_one.call_args[0][0]
+        assert doc.get('prioridade') == 'alta'
+
+    def test_prioridade_urgente_salva_corretamente(self):
+        mock_pend, mock_hist = self._make_mocks()
+        with patch('src.utils.workflow_db.get_mongo_connection',
+                   side_effect=self._side_effect(mock_pend, mock_hist)):
+            from src.utils.workflow_db import criar_subtarefa
+            criar_subtarefa('WF001', 'Título', 'Análise de Falha', 'u1', '', 'u1',
+                            prioridade='urgente')
+        doc = mock_hist.insert_one.call_args[0][0]
+        assert doc.get('prioridade') == 'urgente'
+
+
+# =============================================================================
+# TESTES: prioridade em editar_subtarefa
+# =============================================================================
+
+class TestEditarSubtarefaPrioridade:
+    """Testa que editar_subtarefa atualiza prioridade corretamente."""
+
+    def _make_mock_hist(self):
+        from bson import ObjectId
+        self._oid = ObjectId()
+        mock_hist = make_collection_mock([{
+            '_id': self._oid, 'MaintenanceWF_id': 'WF001',
+            'record_type': 'subtarefa', 'prioridade': 'normal',
+        }])
+        mock_hist.find_one.return_value = {'_id': self._oid, 'prioridade': 'normal'}
+        return mock_hist
+
+    def test_atualiza_prioridade_para_urgente(self):
+        """editar_subtarefa com prioridade='urgente' deve atualizar o campo."""
+        mock_hist = self._make_mock_hist()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock_hist):
+            from src.utils.workflow_db import editar_subtarefa
+            sucesso, _ = editar_subtarefa(str(self._oid), prioridade='urgente')
+        assert sucesso
+        updates = mock_hist.update_one.call_args[0][1]['$set']
+        assert updates.get('prioridade') == 'urgente'
+
+    def test_sem_prioridade_nao_atualiza_campo(self):
+        """editar_subtarefa sem prioridade não deve incluir o campo no $set."""
+        mock_hist = self._make_mock_hist()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock_hist):
+            from src.utils.workflow_db import editar_subtarefa
+            editar_subtarefa(str(self._oid), titulo='Novo título')
+        updates = mock_hist.update_one.call_args[0][1]['$set']
+        assert 'prioridade' not in updates

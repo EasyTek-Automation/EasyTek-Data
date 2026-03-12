@@ -2,6 +2,35 @@
 import dash_bootstrap_components as dbc
 from dash import html, dcc
 
+# Opções e cores de prioridade (estilo ClickUp)
+PRIORIDADE_OPTIONS = [
+    {"label": "🔴 Urgente", "value": "urgente"},
+    {"label": "🟠 Alta",    "value": "alta"},
+    {"label": "🔵 Normal",  "value": "normal"},
+    {"label": "⚫ Baixa",   "value": "baixa"},
+]
+
+PRIORIDADE_CORES = {
+    "urgente": "var(--bs-danger)",
+    "alta":    "var(--bs-warning)",
+    "normal":  "var(--bs-primary)",
+    "baixa":   "var(--bs-secondary)",
+}
+
+def _prioridade_selector(id_prefix, label="Prioridade:"):
+    """Seletor de prioridade reutilizável nos modais."""
+    return html.Div([
+        html.Label(label, className="fw-bold mb-1"),
+        html.Span(" (opcional)", className="text-muted small"),
+        dcc.Dropdown(
+            id=f"{id_prefix}-prioridade",
+            options=PRIORIDADE_OPTIONS,
+            value="normal",
+            clearable=False,
+            className="mb-3"
+        ),
+    ])
+
 # Opções de tipo de evento — "Lançamento Retroativo" é um campo separado (switch)
 TIPOS_EVENTO_OPTIONS = [
     {"label": "Análise de Falha", "value": "Análise de Falha"},
@@ -145,6 +174,9 @@ def create_subtask_modal():
             ], id="create-subtask-retroativo-container", style={"display": "none"}),
 
             html.Hr(className="my-3"),
+
+            # Prioridade
+            _prioridade_selector("create-subtask"),
 
             # Observações
             html.Label("Observações:", className="fw-bold mb-1"),
@@ -366,6 +398,9 @@ def edit_subtask_modal():
             ], id="edit-subtask-retroativo-container", style={"display": "none"}),
 
             html.Hr(className="my-3"),
+
+            # Prioridade
+            _prioridade_selector("edit-subtask"),
 
             # Observações
             html.Label("Observações:", className="fw-bold mb-1"),

@@ -127,6 +127,12 @@ def carregar_historico():
         if 'subtarefa_id' not in df.columns:
             df['subtarefa_id'] = None
 
+        # Retrocompat prioridade
+        if 'prioridade' not in df.columns:
+            df['prioridade'] = 'normal'
+        else:
+            df['prioridade'] = df['prioridade'].fillna('normal')
+
         # Retrocompat is_retroativo e responsavel_retroativo (campos novos)
         if 'is_retroativo' not in df.columns:
             # Registros antigos com tipo_evento == "Lançamento Retroativo" são retroativos
@@ -619,7 +625,8 @@ def rejeitar_tarefa(pend_id, username):
 
 def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
                     editado_por, aprovador=None, data_retroativa=None,
-                    is_retroativo=False, responsavel_retroativo=None, aprovador_retroativo=None):
+                    is_retroativo=False, responsavel_retroativo=None, aprovador_retroativo=None,
+                    prioridade='normal'):
     """
     Cria nova subtarefa (record_type='subtarefa') no histórico.
 
@@ -669,6 +676,7 @@ def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
             'is_retroativo': bool(is_retroativo),
             'responsavel_retroativo': responsavel_retroativo if is_retroativo else None,
             'aprovador_retroativo': aprovador_retroativo if is_retroativo else None,
+            'prioridade': prioridade or 'normal',
         }
 
         collection_hist.insert_one(doc)
@@ -736,7 +744,7 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
                      aprovador=None, update_aprovador=False,
                      data_retroativa=None, update_data_retroativa=False,
                      is_retroativo=None, responsavel_retroativo=None, aprovador_retroativo=None,
-                     update_retroativo=False):
+                     update_retroativo=False, prioridade=None):
     """
     Edita campos de uma subtarefa existente.
 
@@ -784,6 +792,9 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
             updates['is_retroativo'] = bool(is_retroativo)
             updates['responsavel_retroativo'] = responsavel_retroativo if is_retroativo else None
             updates['aprovador_retroativo'] = aprovador_retroativo if is_retroativo else None
+
+        if prioridade is not None:
+            updates['prioridade'] = prioridade
 
         if not updates:
             return False, "Nenhum campo para atualizar"

@@ -47,6 +47,7 @@ def register_subtask_callbacks(app):
         Output("create-subtask-is-retroativo", "value", allow_duplicate=True),
         Output("create-subtask-responsavel-retroativo", "value", allow_duplicate=True),
         Output("create-subtask-aprovador-retroativo", "value", allow_duplicate=True),
+        Output("create-subtask-prioridade", "value", allow_duplicate=True),
         Input({"type": "btn-nova-subtarefa", "index": ALL}, "n_clicks"),
         State("create-subtask-modal", "is_open"),
         State("user-username-store", "data"),
@@ -61,7 +62,7 @@ def register_subtask_callbacks(app):
         id_dict = json.loads(trigger_id_str)
         pend_id = id_dict['index']
 
-        return True, {"pend_id": pend_id, "subtarefa_id": None}, "", None, username or None, "", None, None, "", False, None, None
+        return True, {"pend_id": pend_id, "subtarefa_id": None}, "", None, username or None, "", None, None, "", False, None, None, "normal"
 
     # ==============================================================================
     # CB2: Fechar create-subtask-modal (Cancelar / limpar campos)
@@ -78,13 +79,14 @@ def register_subtask_callbacks(app):
         Output("create-subtask-is-retroativo", "value"),
         Output("create-subtask-responsavel-retroativo", "value"),
         Output("create-subtask-aprovador-retroativo", "value"),
+        Output("create-subtask-prioridade", "value"),
         Input("create-subtask-cancel-btn", "n_clicks"),
         prevent_initial_call=True
     )
     def fechar_create_subtask_modal(n_clicks):
         if not n_clicks:
             raise PreventUpdate
-        return False, "", None, None, "", None, None, "", False, None, None
+        return False, "", None, None, "", None, None, "", False, None, None, "normal"
 
     # ==============================================================================
     # CB3: Mostrar/ocultar campo aprovador no create-subtask-modal
@@ -164,6 +166,7 @@ def register_subtask_callbacks(app):
         State("create-subtask-is-retroativo", "value"),
         State("create-subtask-responsavel-retroativo", "value"),
         State("create-subtask-aprovador-retroativo", "value"),
+        State("create-subtask-prioridade", "value"),
         State("store-subtask-context", "data"),
         State("user-username-store", "data"),
         State("user-level-store", "data"),
@@ -172,7 +175,7 @@ def register_subtask_callbacks(app):
     )
     def submeter_create_subtask(n_clicks, titulo, tipo, responsavel, obs, aprovador,
                                 data_retroativa, is_retroativo, responsavel_retroativo,
-                                aprovador_retroativo, context, username, user_level, filtros):
+                                aprovador_retroativo, prioridade, context, username, user_level, filtros):
         if not n_clicks:
             raise PreventUpdate
 
@@ -231,6 +234,7 @@ def register_subtask_callbacks(app):
             is_retroativo=bool(is_retroativo),
             responsavel_retroativo=responsavel_retroativo if is_retroativo else None,
             aprovador_retroativo=aprovador_retroativo if is_retroativo else None,
+            prioridade=prioridade or 'normal',
         )
 
         from src.pages.workflow.dashboard import carregar_dados_csv
@@ -402,6 +406,7 @@ def register_subtask_callbacks(app):
         Output("edit-subtask-is-retroativo", "value"),
         Output("edit-subtask-responsavel-retroativo", "value"),
         Output("edit-subtask-aprovador-retroativo", "value"),
+        Output("edit-subtask-prioridade", "value"),
         Input({"type": "btn-edit-subtarefa", "index": ALL}, "n_clicks"),
         State("store-historico", "data"),
         prevent_initial_call=True
@@ -424,6 +429,7 @@ def register_subtask_callbacks(app):
         is_retro_val = False
         resp_retro_val = None
         aprov_retro_val = None
+        prioridade_val = "normal"
 
         if historico_data:
             df = pd.DataFrame(historico_data)
@@ -447,8 +453,10 @@ def register_subtask_callbacks(app):
                 resp_retro_val = str(_rr) if _rr and str(_rr) != 'nan' else None
                 _ar = row.get('aprovador_retroativo')
                 aprov_retro_val = str(_ar) if _ar and str(_ar) != 'nan' else None
+                _p = row.get('prioridade')
+                prioridade_val = str(_p) if _p and str(_p) != 'nan' else 'normal'
 
-        return True, hist_id, titulo_val, tipo_val, obs_val, concluido_val, aprovador_val, data_retro_val, is_retro_val, resp_retro_val, aprov_retro_val
+        return True, hist_id, titulo_val, tipo_val, obs_val, concluido_val, aprovador_val, data_retro_val, is_retro_val, resp_retro_val, aprov_retro_val, prioridade_val
 
     # ==============================================================================
     # CB9b: Toggle visibilidade aprovador no edit modal (por tipo de evento)
@@ -540,6 +548,7 @@ def register_subtask_callbacks(app):
         State("edit-subtask-is-retroativo", "value"),
         State("edit-subtask-responsavel-retroativo", "value"),
         State("edit-subtask-aprovador-retroativo", "value"),
+        State("edit-subtask-prioridade", "value"),
         State("user-username-store", "data"),
         State("user-level-store", "data"),
         State("store-filtros-ativos", "data"),
@@ -547,7 +556,7 @@ def register_subtask_callbacks(app):
     )
     def submeter_edit_subtask(n_clicks, hist_id, titulo, tipo, obs, concluido,
                               aprovador, data_retroativa, is_retroativo, responsavel_retroativo,
-                              aprovador_retroativo, username, user_level, filtros):
+                              aprovador_retroativo, prioridade, username, user_level, filtros):
         if not n_clicks or not hist_id:
             raise PreventUpdate
 
@@ -575,6 +584,7 @@ def register_subtask_callbacks(app):
             responsavel_retroativo=responsavel_retroativo if is_retroativo else None,
             aprovador_retroativo=aprovador_retroativo if is_retroativo else None,
             update_retroativo=True,
+            prioridade=prioridade or 'normal',
         )
 
         from src.pages.workflow.dashboard import carregar_dados_csv
@@ -681,6 +691,58 @@ def register_subtask_callbacks(app):
                 False,
                 dbc.Alert([html.I(className="fas fa-exclamation-circle me-2"), f"Erro: {mensagem}"],
                           color="danger", dismissable=True, duration=5000),
+                nova_tabela, store_data,
+                df_hist.to_dict('records') if df_hist is not None else []
+            )
+
+    # ==============================================================================
+    # CB14b: Alterar prioridade inline (ClickUp-style badge)
+    # index format: "{hist_id}__{prioridade}"
+    # ==============================================================================
+    @app.callback(
+        Output("alert-container-workflow", "children", allow_duplicate=True),
+        Output("container-tabela", "children", allow_duplicate=True),
+        Output("store-pendencias", "data", allow_duplicate=True),
+        Output("store-historico", "data", allow_duplicate=True),
+        Input({"type": "set-prioridade", "index": ALL}, "n_clicks"),
+        State("user-username-store", "data"),
+        State("user-level-store", "data"),
+        State("store-filtros-ativos", "data"),
+        prevent_initial_call=True
+    )
+    def set_prioridade_inline(n_clicks, username, user_level, filtros):
+        ctx = callback_context
+        if not ctx.triggered or not any(c for c in n_clicks if c):
+            raise PreventUpdate
+
+        trigger_id_str = ctx.triggered[0]['prop_id'].split('.')[0]
+        id_dict = json.loads(trigger_id_str)
+        index_val = id_dict['index']  # "{hist_id}__{prioridade}"
+
+        parts = index_val.rsplit('__', 1)
+        if len(parts) != 2:
+            raise PreventUpdate
+        hist_id, nova_prioridade = parts
+
+        sucesso, mensagem = editar_subtarefa(hist_id=hist_id, prioridade=nova_prioridade)
+
+        from src.pages.workflow.dashboard import carregar_dados_csv
+        df_pend, df_hist = carregar_dados_csv()
+        nova_tabela, store_data = reconstruir_tabela_com_filtros(
+            df_pend, df_hist, filtros, user_level, username
+        )
+
+        if sucesso:
+            return (
+                dbc.Alert([html.I(className="fas fa-check-circle me-2"),
+                           f"Prioridade alterada para {nova_prioridade}."],
+                          color="success", dismissable=True, duration=3000),
+                nova_tabela, store_data,
+                df_hist.to_dict('records') if df_hist is not None else []
+            )
+        else:
+            return (
+                dbc.Alert(f"Erro: {mensagem}", color="danger", dismissable=True, duration=4000),
                 nova_tabela, store_data,
                 df_hist.to_dict('records') if df_hist is not None else []
             )

@@ -400,3 +400,75 @@ class TestCriarLinhaPendenciaAceite:
         )
         linha_str = str(resultado[0])
         assert 'btn-edit-pend' in linha_str
+
+
+# =============================================================================
+# TESTES: aplicar_filtros_dataframe() — filtro de prioridade
+# =============================================================================
+
+class TestAplicarFiltrosDataframePrioridade:
+    """Testa o parâmetro prioridade_list em aplicar_filtros_dataframe."""
+
+    @pytest.fixture
+    def df_pend(self):
+        agora = datetime.now()
+        return pd.DataFrame([
+            {'id': 'WF001', 'descricao': 'A', 'responsavel': 'u', 'status': 'Pendente',
+             'data_criacao': agora, 'nota_gam': None},
+            {'id': 'WF002', 'descricao': 'B', 'responsavel': 'u', 'status': 'Pendente',
+             'data_criacao': agora, 'nota_gam': None},
+            {'id': 'WF003', 'descricao': 'C', 'responsavel': 'u', 'status': 'Pendente',
+             'data_criacao': agora, 'nota_gam': None},
+        ])
+
+    @pytest.fixture
+    def df_hist(self):
+        agora = datetime.now()
+        return pd.DataFrame([
+            {'hist_id': 'h1', 'pendencia_id': 'WF001', 'record_type': 'subtarefa',
+             'prioridade': 'urgente', 'horas': 1.0, 'data': agora},
+            {'hist_id': 'h2', 'pendencia_id': 'WF002', 'record_type': 'subtarefa',
+             'prioridade': 'normal', 'horas': 0.5, 'data': agora},
+            {'hist_id': 'h3', 'pendencia_id': 'WF003', 'record_type': 'subtarefa',
+             'prioridade': 'baixa', 'horas': 0.0, 'data': agora},
+        ])
+
+    def test_sem_filtro_prioridade_retorna_todos(self, df_pend, df_hist):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            df_historico=df_hist, prioridade_list=None
+        )
+        assert len(resultado) == 3
+
+    def test_filtra_por_prioridade_urgente(self, df_pend, df_hist):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            df_historico=df_hist, prioridade_list=["urgente"]
+        )
+        assert list(resultado['id']) == ['WF001']
+
+    def test_filtra_por_multiplas_prioridades(self, df_pend, df_hist):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            df_historico=df_hist, prioridade_list=["urgente", "normal"]
+        )
+        assert set(resultado['id']) == {'WF001', 'WF002'}
+
+    def test_lista_vazia_nao_filtra(self, df_pend, df_hist):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            df_historico=df_hist, prioridade_list=[]
+        )
+        assert len(resultado) == 3
+
+    def test_sem_df_historico_nao_filtra(self, df_pend):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            df_historico=None, prioridade_list=["urgente"]
+        )
+        assert len(resultado) == 3

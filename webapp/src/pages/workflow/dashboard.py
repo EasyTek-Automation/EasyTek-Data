@@ -750,6 +750,22 @@ def criar_painel_filtros(username_inicial="todos"):
                         ),
                     ], className="w-100")
                 ], width=12, md=3)
+            ]),
+            dbc.Row([
+                dbc.Col([
+                    html.Label("Prioridade das atividades:", className="fw-bold mb-2"),
+                    dcc.Dropdown(
+                        id="filtro-prioridade",
+                        options=[
+                            {"label": "● Urgente", "value": "urgente"},
+                            {"label": "● Alta",    "value": "alta"},
+                            {"label": "● Normal",  "value": "normal"},
+                            {"label": "● Baixa",   "value": "baixa"},
+                        ],
+                        multi=True,
+                        placeholder="Todas as prioridades"
+                    )
+                ], width=12, md=4, className="mb-3"),
             ])
         ])
     ], className="shadow-sm mb-3 workflow-filters")
@@ -771,6 +787,19 @@ def criar_timeline_historico(historico_items, username_atual=None, mostrar_botoe
 
     timeline_items = []
 
+    COR_PRIORIDADE = {
+        "urgente": "var(--bs-danger)",
+        "alta":    "var(--bs-warning)",
+        "normal":  "var(--bs-primary)",
+        "baixa":   "var(--bs-secondary)",
+    }
+    LABEL_PRIORIDADE = {
+        "urgente": "Urgente",
+        "alta":    "Alta",
+        "normal":  "Normal",
+        "baixa":   "Baixa",
+    }
+
     for i, item in enumerate(historico_items):
         is_last = (i == len(historico_items) - 1)
         concluido = item.get('concluido', False)
@@ -778,6 +807,8 @@ def criar_timeline_historico(historico_items, username_atual=None, mostrar_botoe
         horas = item.get('horas')
         aprovador = item.get('aprovador')
         status_aprovacao = item.get('status_aprovacao')
+        record_type = item.get('record_type', 'subtarefa')
+        prioridade = item.get('prioridade', 'normal') or 'normal'
 
         # Estilo geral do item (opacidade reduzida se concluído)
         item_style = {"opacity": "0.6"} if concluido else {}
@@ -891,8 +922,40 @@ def criar_timeline_historico(historico_items, username_atual=None, mostrar_botoe
 
                 # Coluna direita: conteúdo
                 html.Div([
-                    # Título + badges
+                    # Título + prioridade (subtarefas) + badges
                     html.Div([
+                        # Indicador de prioridade ClickUp-style (apenas subtarefas)
+                        dbc.DropdownMenu(
+                            [
+                                dbc.DropdownMenuItem([
+                                    html.Span("●", style={"color": COR_PRIORIDADE["urgente"], "marginRight": "6px"}),
+                                    "Urgente"
+                                ], id={"type": "set-prioridade", "index": f"{hist_id}__urgente"}),
+                                dbc.DropdownMenuItem([
+                                    html.Span("●", style={"color": COR_PRIORIDADE["alta"], "marginRight": "6px"}),
+                                    "Alta"
+                                ], id={"type": "set-prioridade", "index": f"{hist_id}__alta"}),
+                                dbc.DropdownMenuItem([
+                                    html.Span("●", style={"color": COR_PRIORIDADE["normal"], "marginRight": "6px"}),
+                                    "Normal"
+                                ], id={"type": "set-prioridade", "index": f"{hist_id}__normal"}),
+                                dbc.DropdownMenuItem([
+                                    html.Span("●", style={"color": COR_PRIORIDADE["baixa"], "marginRight": "6px"}),
+                                    "Baixa"
+                                ], id={"type": "set-prioridade", "index": f"{hist_id}__baixa"}),
+                            ],
+                            label=html.Span(
+                                "●",
+                                title=f"Prioridade: {LABEL_PRIORIDADE.get(prioridade, 'Normal')}",
+                                style={"color": COR_PRIORIDADE.get(prioridade, COR_PRIORIDADE["normal"]),
+                                       "fontSize": "1.3rem", "lineHeight": "1", "cursor": "pointer"},
+                            ),
+                            size="sm",
+                            direction="down",
+                            className="me-1 d-inline-flex align-items-center",
+                            toggle_class_name="p-0 border-0 bg-transparent shadow-none",
+                            caret=False,
+                        ) if record_type == 'subtarefa' and hist_id and mostrar_botoes else html.Span(),
                         html.Span(item['descricao'], className="fw-bold me-2",
                                   style={"fontSize": "1.05rem",
                                          "textDecoration": "line-through" if concluido else "none"}),

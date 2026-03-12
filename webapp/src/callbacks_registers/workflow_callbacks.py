@@ -441,7 +441,8 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
 
 def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite_list=None,
                               data_inicio=None, data_fim=None,
-                              tipo_data="tarefa", df_historico=None, horas_uteis=False):
+                              tipo_data="tarefa", df_historico=None, horas_uteis=False,
+                              prioridade_list=None):
     """Aplica filtros ao DataFrame de pendências."""
     from datetime import datetime as _dt, timedelta
 
@@ -515,6 +516,17 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
             ids_com_horas = set(df_h[col_id].dropna().astype(str).unique())
             df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_com_horas)]
 
+    if prioridade_list and len(prioridade_list) > 0 and df_historico is not None and not df_historico.empty:
+        df_h = df_historico.copy()
+        if 'record_type' in df_h.columns:
+            df_h = df_h[df_h['record_type'] == 'subtarefa']
+        if 'prioridade' in df_h.columns:
+            df_h = df_h[df_h['prioridade'].isin(prioridade_list)]
+            col_id = 'pendencia_id' if 'pendencia_id' in df_h.columns else 'MaintenanceWF_id'
+            if col_id in df_h.columns:
+                ids_com_prioridade = set(df_h[col_id].dropna().astype(str).unique())
+                df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_com_prioridade)]
+
     return df_filtrado
 
 
@@ -544,6 +556,7 @@ def reconstruir_tabela_com_filtros(df_pendencias, df_historico, filtros, user_le
             tipo_data=filtros.get("tipo_data", "tarefa"),
             df_historico=df_historico,
             horas_uteis=filtros.get("horas_uteis", False),
+            prioridade_list=filtros.get("prioridade"),
         )
     else:
         df_filtrado = df_pendencias
@@ -668,12 +681,14 @@ def register_workflow_callbacks(app):
         State("filtro-data-inicio", "date"),
         State("filtro-data-fim", "date"),
         State("filtro-horas-uteis", "value"),
+        State("filtro-prioridade", "value"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
         prevent_initial_call=True
     )
     def aplicar_filtros(n_clicks, responsavel, status_list, busca, status_aceite_list,
-                        tipo_data, data_inicio, data_fim, horas_uteis, user_level, username_atual):
+                        tipo_data, data_inicio, data_fim, horas_uteis, prioridade_list,
+                        user_level, username_atual):
         """Aplica os filtros selecionados e reconstrói a tabela."""
         if not n_clicks:
             raise PreventUpdate
@@ -692,6 +707,7 @@ def register_workflow_callbacks(app):
             "data_inicio": data_inicio,
             "data_fim": data_fim,
             "horas_uteis": horas_uteis or False,
+            "prioridade": prioridade_list or [],
         }
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
             df_pendencias, df_historico, filtros, user_level, username_atual
@@ -1046,6 +1062,7 @@ def register_workflow_callbacks(app):
         Output("filtro-data-inicio", "date"),
         Output("filtro-data-fim", "date"),
         Output("filtro-horas-uteis", "value"),
+        Output("filtro-prioridade", "value"),
         Output("store-filtros-ativos", "data", allow_duplicate=True),
         Output("container-tabela", "children", allow_duplicate=True),
         Output("store-pendencias", "data", allow_duplicate=True),
@@ -1069,7 +1086,7 @@ def register_workflow_callbacks(app):
             username_atual=username_atual
         )
         return (
-            "todos", [], "", [], ["tarefa", "subtarefa"], None, None, False,  # resetar UI dos filtros + datas
+            "todos", [], "", [], ["tarefa", "subtarefa"], None, None, False, [],  # resetar UI dos filtros + datas
             None,                                        # limpar store de filtros
             nova_tabela,
             df_pendencias.to_dict('records')

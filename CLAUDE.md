@@ -271,6 +271,9 @@ ROUTE_ALIASES = {
 - `/maintenance/config`: KPI target configuration (admin only, level 3)
 - `/maintenance/procedures`: Markdown-based documentation system
 - `/workflow/dashboard`: Workflow management - Pending tasks dashboard (integrated in Maintenance menu)
+  - **Terminologia**: **Demanda** = tarefa/pendência (collection `Maintenance_workflow`); **Atividade** = subtarefa (record_type='subtarefa' em `MaintenanceHistory_workflow`)
+  - Campo `prioridade` nas Atividades: `'urgente'` | `'alta'` | `'normal'` | `'baixa'` (retrocompat: sem campo → `'normal'`)
+  - Filtros: responsável, status, busca, aceite, datas, horas úteis, prioridade das atividades
 - `/maintenance/work-orders`: Work orders management (in development)
 - `/maintenance/schedule`: Maintenance planning (in development)
 - `/maintenance/history`: Intervention history (in development)
