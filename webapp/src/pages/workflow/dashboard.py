@@ -151,37 +151,63 @@ def criar_barra_horas_inline(historico_items):
     total = sum(grupos.values())
 
     # Segmentos da barra — um por tipo, cor determinada pela posição
+    # Implementado com html.Div/flexbox para controle total de altura (dbc.Progress
+    # não garante aplicação do style ao elemento .progress do DOM em DBC 2.0.3)
+    COR_HEX = {
+        'primary': 'var(--bs-primary)',
+        'success': 'var(--bs-success)',
+        'info':    'var(--bs-info)',
+        'warning': 'var(--bs-warning)',
+        'danger':  'var(--bs-danger)',
+        'secondary':'var(--bs-secondary)',
+    }
     total_fmt = float_para_hhmm(total)
-    bars = []
+    segmentos = []
     legenda = [
         html.Span([
             html.Span("Total: ", className="fw-semibold"),
             total_fmt
-        ], className="me-3", style={"fontSize": "0.78rem", "whiteSpace": "nowrap"})
+        ], className="me-3", style={"fontSize": "0.85rem", "whiteSpace": "nowrap"})
     ]
     for i, (desc, horas_soma) in enumerate(grupos.items()):
         cor = PALETA[i % len(PALETA)]
+        cor_css = COR_HEX.get(cor, f'var(--bs-{cor})')
         pct = horas_soma / total * 100
         desc_curta = desc if len(desc) <= 20 else desc[:17] + "..."
         horas_fmt = float_para_hhmm(horas_soma)
 
-        bars.append(dbc.Progress(
-            value=pct,
-            color=cor,
-            bar=True,
-            label=horas_fmt
+        segmentos.append(html.Div(
+            horas_fmt,
+            style={
+                "width": f"{pct}%",
+                "backgroundColor": cor_css,
+                "color": "white",
+                "display": "flex",
+                "alignItems": "center",
+                "justifyContent": "center",
+                "fontSize": "0.85rem",
+                "fontWeight": "600",
+                "overflow": "hidden",
+                "whiteSpace": "nowrap",
+                "padding": "0 4px",
+            }
         ))
         legenda.append(
             html.Span([
-                html.Span("■ ", style={"color": f"var(--bs-{cor})"}),
+                html.Span("■ ", style={"color": cor_css}),
                 f"{desc_curta} {horas_fmt}"
-            ], className="me-2", style={"fontSize": "0.78rem", "whiteSpace": "nowrap"})
+            ], className="me-2", style={"fontSize": "0.85rem", "whiteSpace": "nowrap"})
         )
 
     return html.Div([
-        dbc.Progress(
-            bars,
-            style={"height": "33px"},
+        html.Div(
+            segmentos,
+            style={
+                "height": "36px",
+                "display": "flex",
+                "borderRadius": "0.375rem",
+                "overflow": "hidden",
+            },
             className="mb-1"
         ),
         html.Div(legenda, className="d-flex flex-wrap")
