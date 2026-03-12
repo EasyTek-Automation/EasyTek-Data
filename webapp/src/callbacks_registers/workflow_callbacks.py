@@ -239,10 +239,10 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                 color="info", className="me-1"
             ))
         elif status_validacao_gestor == 'aprovado':
-            badges.append(dbc.Badge(
-                [html.I(className="fas fa-user-check me-1"), "Valid. Gestor"],
-                color="success", className="me-1"
-            ))
+            badge_valid_label = [html.I(className="fas fa-user-check me-1"), "Valid. Gestor"]
+            if validado_por:
+                badge_valid_label.append(html.Span(f": {validado_por}", className="fw-semibold"))
+            badges.append(dbc.Badge(badge_valid_label, color="success", className="me-1"))
         elif status_validacao_gestor == 'devolvido':
             badges.append(dbc.Badge(
                 [html.I(className="fas fa-undo me-1"), "Devolvida"],
@@ -353,6 +353,17 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
             corpo_collapse.append(
                 html.Div(observacoes, className="fst-italic text-muted d-block mb-2",
                          style={"whiteSpace": "pre-line", "fontSize": "0.93rem"})
+            )
+        if status_validacao_gestor == 'aprovado' and validado_por:
+            corpo_collapse.append(
+                html.Div([
+                    html.I(className="fas fa-user-check text-success me-2"),
+                    html.Span("Validado por: ", className="fw-semibold text-success me-1"),
+                    html.Span(validado_por, className="text-success"),
+                ], className="p-2 mb-2 rounded",
+                   style={"backgroundColor": "rgba(25,135,84,0.08)",
+                          "borderLeft": "3px solid var(--bs-success)",
+                          "fontSize": "0.93rem"})
             )
         if status_validacao_gestor == 'devolvido' and nota_devolucao:
             corpo_collapse.append(
