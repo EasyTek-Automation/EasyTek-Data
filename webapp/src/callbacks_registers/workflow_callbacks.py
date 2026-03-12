@@ -41,6 +41,14 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
     log_items_all = [h for h in historico_items if h.get('record_type') == 'log']
     criacao_items = [h for h in historico_items if h.get('record_type') == 'criacao']
 
+    _COR_PRIO = {
+        "urgente": "var(--bs-danger)",
+        "alta":    "var(--bs-warning)",
+        "normal":  "var(--bs-primary)",
+        "baixa":   "var(--bs-secondary)",
+    }
+    _LABEL_PRIO = {"urgente": "Urgente", "alta": "Alta", "normal": "Normal", "baixa": "Baixa"}
+
     _datas_info = []
     if data_criacao:
         _datas_info.append(html.Span(f"Criado: {data_criacao}", className="text-muted"))
@@ -60,7 +68,14 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
             size="sm",
             outline=True
         ),
-        html.Small(_datas_sep, className="ms-3") if _datas_sep else html.Span()
+        html.Small(_datas_sep, className="ms-3") if _datas_sep else html.Span(),
+        html.Small([
+            html.Span("Prioridade: ", className="text-muted me-1"),
+            *[html.Span([
+                html.Span("●", style={"color": _COR_PRIO[k], "marginRight": "2px"}),
+                html.Span(v, className="text-muted me-2"),
+            ]) for k, v in _LABEL_PRIO.items()]
+        ], className="ms-auto d-none d-md-flex align-items-center")
     ], className="px-3 pt-3 pb-2 d-flex align-items-center") if pend_id else html.Div()
 
     # --- Seção de eventos do sistema (criação/aceite/rejeição) ---
@@ -126,6 +141,7 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
 
         # Logs desta subtarefa
         logs_da_sub = [h for h in log_items_all if h.get('subtarefa_id') == hist_id]
+        prioridade = item.get('prioridade') or 'normal'
         n_logs = len(logs_da_sub)
         horas_logs = sum(
             float(h.get('horas') or 0)
@@ -137,6 +153,39 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
             horas_val = float(horas_raw) if horas_raw is not None and str(horas_raw) != 'nan' else None
         except (ValueError, TypeError):
             horas_val = None
+
+        # Badge de prioridade ClickUp-style
+        badge_prioridade = dbc.DropdownMenu(
+            [
+                dbc.DropdownMenuItem([
+                    html.Span("●", style={"color": _COR_PRIO["urgente"], "marginRight": "6px"}),
+                    "Urgente"
+                ], id={"type": "set-prioridade", "index": f"{hist_id}__urgente"}),
+                dbc.DropdownMenuItem([
+                    html.Span("●", style={"color": _COR_PRIO["alta"], "marginRight": "6px"}),
+                    "Alta"
+                ], id={"type": "set-prioridade", "index": f"{hist_id}__alta"}),
+                dbc.DropdownMenuItem([
+                    html.Span("●", style={"color": _COR_PRIO["normal"], "marginRight": "6px"}),
+                    "Normal"
+                ], id={"type": "set-prioridade", "index": f"{hist_id}__normal"}),
+                dbc.DropdownMenuItem([
+                    html.Span("●", style={"color": _COR_PRIO["baixa"], "marginRight": "6px"}),
+                    "Baixa"
+                ], id={"type": "set-prioridade", "index": f"{hist_id}__baixa"}),
+            ],
+            label=html.Span(
+                "●",
+                title=f"Prioridade: {_LABEL_PRIO.get(prioridade, 'Normal')}",
+                style={"color": _COR_PRIO.get(prioridade, _COR_PRIO["normal"]),
+                       "fontSize": "1.2rem", "lineHeight": "1", "cursor": "pointer"},
+            ),
+            size="sm",
+            direction="down",
+            className="me-1 d-inline-flex align-items-center",
+            toggle_class_name="p-0 border-0 bg-transparent shadow-none",
+            caret=False,
+        ) if hist_id else html.Span()
 
         # Ícone de status
         if concluido:
@@ -301,7 +350,7 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
         # Subtarefa com collapse
         tem_corpo = bool(meta_children or observacoes or logs_da_sub)
         item_html = html.Div([
-            # Linha do cabeçalho: chevron | status | título+badges | botões
+            # Linha do cabeçalho: chevron | prioridade | status | título+badges | botões
             html.Div([
                 dbc.Button(
                     html.I(className="fas fa-chevron-right",
@@ -311,6 +360,8 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                     className="p-0 me-1 text-muted text-decoration-none",
                     style={"visibility": "visible" if tem_corpo else "hidden"}
                 ),
+                html.Div(badge_prioridade,
+                         style={"width": "22px", "flexShrink": "0"}),
                 html.Div(icone_status,
                          style={"width": "22px", "flexShrink": "0"}),
                 html.Div([
@@ -396,6 +447,31 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
             historico_pendencia.apply(_manter, axis=1)
         ]
 
+    # Filtrar subtarefas por prioridade quando o filtro inclui atividades
+    _prioridade_filtro = filtros.get('prioridade') if filtros else None
+    if (_prioridade_filtro and len(_prioridade_filtro) > 0
+            and filtros and 'subtarefa' in _tipos_filtro):
+        if 'prioridade' in historico_pendencia.columns:
+            df_subs_p = historico_pendencia[
+                historico_pendencia['record_type'].fillna('subtarefa') == 'subtarefa'
+            ].copy()
+            df_subs_p = df_subs_p[df_subs_p['prioridade'].fillna('normal').isin(_prioridade_filtro)]
+            hist_ids_prioridade = set(df_subs_p['hist_id'].dropna().astype(str).tolist())
+
+            def _manter_prioridade(row):
+                rt = row.get('record_type') or 'subtarefa'
+                if rt == 'criacao':
+                    return True
+                if rt == 'subtarefa':
+                    return str(row.get('hist_id', '')) in hist_ids_prioridade
+                if rt == 'log':
+                    return str(row.get('subtarefa_id', '')) in hist_ids_prioridade
+                return True
+
+            historico_pendencia = historico_pendencia[
+                historico_pendencia.apply(_manter_prioridade, axis=1)
+            ]
+
     historico_items = []
     for _, row in historico_pendencia.iterrows():
         horas_raw = row.get('horas')
@@ -430,6 +506,7 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
             'tipo_evento': _str_or_none(row.get('tipo_evento')) or '',
             'record_type': row.get('record_type', 'subtarefa') or 'subtarefa',
             'subtarefa_id': _str_or_none(row.get('subtarefa_id')),
+            'prioridade': _str_or_none(row.get('prioridade')) or 'normal',
         })
 
     return criar_checklist_subtarefas(
