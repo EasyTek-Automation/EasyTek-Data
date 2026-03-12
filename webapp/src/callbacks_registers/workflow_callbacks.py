@@ -28,23 +28,16 @@ from src.pages.workflow.dashboard import (
 # ======================================================================================
 
 def _fmt_data_str(valor):
-    """Converte qualquer valor de data (datetime, Timestamp, NaT, str, None) para string formatada."""
+    """Converte qualquer valor de data (datetime, Timestamp, NaT, numpy.datetime64, None) para string formatada."""
     if valor is None:
         return ''
     try:
-        import pandas as _pd
-        if valor is _pd.NaT:
+        ts = pd.Timestamp(valor)
+        if pd.isna(ts):
             return ''
+        return ts.strftime('%d/%m/%Y %H:%M')
     except Exception:
-        pass
-    try:
-        return valor.strftime('%d/%m/%Y %H:%M')
-    except Exception:
-        try:
-            s = str(valor)
-            return s if s not in ('NaT', 'nan', 'None', '') else ''
-        except Exception:
-            return ''
+        return ''
 
 
 def _processar_historico_validacao(raw):
