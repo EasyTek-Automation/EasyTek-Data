@@ -984,6 +984,7 @@ def register_workflow_callbacks(app):
         Output("container-tabela", "children"),
         Output("store-pendencias", "data"),
         Output("store-filtros-ativos", "data"),
+        Output("store-historico", "data", allow_duplicate=True),
         Input("btn-aplicar-filtros", "n_clicks"),
         State("filtro-responsavel", "value"),
         State("filtro-status", "value"),
@@ -1009,7 +1010,7 @@ def register_workflow_callbacks(app):
         df_pendencias, df_historico = carregar_dados_csv()
 
         if df_pendencias is None or df_pendencias.empty:
-            return html.Div("Erro ao carregar dados.", className="text-danger"), [], None
+            return html.Div("Erro ao carregar dados.", className="text-danger"), [], None, no_update
 
         filtros = {
             "responsavel": responsavel,
@@ -1026,7 +1027,8 @@ def register_workflow_callbacks(app):
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
             df_pendencias, df_historico, filtros, user_level, username_atual
         )
-        return nova_tabela, store_data, filtros
+        hist_store = df_historico.to_dict('records') if df_historico is not None else []
+        return nova_tabela, store_data, filtros, hist_store
 
 
     # ==================================================================================
