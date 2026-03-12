@@ -856,3 +856,143 @@ class TestEditarSubtarefaDatas:
             editar_subtarefa(str(self._oid), data_execucao=data, update_data_execucao=True)
         updates = mock.update_one.call_args[0][1]['$set']
         assert updates.get('data_execucao') == data
+
+
+# =============================================================================
+# TESTES: Fase 3 — status_validacao_gestor (retrocompat + validar + devolver)
+# =============================================================================
+
+class TestCarregarHistoricoValidacaoGestor:
+    """Retrocompat para status_validacao_gestor em carregar_historico."""
+
+    def _make_mock(self, docs):
+        mock = MagicMock()
+        fr = MagicMock()
+        fr.sort.return_value = iter(docs)
+        mock.find.return_value = fr
+        return mock
+
+    def _doc_base(self):
+        from bson import ObjectId
+        return {'_id': ObjectId(), 'MaintenanceWF_id': 'WF001', 'descricao': 'X',
+                'data': datetime.now(), 'responsavel': 'u', 'tipo_evento': 'Análise de Falha',
+                'editado_por': 'u', 'horas': None, 'concluido': False}
+
+    def test_sem_campo_recebe_none(self):
+        """Docs antigos sem status_validacao_gestor devem receber None."""
+        doc = self._doc_base()
+        mock = self._make_mock([doc])
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import carregar_historico
+            df = carregar_historico()
+        assert 'status_validacao_gestor' in df.columns
+        assert df.iloc[0]['status_validacao_gestor'] is None
+
+    def test_concluido_sem_campo_recebe_aprovado(self):
+        """Docs antigos com concluido=True sem status_validacao devem receber 'aprovado'."""
+        doc = self._doc_base()
+        doc['concluido'] = True
+        mock = self._make_mock([doc])
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import carregar_historico
+            df = carregar_historico()
+        assert df.iloc[0]['status_validacao_gestor'] == 'aprovado'
+
+    def test_campo_existente_preservado(self):
+        """Docs com status_validacao_gestor definido devem manter o valor."""
+        doc = self._doc_base()
+        doc['concluido'] = True
+        doc['status_validacao_gestor'] = 'devolvido'
+        mock = self._make_mock([doc])
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import carregar_historico
+            df = carregar_historico()
+        assert df.iloc[0]['status_validacao_gestor'] == 'devolvido'
+
+
+class TestMarcarSubtarefaConcluidaValidacao:
+    """Testa que marcar_subtarefa_concluida grava status_validacao_gestor='pendente'."""
+
+    def _make_mock(self):
+        from bson import ObjectId
+        mock = MagicMock()
+        mock.update_one.return_value = MagicMock(modified_count=1)
+        return mock, str(ObjectId())
+
+    def test_grava_status_validacao_pendente(self):
+        mock, oid = self._make_mock()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import marcar_subtarefa_concluida
+            marcar_subtarefa_concluida(oid, data_execucao=datetime.now())
+        updates = mock.update_one.call_args[0][1]['$set']
+        assert updates.get('status_validacao_gestor') == 'pendente'
+
+
+class TestValidarAtividade:
+    """Testa validar_atividade."""
+
+    def _make_mock(self):
+        from bson import ObjectId
+        mock = MagicMock()
+        mock.update_one.return_value = MagicMock(modified_count=1)
+        return mock, str(ObjectId())
+
+    def test_retorna_true_em_sucesso(self):
+        mock, oid = self._make_mock()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import validar_atividade
+            resultado = validar_atividade(oid, 'gestor1')
+        assert resultado is True
+
+    def test_grava_status_aprovado(self):
+        mock, oid = self._make_mock()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import validar_atividade
+            validar_atividade(oid, 'gestor1')
+        updates = mock.update_one.call_args[0][1]['$set']
+        assert updates.get('status_validacao_gestor') == 'aprovado'
+        assert updates.get('validado_por') == 'gestor1'
+
+    def test_retorna_false_em_erro(self):
+        mock, oid = self._make_mock()
+        mock.update_one.side_effect = Exception("DB error")
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import validar_atividade
+            resultado = validar_atividade(oid, 'gestor1')
+        assert resultado is False
+
+
+class TestDevolverAtividade:
+    """Testa devolver_atividade."""
+
+    def _make_mock(self):
+        from bson import ObjectId
+        mock = MagicMock()
+        mock.update_one.return_value = MagicMock(modified_count=1)
+        return mock, str(ObjectId())
+
+    def test_retorna_true_em_sucesso(self):
+        mock, oid = self._make_mock()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import devolver_atividade
+            resultado = devolver_atividade(oid, 'Nota de devolução', 'gestor1')
+        assert resultado is True
+
+    def test_grava_status_devolvido(self):
+        mock, oid = self._make_mock()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import devolver_atividade
+            devolver_atividade(oid, 'Revisar medição', 'gestor1')
+        updates = mock.update_one.call_args[0][1]['$set']
+        assert updates.get('status_validacao_gestor') == 'devolvido'
+        assert updates.get('nota_devolucao') == 'Revisar medição'
+        assert updates.get('concluido') is False
+        assert updates.get('devolvido_por') == 'gestor1'
+
+    def test_retorna_false_em_erro(self):
+        mock, oid = self._make_mock()
+        mock.update_one.side_effect = Exception("DB error")
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import devolver_atividade
+            resultado = devolver_atividade(oid, 'Nota', 'gestor1')
+        assert resultado is False

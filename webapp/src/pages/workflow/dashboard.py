@@ -18,7 +18,8 @@ from src.components.workflow.subtask_modals import (
     add_log_modal,
     edit_subtask_modal,
     edit_log_modal,
-    delete_subtask_confirm_modal
+    delete_subtask_confirm_modal,
+    devolver_atividade_modal,
 )
 
 
@@ -767,6 +768,20 @@ def criar_painel_filtros(username_inicial="todos"):
                         placeholder="Todas as prioridades"
                     )
                 ], width=12, md=4, className="mb-3"),
+                dbc.Col([
+                    html.Label("Validação Gestor:", className="fw-bold mb-2"),
+                    dbc.Checklist(
+                        id="filtro-validacao-gestor",
+                        options=[
+                            {"label": "Ag. Validação", "value": "pendente"},
+                            {"label": "Aprovadas",     "value": "aprovado"},
+                            {"label": "Devolvidas",    "value": "devolvido"},
+                        ],
+                        value=[],
+                        inline=True,
+                        className="mt-1"
+                    )
+                ], width=12, md=4, className="mb-3"),
             ])
         ])
     ], className="shadow-sm mb-3 workflow-filters")
@@ -1356,6 +1371,7 @@ def layout():
         edit_subtask_modal(),
         edit_log_modal(),
         delete_subtask_confirm_modal(),
+        devolver_atividade_modal(),
 
         # Header
         dbc.Row([

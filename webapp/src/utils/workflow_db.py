@@ -139,6 +139,20 @@ def carregar_historico():
         if 'data_execucao' not in df.columns:
             df['data_execucao'] = None
 
+        # Retrocompat status_validacao_gestor
+        # Docs antigos com concluido=True → tratados como já validados ('aprovado')
+        # Docs antigos sem concluido ou concluido=False → None (sem validação pendente)
+        if 'status_validacao_gestor' not in df.columns:
+            df['status_validacao_gestor'] = df['concluido'].apply(
+                lambda c: 'aprovado' if c is True else None
+            )
+        else:
+            # Preenche NaN/None apenas para não-concluídos antigos
+            mask_vazio = df['status_validacao_gestor'].isna()
+            df.loc[mask_vazio, 'status_validacao_gestor'] = df.loc[mask_vazio, 'concluido'].apply(
+                lambda c: 'aprovado' if c is True else None
+            )
+
         # Retrocompat is_retroativo e responsavel_retroativo (campos novos)
         if 'is_retroativo' not in df.columns:
             # Registros antigos com tipo_evento == "Lançamento Retroativo" são retroativos
@@ -469,7 +483,7 @@ def marcar_subtarefa_concluida(hist_id_str, data_execucao=None):
     """
     try:
         collection = get_mongo_connection(COLLECTION_HISTORICO)
-        set_fields = {'concluido': True}
+        set_fields = {'concluido': True, 'status_validacao_gestor': 'pendente'}
         if data_execucao is not None:
             set_fields['data_execucao'] = data_execucao
         result = collection.update_one(
@@ -479,6 +493,66 @@ def marcar_subtarefa_concluida(hist_id_str, data_execucao=None):
         return result.modified_count > 0
     except Exception as e:
         print(f"Erro ao marcar subtarefa como concluída: {e}")
+        return False
+
+
+def validar_atividade(hist_id_str, validado_por):
+    """
+    Gestor (nível 4) valida uma atividade concluída.
+
+    Args:
+        hist_id_str: ObjectId string da atividade
+        validado_por: Username do gestor que está validando
+
+    Returns:
+        bool: True se a atualização foi bem-sucedida
+    """
+    try:
+        collection = get_mongo_connection(COLLECTION_HISTORICO)
+        result = collection.update_one(
+            {'_id': ObjectId(hist_id_str)},
+            {'$set': {
+                'status_validacao_gestor': 'aprovado',
+                'validado_por': validado_por,
+                'data_validacao': datetime.now(),
+            }}
+        )
+        return result.modified_count > 0
+    except Exception as e:
+        print(f"Erro ao validar atividade: {e}")
+        return False
+
+
+def devolver_atividade(hist_id_str, nota_devolucao, devolvido_por):
+    """
+    Gestor (nível 4) devolve uma atividade concluída para revisão.
+
+    Reseta concluido=False e status_validacao_gestor='devolvido'.
+    A nota de devolução é obrigatória.
+
+    Args:
+        hist_id_str: ObjectId string da atividade
+        nota_devolucao: Motivo da devolução (obrigatório)
+        devolvido_por: Username do gestor que está devolvendo
+
+    Returns:
+        bool: True se a atualização foi bem-sucedida
+    """
+    try:
+        collection = get_mongo_connection(COLLECTION_HISTORICO)
+        result = collection.update_one(
+            {'_id': ObjectId(hist_id_str)},
+            {'$set': {
+                'status_validacao_gestor': 'devolvido',
+                'nota_devolucao': nota_devolucao,
+                'devolvido_por': devolvido_por,
+                'data_devolucao': datetime.now(),
+                'concluido': False,
+            }}
+        )
+        return result.modified_count > 0
+    except Exception as e:
+        print(f"Erro ao devolver atividade: {e}")
         return False
 
 

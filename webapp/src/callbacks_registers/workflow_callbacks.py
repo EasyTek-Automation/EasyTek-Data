@@ -41,6 +41,12 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
     log_items_all = [h for h in historico_items if h.get('record_type') == 'log']
     criacao_items = [h for h in historico_items if h.get('record_type') == 'criacao']
 
+    _COR_VAL = {
+        'pendente':  'var(--bs-info)',
+        'aprovado':  'var(--bs-success)',
+        'devolvido': 'var(--bs-danger)',
+    }
+
     _COR_PRIO = {
         "urgente": "var(--bs-danger)",
         "alta":    "var(--bs-warning)",
@@ -129,6 +135,10 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
         horas_raw = item.get('horas')
         aprovador = item.get('aprovador')
         status_aprovacao = item.get('status_aprovacao')
+        status_validacao_gestor = item.get('status_validacao_gestor')
+        nota_devolucao = item.get('nota_devolucao')
+        devolvido_por = item.get('devolvido_por')
+        validado_por = item.get('validado_por')
 
         _t = item.get('titulo')
         _d = item.get('descricao')
@@ -223,6 +233,21 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                 [html.I(className="fas fa-file-alt me-1"), n_label],
                 color="info", className="me-1"
             ))
+        if status_validacao_gestor == 'pendente':
+            badges.append(dbc.Badge(
+                [html.I(className="fas fa-user-clock me-1"), "Ag. Valid. Gestor"],
+                color="info", className="me-1"
+            ))
+        elif status_validacao_gestor == 'aprovado':
+            badges.append(dbc.Badge(
+                [html.I(className="fas fa-user-check me-1"), "Valid. Gestor"],
+                color="success", className="me-1"
+            ))
+        elif status_validacao_gestor == 'devolvido':
+            badges.append(dbc.Badge(
+                [html.I(className="fas fa-undo me-1"), "Devolvida"],
+                color="danger", className="me-1"
+            ))
 
         # Meta info
         horas_fmt = float_para_hhmm(horas_val) if horas_val else None
@@ -299,6 +324,19 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                 color="danger", size="sm", outline=True,
                 title="Rejeitar"
             ))
+        if user_level >= 4 and hist_id and status_validacao_gestor == 'pendente':
+            botoes.append(dbc.Button(
+                html.I(className="fas fa-user-check"),
+                id={"type": "btn-validar-atividade", "index": hist_id},
+                color="success", size="sm", outline=True,
+                title="Validar (Gestor)"
+            ))
+            botoes.append(dbc.Button(
+                html.I(className="fas fa-undo"),
+                id={"type": "btn-devolver-atividade", "index": hist_id},
+                color="warning", size="sm", outline=True,
+                title="Devolver para revisão"
+            ))
 
         cor_borda = ("var(--bs-success)" if concluido
                      else "var(--bs-warning)" if status_aprovacao == 'pendente'
@@ -315,6 +353,18 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
             corpo_collapse.append(
                 html.Div(observacoes, className="fst-italic text-muted d-block mb-2",
                          style={"whiteSpace": "pre-line", "fontSize": "0.93rem"})
+            )
+        if status_validacao_gestor == 'devolvido' and nota_devolucao:
+            corpo_collapse.append(
+                html.Div([
+                    html.I(className="fas fa-undo text-danger me-2"),
+                    html.Span("Devolvida: ", className="fw-semibold text-danger me-1"),
+                    html.Span(nota_devolucao, className="text-danger"),
+                    html.Span(f" · {devolvido_por}", className="text-muted ms-2") if devolvido_por else None,
+                ], className="p-2 mb-2 rounded",
+                   style={"backgroundColor": "rgba(220,53,69,0.08)",
+                          "borderLeft": "3px solid var(--bs-danger)",
+                          "fontSize": "0.93rem"})
             )
         # Logs como sub-itens
         for log in logs_da_sub:
@@ -502,6 +552,30 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
                 historico_pendencia.apply(_manter_prioridade, axis=1)
             ]
 
+    # Filtrar subtarefas por validação gestor
+    _validacao_filtro = filtros.get('validacao_gestor') if filtros else None
+    if _validacao_filtro and len(_validacao_filtro) > 0:
+        if 'status_validacao_gestor' in historico_pendencia.columns:
+            df_subs_v = historico_pendencia[
+                historico_pendencia['record_type'].fillna('subtarefa') == 'subtarefa'
+            ].copy()
+            df_subs_v = df_subs_v[df_subs_v['status_validacao_gestor'].isin(_validacao_filtro)]
+            hist_ids_validacao = set(df_subs_v['hist_id'].dropna().astype(str).tolist())
+
+            def _manter_validacao(row):
+                rt = row.get('record_type') or 'subtarefa'
+                if rt == 'criacao':
+                    return True
+                if rt == 'subtarefa':
+                    return str(row.get('hist_id', '')) in hist_ids_validacao
+                if rt == 'log':
+                    return str(row.get('subtarefa_id', '')) in hist_ids_validacao
+                return True
+
+            historico_pendencia = historico_pendencia[
+                historico_pendencia.apply(_manter_validacao, axis=1)
+            ]
+
     historico_items = []
     for _, row in historico_pendencia.iterrows():
         horas_raw = row.get('horas')
@@ -547,6 +621,10 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
                               and str(row.get('data_execucao')) != 'nan'
                               and hasattr(row['data_execucao'], 'strftime')
                               else None),
+            'status_validacao_gestor': _str_or_none(row.get('status_validacao_gestor')),
+            'nota_devolucao': _str_or_none(row.get('nota_devolucao')),
+            'devolvido_por': _str_or_none(row.get('devolvido_por')),
+            'validado_por': _str_or_none(row.get('validado_por')),
         })
 
     return criar_checklist_subtarefas(
@@ -559,7 +637,7 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
 def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite_list=None,
                               data_inicio=None, data_fim=None,
                               tipo_data="tarefa", df_historico=None, horas_uteis=False,
-                              prioridade_list=None):
+                              prioridade_list=None, validacao_gestor_list=None):
     """Aplica filtros ao DataFrame de pendências."""
     from datetime import datetime as _dt, timedelta
 
@@ -660,6 +738,17 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
                 ids_com_prioridade = set(df_h[col_id].dropna().astype(str).unique())
                 df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_com_prioridade)]
 
+    if validacao_gestor_list and len(validacao_gestor_list) > 0 and df_historico is not None and not df_historico.empty:
+        df_h = df_historico.copy()
+        if 'record_type' in df_h.columns:
+            df_h = df_h[df_h['record_type'] == 'subtarefa']
+        if 'status_validacao_gestor' in df_h.columns:
+            df_h = df_h[df_h['status_validacao_gestor'].isin(validacao_gestor_list)]
+            col_id = 'pendencia_id' if 'pendencia_id' in df_h.columns else 'MaintenanceWF_id'
+            if col_id in df_h.columns:
+                ids_com_validacao = set(df_h[col_id].dropna().astype(str).unique())
+                df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_com_validacao)]
+
     return df_filtrado
 
 
@@ -690,6 +779,7 @@ def reconstruir_tabela_com_filtros(df_pendencias, df_historico, filtros, user_le
             df_historico=df_historico,
             horas_uteis=filtros.get("horas_uteis", False),
             prioridade_list=filtros.get("prioridade"),
+            validacao_gestor_list=filtros.get("validacao_gestor"),
         )
     else:
         df_filtrado = df_pendencias
@@ -815,13 +905,14 @@ def register_workflow_callbacks(app):
         State("filtro-data-fim", "date"),
         State("filtro-horas-uteis", "value"),
         State("filtro-prioridade", "value"),
+        State("filtro-validacao-gestor", "value"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
         prevent_initial_call=True
     )
     def aplicar_filtros(n_clicks, responsavel, status_list, busca, status_aceite_list,
                         tipo_data, data_inicio, data_fim, horas_uteis, prioridade_list,
-                        user_level, username_atual):
+                        validacao_gestor_list, user_level, username_atual):
         """Aplica os filtros selecionados e reconstrói a tabela."""
         if not n_clicks:
             raise PreventUpdate
@@ -841,6 +932,7 @@ def register_workflow_callbacks(app):
             "data_fim": data_fim,
             "horas_uteis": horas_uteis or False,
             "prioridade": prioridade_list or [],
+            "validacao_gestor": validacao_gestor_list or [],
         }
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
             df_pendencias, df_historico, filtros, user_level, username_atual
@@ -1211,6 +1303,7 @@ def register_workflow_callbacks(app):
         Output("filtro-data-fim", "date"),
         Output("filtro-horas-uteis", "value"),
         Output("filtro-prioridade", "value"),
+        Output("filtro-validacao-gestor", "value"),
         Output("store-filtros-ativos", "data", allow_duplicate=True),
         Output("container-tabela", "children", allow_duplicate=True),
         Output("store-pendencias", "data", allow_duplicate=True),
@@ -1234,7 +1327,7 @@ def register_workflow_callbacks(app):
             username_atual=username_atual
         )
         return (
-            "todos", [], "", [], ["tarefa", "subtarefa"], None, None, False, [],  # resetar UI dos filtros + datas
+            "todos", [], "", [], ["tarefa", "subtarefa"], None, None, False, [], [],  # resetar UI dos filtros + datas + validacao
             None,                                        # limpar store de filtros
             nova_tabela,
             df_pendencias.to_dict('records')

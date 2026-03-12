@@ -558,6 +558,49 @@ def edit_log_modal():
     ], id="edit-log-modal", is_open=False, size="lg", centered=True)
 
 
+def devolver_atividade_modal():
+    """Modal para gestor (nível 4) devolver atividade concluída para revisão."""
+    return dbc.Modal([
+        dbc.ModalHeader(dbc.ModalTitle([
+            html.I(className="fas fa-undo me-2 text-warning"),
+            "Devolver Atividade"
+        ])),
+        dbc.ModalBody([
+            dbc.Alert([
+                html.I(className="fas fa-exclamation-triangle me-2"),
+                html.Strong("Atenção: "),
+                "A atividade será marcada como ",
+                html.Strong("não concluída"),
+                " e devolvida ao responsável para revisão."
+            ], color="warning", className="py-2 mb-3"),
+            html.Label("Motivo da Devolução:", className="fw-bold mb-1"),
+            html.Span(" *", className="text-danger"),
+            dbc.Textarea(
+                id="devolver-atividade-nota",
+                placeholder="Descreva o que deve ser revisado ou corrigido...",
+                rows=4,
+                className="mb-2",
+            ),
+            html.Div(id="devolver-atividade-alert"),
+            dcc.Store(id="devolver-atividade-hist-id"),
+        ]),
+        dbc.ModalFooter([
+            dbc.Button(
+                "Cancelar",
+                id="devolver-atividade-cancel-btn",
+                color="secondary",
+                outline=True,
+                className="me-2"
+            ),
+            dbc.Button(
+                [html.I(className="fas fa-undo me-2"), "Devolver"],
+                id="devolver-atividade-submit-btn",
+                color="warning"
+            )
+        ])
+    ], id="devolver-atividade-modal", is_open=False, centered=True)
+
+
 def delete_subtask_confirm_modal():
     """Modal de confirmação para exclusão de subtarefa."""
     return dbc.Modal([

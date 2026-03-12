@@ -22,7 +22,9 @@ from src.utils.workflow_db import (
     deletar_subtarefa,
     get_usuarios_por_perfil,
     get_usuarios_nivel3_por_perfil,
-    TIPOS_REQUEREM_APROVACAO
+    TIPOS_REQUEREM_APROVACAO,
+    validar_atividade,
+    devolver_atividade,
 )
 from src.callbacks_registers.workflow_callbacks import reconstruir_tabela_com_filtros
 from src.pages.workflow.dashboard import hhmm_para_float
@@ -788,6 +790,148 @@ def register_subtask_callbacks(app):
                 dbc.Alert(f"Erro: {mensagem}", color="danger", dismissable=True, duration=4000),
                 nova_tabela, store_data,
                 df_hist.to_dict('records') if df_hist is not None else []
+            )
+
+    # ==============================================================================
+    # CB_V1: Validar atividade (Gestor - nível 4)
+    # ==============================================================================
+    @app.callback(
+        Output("alert-container-workflow", "children", allow_duplicate=True),
+        Output("container-tabela", "children", allow_duplicate=True),
+        Output("store-pendencias", "data", allow_duplicate=True),
+        Output("store-historico", "data", allow_duplicate=True),
+        Input({"type": "btn-validar-atividade", "index": ALL}, "n_clicks"),
+        State("user-username-store", "data"),
+        State("user-level-store", "data"),
+        State("store-filtros-ativos", "data"),
+        prevent_initial_call=True
+    )
+    def validar_atividade_callback(n_clicks, username, user_level, filtros):
+        ctx = callback_context
+        if not ctx.triggered or not any(c for c in n_clicks if c):
+            raise PreventUpdate
+
+        trigger_id_str = ctx.triggered[0]['prop_id'].split('.')[0]
+        id_dict = json.loads(trigger_id_str)
+        hist_id = id_dict['index']
+
+        sucesso = validar_atividade(hist_id, validado_por=username or '')
+
+        from src.pages.workflow.dashboard import carregar_dados_csv
+        df_pend, df_hist = carregar_dados_csv()
+        nova_tabela, store_data = reconstruir_tabela_com_filtros(
+            df_pend, df_hist, filtros, user_level, username
+        )
+
+        if sucesso:
+            alerta = dbc.Alert([
+                html.I(className="fas fa-user-check me-2"),
+                "Atividade validada pelo gestor."
+            ], color="success", dismissable=True, duration=5000)
+        else:
+            alerta = dbc.Alert([
+                html.I(className="fas fa-exclamation-circle me-2"),
+                "Erro ao validar atividade."
+            ], color="danger", dismissable=True, duration=5000)
+
+        return (
+            alerta,
+            nova_tabela,
+            store_data,
+            df_hist.to_dict('records') if df_hist is not None else []
+        )
+
+    # ==============================================================================
+    # CB_D1: Abrir modal de devolução (Gestor - nível 4)
+    # ==============================================================================
+    @app.callback(
+        Output("devolver-atividade-modal", "is_open"),
+        Output("devolver-atividade-hist-id", "data"),
+        Output("devolver-atividade-nota", "value", allow_duplicate=True),
+        Output("devolver-atividade-alert", "children", allow_duplicate=True),
+        Input({"type": "btn-devolver-atividade", "index": ALL}, "n_clicks"),
+        prevent_initial_call=True
+    )
+    def abrir_devolver_modal(n_clicks):
+        ctx = callback_context
+        if not ctx.triggered or not any(c for c in n_clicks if c):
+            raise PreventUpdate
+
+        trigger_id_str = ctx.triggered[0]['prop_id'].split('.')[0]
+        id_dict = json.loads(trigger_id_str)
+        hist_id = id_dict['index']
+
+        return True, hist_id, "", ""
+
+    # ==============================================================================
+    # CB_D2: Fechar modal de devolução (Cancelar)
+    # ==============================================================================
+    @app.callback(
+        Output("devolver-atividade-modal", "is_open", allow_duplicate=True),
+        Output("devolver-atividade-nota", "value"),
+        Output("devolver-atividade-alert", "children"),
+        Input("devolver-atividade-cancel-btn", "n_clicks"),
+        prevent_initial_call=True
+    )
+    def fechar_devolver_modal(n_clicks):
+        if not n_clicks:
+            raise PreventUpdate
+        return False, "", ""
+
+    # ==============================================================================
+    # CB_D3: Submeter devolução
+    # ==============================================================================
+    @app.callback(
+        Output("devolver-atividade-modal", "is_open", allow_duplicate=True),
+        Output("devolver-atividade-alert", "children", allow_duplicate=True),
+        Output("alert-container-workflow", "children", allow_duplicate=True),
+        Output("container-tabela", "children", allow_duplicate=True),
+        Output("store-pendencias", "data", allow_duplicate=True),
+        Output("store-historico", "data", allow_duplicate=True),
+        Input("devolver-atividade-submit-btn", "n_clicks"),
+        State("devolver-atividade-hist-id", "data"),
+        State("devolver-atividade-nota", "value"),
+        State("user-username-store", "data"),
+        State("user-level-store", "data"),
+        State("store-filtros-ativos", "data"),
+        prevent_initial_call=True
+    )
+    def submeter_devolver(n_clicks, hist_id, nota, username, user_level, filtros):
+        if not n_clicks or not hist_id:
+            raise PreventUpdate
+
+        if not nota or not nota.strip():
+            return (
+                True,
+                dbc.Alert("A nota de devolução é obrigatória.", color="warning"),
+                no_update, no_update, no_update, no_update
+            )
+
+        sucesso = devolver_atividade(
+            hist_id_str=hist_id,
+            nota_devolucao=nota.strip(),
+            devolvido_por=username or ''
+        )
+
+        from src.pages.workflow.dashboard import carregar_dados_csv
+        df_pend, df_hist = carregar_dados_csv()
+        nova_tabela, store_data = reconstruir_tabela_com_filtros(
+            df_pend, df_hist, filtros, user_level, username
+        )
+
+        if sucesso:
+            return (
+                False, "",
+                dbc.Alert([html.I(className="fas fa-undo me-2"), "Atividade devolvida para revisão."],
+                          color="warning", dismissable=True, duration=6000),
+                nova_tabela, store_data,
+                df_hist.to_dict('records') if df_hist is not None else []
+            )
+        else:
+            return (
+                True,
+                dbc.Alert("Erro ao devolver atividade.", color="danger"),
+                no_update, no_update, no_update, no_update
             )
 
     # ==============================================================================
