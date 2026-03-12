@@ -151,8 +151,14 @@ def criar_barra_horas_inline(historico_items):
     total = sum(grupos.values())
 
     # Segmentos da barra — um por tipo, cor determinada pela posição
+    total_fmt = float_para_hhmm(total)
     bars = []
-    legenda = []
+    legenda = [
+        html.Span([
+            html.Span("Total: ", className="fw-semibold"),
+            total_fmt
+        ], className="me-3", style={"fontSize": "0.78rem", "whiteSpace": "nowrap"})
+    ]
     for i, (desc, horas_soma) in enumerate(grupos.items()):
         cor = PALETA[i % len(PALETA)]
         pct = horas_soma / total * 100
@@ -169,13 +175,13 @@ def criar_barra_horas_inline(historico_items):
             html.Span([
                 html.Span("■ ", style={"color": f"var(--bs-{cor})"}),
                 f"{desc_curta} {horas_fmt}"
-            ], className="me-2", style={"fontSize": "0.70rem", "whiteSpace": "nowrap"})
+            ], className="me-2", style={"fontSize": "0.78rem", "whiteSpace": "nowrap"})
         )
 
     return html.Div([
         dbc.Progress(
             bars,
-            style={"height": "14px"},
+            style={"height": "22px"},
             className="mb-1"
         ),
         html.Div(legenda, className="d-flex flex-wrap")
@@ -291,7 +297,7 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
                 _vsep(),
                 _stat("Concluídas", concluidas, "text-success" if concluidas else ""),
                 _vsep(),
-                _stat("Subtarefas ✓", _pct_label, _pct_cor),
+                _stat("Atividades ✓", _pct_label, _pct_cor),
             ], className="d-flex align-items-center justify-content-around flex-wrap"),
             className="py-2"
         ),
@@ -405,8 +411,8 @@ def criar_painel_filtros():
                     dbc.RadioItems(
                         id="filtro-tipo-data",
                         options=[
-                            {"label": "Tarefa", "value": "tarefa"},
-                            {"label": "Subtarefa", "value": "subtarefa"},
+                            {"label": "Demanda", "value": "tarefa"},
+                            {"label": "Atividade", "value": "subtarefa"},
                         ],
                         value="tarefa",
                         inline=True,
@@ -648,9 +654,6 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
     Returns:
         list: Lista com 2 elementos <tr>
     """
-    data_criacao = pendencia['data_criacao'].strftime("%d/%m/%Y")
-    ultima_atualizacao = pendencia['ultima_atualizacao'].strftime("%d/%m/%Y")
-
     # Status de aceite e aprovação pendente
     status_aceite = str(pendencia.get('status_aceite') or 'aceito')
     tem_aprovacao_pendente = False
@@ -799,8 +802,6 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
         html.Td(responsavel),
         html.Td(criar_badge_status(pendencia['status'])),
         td_progresso,
-        html.Td(data_criacao),
-        html.Td(ultima_atualizacao),
         html.Td(botoes_acao, style={"width": "120px", "textAlign": "center"})
     ])
 
@@ -815,7 +816,7 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
                 id={"type": "collapse-historico", "index": index},
                 is_open=False
             ),
-            colSpan=9,
+            colSpan=7,
             className="p-0"
         )
     ])
@@ -854,8 +855,6 @@ def criar_tabela_pendencias(df_pendencias, df_historico=None, user_level=1, user
             html.Th("Responsável", style={"width": "150px"}),
             html.Th("Status", style={"width": "150px"}),
             html.Th("Progresso", style={"width": "100px"}),
-            html.Th("Criação", style={"width": "100px"}),
-            html.Th("Atualização", style={"width": "100px"}),
             html.Th("Ações", style={"width": "120px"})
         ])
     ])
@@ -903,7 +902,7 @@ def concluir_subtarefa_modal():
         ])),
         dbc.ModalBody([
             html.P([
-                "Deseja marcar esta subatividade como ",
+                "Deseja marcar esta atividade como ",
                 html.Strong("concluída", className="text-success"),
                 "?"
             ]),

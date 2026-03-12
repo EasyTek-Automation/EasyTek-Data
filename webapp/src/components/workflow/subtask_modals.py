@@ -26,7 +26,7 @@ def create_subtask_modal():
     return dbc.Modal([
         dbc.ModalHeader(dbc.ModalTitle([
             html.I(className="fas fa-tasks me-2"),
-            "Nova Subtarefa"
+            "Nova Atividade"
         ])),
 
         dbc.ModalBody([
@@ -151,7 +151,7 @@ def create_subtask_modal():
             html.Span(" (opcional)", className="text-muted small"),
             dbc.Textarea(
                 id="create-subtask-obs",
-                placeholder="Informações adicionais sobre esta subtarefa...",
+                placeholder="Informações adicionais sobre esta atividade...",
                 rows=3,
                 className="mb-3"
             ),
@@ -168,7 +168,7 @@ def create_subtask_modal():
                 className="me-2"
             ),
             dbc.Button(
-                [html.I(className="fas fa-plus me-2"), "Criar Subtarefa"],
+                [html.I(className="fas fa-plus me-2"), "Criar Atividade"],
                 id="create-subtask-submit-btn",
                 color="success"
             )
@@ -187,7 +187,7 @@ def add_log_modal():
         dbc.ModalBody([
             # Contexto da subtarefa
             html.Div([
-                html.Small("Subtarefa:", className="text-muted"),
+                html.Small("Atividade:", className="text-muted"),
                 html.Div(
                     id="add-log-subtarefa-titulo",
                     className="fw-semibold"
@@ -261,7 +261,7 @@ def edit_subtask_modal():
     return dbc.Modal([
         dbc.ModalHeader(dbc.ModalTitle([
             html.I(className="fas fa-pencil-alt me-2"),
-            "Editar Subtarefa"
+            "Editar Atividade"
         ])),
 
         dbc.ModalBody([
@@ -270,7 +270,7 @@ def edit_subtask_modal():
             dbc.Input(
                 id="edit-subtask-titulo",
                 type="text",
-                placeholder="Título da subtarefa...",
+                placeholder="Título da atividade...",
                 className="mb-3"
             ),
 
@@ -484,7 +484,7 @@ def delete_subtask_confirm_modal():
 
         dbc.ModalBody([
             html.P([
-                "Deseja excluir esta subtarefa e todos os seus ",
+                "Deseja excluir esta atividade e todos os seus ",
                 html.Strong("relatórios vinculados", className="text-danger"),
                 "?"
             ]),

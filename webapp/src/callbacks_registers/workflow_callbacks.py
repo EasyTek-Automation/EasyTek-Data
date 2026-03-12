@@ -28,7 +28,8 @@ from src.pages.workflow.dashboard import (
 # ======================================================================================
 
 def criar_checklist_subtarefas(historico_items, username_atual=None,
-                               user_level=1, pend_id=None):
+                               user_level=1, pend_id=None,
+                               data_criacao=None, ultima_atualizacao=None):
     """
     View unificada de subtarefas (estilo ClickUp).
 
@@ -40,16 +41,27 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
     log_items_all = [h for h in historico_items if h.get('record_type') == 'log']
     criacao_items = [h for h in historico_items if h.get('record_type') == 'criacao']
 
-    botao_nova = html.Div(
+    _datas_info = []
+    if data_criacao:
+        _datas_info.append(html.Span(f"Criado: {data_criacao}", className="text-muted"))
+    if ultima_atualizacao:
+        _datas_info.append(html.Span(f"Atualizado: {ultima_atualizacao}", className="text-muted"))
+    _datas_sep = []
+    for i, d in enumerate(_datas_info):
+        _datas_sep.append(d)
+        if i < len(_datas_info) - 1:
+            _datas_sep.append(html.Span(" · ", className="text-muted"))
+
+    botao_nova = html.Div([
         dbc.Button(
-            [html.I(className="fas fa-plus me-1"), "Nova Subtarefa"],
+            [html.I(className="fas fa-plus me-1"), "Nova Atividade"],
             id={"type": "btn-nova-subtarefa", "index": pend_id or ""},
             color="success",
             size="sm",
             outline=True
         ),
-        className="px-3 pt-3 pb-2"
-    ) if pend_id else html.Div()
+        html.Small(_datas_sep, className="ms-3") if _datas_sep else html.Span()
+    ], className="px-3 pt-3 pb-2 d-flex align-items-center") if pend_id else html.Div()
 
     # --- Seção de eventos do sistema (criação/aceite/rejeição) ---
     secao_sistema = None
@@ -90,7 +102,7 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
             secao_sistema or html.Div(),
             html.Div([
                 html.I(className="fas fa-check-square fa-2x text-muted mb-2 d-block"),
-                html.Span("Nenhuma subtarefa registrada.", className="text-muted")
+                html.Span("Nenhuma atividade registrada.", className="text-muted")
             ], className="text-center py-4")
         ])
 
@@ -337,7 +349,7 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
 
 
 def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, user_level=1,
-                             filtros=None):
+                             filtros=None, data_criacao=None, ultima_atualizacao=None):
     """
     Cria o conteúdo expandido de uma pendência — view unificada sem abas.
 
@@ -419,7 +431,8 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
 
     return criar_checklist_subtarefas(
         historico_items, username_atual,
-        user_level=user_level, pend_id=pendencia_id
+        user_level=user_level, pend_id=pendencia_id,
+        data_criacao=data_criacao, ultima_atualizacao=ultima_atualizacao
     )
 
 
@@ -576,7 +589,20 @@ def register_workflow_callbacks(app):
         if index >= len(df_pendencias):
             raise PreventUpdate
 
-        pendencia_id = df_pendencias.iloc[index]['id']
+        pend_row = df_pendencias.iloc[index]
+        pendencia_id = pend_row['id']
+
+        # Extrair datas para exibição inline no painel de atividades
+        try:
+            dc = pd.to_datetime(pend_row.get('data_criacao'))
+            data_criacao_fmt = dc.strftime("%d/%m/%Y") if pd.notna(dc) else None
+        except Exception:
+            data_criacao_fmt = None
+        try:
+            ua = pd.to_datetime(pend_row.get('ultima_atualizacao'))
+            ultima_atualizacao_fmt = ua.strftime("%d/%m/%Y") if pd.notna(ua) else None
+        except Exception:
+            ultima_atualizacao_fmt = None
 
         # Ajustar coluna pendencia_id no histórico
         if not df_historico.empty and 'MaintenanceWF_id' in df_historico.columns and 'pendencia_id' not in df_historico.columns:
@@ -589,7 +615,9 @@ def register_workflow_callbacks(app):
             conteudo_historico = criar_conteudo_historico(
                 pendencia_id, df_historico, username_atual,
                 user_level=user_level or 1,
-                filtros=filtros_ativos
+                filtros=filtros_ativos,
+                data_criacao=data_criacao_fmt,
+                ultima_atualizacao=ultima_atualizacao_fmt
             )
         else:
             conteudo_historico = html.Div()
