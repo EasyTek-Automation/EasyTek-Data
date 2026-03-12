@@ -692,10 +692,11 @@ def register_workflow_callbacks(app):
         State("user-level-store", "data"),
         State("user-username-store", "data"),
         State("store-filtros-ativos", "data"),
+        State("filtro-responsavel", "value"),
         prevent_initial_call=True
     )
-    def refresh_dados(n_clicks, user_level, username_atual, filtros):
-        """Recarrega os dados e reconstrói a tabela preservando filtros ativos."""
+    def refresh_dados(n_clicks, user_level, username_atual, filtros, responsavel_dropdown):
+        """Recarrega os dados e reconstrói a tabela usando o responsável atual do dropdown."""
         if not n_clicks:
             raise PreventUpdate
 
@@ -704,8 +705,12 @@ def register_workflow_callbacks(app):
         if df_pendencias is None or df_historico is None:
             return html.Div("Erro ao carregar dados.", className="text-danger"), [], []
 
+        # Sobrepõe o responsável com o valor atual do dropdown
+        filtros_refresh = dict(filtros or {})
+        filtros_refresh["responsavel"] = responsavel_dropdown or "todos"
+
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
-            df_pendencias, df_historico, filtros, user_level, username_atual
+            df_pendencias, df_historico, filtros_refresh, user_level, username_atual
         )
         return nova_tabela, store_data, df_historico.to_dict('records')
 

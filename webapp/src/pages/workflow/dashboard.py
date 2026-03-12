@@ -377,7 +377,7 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
     return html.Div([status_strip, cards_pessoais], className="mb-3")
 
 
-def criar_painel_filtros():
+def criar_painel_filtros(username_inicial="todos"):
     """Cria o painel de filtros sempre visível."""
     return dbc.Card([
         dbc.CardBody([
@@ -387,7 +387,7 @@ def criar_painel_filtros():
                     dcc.Dropdown(
                         id="filtro-responsavel",
                         options=[{"label": "Todos", "value": "todos"}],
-                        value="todos",
+                        value=username_inicial,
                         clearable=False
                     )
                 ], width=12, md=4, className="mb-3"),
@@ -983,8 +983,16 @@ def layout():
         # Store para hist_id pendente de confirmação de conclusão
         dcc.Store(id="store-subtarefa-concluir-pending"),
 
-        # Store para filtros ativos (preserva filtros durante ações)
-        dcc.Store(id="store-filtros-ativos"),
+        # Store para filtros ativos — inicializado com filtro pelo usuário logado
+        dcc.Store(id="store-filtros-ativos", data={
+            "responsavel": username_atual or "todos",
+            "status": None,
+            "busca": None,
+            "status_aceite": None,
+            "tipo_data": ["tarefa", "subtarefa"],
+            "data_inicio": None,
+            "data_fim": None,
+        }),
 
         # Store para contexto de subtarefa (pend_id + subtarefa_id)
         dcc.Store(id="store-subtask-context", storage_type="memory"),
@@ -1043,14 +1051,17 @@ def layout():
         ),
 
         # Painel de Filtros
-        criar_painel_filtros(),
+        criar_painel_filtros(username_inicial=username_atual or "todos"),
 
-        # Tabela de Pendências
+        # Tabela de Pendências — pré-filtrada pelo usuário logado
         dbc.Card([
             dbc.CardBody([
                 html.Div(
                     criar_tabela_pendencias(
-                        df_pendencias, df_historico,
+                        df_pendencias[df_pendencias['responsavel'] == username_atual]
+                        if (df_pendencias is not None and not df_pendencias.empty and username_atual)
+                        else df_pendencias,
+                        df_historico,
                         user_level=current_user.level if current_user.is_authenticated else 1,
                         username_atual=username_atual
                     ),
