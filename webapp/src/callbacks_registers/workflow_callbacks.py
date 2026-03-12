@@ -1036,31 +1036,52 @@ def register_workflow_callbacks(app):
         Output("container-tabela", "children", allow_duplicate=True),
         Output("store-pendencias", "data", allow_duplicate=True),
         Output("store-historico", "data"),
+        Output("store-filtros-ativos", "data", allow_duplicate=True),
         Input("btn-refresh", "n_clicks"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
-        State("store-filtros-ativos", "data"),
         State("filtro-responsavel", "value"),
+        State("filtro-status", "value"),
+        State("filtro-busca", "value"),
+        State("filtro-status-aceite", "value"),
+        State("filtro-tipo-data", "value"),
+        State("filtro-data-inicio", "date"),
+        State("filtro-data-fim", "date"),
+        State("filtro-horas-uteis", "value"),
+        State("filtro-prioridade", "value"),
+        State("filtro-validacao-gestor", "value"),
         prevent_initial_call=True
     )
-    def refresh_dados(n_clicks, user_level, username_atual, filtros, responsavel_dropdown):
-        """Recarrega os dados e reconstrói a tabela usando o responsável atual do dropdown."""
+    def refresh_dados(n_clicks, user_level, username_atual,
+                      responsavel, status_list, busca, status_aceite_list,
+                      tipo_data, data_inicio, data_fim, horas_uteis,
+                      prioridade_list, validacao_gestor_list):
+        """Recarrega dados do MongoDB e reconstrói a tabela preservando todos os filtros atuais."""
         if not n_clicks:
             raise PreventUpdate
 
         df_pendencias, df_historico = carregar_dados_csv()
 
         if df_pendencias is None or df_historico is None:
-            return html.Div("Erro ao carregar dados.", className="text-danger"), [], []
+            return html.Div("Erro ao carregar dados.", className="text-danger"), [], [], no_update
 
-        # Sobrepõe o responsável com o valor atual do dropdown
-        filtros_refresh = dict(filtros or {})
-        filtros_refresh["responsavel"] = responsavel_dropdown or "todos"
+        filtros = {
+            "responsavel": responsavel,
+            "status": status_list,
+            "busca": busca,
+            "status_aceite": status_aceite_list,
+            "tipo_data": tipo_data if tipo_data else ["tarefa", "subtarefa"],
+            "data_inicio": data_inicio,
+            "data_fim": data_fim,
+            "horas_uteis": horas_uteis or False,
+            "prioridade": prioridade_list or [],
+            "validacao_gestor": validacao_gestor_list or [],
+        }
 
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
-            df_pendencias, df_historico, filtros_refresh, user_level, username_atual
+            df_pendencias, df_historico, filtros, user_level, username_atual
         )
-        return nova_tabela, store_data, df_historico.to_dict('records')
+        return nova_tabela, store_data, df_historico.to_dict('records'), filtros
 
 
     # ==================================================================================

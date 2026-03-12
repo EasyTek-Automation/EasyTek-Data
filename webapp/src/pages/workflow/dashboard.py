@@ -1354,6 +1354,9 @@ def layout():
             "tipo_data": ["tarefa", "subtarefa"],
             "data_inicio": None,
             "data_fim": None,
+            "horas_uteis": False,
+            "prioridade": [],
+            "validacao_gestor": [],
         }),
 
         # Store para contexto de subtarefa (pend_id + subtarefa_id)
