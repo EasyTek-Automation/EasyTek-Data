@@ -441,7 +441,7 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
 
 def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite_list=None,
                               data_inicio=None, data_fim=None,
-                              tipo_data="tarefa", df_historico=None):
+                              tipo_data="tarefa", df_historico=None, horas_uteis=False):
     """Aplica filtros ao DataFrame de pendências."""
     from datetime import datetime as _dt, timedelta
 
@@ -500,6 +500,21 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
             ids_validos = (ids_tarefa or set()) | (ids_subtarefa or set())
             df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_validos)]
 
+    if horas_uteis and df_historico is not None and not df_historico.empty:
+        df_h = df_historico.copy()
+        if 'record_type' in df_h.columns:
+            df_h = df_h[df_h['record_type'] != 'criacao']
+        def _tem_horas(h):
+            try:
+                return h is not None and str(h) != 'nan' and float(h) > 0
+            except (ValueError, TypeError):
+                return False
+        df_h = df_h[df_h['horas'].apply(_tem_horas)]
+        col_id = 'pendencia_id' if 'pendencia_id' in df_h.columns else 'MaintenanceWF_id'
+        if col_id in df_h.columns:
+            ids_com_horas = set(df_h[col_id].dropna().astype(str).unique())
+            df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_com_horas)]
+
     return df_filtrado
 
 
@@ -528,6 +543,7 @@ def reconstruir_tabela_com_filtros(df_pendencias, df_historico, filtros, user_le
             filtros.get("data_fim"),
             tipo_data=filtros.get("tipo_data", "tarefa"),
             df_historico=df_historico,
+            horas_uteis=filtros.get("horas_uteis", False),
         )
     else:
         df_filtrado = df_pendencias
@@ -651,12 +667,13 @@ def register_workflow_callbacks(app):
         State("filtro-tipo-data", "value"),
         State("filtro-data-inicio", "date"),
         State("filtro-data-fim", "date"),
+        State("filtro-horas-uteis", "value"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
         prevent_initial_call=True
     )
     def aplicar_filtros(n_clicks, responsavel, status_list, busca, status_aceite_list,
-                        tipo_data, data_inicio, data_fim, user_level, username_atual):
+                        tipo_data, data_inicio, data_fim, horas_uteis, user_level, username_atual):
         """Aplica os filtros selecionados e reconstrói a tabela."""
         if not n_clicks:
             raise PreventUpdate
@@ -674,6 +691,7 @@ def register_workflow_callbacks(app):
             "tipo_data": tipo_data if tipo_data else ["tarefa", "subtarefa"],
             "data_inicio": data_inicio,
             "data_fim": data_fim,
+            "horas_uteis": horas_uteis or False,
         }
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
             df_pendencias, df_historico, filtros, user_level, username_atual
@@ -1027,6 +1045,7 @@ def register_workflow_callbacks(app):
         Output("filtro-tipo-data", "value"),
         Output("filtro-data-inicio", "date"),
         Output("filtro-data-fim", "date"),
+        Output("filtro-horas-uteis", "value"),
         Output("store-filtros-ativos", "data", allow_duplicate=True),
         Output("container-tabela", "children", allow_duplicate=True),
         Output("store-pendencias", "data", allow_duplicate=True),
@@ -1050,7 +1069,7 @@ def register_workflow_callbacks(app):
             username_atual=username_atual
         )
         return (
-            "todos", [], "", [], ["tarefa", "subtarefa"], None, None,  # resetar UI dos filtros + datas
+            "todos", [], "", [], ["tarefa", "subtarefa"], None, None, False,  # resetar UI dos filtros + datas
             None,                                        # limpar store de filtros
             nova_tabela,
             df_pendencias.to_dict('records')

@@ -684,7 +684,17 @@ def criar_painel_filtros(username_inicial="todos"):
                         multi=True,
                         placeholder="Todos"
                     )
-                ], width=12, md=3, className="mb-3"),
+                ], width=12, md=2, className="mb-3"),
+
+                dbc.Col([
+                    html.Label("Horas:", className="fw-bold mb-2"),
+                    dbc.Switch(
+                        id="filtro-horas-uteis",
+                        label="Com horas",
+                        value=False,
+                        className="mt-1"
+                    )
+                ], width=12, md=1, className="mb-3"),
 
                 dbc.Col([
                     html.Label("Data de:", className="fw-bold mb-2"),
