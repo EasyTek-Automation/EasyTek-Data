@@ -138,7 +138,9 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
         status_validacao_gestor = item.get('status_validacao_gestor')
         nota_devolucao = item.get('nota_devolucao')
         devolvido_por = item.get('devolvido_por')
+        data_devolucao = item.get('data_devolucao')
         validado_por = item.get('validado_por')
+        data_validacao = item.get('data_validacao')
         historico_validacao = item.get('historico_validacao') or []
 
         _t = item.get('titulo')
@@ -395,6 +397,7 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                         html.I(className="fas fa-user-check text-success me-2"),
                         html.Span("Validado por: ", className="fw-semibold text-success me-1"),
                         html.Span(validado_por, className="text-success"),
+                        html.Span(f" · {data_validacao}", className="text-muted ms-2") if data_validacao else None,
                     ], className="p-2 mb-1 rounded",
                        style={"backgroundColor": "rgba(25,135,84,0.08)",
                               "borderLeft": "3px solid var(--bs-success)",
@@ -407,6 +410,7 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                         html.Span("Devolvida: ", className="fw-semibold text-danger me-1"),
                         html.Span(nota_devolucao, className="text-danger"),
                         html.Span(f" · {devolvido_por}", className="text-muted ms-2") if devolvido_por else None,
+                        html.Span(f" · {data_devolucao}", className="text-muted ms-1") if data_devolucao else None,
                     ], className="p-2 mb-1 rounded",
                        style={"backgroundColor": "rgba(220,53,69,0.08)",
                               "borderLeft": "3px solid var(--bs-danger)",
@@ -670,7 +674,17 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
             'status_validacao_gestor': _str_or_none(row.get('status_validacao_gestor')),
             'nota_devolucao': _str_or_none(row.get('nota_devolucao')),
             'devolvido_por': _str_or_none(row.get('devolvido_por')),
+            'data_devolucao': (row['data_devolucao'].strftime("%d/%m/%Y %H:%M")
+                               if row.get('data_devolucao') is not None
+                               and str(row.get('data_devolucao')) != 'nan'
+                               and hasattr(row.get('data_devolucao'), 'strftime')
+                               else None),
             'validado_por': _str_or_none(row.get('validado_por')),
+            'data_validacao': (row['data_validacao'].strftime("%d/%m/%Y %H:%M")
+                               if row.get('data_validacao') is not None
+                               and str(row.get('data_validacao')) != 'nan'
+                               and hasattr(row.get('data_validacao'), 'strftime')
+                               else None),
             'historico_validacao': row.get('historico_validacao') if isinstance(row.get('historico_validacao'), list) else [],
         })
 
