@@ -216,31 +216,28 @@ def criar_barra_horas_inline(historico_items):
 
 def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
     """
-    Cria os cards KPI com estatísticas das pendências.
+    Cria o dashboard KPI do workflow com cards visuais.
 
     Args:
         df_pendencias: DataFrame com as pendências
-        df_historico: DataFrame com o histórico (para calcular aprovações pendentes)
+        df_historico: DataFrame com o histórico
         username_atual: Username do usuário logado
 
     Returns:
-        dbc.Row: Linha com os cards KPI
+        html.Div: Dashboard KPI completo
     """
-    pct_subtarefas_geral = None
-
+    # === Métricas de Demandas ===
     if df_pendencias is None or df_pendencias.empty:
-        total = em_fila = pendentes = em_andamento = bloqueados = concluidas = 0
-        aguardando_aceite = 0
-        abertos_por_mim = abertos_aceitos = abertos_rejeitados = 0
+        total = em_fila = pendentes = em_andamento = bloqueados = concluidas_d = 0
+        aguardando_aceite = abertos_por_mim = abertos_aceitos = abertos_rejeitados = 0
     else:
         total = len(df_pendencias)
         em_fila = len(df_pendencias[df_pendencias['status'] == 'Em Fila (Planejamento)'])
         pendentes = len(df_pendencias[df_pendencias['status'] == 'Pendente'])
         em_andamento = len(df_pendencias[df_pendencias['status'] == 'Em Andamento'])
         bloqueados = len(df_pendencias[df_pendencias['status'] == 'Bloqueado'])
-        concluidas = len(df_pendencias[df_pendencias['status'] == 'Concluído'])
+        concluidas_d = len(df_pendencias[df_pendencias['status'] == 'Concluído'])
 
-        # Tarefas aguardando aceite pelo usuário atual (responsável)
         aguardando_aceite = 0
         if username_atual and 'status_aceite' in df_pendencias.columns and 'responsavel' in df_pendencias.columns:
             mask_aceite = (
@@ -249,7 +246,6 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
             )
             aguardando_aceite = int(mask_aceite.sum())
 
-        # Tarefas abertas por mim e seus status de aceite
         abertos_por_mim = abertos_aceitos = abertos_rejeitados = 0
         if username_atual and 'criado_por' in df_pendencias.columns:
             mask_meus = df_pendencias['criado_por'] == username_atual
@@ -262,119 +258,353 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):
                     (mask_meus & (df_pendencias['status_aceite'] == 'rejeitado')).sum()
                 )
 
-    # Calcular % geral de subtarefas concluídas (excluindo "Em Fila (Planejamento)")
-    if df_historico is not None and not df_historico.empty and df_pendencias is not None and not df_pendencias.empty:
-        ids_ativas = set(df_pendencias[
-            df_pendencias['status'] != 'Em Fila (Planejamento)'
-        ]['id'])
-        col_id = 'pendencia_id' if 'pendencia_id' in df_historico.columns else 'MaintenanceWF_id'
-        mask_ativas = df_historico[col_id].isin(ids_ativas)
-        if 'record_type' in df_historico.columns:
-            mask_ativas = mask_ativas & (df_historico['record_type'] == 'subtarefa')
-        elif 'tipo_evento' in df_historico.columns:
-            mask_ativas = mask_ativas & (df_historico['tipo_evento'] != 'criacao')
-        hist_ativas = df_historico[mask_ativas]
-        if not hist_ativas.empty:
-            total_g = len(hist_ativas)
-            conc_g = int(hist_ativas['concluido'].eq(True).sum())
-            pct_subtarefas_geral = int(conc_g / total_g * 100)
-
-    # Calcular aprovações pendentes para o usuário atual
+    # === Métricas de Atividades e Horas ===
+    total_ativ = em_andamento_ativ = concluidas_ativ = 0
+    horas_concluidas = horas_total = 0.0
     aguardando_aprovacao = 0
-    if df_historico is not None and not df_historico.empty and username_atual:
-        if 'aprovador' in df_historico.columns and 'status_aprovacao' in df_historico.columns:
+
+    if df_historico is not None and not df_historico.empty:
+        if 'record_type' in df_historico.columns:
+            df_ativ = df_historico[df_historico['record_type'] == 'subtarefa']
+        else:
+            df_ativ = df_historico
+
+        total_ativ = len(df_ativ)
+        if total_ativ > 0 and 'concluido' in df_ativ.columns:
+            concluidas_ativ = int(df_ativ['concluido'].eq(True).sum())
+        em_andamento_ativ = total_ativ - concluidas_ativ
+
+        if 'horas' in df_ativ.columns:
+            h_num = pd.to_numeric(df_ativ['horas'], errors='coerce')
+            horas_total = float(h_num.sum())
+            if 'concluido' in df_ativ.columns:
+                horas_concluidas = float(h_num[df_ativ['concluido'].eq(True)].sum())
+
+        if username_atual and 'aprovador' in df_historico.columns and 'status_aprovacao' in df_historico.columns:
             mask = (
                 (df_historico['aprovador'] == username_atual) &
                 (df_historico['status_aprovacao'] == 'pendente')
             )
             aguardando_aprovacao = int(mask.sum())
 
-    # --- Barra de status compacta (substitui a grade de 4 cards) ---
-    def _stat(rotulo, valor, cor=""):
+    # === Helpers visuais ===
+    COR = {
+        'primary':   'var(--bs-primary)',
+        'success':   'var(--bs-success)',
+        'info':      'var(--bs-info)',
+        'warning':   'var(--bs-warning)',
+        'danger':    'var(--bs-danger)',
+        'secondary': 'var(--bs-secondary)',
+    }
+
+    def _barra(segmentos, altura=26):
+        """segmentos: list of (valor_numerico, cor_key, label_tooltip)"""
+        total_v = sum(v for v, _, _ in segmentos if v > 0)
+        if total_v == 0:
+            return html.Div(style={
+                "height": f"{altura}px",
+                "backgroundColor": "#e9ecef",
+                "borderRadius": "0.375rem"
+            })
+        segs = []
+        for valor, cor_key, label in segmentos:
+            if valor <= 0:
+                continue
+            pct = valor / total_v * 100
+            segs.append(html.Div(
+                str(valor) if pct > 9 else "",
+                title=f"{label}: {valor}",
+                style={
+                    "width": f"{pct}%",
+                    "backgroundColor": COR.get(cor_key, f'var(--bs-{cor_key})'),
+                    "color": "white",
+                    "display": "flex",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "fontSize": "0.78rem",
+                    "fontWeight": "700",
+                    "overflow": "hidden",
+                    "whiteSpace": "nowrap",
+                    "padding": "0 4px",
+                    "cursor": "default",
+                }
+            ))
+        return html.Div(segs, style={
+            "height": f"{altura}px",
+            "display": "flex",
+            "borderRadius": "0.375rem",
+            "overflow": "hidden",
+        })
+
+    def _legenda(itens):
+        """itens: list of (cor_key, label, valor_str)"""
+        spans = []
+        for cor_key, label, valor in itens:
+            cor_css = COR.get(cor_key, f'var(--bs-{cor_key})')
+            spans.append(html.Span([
+                html.Span("■ ", style={"color": cor_css}),
+                html.Span(f"{label} ", style={"color": "#6c757d"}),
+                html.Span(str(valor), style={"fontWeight": "700"}),
+            ], className="me-3", style={"fontSize": "0.8rem", "whiteSpace": "nowrap"}))
+        return html.Div(spans, className="d-flex flex-wrap mt-2")
+
+    def _num(valor, cor_key=None, tamanho="2.6rem"):
+        style = {"lineHeight": "1", "fontWeight": "800", "fontSize": tamanho}
+        if cor_key:
+            style["color"] = COR.get(cor_key, f'var(--bs-{cor_key})')
+        return html.Div(str(valor), style=style)
+
+    def _sub(valor, label, cor_key):
         return html.Div([
-            html.Span(
-                str(valor),
-                className=f"d-block fs-3 fw-bold lh-1{' ' + cor if cor else ''}"
-            ),
-            html.Small(rotulo, className="text-muted"),
-        ], className="text-center px-3 py-1 flex-fill")
+            html.Span(str(valor), style={
+                "fontSize": "1.4rem",
+                "fontWeight": "700",
+                "color": COR.get(cor_key, f'var(--bs-{cor_key})'),
+            }),
+            html.Span(f" {label}", style={"fontSize": "0.8rem", "color": "#6c757d", "marginLeft": "3px"}),
+        ])
 
-    def _vsep():
-        return html.Div(style={"width": "1px", "backgroundColor": "#dee2e6", "margin": "4px 0"})
+    # ============================================================
+    # CARD 1 — DEMANDAS
+    # ============================================================
+    planejadas = total - concluidas_d
 
-    _pct_label = f"{pct_subtarefas_geral}%" if pct_subtarefas_geral is not None else "—"
-    _pct_cor = ("text-success" if pct_subtarefas_geral == 100
-                else "text-primary" if pct_subtarefas_geral and pct_subtarefas_geral >= 50
-                else "text-warning" if pct_subtarefas_geral is not None
-                else "")
-
-    status_strip = dbc.Card(
-        dbc.CardBody(
+    card_demandas = dbc.Card([
+        dbc.CardBody([
+            # Cabeçalho do card
             html.Div([
-                _stat("Total", total),
-                _vsep(),
-                _stat("Em Fila", em_fila, "text-info" if em_fila else ""),
-                _vsep(),
-                _stat("Pendentes", pendentes, "text-warning" if pendentes else ""),
-                _vsep(),
-                _stat("Em Andamento", em_andamento, "text-primary" if em_andamento else ""),
-                _vsep(),
-                _stat("Bloqueados", bloqueados, "text-danger" if bloqueados else ""),
-                _vsep(),
-                _stat("Concluídas", concluidas, "text-success" if concluidas else ""),
-                _vsep(),
-                _stat("Atividades ✓", _pct_label, _pct_cor),
-            ], className="d-flex align-items-center justify-content-around flex-wrap"),
-            className="py-2"
-        ),
-        className="shadow-sm mb-3 workflow-kpi-strip"
+                html.I(className="fas fa-tasks me-2",
+                       style={"color": COR['primary'], "fontSize": "1.1rem"}),
+                html.Span("Demandas", className="fw-semibold",
+                           style={"fontSize": "0.95rem", "color": "#495057"}),
+            ], className="mb-3"),
+
+            # Números principais
+            html.Div([
+                html.Div([
+                    _num(total),
+                    html.Div("total", style={"fontSize": "0.75rem", "color": "#adb5bd", "marginTop": "2px"}),
+                ], className="me-4"),
+                html.Div([
+                    _sub(planejadas, "planejadas", "primary"),
+                    _sub(em_andamento, "em andamento", "primary"),
+                ]),
+            ], className="d-flex align-items-center mb-3"),
+
+            # Barra visual
+            _barra([
+                (em_fila,      'info',    'Em Fila'),
+                (pendentes,    'warning', 'Pendente'),
+                (em_andamento, 'primary', 'Em Andamento'),
+                (bloqueados,   'danger',  'Bloqueado'),
+                (concluidas_d, 'success', 'Concluído'),
+            ]),
+
+            # Legenda
+            _legenda([
+                ('info',    'Em Fila',      em_fila),
+                ('warning', 'Pendente',     pendentes),
+                ('primary', 'Em Andamento', em_andamento),
+                ('danger',  'Bloqueado',    bloqueados),
+                ('success', 'Concluído',    concluidas_d),
+            ]),
+        ], className="p-3")
+    ], className="shadow-sm h-100")
+
+    # ============================================================
+    # CARD 2 — ATIVIDADES
+    # ============================================================
+    pct_ativ = int(concluidas_ativ / total_ativ * 100) if total_ativ > 0 else 0
+    pct_ativ_cor = (
+        'success' if pct_ativ == 100 else
+        'primary' if pct_ativ >= 50 else
+        'warning'
     )
 
-    # --- Cards de ação pessoal ---
-    def _card(titulo, valor, cor_valor=None, icone=None, borda=None):
-        h6_children = []
-        if icone:
-            h6_children.append(html.I(className=f"{icone} me-1"))
-        h6_children.append(titulo)
-        return dbc.Card([
+    card_atividades = dbc.Card([
+        dbc.CardBody([
+            html.Div([
+                html.I(className="fas fa-tasks me-2",
+                       style={"color": COR['success'], "fontSize": "1.1rem"}),
+                html.Span("Atividades", className="fw-semibold",
+                           style={"fontSize": "0.95rem", "color": "#495057"}),
+            ], className="mb-3"),
+
+            html.Div([
+                html.Div([
+                    _num(total_ativ, 'success'),
+                    html.Div("total", style={"fontSize": "0.75rem", "color": "#adb5bd", "marginTop": "2px"}),
+                ], className="me-4"),
+                html.Div([
+                    _sub(em_andamento_ativ, "em andamento", "warning"),
+                    _sub(concluidas_ativ, "concluídas", "success"),
+                ]),
+            ], className="d-flex align-items-center mb-3"),
+
+            _barra([
+                (em_andamento_ativ, 'warning', 'Em Andamento'),
+                (concluidas_ativ,   'success', 'Concluídas'),
+            ]),
+
+            html.Div([
+                *_legenda([
+                    ('warning', 'Em Andamento', em_andamento_ativ),
+                    ('success', 'Concluídas',   concluidas_ativ),
+                ]).children,
+                html.Span([
+                    html.Span(f"{pct_ativ}%", style={
+                        "fontWeight": "700",
+                        "color": COR[pct_ativ_cor],
+                        "fontSize": "0.88rem",
+                    }),
+                    html.Span(" concluídas", style={"fontSize": "0.8rem", "color": "#6c757d"}),
+                ], className="ms-auto"),
+            ], className="d-flex flex-wrap align-items-center mt-2"),
+        ], className="p-3")
+    ], className="shadow-sm h-100")
+
+    # ============================================================
+    # CARD 3 — HORAS
+    # ============================================================
+    pct_horas = int(horas_concluidas / horas_total * 100) if horas_total > 0 else 0
+    horas_pend = horas_total - horas_concluidas
+    horas_conc_fmt = float_para_hhmm(horas_concluidas) or "—"
+    horas_total_fmt = float_para_hhmm(horas_total) or "—"
+    horas_pend_fmt = float_para_hhmm(horas_pend) or "—"
+
+    cor_circ = (
+        'success'   if pct_horas == 100 else
+        'primary'   if pct_horas >= 50  else
+        'warning'   if pct_horas > 0    else
+        'secondary'
+    )
+
+    card_horas = dbc.Card([
+        dbc.CardBody([
+            html.Div([
+                html.I(className="fas fa-clock me-2",
+                       style={"color": COR['info'], "fontSize": "1.1rem"}),
+                html.Span("Horas", className="fw-semibold",
+                           style={"fontSize": "0.95rem", "color": "#495057"}),
+            ], className="mb-3"),
+
+            html.Div([
+                # Círculo de progresso (visual)
+                html.Div([
+                    html.Div(f"{pct_horas}%", style={
+                        "fontSize": "1.7rem",
+                        "fontWeight": "800",
+                        "color": COR[cor_circ],
+                        "lineHeight": "1",
+                    }),
+                    html.Div("concluídas", style={"fontSize": "0.68rem", "color": "#adb5bd"}),
+                ], style={
+                    "width": "76px",
+                    "height": "76px",
+                    "borderRadius": "50%",
+                    "border": f"5px solid {COR[cor_circ]}",
+                    "display": "flex",
+                    "flexDirection": "column",
+                    "alignItems": "center",
+                    "justifyContent": "center",
+                    "flexShrink": "0",
+                    "marginRight": "16px",
+                }),
+                html.Div([
+                    _sub(horas_conc_fmt, "concluídas", "success"),
+                    _sub(horas_total_fmt, "total", "secondary"),
+                ]),
+            ], className="d-flex align-items-center mb-3"),
+
+            _barra([
+                (horas_concluidas, 'success',   'Concluídas'),
+                (horas_pend,       'secondary', 'Pendentes'),
+            ]),
+
+            _legenda([
+                ('success',   'Concluídas', horas_conc_fmt),
+                ('secondary', 'Pendentes',  horas_pend_fmt),
+            ]),
+        ], className="p-3")
+    ], className="shadow-sm h-100")
+
+    # ============================================================
+    # NOTIFICAÇÕES PESSOAIS (compacto)
+    # ============================================================
+    def _notif_item(icone, label, valor, cor_key=None, destaque=False):
+        num_style = {
+            "fontSize": "1.6rem",
+            "fontWeight": "800",
+            "lineHeight": "1.1",
+            "color": COR.get(cor_key, "#212529") if cor_key else "#212529",
+        }
+        return html.Div([
+            html.Div([
+                html.I(className=f"{icone} me-1 text-muted",
+                       style={"fontSize": "0.75rem"}),
+                html.Span(label, style={"fontSize": "0.75rem", "color": "#6c757d"}),
+            ]),
+            html.Div(str(valor), style=num_style),
+        ], className="text-center px-4 py-2", style={
+            "borderLeft": "1px solid #dee2e6",
+            "minWidth": "80px",
+        })
+
+    notif_items = []
+    if username_atual:
+        notif_items.append(_notif_item(
+            "fas fa-inbox", "Para Aceitar", aguardando_aceite,
+            cor_key="secondary" if aguardando_aceite else None
+        ))
+        notif_items.append(_notif_item(
+            "fas fa-clock", "Para Aprovar", aguardando_aprovacao,
+            cor_key="warning" if aguardando_aprovacao else None
+        ))
+        notif_items.append(_notif_item(
+            "fas fa-folder-open", "Criadas p/ Mim", abertos_por_mim
+        ))
+        notif_items.append(_notif_item(
+            "fas fa-check-circle", "Aceitas", abertos_aceitos,
+            cor_key="success" if abertos_aceitos else None
+        ))
+        notif_items.append(_notif_item(
+            "fas fa-times-circle", "Rejeitadas", abertos_rejeitados,
+            cor_key="danger" if abertos_rejeitados else None
+        ))
+
+    notif_card = None
+    if notif_items:
+        notif_card = dbc.Card([
             dbc.CardBody([
-                html.H6(h6_children, className="text-muted mb-2 small"),
-                html.H4(str(valor), className=f"mb-0 {cor_valor}" if cor_valor else "mb-0")
-            ])
-        ], className=f"shadow-sm h-100{' border-' + borda if borda else ''}")
+                html.Div([
+                    html.Div([
+                        html.I(className="fas fa-user-circle me-2",
+                               style={"color": COR['primary']}),
+                        html.Span("Suas notificações", className="fw-semibold",
+                                   style={"fontSize": "0.85rem", "color": "#6c757d"}),
+                    ], className="px-3 py-2",
+                       style={"borderBottom": "1px solid #dee2e6"}),
+                    html.Div([
+                        # Remove a borda esquerda do primeiro item
+                        html.Div(notif_items[0].children, className="text-center px-4 py-2",
+                                 style={"minWidth": "80px"}),
+                        *notif_items[1:],
+                    ], className="d-flex align-items-center flex-wrap"),
+                ])
+            ], className="p-0")
+        ], className="shadow-sm mb-3")
 
-    cards_pessoais = dbc.Row([
-        dbc.Col(_card(
-            "Aguard. Aceite", aguardando_aceite,
-            icone="fas fa-inbox",
-            cor_valor="text-secondary" if aguardando_aceite else None,
-            borda="secondary" if aguardando_aceite else None
-        ), width=True, className="mb-2"),
-        dbc.Col(_card(
-            "Aguard. Aprovação", aguardando_aprovacao,
-            icone="fas fa-clock",
-            cor_valor="text-warning" if aguardando_aprovacao else None,
-            borda="warning" if aguardando_aprovacao else None
-        ), width=True, className="mb-2"),
-        dbc.Col(_card(
-            "Abertas por Mim", abertos_por_mim,
-            icone="fas fa-folder-open"
-        ), width=True, className="mb-2"),
-        dbc.Col(_card(
-            "Abertas — Aceitas", abertos_aceitos,
-            icone="fas fa-check-circle",
-            cor_valor="text-success" if abertos_aceitos else None,
-            borda="success" if abertos_aceitos else None
-        ), width=True, className="mb-2"),
-        dbc.Col(_card(
-            "Abertas — Rejeitadas", abertos_rejeitados,
-            icone="fas fa-times-circle",
-            cor_valor="text-danger" if abertos_rejeitados else None,
-            borda="danger" if abertos_rejeitados else None
-        ), width=True, className="mb-2"),
-    ], className="workflow-kpi-cards")
+    tres_cards = dbc.Row([
+        dbc.Col(card_demandas,   width=12, lg=4, className="mb-3"),
+        dbc.Col(card_atividades, width=12, lg=4, className="mb-3"),
+        dbc.Col(card_horas,      width=12, lg=4, className="mb-3"),
+    ], className="g-3 mb-0")
 
-    return html.Div([status_strip, cards_pessoais], className="mb-3")
+    children = [tres_cards]
+    if notif_card:
+        children.append(notif_card)
+
+    return html.Div(children, className="mb-3")
 
 
 def criar_painel_filtros(username_inicial="todos"):
