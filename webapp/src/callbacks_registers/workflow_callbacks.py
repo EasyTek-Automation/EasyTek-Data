@@ -373,9 +373,9 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                     style={"visibility": "visible" if tem_corpo else "hidden"}
                 ),
                 html.Div(badge_prioridade,
-                         style={"width": "22px", "flexShrink": "0"}),
+                         style={"width": "36px", "flexShrink": "0"}),
                 html.Div(icone_status,
-                         style={"width": "22px", "flexShrink": "0"}),
+                         style={"width": "20px", "flexShrink": "0", "marginLeft": "4px"}),
                 html.Div([
                     html.Span(
                         titulo,
