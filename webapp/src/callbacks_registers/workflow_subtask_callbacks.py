@@ -48,6 +48,7 @@ def register_subtask_callbacks(app):
         Output("create-subtask-responsavel-retroativo", "value", allow_duplicate=True),
         Output("create-subtask-aprovador-retroativo", "value", allow_duplicate=True),
         Output("create-subtask-prioridade", "value", allow_duplicate=True),
+        Output("create-subtask-data-planejada", "date", allow_duplicate=True),
         Input({"type": "btn-nova-subtarefa", "index": ALL}, "n_clicks"),
         State("create-subtask-modal", "is_open"),
         State("user-username-store", "data"),
@@ -62,7 +63,7 @@ def register_subtask_callbacks(app):
         id_dict = json.loads(trigger_id_str)
         pend_id = id_dict['index']
 
-        return True, {"pend_id": pend_id, "subtarefa_id": None}, "", None, username or None, "", None, None, "", False, None, None, "normal"
+        return True, {"pend_id": pend_id, "subtarefa_id": None}, "", None, username or None, "", None, None, "", False, None, None, "normal", None
 
     # ==============================================================================
     # CB2: Fechar create-subtask-modal (Cancelar / limpar campos)
@@ -80,13 +81,14 @@ def register_subtask_callbacks(app):
         Output("create-subtask-responsavel-retroativo", "value"),
         Output("create-subtask-aprovador-retroativo", "value"),
         Output("create-subtask-prioridade", "value"),
+        Output("create-subtask-data-planejada", "date"),
         Input("create-subtask-cancel-btn", "n_clicks"),
         prevent_initial_call=True
     )
     def fechar_create_subtask_modal(n_clicks):
         if not n_clicks:
             raise PreventUpdate
-        return False, "", None, None, "", None, None, "", False, None, None, "normal"
+        return False, "", None, None, "", None, None, "", False, None, None, "normal", None
 
     # ==============================================================================
     # CB3: Mostrar/ocultar campo aprovador no create-subtask-modal
@@ -167,6 +169,7 @@ def register_subtask_callbacks(app):
         State("create-subtask-responsavel-retroativo", "value"),
         State("create-subtask-aprovador-retroativo", "value"),
         State("create-subtask-prioridade", "value"),
+        State("create-subtask-data-planejada", "date"),
         State("store-subtask-context", "data"),
         State("user-username-store", "data"),
         State("user-level-store", "data"),
@@ -175,7 +178,8 @@ def register_subtask_callbacks(app):
     )
     def submeter_create_subtask(n_clicks, titulo, tipo, responsavel, obs, aprovador,
                                 data_retroativa, is_retroativo, responsavel_retroativo,
-                                aprovador_retroativo, prioridade, context, username, user_level, filtros):
+                                aprovador_retroativo, prioridade, data_planejada_str,
+                                context, username, user_level, filtros):
         if not n_clicks:
             raise PreventUpdate
 
@@ -213,7 +217,7 @@ def register_subtask_callbacks(app):
                     dbc.Alert("Informe o aprovador do lançamento retroativo.", color="warning"),
                     no_update, no_update, no_update, no_update)
 
-        # Converter data_retroativa de string ISO para datetime
+        # Converter datas de string ISO para datetime
         from datetime import datetime as _dt
         data_retro_dt = None
         if is_retroativo and data_retroativa:
@@ -221,6 +225,13 @@ def register_subtask_callbacks(app):
                 data_retro_dt = _dt.fromisoformat(data_retroativa)
             except (ValueError, TypeError):
                 data_retro_dt = None
+
+        data_planejada_dt = None
+        if data_planejada_str:
+            try:
+                data_planejada_dt = _dt.fromisoformat(data_planejada_str)
+            except (ValueError, TypeError):
+                data_planejada_dt = None
 
         sucesso, mensagem = criar_subtarefa(
             pend_id=pend_id,
@@ -235,6 +246,7 @@ def register_subtask_callbacks(app):
             responsavel_retroativo=responsavel_retroativo if is_retroativo else None,
             aprovador_retroativo=aprovador_retroativo if is_retroativo else None,
             prioridade=prioridade or 'normal',
+            data_planejada=data_planejada_dt,
         )
 
         from src.pages.workflow.dashboard import carregar_dados_csv
@@ -407,6 +419,8 @@ def register_subtask_callbacks(app):
         Output("edit-subtask-responsavel-retroativo", "value"),
         Output("edit-subtask-aprovador-retroativo", "value"),
         Output("edit-subtask-prioridade", "value"),
+        Output("edit-subtask-data-planejada", "date"),
+        Output("edit-subtask-data-execucao", "date"),
         Input({"type": "btn-edit-subtarefa", "index": ALL}, "n_clicks"),
         State("store-historico", "data"),
         prevent_initial_call=True
@@ -430,6 +444,8 @@ def register_subtask_callbacks(app):
         resp_retro_val = None
         aprov_retro_val = None
         prioridade_val = "normal"
+        data_planejada_val = None
+        data_execucao_val = None
 
         if historico_data:
             df = pd.DataFrame(historico_data)
@@ -455,8 +471,14 @@ def register_subtask_callbacks(app):
                 aprov_retro_val = str(_ar) if _ar and str(_ar) != 'nan' else None
                 _p = row.get('prioridade')
                 prioridade_val = str(_p) if _p and str(_p) != 'nan' else 'normal'
+                dp_raw = row.get('data_planejada')
+                data_planejada_val = str(dp_raw)[:10] if dp_raw and str(dp_raw) != 'nan' else None
+                de_raw = row.get('data_execucao')
+                data_execucao_val = str(de_raw)[:10] if de_raw and str(de_raw) != 'nan' else None
 
-        return True, hist_id, titulo_val, tipo_val, obs_val, concluido_val, aprovador_val, data_retro_val, is_retro_val, resp_retro_val, aprov_retro_val, prioridade_val
+        return (True, hist_id, titulo_val, tipo_val, obs_val, concluido_val, aprovador_val,
+                data_retro_val, is_retro_val, resp_retro_val, aprov_retro_val, prioridade_val,
+                data_planejada_val, data_execucao_val)
 
     # ==============================================================================
     # CB9b: Toggle visibilidade aprovador no edit modal (por tipo de evento)
@@ -549,6 +571,8 @@ def register_subtask_callbacks(app):
         State("edit-subtask-responsavel-retroativo", "value"),
         State("edit-subtask-aprovador-retroativo", "value"),
         State("edit-subtask-prioridade", "value"),
+        State("edit-subtask-data-planejada", "date"),
+        State("edit-subtask-data-execucao", "date"),
         State("user-username-store", "data"),
         State("user-level-store", "data"),
         State("store-filtros-ativos", "data"),
@@ -556,7 +580,8 @@ def register_subtask_callbacks(app):
     )
     def submeter_edit_subtask(n_clicks, hist_id, titulo, tipo, obs, concluido,
                               aprovador, data_retroativa, is_retroativo, responsavel_retroativo,
-                              aprovador_retroativo, prioridade, username, user_level, filtros):
+                              aprovador_retroativo, prioridade, data_planejada_str,
+                              data_execucao_str, username, user_level, filtros):
         if not n_clicks or not hist_id:
             raise PreventUpdate
 
@@ -569,6 +594,20 @@ def register_subtask_callbacks(app):
                 data_retro_dt = _dt.fromisoformat(data_retroativa)
             except (ValueError, TypeError):
                 data_retro_dt = None
+
+        data_planejada_dt = None
+        if data_planejada_str:
+            try:
+                data_planejada_dt = _dt.fromisoformat(data_planejada_str)
+            except (ValueError, TypeError):
+                data_planejada_dt = None
+
+        data_execucao_dt = None
+        if data_execucao_str:
+            try:
+                data_execucao_dt = _dt.fromisoformat(data_execucao_str)
+            except (ValueError, TypeError):
+                data_execucao_dt = None
 
         sucesso, mensagem = editar_subtarefa(
             hist_id=hist_id,
@@ -585,6 +624,10 @@ def register_subtask_callbacks(app):
             aprovador_retroativo=aprovador_retroativo if is_retroativo else None,
             update_retroativo=True,
             prioridade=prioridade or 'normal',
+            data_planejada=data_planejada_dt,
+            update_data_planejada=True,
+            data_execucao=data_execucao_dt,
+            update_data_execucao=True,
         )
 
         from src.pages.workflow.dashboard import carregar_dados_csv

@@ -697,12 +697,13 @@ def criar_painel_filtros(username_inicial="todos"):
                 ], width=12, md=1, className="mb-3"),
 
                 dbc.Col([
-                    html.Label("Data de:", className="fw-bold mb-2"),
+                    html.Label("Referência:", className="fw-bold mb-2"),
                     dbc.Checklist(
                         id="filtro-tipo-data",
                         options=[
                             {"label": "Demanda", "value": "tarefa"},
                             {"label": "Atividade", "value": "subtarefa"},
+                            {"label": "Planejada", "value": "planejada"},
                         ],
                         value=["tarefa", "subtarefa"],
                         inline=True,
@@ -1263,7 +1264,26 @@ def concluir_subtarefa_modal():
                 "Esta ação é ",
                 html.Strong("irreversível", className="text-danger"),
                 ". Para desfazer, será necessário criar uma nova entrada."
-            ], className="text-muted small")
+            ], className="text-muted small"),
+            html.Hr(className="my-3"),
+            html.Label("Data de Execução:", className="fw-bold mb-1"),
+            html.Span(" *", className="text-danger"),
+            html.Div(
+                dcc.DatePickerSingle(
+                    id="concluir-subtarefa-data-execucao",
+                    placeholder="DD/MM/AAAA",
+                    display_format="DD/MM/YYYY",
+                    first_day_of_week=0,
+                    clearable=True,
+                    style={"width": "100%"}
+                ),
+                className="mb-2"
+            ),
+            html.Small(
+                "Informe quando a atividade foi executada.",
+                className="text-muted"
+            ),
+            html.Div(id="concluir-subtarefa-alert", className="mt-2"),
         ]),
         dbc.ModalFooter([
             dbc.Button(

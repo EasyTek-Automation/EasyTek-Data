@@ -178,6 +178,21 @@ def create_subtask_modal():
             # Prioridade
             _prioridade_selector("create-subtask"),
 
+            # Data Planejada
+            html.Label("Data Planejada:", className="fw-bold mb-1"),
+            html.Span(" (opcional)", className="text-muted small"),
+            html.Div(
+                dcc.DatePickerSingle(
+                    id="create-subtask-data-planejada",
+                    placeholder="DD/MM/AAAA",
+                    display_format="DD/MM/YYYY",
+                    first_day_of_week=0,
+                    clearable=True,
+                    style={"width": "100%"}
+                ),
+                className="mb-3"
+            ),
+
             # Observações
             html.Label("Observações:", className="fw-bold mb-1"),
             html.Span(" (opcional)", className="text-muted small"),
@@ -401,6 +416,40 @@ def edit_subtask_modal():
 
             # Prioridade
             _prioridade_selector("edit-subtask"),
+
+            # Data Planejada + Data Executada
+            dbc.Row([
+                dbc.Col([
+                    html.Label("Data Planejada:", className="fw-bold mb-1"),
+                    html.Span(" (opcional)", className="text-muted small"),
+                    html.Div(
+                        dcc.DatePickerSingle(
+                            id="edit-subtask-data-planejada",
+                            placeholder="DD/MM/AAAA",
+                            display_format="DD/MM/YYYY",
+                            first_day_of_week=0,
+                            clearable=True,
+                            style={"width": "100%"}
+                        ),
+                        className="mb-3"
+                    ),
+                ], md=6),
+                dbc.Col([
+                    html.Label("Data Executada:", className="fw-bold mb-1"),
+                    html.Span(" (opcional)", className="text-muted small"),
+                    html.Div(
+                        dcc.DatePickerSingle(
+                            id="edit-subtask-data-execucao",
+                            placeholder="DD/MM/AAAA",
+                            display_format="DD/MM/YYYY",
+                            first_day_of_week=0,
+                            clearable=True,
+                            style={"width": "100%"}
+                        ),
+                        className="mb-3"
+                    ),
+                ], md=6),
+            ]),
 
             # Observações
             html.Label("Observações:", className="fw-bold mb-1"),

@@ -133,6 +133,12 @@ def carregar_historico():
         else:
             df['prioridade'] = df['prioridade'].fillna('normal')
 
+        # Retrocompat data_planejada / data_execucao
+        if 'data_planejada' not in df.columns:
+            df['data_planejada'] = None
+        if 'data_execucao' not in df.columns:
+            df['data_execucao'] = None
+
         # Retrocompat is_retroativo e responsavel_retroativo (campos novos)
         if 'is_retroativo' not in df.columns:
             # Registros antigos com tipo_evento == "Lançamento Retroativo" são retroativos
@@ -450,21 +456,25 @@ def get_usuarios_nivel3_por_perfil(perfil):
         return []
 
 
-def marcar_subtarefa_concluida(hist_id_str):
+def marcar_subtarefa_concluida(hist_id_str, data_execucao=None):
     """
     Marca uma subatividade do histórico como concluída (operação irreversível).
 
     Args:
         hist_id_str: String com o ObjectId da entrada de histórico
+        data_execucao: Data de execução (datetime ou date) — obrigatória para novos registros
 
     Returns:
         bool: True se a atualização foi bem-sucedida
     """
     try:
         collection = get_mongo_connection(COLLECTION_HISTORICO)
+        set_fields = {'concluido': True}
+        if data_execucao is not None:
+            set_fields['data_execucao'] = data_execucao
         result = collection.update_one(
             {'_id': ObjectId(hist_id_str), 'concluido': {'$ne': True}},
-            {'$set': {'concluido': True}}
+            {'$set': set_fields}
         )
         return result.modified_count > 0
     except Exception as e:
@@ -626,7 +636,7 @@ def rejeitar_tarefa(pend_id, username):
 def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
                     editado_por, aprovador=None, data_retroativa=None,
                     is_retroativo=False, responsavel_retroativo=None, aprovador_retroativo=None,
-                    prioridade='normal'):
+                    prioridade='normal', data_planejada=None):
     """
     Cria nova subtarefa (record_type='subtarefa') no histórico.
 
@@ -677,6 +687,8 @@ def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
             'responsavel_retroativo': responsavel_retroativo if is_retroativo else None,
             'aprovador_retroativo': aprovador_retroativo if is_retroativo else None,
             'prioridade': prioridade or 'normal',
+            'data_planejada': data_planejada,
+            'data_execucao': None,
         }
 
         collection_hist.insert_one(doc)
@@ -744,7 +756,9 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
                      aprovador=None, update_aprovador=False,
                      data_retroativa=None, update_data_retroativa=False,
                      is_retroativo=None, responsavel_retroativo=None, aprovador_retroativo=None,
-                     update_retroativo=False, prioridade=None):
+                     update_retroativo=False, prioridade=None,
+                     data_planejada=None, update_data_planejada=False,
+                     data_execucao=None, update_data_execucao=False):
     """
     Edita campos de uma subtarefa existente.
 
@@ -795,6 +809,12 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
 
         if prioridade is not None:
             updates['prioridade'] = prioridade
+
+        if update_data_planejada:
+            updates['data_planejada'] = data_planejada
+
+        if update_data_execucao:
+            updates['data_execucao'] = data_execucao
 
         if not updates:
             return False, "Nenhum campo para atualizar"

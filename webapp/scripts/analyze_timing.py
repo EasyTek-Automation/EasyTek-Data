@@ -12,7 +12,7 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-LOG_FILE = Path("logs/callback_timing.log")
+LOG_FILE = Path("E:\Projetos Python\AMG\AMG_Infra\logs\callback_timing.log")
 DEFAULT_TOP = 15
 DEFAULT_SLOW_THRESHOLD = 0  # ms — mostrar todos por padrão
 

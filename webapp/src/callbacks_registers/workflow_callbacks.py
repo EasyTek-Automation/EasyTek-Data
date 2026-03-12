@@ -226,11 +226,23 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
 
         # Meta info
         horas_fmt = float_para_hhmm(horas_val) if horas_val else None
+        data_planejada = item.get('data_planejada')
+        data_execucao  = item.get('data_execucao')
         meta_partes = [editado_por, data]
         if horas_fmt:
             meta_partes.append(html.Span([
                 html.I(className="fas fa-clock me-1 text-info"), horas_fmt
             ], className="text-info fw-semibold"))
+        if data_planejada:
+            meta_partes.append(html.Span([
+                html.I(className="fas fa-calendar-alt me-1"),
+                f"Plan.: {data_planejada}"
+            ], className="text-muted"))
+        if data_execucao:
+            meta_partes.append(html.Span([
+                html.I(className="fas fa-calendar-check me-1"),
+                f"Exec.: {data_execucao}"
+            ], className="text-success fw-semibold" if concluido else "text-muted"))
         if aprovador and not concluido:
             meta_partes.append(html.Span([
                 html.I(className="fas fa-user-check me-1 text-warning"),
@@ -419,19 +431,37 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
     # Filtrar subtarefas pelo período quando o filtro inclui atividades
     _tipos_filtro = filtros.get('tipo_data') if filtros else None
     _tipos_filtro = _tipos_filtro if isinstance(_tipos_filtro, list) else ([_tipos_filtro] if _tipos_filtro else [])
-    if (filtros and 'subtarefa' in _tipos_filtro
+    if (filtros and ('subtarefa' in _tipos_filtro or 'planejada' in _tipos_filtro)
             and (filtros.get('data_inicio') or filtros.get('data_fim'))):
         data_inicio = filtros.get('data_inicio')
         data_fim = filtros.get('data_fim')
 
-        # Subtarefas que passam o filtro de data
+        # Subtarefas que passam o filtro de data (atividade ou planejada)
+        usar_subtarefa_exp = 'subtarefa' in _tipos_filtro
+        usar_planejada_exp = 'planejada' in _tipos_filtro
         mask_sub = historico_pendencia['record_type'].fillna('subtarefa') == 'subtarefa'
         df_subs = historico_pendencia[mask_sub].copy()
-        if data_inicio:
-            df_subs = df_subs[df_subs['data'] >= _dt.fromisoformat(data_inicio)]
-        if data_fim:
-            df_subs = df_subs[df_subs['data'] < _dt.fromisoformat(data_fim) + timedelta(days=1)]
-        hist_ids_validos = set(df_subs['hist_id'].dropna().astype(str).tolist())
+
+        ids_sub_data = set()
+        if usar_subtarefa_exp:
+            df_tmp = df_subs.copy()
+            if data_inicio:
+                df_tmp = df_tmp[df_tmp['data'] >= _dt.fromisoformat(data_inicio)]
+            if data_fim:
+                df_tmp = df_tmp[df_tmp['data'] < _dt.fromisoformat(data_fim) + timedelta(days=1)]
+            ids_sub_data |= set(df_tmp['hist_id'].dropna().astype(str).tolist())
+
+        if usar_planejada_exp and 'data_planejada' in df_subs.columns:
+            df_tmp = df_subs.copy()
+            df_tmp['_dp'] = pd.to_datetime(df_tmp['data_planejada'], errors='coerce')
+            df_tmp = df_tmp[df_tmp['_dp'].notna()]
+            if data_inicio:
+                df_tmp = df_tmp[df_tmp['_dp'] >= _dt.fromisoformat(data_inicio)]
+            if data_fim:
+                df_tmp = df_tmp[df_tmp['_dp'] < _dt.fromisoformat(data_fim) + timedelta(days=1)]
+            ids_sub_data |= set(df_tmp['hist_id'].dropna().astype(str).tolist())
+
+        hist_ids_validos = ids_sub_data
 
         def _manter(row):
             rt = row.get('record_type') or 'subtarefa'
@@ -507,6 +537,16 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
             'record_type': row.get('record_type', 'subtarefa') or 'subtarefa',
             'subtarefa_id': _str_or_none(row.get('subtarefa_id')),
             'prioridade': _str_or_none(row.get('prioridade')) or 'normal',
+            'data_planejada': (row['data_planejada'].strftime("%d/%m/%Y")
+                               if row.get('data_planejada') is not None
+                               and str(row.get('data_planejada')) != 'nan'
+                               and hasattr(row['data_planejada'], 'strftime')
+                               else None),
+            'data_execucao': (row['data_execucao'].strftime("%d/%m/%Y")
+                              if row.get('data_execucao') is not None
+                              and str(row.get('data_execucao')) != 'nan'
+                              and hasattr(row['data_execucao'], 'strftime')
+                              else None),
         })
 
     return criar_checklist_subtarefas(
@@ -547,10 +587,11 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
     if (data_inicio or data_fim):
         # tipo_data pode ser string (legado) ou lista de strings
         tipos = tipo_data if isinstance(tipo_data, list) else ([tipo_data] if tipo_data else [])
-        usar_tarefa   = "tarefa"    in tipos
+        usar_tarefa    = "tarefa"    in tipos
         usar_subtarefa = "subtarefa" in tipos
+        usar_planejada = "planejada" in tipos
 
-        ids_tarefa = ids_subtarefa = None
+        ids_tarefa = ids_subtarefa = ids_planejada = None
 
         if usar_tarefa and 'data_criacao' in df_filtrado.columns:
             mask = pd.Series([True] * len(df_filtrado), index=df_filtrado.index)
@@ -573,9 +614,24 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
             if col_id in df_h.columns:
                 ids_subtarefa = set(df_h[col_id].dropna().astype(str).unique().tolist())
 
+        if usar_planejada and df_historico is not None and not df_historico.empty:
+            df_h = df_historico.copy()
+            df_h['record_type'] = df_h['record_type'].fillna('subtarefa')
+            df_h = df_h[df_h['record_type'] == 'subtarefa']
+            if 'data_planejada' in df_h.columns:
+                df_h['_dp'] = pd.to_datetime(df_h['data_planejada'], errors='coerce')
+                df_h = df_h[df_h['_dp'].notna()]
+                if data_inicio:
+                    df_h = df_h[df_h['_dp'] >= _dt.fromisoformat(data_inicio)]
+                if data_fim:
+                    df_h = df_h[df_h['_dp'] < _dt.fromisoformat(data_fim) + timedelta(days=1)]
+                col_id = 'pendencia_id' if 'pendencia_id' in df_h.columns else 'MaintenanceWF_id'
+                if col_id in df_h.columns:
+                    ids_planejada = set(df_h[col_id].dropna().astype(str).unique().tolist())
+
         # Combinar: OR entre os tipos selecionados (união)
-        if ids_tarefa is not None or ids_subtarefa is not None:
-            ids_validos = (ids_tarefa or set()) | (ids_subtarefa or set())
+        if ids_tarefa is not None or ids_subtarefa is not None or ids_planejada is not None:
+            ids_validos = (ids_tarefa or set()) | (ids_subtarefa or set()) | (ids_planejada or set())
             df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_validos)]
 
     if horas_uteis and df_historico is not None and not df_historico.empty:
@@ -892,6 +948,7 @@ def register_workflow_callbacks(app):
     @app.callback(
         Output("concluir-subtarefa-modal", "is_open"),
         Output("store-subtarefa-concluir-pending", "data"),
+        Output("concluir-subtarefa-data-execucao", "date"),
         Input({"type": "btn-concluir-subtarefa", "index": ALL}, "n_clicks"),
         Input("concluir-subtarefa-cancel-btn", "n_clicks"),
         State("concluir-subtarefa-modal", "is_open"),
@@ -908,7 +965,7 @@ def register_workflow_callbacks(app):
 
         # Fechar modal ao cancelar
         if 'cancel' in trigger_id_str:
-            return False, no_update
+            return False, no_update, no_update
 
         # Abrir modal ao clicar no botão de concluir
         if 'btn-concluir-subtarefa' in trigger_id_str:
@@ -916,7 +973,7 @@ def register_workflow_callbacks(app):
                 raise PreventUpdate
             id_dict = json.loads(trigger_id_str)
             hist_id = id_dict['index']
-            return True, hist_id
+            return True, hist_id, None  # reset data_execucao
 
         raise PreventUpdate
 
@@ -930,21 +987,34 @@ def register_workflow_callbacks(app):
         Output("store-historico", "data", allow_duplicate=True),
         Output("alert-container-workflow", "children", allow_duplicate=True),
         Output("concluir-subtarefa-modal", "is_open", allow_duplicate=True),
+        Output("concluir-subtarefa-alert", "children"),
         Input("concluir-subtarefa-confirm-btn", "n_clicks"),
         State("store-subtarefa-concluir-pending", "data"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
         State("store-filtros-ativos", "data"),
+        State("concluir-subtarefa-data-execucao", "date"),
         prevent_initial_call=True
     )
-    def confirmar_concluir_subtarefa(n_clicks, hist_id, user_level, username_atual, filtros):
+    def confirmar_concluir_subtarefa(n_clicks, hist_id, user_level, username_atual,
+                                     filtros, data_execucao_str):
         """Marca a subatividade como concluída após confirmação."""
         if not n_clicks or not hist_id:
             raise PreventUpdate
 
-        from src.utils.workflow_db import marcar_subtarefa_concluida
+        # Validar data_execucao obrigatória
+        if not data_execucao_str:
+            alerta_modal = dbc.Alert([
+                html.I(className="fas fa-exclamation-circle me-2"),
+                "Informe a data de execução."
+            ], color="danger", className="py-2 mb-0")
+            return no_update, no_update, no_update, no_update, True, alerta_modal
 
-        sucesso = marcar_subtarefa_concluida(hist_id)
+        from src.utils.workflow_db import marcar_subtarefa_concluida
+        from datetime import datetime as _dt
+
+        data_execucao = _dt.fromisoformat(data_execucao_str)
+        sucesso = marcar_subtarefa_concluida(hist_id, data_execucao=data_execucao)
 
         df_pend, df_hist = carregar_dados_csv()
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
@@ -967,7 +1037,8 @@ def register_workflow_callbacks(app):
             store_data,
             df_hist.to_dict('records') if df_hist is not None else [],
             alerta,
-            False  # Fechar modal
+            False,  # Fechar modal
+            None    # Limpar alerta do modal
         )
 
 

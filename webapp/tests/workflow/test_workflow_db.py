@@ -703,3 +703,156 @@ class TestEditarSubtarefaPrioridade:
             editar_subtarefa(str(self._oid), titulo='Novo título')
         updates = mock_hist.update_one.call_args[0][1]['$set']
         assert 'prioridade' not in updates
+
+
+# =============================================================================
+# TESTES: Fase 2 — data_planejada / data_execucao
+# =============================================================================
+
+class TestCarregarHistoricoDatasPlanejada:
+    """Retrocompat para data_planejada e data_execucao em carregar_historico."""
+
+    def _make_mock(self, docs):
+        mock = MagicMock()
+        fr = MagicMock()
+        fr.sort.return_value = iter(docs)
+        mock.find.return_value = fr
+        return mock
+
+    def test_sem_data_planejada_recebe_none(self):
+        from bson import ObjectId
+        doc = {'_id': ObjectId(), 'MaintenanceWF_id': 'WF001', 'descricao': 'X',
+               'data': datetime.now(), 'responsavel': 'u', 'tipo_evento': 'Análise de Falha',
+               'editado_por': 'u', 'horas': None, 'concluido': False}
+        mock = self._make_mock([doc])
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import carregar_historico
+            df = carregar_historico()
+        assert 'data_planejada' in df.columns
+        assert df.iloc[0]['data_planejada'] is None
+
+    def test_sem_data_execucao_recebe_none(self):
+        from bson import ObjectId
+        doc = {'_id': ObjectId(), 'MaintenanceWF_id': 'WF001', 'descricao': 'X',
+               'data': datetime.now(), 'responsavel': 'u', 'tipo_evento': 'Análise de Falha',
+               'editado_por': 'u', 'horas': None, 'concluido': False}
+        mock = self._make_mock([doc])
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import carregar_historico
+            df = carregar_historico()
+        assert 'data_execucao' in df.columns
+        assert df.iloc[0]['data_execucao'] is None
+
+    def test_data_planejada_existente_preservada(self):
+        from bson import ObjectId
+        from datetime import date
+        data_plan = datetime(2026, 3, 20)
+        doc = {'_id': ObjectId(), 'MaintenanceWF_id': 'WF001', 'descricao': 'X',
+               'data': datetime.now(), 'responsavel': 'u', 'tipo_evento': 'Análise de Falha',
+               'editado_por': 'u', 'horas': None, 'concluido': False,
+               'data_planejada': data_plan}
+        mock = self._make_mock([doc])
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import carregar_historico
+            df = carregar_historico()
+        assert df.iloc[0]['data_planejada'] == data_plan
+
+
+class TestCriarSubtarefaDataPlanejada:
+    """Testa que data_planejada é salva corretamente em criar_subtarefa."""
+
+    def _make_mocks(self):
+        mock_pend = MagicMock()
+        mock_pend.find_one.return_value = {'id': 'WF001', 'descricao': 'X', 'responsavel': 'u', 'status': 'Pendente'}
+        mock_pend.update_one.return_value = MagicMock()
+        mock_hist = MagicMock()
+        mock_hist.insert_one.return_value = MagicMock()
+        return mock_pend, mock_hist
+
+    def _side(self, mp, mh):
+        def se(name):
+            return mp if name == 'Maintenance_workflow' else mh
+        return se
+
+    def test_data_planejada_none_por_padrao(self):
+        mp, mh = self._make_mocks()
+        with patch('src.utils.workflow_db.get_mongo_connection', side_effect=self._side(mp, mh)):
+            from src.utils.workflow_db import criar_subtarefa
+            criar_subtarefa('WF001', 'T', 'Análise de Falha', 'u', '', 'admin')
+        doc = mh.insert_one.call_args[0][0]
+        assert doc.get('data_planejada') is None
+
+    def test_data_planejada_salva_quando_fornecida(self):
+        from datetime import date
+        mp, mh = self._make_mocks()
+        data = datetime(2026, 3, 25)
+        with patch('src.utils.workflow_db.get_mongo_connection', side_effect=self._side(mp, mh)):
+            from src.utils.workflow_db import criar_subtarefa
+            criar_subtarefa('WF001', 'T', 'Análise de Falha', 'u', '', 'admin', data_planejada=data)
+        doc = mh.insert_one.call_args[0][0]
+        assert doc.get('data_planejada') == data
+
+
+class TestMarcarSubtarefaConcluida:
+    """Testa que marcar_subtarefa_concluida salva data_execucao."""
+
+    def _make_mock(self):
+        from bson import ObjectId
+        mock = MagicMock()
+        mock.update_one.return_value = MagicMock(modified_count=1)
+        return mock, str(ObjectId())
+
+    def test_salva_data_execucao(self):
+        mock, oid = self._make_mock()
+        data_exec = datetime(2026, 3, 22)
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import marcar_subtarefa_concluida
+            resultado = marcar_subtarefa_concluida(oid, data_execucao=data_exec)
+        assert resultado is True
+        updates = mock.update_one.call_args[0][1]['$set']
+        assert updates.get('data_execucao') == data_exec
+        assert updates.get('concluido') is True
+
+    def test_retorna_true_em_sucesso(self):
+        mock, oid = self._make_mock()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import marcar_subtarefa_concluida
+            resultado = marcar_subtarefa_concluida(oid, data_execucao=datetime(2026, 3, 22))
+        assert resultado is True
+
+
+class TestEditarSubtarefaDatas:
+    """Testa editar_subtarefa com data_planejada e data_execucao."""
+
+    def _make_mock_hist(self):
+        from bson import ObjectId
+        mock = MagicMock()
+        mock.update_one.return_value = MagicMock(matched_count=1)
+        self._oid = ObjectId()
+        return mock
+
+    def test_atualiza_data_planejada(self):
+        mock = self._make_mock_hist()
+        data = datetime(2026, 4, 1)
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import editar_subtarefa
+            editar_subtarefa(str(self._oid), data_planejada=data, update_data_planejada=True)
+        updates = mock.update_one.call_args[0][1]['$set']
+        assert updates.get('data_planejada') == data
+
+    def test_sem_update_data_planejada_nao_altera(self):
+        mock = self._make_mock_hist()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import editar_subtarefa
+            editar_subtarefa(str(self._oid), titulo='X')
+        updates = mock.update_one.call_args[0][1]['$set']
+        assert 'data_planejada' not in updates
+
+    def test_atualiza_data_execucao(self):
+        mock = self._make_mock_hist()
+        data = datetime(2026, 4, 5)
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import editar_subtarefa
+            editar_subtarefa(str(self._oid), data_execucao=data, update_data_execucao=True)
+        updates = mock.update_one.call_args[0][1]['$set']
+        assert updates.get('data_execucao') == data
