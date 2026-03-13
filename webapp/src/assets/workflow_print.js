@@ -6,6 +6,11 @@
  * Isso elimina completamente a interferência do layout do Dash:
  * navbar, sidebar, overflow-y, duplicação de camadas, etc.
  *
+ * Rodapé: usa <tfoot> de uma tabela externa para repetir o "Powered by"
+ * no fundo de cada página impressa, sem sobrepor o conteúdo.
+ * O Chrome/Chromium repete automaticamente <tfoot> em cada página,
+ * reservando o espaço necessário — nenhuma linha é cortada.
+ *
  * A página original não é modificada em momento algum.
  */
 document.addEventListener('click', function (e) {
@@ -66,13 +71,19 @@ document.addEventListener('click', function (e) {
         '* { -webkit-print-color-adjust: exact !important;',
         '    print-color-adjust: exact !important; }',
 
-        /* Reset limpo — largura 100% para o conteúdo preencher a página */
+        /* Reset limpo */
         'html, body { margin: 0; padding: 0; background: white; width: 100%;',
         '  font-size: 11px; }',
 
-        /* Container principal: garante que .row Bootstrap use largura total.
-           padding-bottom reserva espaço para o rodapé fixo na última página,
-           evitando que a última linha da tabela fique coberta. */
+        /* Tabela externa de layout — ocupa 100% da largura.
+           O <tfoot> desta tabela é repetido automaticamente pelo Chrome
+           no fundo de cada página impressa, reservando o espaço necessário. */
+        '#outer-layout {',
+        '  width: 100%; border-spacing: 0; border-collapse: collapse; }',
+        '#outer-layout > tbody > tr > td { padding: 0; vertical-align: top; }',
+        '#outer-layout > tfoot > tr > td { padding: 0; }',
+
+        /* Container do conteúdo */
         '#print-root { width: 100%; padding: 0 8px; box-sizing: border-box; }',
 
         /* Cabeçalho */
@@ -85,14 +96,11 @@ document.addEventListener('click', function (e) {
         '#amg-print-header .hdr-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }',
         '#amg-print-header .hdr-meta  { font-size: 13px; color: #555; }',
 
-        /* Rodapé fixo — posicionado dentro da margem inferior da página (@page margin-bottom: 1.5cm ≈ 57px).
-           bottom: -36px empurra o rodapé para além da área imprimível, eliminando sobreposição
-           com o conteúdo em todas as páginas (não só na última). */
+        /* Rodapé no <tfoot> — repete no fundo de cada página */
         '#amg-print-footer {',
-        '  position: fixed; bottom: -36px; left: 0; right: 0;',
         '  display: flex; align-items: center; justify-content: flex-end; gap: 6px;',
         '  padding: 4px 10px;',
-        '  background: white; border-top: 1px solid #dee2e6;',
+        '  border-top: 1px solid #dee2e6;',
         '}',
         '#amg-print-footer .ftr-text {',
         '  font-size: 0.72rem; color: #6c757d; opacity: 0.7; line-height: 1;',
@@ -146,7 +154,23 @@ document.addEventListener('click', function (e) {
         '</head>',
         '<body>',
 
-        /* Wrapper principal: garante alinhamento correto das .row do Bootstrap */
+        /* Tabela de layout externa: tfoot repete no fundo de cada página */
+        '<table id="outer-layout">',
+
+        /* tfoot declarado ANTES do tbody — Chrome usa isso para reservar espaço */
+        '<tfoot>',
+        '<tr><td>',
+        '<div id="amg-print-footer">',
+        '  <span class="ftr-text">Powered by</span>',
+        '  <img src="' + logoTek + '" class="ftr-logo" alt="Tekmont">',
+        '</div>',
+        '</td></tr>',
+        '</tfoot>',
+
+        '<tbody>',
+        '<tr><td>',
+
+        /* Conteúdo principal */
         '<div id="print-root">',
 
         /* Cabeçalho */
@@ -159,19 +183,17 @@ document.addEventListener('click', function (e) {
         '  </div>',
         '</div>',
 
-        /* Rodapé fixo — estilo "Powered by" dos mega menus */
-        '<div id="amg-print-footer">',
-        '  <span class="ftr-text">Powered by</span>',
-        '  <img src="' + logoTek + '" class="ftr-logo" alt="Tekmont">',
-        '</div>',
-
         /* KPI cards */
         '<div id="kpi-wrap">' + kpiEl.outerHTML + '</div>',
 
         /* Tabela de demandas (clone com collapses abertos forçados) */
         tableClone.outerHTML,
 
-        '</div>',
+        '</div>',   /* #print-root */
+
+        '</td></tr>',
+        '</tbody>',
+        '</table>',   /* #outer-layout */
 
         /* Aguarda estilos carregarem, então abre diálogo de impressão */
         '<script>',
