@@ -70,9 +70,10 @@ document.addEventListener('click', function (e) {
         'html, body { margin: 0; padding: 0; background: white; width: 100%;',
         '  font-size: 11px; }',
 
-        /* Container principal: garante que .row Bootstrap use largura total
-           sem margens negativas vazando para fora da área impressa */
-        '#print-root { width: 100%; padding: 0 8px 0; box-sizing: border-box; }',
+        /* Container principal: garante que .row Bootstrap use largura total.
+           padding-bottom reserva espaço para o rodapé fixo na última página,
+           evitando que a última linha da tabela fique coberta. */
+        '#print-root { width: 100%; padding: 0 8px 52px; box-sizing: border-box; }',
 
         /* Cabeçalho */
         '#amg-print-header {',
@@ -84,18 +85,17 @@ document.addEventListener('click', function (e) {
         '#amg-print-header .hdr-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }',
         '#amg-print-header .hdr-meta  { font-size: 13px; color: #555; }',
 
-        /* Rodapé no fluxo normal — aparece ao final do documento.
-           break-inside:avoid garante que não seja cortado entre páginas. */
+        /* Rodapé fixo — aparece no canto inferior direito de cada página impressa. */
         '#amg-print-footer {',
-        '  display: flex; align-items: flex-end; justify-content: flex-end; gap: 8px;',
-        '  padding: 6px 8px; margin-top: 12px;',
-        '  border-top: 1px solid #dee2e6;',
-        '  break-inside: avoid; page-break-inside: avoid;',
+        '  position: fixed; bottom: 0; left: 0; right: 0;',
+        '  display: flex; align-items: center; justify-content: flex-end; gap: 6px;',
+        '  padding: 4px 10px;',
+        '  background: white; border-top: 1px solid #dee2e6;',
         '}',
         '#amg-print-footer .ftr-text {',
         '  font-size: 0.72rem; color: #6c757d; opacity: 0.7; line-height: 1;',
         '}',
-        '#amg-print-footer .ftr-logo { height: 26px; width: auto; opacity: 0.65; }',
+        '#amg-print-footer .ftr-logo { height: 22px; width: auto; opacity: 0.65; }',
 
         /* KPI cards: forçar 3 colunas (Bootstrap reseta para block em @media print) */
         '#kpi-wrap .row { display: flex !important; flex-wrap: nowrap !important; }',
