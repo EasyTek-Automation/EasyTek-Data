@@ -73,7 +73,7 @@ document.addEventListener('click', function (e) {
         /* Container principal: garante que .row Bootstrap use largura total.
            padding-bottom reserva espaço para o rodapé fixo na última página,
            evitando que a última linha da tabela fique coberta. */
-        '#print-root { width: 100%; padding: 0 8px 80px; box-sizing: border-box; }',
+        '#print-root { width: 100%; padding: 0 8px; box-sizing: border-box; }',
 
         /* Cabeçalho */
         '#amg-print-header {',
@@ -85,9 +85,11 @@ document.addEventListener('click', function (e) {
         '#amg-print-header .hdr-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }',
         '#amg-print-header .hdr-meta  { font-size: 13px; color: #555; }',
 
-        /* Rodapé fixo — aparece no canto inferior direito de cada página impressa. */
+        /* Rodapé fixo — posicionado dentro da margem inferior da página (@page margin-bottom: 1.5cm ≈ 57px).
+           bottom: -36px empurra o rodapé para além da área imprimível, eliminando sobreposição
+           com o conteúdo em todas as páginas (não só na última). */
         '#amg-print-footer {',
-        '  position: fixed; bottom: 0; left: 0; right: 0;',
+        '  position: fixed; bottom: -36px; left: 0; right: 0;',
         '  display: flex; align-items: center; justify-content: flex-end; gap: 6px;',
         '  padding: 4px 10px;',
         '  background: white; border-top: 1px solid #dee2e6;',
