@@ -867,6 +867,19 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
     return df_filtrado
 
 
+def _kpi_filtrado(df_filtrado, df_historico, username):
+    """Calcula KPI cards restringindo o histórico às pendências do df_filtrado."""
+    if df_filtrado is None or df_filtrado.empty:
+        return criar_cards_kpi(df_filtrado, None, username)
+    ids = set(df_filtrado['id'].dropna().tolist()) if 'id' in df_filtrado.columns else set()
+    col = ('pendencia_id' if df_historico is not None and 'pendencia_id' in df_historico.columns
+           else 'MaintenanceWF_id')
+    df_hist_kpi = (df_historico[df_historico[col].isin(ids)]
+                   if df_historico is not None and not df_historico.empty and ids
+                   else df_historico)
+    return criar_cards_kpi(df_filtrado, df_hist_kpi, username)
+
+
 def reconstruir_tabela_com_filtros(df_pendencias, df_historico, filtros, user_level, username):
     """
     Reconstrói a tabela aplicando os filtros ativos do store.
@@ -1011,6 +1024,7 @@ def register_workflow_callbacks(app):
         Output("store-pendencias", "data"),
         Output("store-filtros-ativos", "data"),
         Output("store-historico", "data", allow_duplicate=True),
+        Output("container-cards-kpi", "children", allow_duplicate=True),
         Input("btn-aplicar-filtros", "n_clicks"),
         State("filtro-responsavel", "value"),
         State("filtro-status", "value"),
@@ -1036,7 +1050,7 @@ def register_workflow_callbacks(app):
         df_pendencias, df_historico = carregar_dados_csv()
 
         if df_pendencias is None or df_pendencias.empty:
-            return html.Div("Erro ao carregar dados.", className="text-danger"), [], None, no_update
+            return html.Div("Erro ao carregar dados.", className="text-danger"), [], None, no_update, no_update
 
         filtros = {
             "responsavel": responsavel,
@@ -1054,7 +1068,9 @@ def register_workflow_callbacks(app):
             df_pendencias, df_historico, filtros, user_level, username_atual
         )
         hist_store = df_historico.to_dict('records') if df_historico is not None else []
-        return nova_tabela, store_data, filtros, hist_store
+        df_filtrado = pd.DataFrame(store_data) if store_data else pd.DataFrame()
+        novos_kpis = _kpi_filtrado(df_filtrado, df_historico, username_atual)
+        return nova_tabela, store_data, filtros, hist_store, novos_kpis
 
 
     # ==================================================================================
@@ -1065,6 +1081,7 @@ def register_workflow_callbacks(app):
         Output("store-pendencias", "data", allow_duplicate=True),
         Output("store-historico", "data"),
         Output("store-filtros-ativos", "data", allow_duplicate=True),
+        Output("container-cards-kpi", "children", allow_duplicate=True),
         Input("btn-refresh", "n_clicks"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
@@ -1091,7 +1108,7 @@ def register_workflow_callbacks(app):
         df_pendencias, df_historico = carregar_dados_csv()
 
         if df_pendencias is None or df_historico is None:
-            return html.Div("Erro ao carregar dados.", className="text-danger"), [], [], no_update
+            return html.Div("Erro ao carregar dados.", className="text-danger"), [], [], no_update, no_update
 
         filtros = {
             "responsavel": responsavel,
@@ -1109,7 +1126,9 @@ def register_workflow_callbacks(app):
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
             df_pendencias, df_historico, filtros, user_level, username_atual
         )
-        return nova_tabela, store_data, df_historico.to_dict('records'), filtros
+        df_filtrado = pd.DataFrame(store_data) if store_data else pd.DataFrame()
+        novos_kpis = _kpi_filtrado(df_filtrado, df_historico, username_atual)
+        return nova_tabela, store_data, df_historico.to_dict('records'), filtros, novos_kpis
 
 
     # ==================================================================================
@@ -1406,7 +1425,8 @@ def register_workflow_callbacks(app):
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
             df_pend, df_hist, filtros, user_level, username_atual
         )
-        novos_kpis = criar_cards_kpi(df_pend, df_hist, username_atual)
+        df_filtrado = pd.DataFrame(store_data) if store_data else pd.DataFrame()
+        novos_kpis = _kpi_filtrado(df_filtrado, df_hist, username_atual)
 
         if sucesso:
             alerta = dbc.Alert([
@@ -1504,7 +1524,8 @@ def register_workflow_callbacks(app):
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
             df_pend, df_hist, filtros, user_level, username_atual
         )
-        novos_kpis = criar_cards_kpi(df_pend, df_hist, username_atual)
+        df_filtrado = pd.DataFrame(store_data) if store_data else pd.DataFrame()
+        novos_kpis = _kpi_filtrado(df_filtrado, df_hist, username_atual)
 
         if sucesso:
             alerta = dbc.Alert([
