@@ -1497,13 +1497,13 @@ def layout():
                     ], id="btn-refresh", color="secondary", outline=True),
 
                     dbc.Button([
-                        html.I(className="fas fa-download me-2"),
-                        "Exportar"
-                    ], id="btn-export", color="secondary", outline=True, disabled=True),
+                        html.I(className="fas fa-file-pdf me-2"),
+                        "Exportar PDF"
+                    ], id="btn-export", color="secondary", outline=True),
 
                 ], className="w-100")
             ], width=12, md=6, className="text-end")
-        ], className="mb-4 align-items-center"),
+        ], id="workflow-header-row", className="mb-4 align-items-center"),
 
         # Container de Alertas
         html.Div(id="alert-container-workflow", className="mb-3"),

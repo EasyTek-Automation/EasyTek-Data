@@ -158,3 +158,115 @@
 .workflow-subtask-panel details summary::-webkit-details-marker {
     display: none;
 }
+
+
+/* ================================================================
+   IMPRESSÃO / EXPORT PDF
+   @media print: garante que os elementos não sejam cortados
+   no meio ao mudar de página. Acionado via window.print().
+   ================================================================ */
+@media print {
+
+    /* --- Configuração da página A4 paisagem --- */
+    @page {
+        size: A4 landscape;
+        margin: 1.5cm 1cm;
+    }
+
+    /* --- Ocultar chrome da aplicação --- */
+    .navbar,
+    #sidebar-column,
+    #workflow-header-row,
+    #alert-container-workflow,
+    .workflow-filters {
+        display: none !important;
+    }
+
+    /* --- Layout: expandir área de conteúdo para tela cheia --- */
+    #content-column {
+        width: 100% !important;
+        max-width: 100% !important;
+        flex: 0 0 100% !important;
+        padding: 0 !important;
+    }
+
+    .workflow-page {
+        padding: 0 !important;
+        font-size: 11px !important;
+    }
+
+    /* --- Tabela responsiva: evitar overflow oculto --- */
+    .table-responsive {
+        overflow: visible !important;
+    }
+
+    /* --- Tabela: fontes e padding compactos --- */
+    .workflow-table th,
+    .workflow-table td {
+        padding: 4px 8px !important;
+        font-size: 11px !important;
+    }
+
+    .workflow-table th {
+        font-size: 10px !important;
+    }
+
+    /* --- Ocultar colunas de interação (chevron e ações) --- */
+    .workflow-table th:first-child,
+    .workflow-table td:first-child,
+    .workflow-table th:last-child,
+    .workflow-table td:last-child {
+        display: none !important;
+    }
+
+    /* --- Botões dentro da tabela viram texto puro --- */
+    .workflow-table .btn {
+        color: inherit !important;
+        background: none !important;
+        border: none !important;
+        padding: 0 !important;
+        font-size: inherit !important;
+        font-weight: 600;
+        text-decoration: none !important;
+        pointer-events: none;
+        box-shadow: none !important;
+    }
+
+    /* --- Quebra de página: manter par (linha principal + detalhe) junto ---
+         break-after: avoid na linha principal (ímpar) impede que a linha de
+         detalhe fique isolada no topo da próxima página.
+         break-inside: avoid impede que uma única linha seja cortada no meio. */
+    .workflow-table tbody tr:nth-child(2n+1) {
+        break-after: avoid !important;
+        page-break-after: avoid !important;
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    /* --- Painel de detalhe expandido: não cortar no meio --- */
+    .workflow-table .collapse.show {
+        overflow: visible !important;
+    }
+
+    .workflow-subtask-panel {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+
+    /* --- KPI cards: forçar layout em linha no print --- */
+    #container-cards-kpi .row {
+        display: flex !important;
+        flex-wrap: nowrap !important;
+    }
+
+    #container-cards-kpi [class*="col-"] {
+        width: 33.33% !important;
+        max-width: 33.33% !important;
+        flex: 0 0 33.33% !important;
+    }
+
+    #container-cards-kpi .card {
+        break-inside: avoid !important;
+        page-break-inside: avoid !important;
+    }
+}
