@@ -1160,6 +1160,22 @@ def register_workflow_callbacks(app):
 
 
     # ==================================================================================
+    # CALLBACK 4b: Toggle colapso do painel de filtros
+    # ==================================================================================
+    @app.callback(
+        Output("filtros-collapse", "is_open"),
+        Output("filtros-chevron", "className"),
+        Input("btn-toggle-filtros", "n_clicks"),
+        State("filtros-collapse", "is_open"),
+        prevent_initial_call=True
+    )
+    def toggle_filtros_collapse(n_clicks, is_open):
+        novo_estado = not is_open
+        chevron = "fas fa-chevron-up" if novo_estado else "fas fa-chevron-down"
+        return novo_estado, chevron
+
+
+    # ==================================================================================
     # CALLBACK 5: Atualizar cards KPI
     # ==================================================================================
     @app.callback(

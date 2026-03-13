@@ -807,44 +807,69 @@ def criar_painel_filtros(username_inicial="todos"):
     ], style={"flex": "1", "minWidth": "180px"})
 
     # ------------------------------------------------------------------
-    # Card principal
+    # Card principal com header fixo (botões sempre visíveis) + corpo colapsável
     # ------------------------------------------------------------------
     return dbc.Card([
-        dbc.CardBody([
-            # Linha 1 — Notificações centralizadas (conteúdo reativo via CB5)
-            dbc.Row([
-                dbc.Col(
-                    html.Div(id="container-notificacoes"),
-                    width=12,
-                    className="text-center"
-                )
-            ]),
-            html.Hr(className="my-2"),
-            # Linha 2 — Sub-cards de filtro por categoria
+        # Header — sempre visível
+        dbc.CardHeader(
             html.Div([
-                card_busca,
-                card_flags,
-                card_periodo,
-                card_dropdowns,
-            ], className="d-flex flex-wrap gap-2 mb-3"),
-            # Botões
-            html.Div(
+                # Esquerda: toggle + título
+                html.Div([
+                    dbc.Button(
+                        html.I(className="fas fa-chevron-up", id="filtros-chevron"),
+                        id="btn-toggle-filtros",
+                        color="link",
+                        size="sm",
+                        className="p-0 me-2 text-decoration-none text-muted",
+                    ),
+                    html.Span([
+                        html.I(className="fas fa-filter me-2 text-muted",
+                               style={"fontSize": "0.85rem"}),
+                        "Filtros",
+                    ], className="fw-semibold", style={"fontSize": "0.95rem"}),
+                ], className="d-flex align-items-center"),
+                # Direita: botões de ação
                 dbc.ButtonGroup([
                     dbc.Button(
                         [html.I(className="fas fa-filter me-1"), "Aplicar Filtros"],
                         id="btn-aplicar-filtros",
                         color="primary",
+                        size="sm",
                     ),
                     dbc.Button(
                         [html.I(className="fas fa-times me-1"), "Limpar"],
                         id="btn-limpar-filtros",
                         color="secondary",
                         outline=True,
+                        size="sm",
                     ),
                 ]),
-                className="text-end"
-            ),
-        ], className="p-3"),
+            ], className="d-flex justify-content-between align-items-center"),
+            className="py-2 px-3"
+        ),
+        # Corpo colapsável
+        dbc.Collapse(
+            dbc.CardBody([
+                # Linha 1 — Notificações centralizadas (conteúdo reativo via CB5)
+                dbc.Row([
+                    dbc.Col(
+                        html.Div(id="container-notificacoes"),
+                        width=12,
+                        className="text-center"
+                    )
+                ]),
+                html.Hr(className="my-2"),
+                # Linha 2 — Sub-cards de filtro por categoria
+                html.Div([
+                    card_busca,
+                    card_flags,
+                    card_periodo,
+                    card_dropdowns,
+                ], className="d-flex flex-wrap gap-2"),
+            ], className="p-3"),
+            id="filtros-collapse",
+            is_open=True,
+        ),
     ], className="shadow-sm mb-3 workflow-filters")
 
 
@@ -1471,14 +1496,14 @@ def layout():
         # Container de Alertas
         html.Div(id="alert-container-workflow", className="mb-3"),
 
+        # Painel de Filtros (colapsável, acima dos KPIs)
+        criar_painel_filtros(username_inicial=username_atual or "todos"),
+
         # Cards KPI
         html.Div(
             criar_cards_kpi(df_pendencias, df_historico, username_atual),
             id="container-cards-kpi"
         ),
-
-        # Painel de Filtros
-        criar_painel_filtros(username_inicial=username_atual or "todos"),
 
         # Tabela de Pendências — pré-filtrada pelo usuário logado
         dbc.Card([
