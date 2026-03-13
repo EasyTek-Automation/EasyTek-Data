@@ -843,7 +843,7 @@ def criar_painel_filtros(username_inicial="todos"):
                         size="sm",
                     ),
                 ], className="ms-auto"),
-            ], className="d-flex justify-content-between align-items-center"),
+            ], className="d-flex justify-content-between align-items-center w-100"),
             className="py-2 px-3"
         ),
         # Corpo colapsável — default fechado; estado restaurado pelo callback via store local
