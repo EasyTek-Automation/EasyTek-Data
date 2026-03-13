@@ -72,7 +72,7 @@ document.addEventListener('click', function (e) {
 
         /* Container principal: garante que .row Bootstrap use largura total
            sem margens negativas vazando para fora da área impressa */
-        '#print-root { width: 100%; padding: 0 8px; box-sizing: border-box; }',
+        '#print-root { width: 100%; padding: 0 8px 0; box-sizing: border-box; }',
 
         /* Cabeçalho */
         '#amg-print-header {',
@@ -84,21 +84,18 @@ document.addEventListener('click', function (e) {
         '#amg-print-header .hdr-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }',
         '#amg-print-header .hdr-meta  { font-size: 13px; color: #555; }',
 
-        /* Rodapé fixo — aparece em todas as páginas impressas */
+        /* Rodapé no fluxo normal — aparece ao final do documento.
+           break-inside:avoid garante que não seja cortado entre páginas. */
         '#amg-print-footer {',
-        '  position: fixed; bottom: 0; left: 0; right: 0;',
         '  display: flex; align-items: flex-end; justify-content: flex-end; gap: 8px;',
-        '  padding: 6px 8px;',
+        '  padding: 6px 8px; margin-top: 12px;',
         '  border-top: 1px solid #dee2e6;',
-        '  background: white;',
+        '  break-inside: avoid; page-break-inside: avoid;',
         '}',
         '#amg-print-footer .ftr-text {',
         '  font-size: 0.72rem; color: #6c757d; opacity: 0.7; line-height: 1;',
         '}',
         '#amg-print-footer .ftr-logo { height: 26px; width: auto; opacity: 0.65; }',
-
-        /* Espaço na base do conteúdo para não sobrepor o rodapé */
-        '#print-root { padding-bottom: 44px; }',
 
         /* KPI cards: forçar 3 colunas (Bootstrap reseta para block em @media print) */
         '#kpi-wrap .row { display: flex !important; flex-wrap: nowrap !important; }',
