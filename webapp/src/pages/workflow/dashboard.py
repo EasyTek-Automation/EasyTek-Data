@@ -842,7 +842,7 @@ def criar_painel_filtros(username_inicial="todos"):
                         outline=True,
                         size="sm",
                     ),
-                ]),
+                ], className="ms-auto"),
             ], className="d-flex justify-content-between align-items-center"),
             className="py-2 px-3"
         ),
