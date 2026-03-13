@@ -73,7 +73,7 @@ document.addEventListener('click', function (e) {
         /* Container principal: garante que .row Bootstrap use largura total.
            padding-bottom reserva espaço para o rodapé fixo na última página,
            evitando que a última linha da tabela fique coberta. */
-        '#print-root { width: 100%; padding: 0 8px 52px; box-sizing: border-box; }',
+        '#print-root { width: 100%; padding: 0 8px 80px; box-sizing: border-box; }',
 
         /* Cabeçalho */
         '#amg-print-header {',
