@@ -18,6 +18,28 @@ TIPOS_REQUEREM_APROVACAO = [
 ]
 
 
+def _criar_evento_timeline(collection_hist, pend_id, descricao, tipo_evento,
+                            editado_por, observacoes='', alteracoes=''):
+    """Registra evento de auditoria na linha do tempo da demanda (record_type='criacao')."""
+    collection_hist.insert_one({
+        'MaintenanceWF_id': pend_id,
+        'descricao': descricao,
+        'data': datetime.now(),
+        'responsavel': editado_por or '',
+        'tipo_evento': tipo_evento,
+        'editado_por': editado_por or '',
+        'observacoes': observacoes or '',
+        'alteracoes': alteracoes or '',
+        'horas': None,
+        'concluido': False,
+        'aprovador': None,
+        'status_aprovacao': None,
+        'data_aprovacao': None,
+        'record_type': 'criacao',
+        'subtarefa_id': None,
+    })
+
+
 def carregar_pendencias():
     """
     Carrega pendências do MongoDB.
@@ -478,19 +500,23 @@ def get_usuarios_nivel3_por_perfil(perfil):
         return []
 
 
-def marcar_subtarefa_concluida(hist_id_str, data_execucao=None):
+def marcar_subtarefa_concluida(hist_id_str, data_execucao=None, editado_por=None):
     """
     Marca uma subatividade do histórico como concluída (operação irreversível).
 
     Args:
         hist_id_str: String com o ObjectId da entrada de histórico
         data_execucao: Data de execução (datetime ou date) — obrigatória para novos registros
+        editado_por: Username de quem está concluindo (para auditoria)
 
     Returns:
         bool: True se a atualização foi bem-sucedida
     """
     try:
         collection = get_mongo_connection(COLLECTION_HISTORICO)
+
+        doc = collection.find_one({'_id': ObjectId(hist_id_str)})
+
         set_fields = {'concluido': True, 'status_validacao_gestor': 'pendente'}
         if data_execucao is not None:
             set_fields['data_execucao'] = data_execucao
@@ -498,7 +524,18 @@ def marcar_subtarefa_concluida(hist_id_str, data_execucao=None):
             {'_id': ObjectId(hist_id_str), 'concluido': {'$ne': True}},
             {'$set': set_fields}
         )
-        return result.modified_count > 0
+        if result.modified_count > 0:
+            if doc:
+                pend_id = doc.get('MaintenanceWF_id', '')
+                _titulo_doc = doc.get('titulo') or doc.get('descricao') or hist_id_str
+                _criar_evento_timeline(
+                    collection, pend_id,
+                    descricao=f"Atividade concluída: {_titulo_doc}",
+                    tipo_evento='conclusao_atividade',
+                    editado_por=editado_por or '',
+                )
+            return True
+        return False
     except Exception as e:
         print(f"Erro ao marcar subtarefa como concluída: {e}")
         return False
@@ -517,6 +554,7 @@ def validar_atividade(hist_id_str, validado_por):
     """
     try:
         collection = get_mongo_connection(COLLECTION_HISTORICO)
+        doc = collection.find_one({'_id': ObjectId(hist_id_str)})
         agora = datetime.now()
         result = collection.update_one(
             {'_id': ObjectId(hist_id_str)},
@@ -536,7 +574,18 @@ def validar_atividade(hist_id_str, validado_por):
                 },
             }
         )
-        return result.modified_count > 0
+        if result.modified_count > 0:
+            if doc:
+                pend_id = doc.get('MaintenanceWF_id', '')
+                _titulo_doc = doc.get('titulo') or doc.get('descricao') or hist_id_str
+                _criar_evento_timeline(
+                    collection, pend_id,
+                    descricao=f"Atividade validada pelo gestor: {_titulo_doc}",
+                    tipo_evento='validacao_atividade',
+                    editado_por=validado_por,
+                )
+            return True
+        return False
     except Exception as e:
         print(f"Erro ao validar atividade: {e}")
         return False
@@ -559,6 +608,7 @@ def devolver_atividade(hist_id_str, nota_devolucao, devolvido_por):
     """
     try:
         collection = get_mongo_connection(COLLECTION_HISTORICO)
+        doc = collection.find_one({'_id': ObjectId(hist_id_str)})
         agora = datetime.now()
         result = collection.update_one(
             {'_id': ObjectId(hist_id_str)},
@@ -580,7 +630,19 @@ def devolver_atividade(hist_id_str, nota_devolucao, devolvido_por):
                 },
             }
         )
-        return result.modified_count > 0
+        if result.modified_count > 0:
+            if doc:
+                pend_id = doc.get('MaintenanceWF_id', '')
+                _titulo_doc = doc.get('titulo') or doc.get('descricao') or hist_id_str
+                _criar_evento_timeline(
+                    collection, pend_id,
+                    descricao=f"Atividade devolvida: {_titulo_doc}",
+                    tipo_evento='devolucao_atividade',
+                    editado_por=devolvido_por,
+                    observacoes=nota_devolucao or '',
+                )
+            return True
+        return False
     except Exception as e:
         print(f"Erro ao devolver atividade: {e}")
         return False
@@ -801,6 +863,14 @@ def criar_subtarefa(pend_id, titulo, tipo_evento, responsavel, observacoes,
             {'$set': {'ultima_atualizacao': agora}}
         )
 
+        _criar_evento_timeline(
+            collection_hist, pend_id,
+            descricao=f"Atividade criada: {titulo}",
+            tipo_evento='criacao_atividade',
+            editado_por=editado_por or '',
+            observacoes=(observacoes or '')[:300],
+        )
+
         return True, "Subtarefa criada com sucesso"
 
     except Exception as e:
@@ -826,6 +896,15 @@ def adicionar_log(subtarefa_hist_id, pend_id, observacoes, editado_por, horas=No
         collection_pend = get_mongo_connection(COLLECTION_PENDENCIAS)
         agora = datetime.now()
 
+        # Verificar se subtarefa-pai está validada (bloqueio de compliance)
+        sub_doc = collection_hist.find_one({'_id': ObjectId(subtarefa_hist_id)})
+        if sub_doc and sub_doc.get('status_validacao_gestor') == 'aprovado':
+            return False, "Atividade já validada pelo gestor. Não é possível adicionar relatórios."
+        _titulo_sub = (
+            (sub_doc.get('titulo') or sub_doc.get('descricao') or subtarefa_hist_id)
+            if sub_doc else subtarefa_hist_id
+        )
+
         doc = {
             'MaintenanceWF_id': pend_id,
             'descricao': 'Relatório',
@@ -850,6 +929,14 @@ def adicionar_log(subtarefa_hist_id, pend_id, observacoes, editado_por, horas=No
             {'$set': {'ultima_atualizacao': agora}}
         )
 
+        _criar_evento_timeline(
+            collection_hist, pend_id,
+            descricao=f"Relatório adicionado em: {_titulo_sub}",
+            tipo_evento='adicao_log',
+            editado_por=editado_por or '',
+            observacoes=(observacoes or '')[:300],
+        )
+
         return True, "Relatório adicionado com sucesso"
 
     except Exception as e:
@@ -862,7 +949,8 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
                      is_retroativo=None, responsavel_retroativo=None, aprovador_retroativo=None,
                      update_retroativo=False, prioridade=None,
                      data_planejada=None, update_data_planejada=False,
-                     data_execucao=None, update_data_execucao=False):
+                     data_execucao=None, update_data_execucao=False,
+                     editado_por=None):
     """
     Edita campos de uma subtarefa existente.
 
@@ -886,14 +974,33 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
     try:
         collection = get_mongo_connection(COLLECTION_HISTORICO)
 
+        # Buscar documento para validar e extrair contexto para o timeline
+        doc = collection.find_one({'_id': ObjectId(hist_id)})
+        if not doc:
+            return False, "Subtarefa não encontrada"
+        if doc.get('status_validacao_gestor') == 'aprovado':
+            return False, "Atividade já validada pelo gestor e não pode ser editada. Use 'Devolver' para reabrir."
+
         updates = {}
+        alteracoes_log = []
+
         if titulo is not None:
             updates['titulo'] = titulo
             updates['descricao'] = titulo  # mantém retrocompat
+            old_titulo = doc.get('titulo') or doc.get('descricao') or ''
+            if titulo != old_titulo:
+                alteracoes_log.append(f"Título alterado")
+
         if tipo_evento is not None:
             updates['tipo_evento'] = tipo_evento
+            if tipo_evento != doc.get('tipo_evento'):
+                alteracoes_log.append(f"Tipo: {doc.get('tipo_evento','?')} → {tipo_evento}")
+
         if observacoes is not None:
             updates['observacoes'] = observacoes
+            if observacoes != (doc.get('observacoes') or ''):
+                alteracoes_log.append("Observações alteradas")
+
         if concluido is not None:
             updates['concluido'] = concluido
 
@@ -913,6 +1020,8 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
 
         if prioridade is not None:
             updates['prioridade'] = prioridade
+            if prioridade != doc.get('prioridade', 'normal'):
+                alteracoes_log.append(f"Prioridade: {doc.get('prioridade','normal')} → {prioridade}")
 
         if update_data_planejada:
             updates['data_planejada'] = data_planejada
@@ -931,13 +1040,23 @@ def editar_subtarefa(hist_id, titulo=None, tipo_evento=None, observacoes=None, c
         if result.matched_count == 0:
             return False, "Subtarefa não encontrada"
 
+        pend_id = doc.get('MaintenanceWF_id', '')
+        _titulo_doc = doc.get('titulo') or doc.get('descricao') or hist_id
+        _criar_evento_timeline(
+            collection, pend_id,
+            descricao=f"Atividade editada: {_titulo_doc}",
+            tipo_evento='edicao_atividade',
+            editado_por=editado_por or '',
+            alteracoes=' | '.join(alteracoes_log) if alteracoes_log else '',
+        )
+
         return True, "Subtarefa atualizada com sucesso"
 
     except Exception as e:
         return False, str(e)
 
 
-def editar_log(hist_id, horas, observacoes):
+def editar_log(hist_id, horas, observacoes, editado_por=None):
     """
     Atualiza horas e texto de um log (relatório) existente.
 
@@ -945,35 +1064,74 @@ def editar_log(hist_id, horas, observacoes):
         hist_id: ObjectId string do log
         horas: Valor float das horas (ou None para remover)
         observacoes: Texto do relatório (obrigatório)
+        editado_por: Username de quem está editando (para auditoria)
 
     Returns:
         tuple: (sucesso: bool, mensagem: str)
     """
     try:
         collection = get_mongo_connection(COLLECTION_HISTORICO)
+
+        # Buscar log para extrair contexto e verificar subtarefa-pai
+        log_doc = collection.find_one({'_id': ObjectId(hist_id)})
+        if not log_doc:
+            return False, "Relatório não encontrado"
+
+        pend_id = log_doc.get('MaintenanceWF_id', '')
+        _titulo_sub = hist_id
+        subtarefa_id = log_doc.get('subtarefa_id')
+        if subtarefa_id:
+            try:
+                sub_doc = collection.find_one({'_id': ObjectId(subtarefa_id)})
+                if sub_doc:
+                    if sub_doc.get('status_validacao_gestor') == 'aprovado':
+                        return False, "Atividade já validada pelo gestor. Não é possível editar relatórios."
+                    _titulo_sub = sub_doc.get('titulo') or sub_doc.get('descricao') or subtarefa_id
+            except Exception:
+                pass
+
         result = collection.update_one(
             {'_id': ObjectId(hist_id)},
             {'$set': {'horas': horas, 'observacoes': observacoes}}
         )
         if result.matched_count == 0:
             return False, "Relatório não encontrado"
+
+        _criar_evento_timeline(
+            collection, pend_id,
+            descricao=f"Relatório editado em: {_titulo_sub}",
+            tipo_evento='edicao_log',
+            editado_por=editado_por or '',
+        )
+
         return True, "Relatório atualizado com sucesso"
     except Exception as e:
         return False, str(e)
 
 
-def deletar_subtarefa(hist_id):
+def deletar_subtarefa(hist_id, editado_por=None):
     """
     Deleta uma subtarefa e todos os seus logs.
 
     Args:
         hist_id: ObjectId string da subtarefa
+        editado_por: Username de quem está deletando (para auditoria)
 
     Returns:
         tuple: (sucesso: bool, mensagem: str)
     """
     try:
         collection = get_mongo_connection(COLLECTION_HISTORICO)
+
+        # Buscar doc para validar e extrair contexto
+        doc = collection.find_one({'_id': ObjectId(hist_id)})
+        if not doc:
+            return False, "Subtarefa não encontrada"
+        if doc.get('status_validacao_gestor') == 'aprovado':
+            return False, "Atividade já validada pelo gestor e não pode ser removida. Use 'Devolver' para reabrir."
+
+        pend_id = doc.get('MaintenanceWF_id', '')
+        _titulo_doc = doc.get('titulo') or doc.get('descricao') or hist_id
 
         result = collection.delete_one({'_id': ObjectId(hist_id)})
         if result.deleted_count == 0:
@@ -981,6 +1139,13 @@ def deletar_subtarefa(hist_id):
 
         # Deletar logs vinculados
         collection.delete_many({'subtarefa_id': hist_id})
+
+        _criar_evento_timeline(
+            collection, pend_id,
+            descricao=f"Atividade removida: {_titulo_doc}",
+            tipo_evento='remocao_atividade',
+            editado_por=editado_por or '',
+        )
 
         return True, "Subtarefa e seus logs foram removidos"
 

@@ -130,12 +130,24 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
             by = ev.get('editado_por') or ev.get('responsavel', '')
             data_ev = ev.get('data', '')
             desc_lower = desc.lower()
-            if 'rejeit' in desc_lower:
+            if 'rejeit' in desc_lower or 'remov' in desc_lower:
                 icone_ev = "fas fa-times-circle text-danger"
+            elif 'validada pelo gestor' in desc_lower:
+                icone_ev = "fas fa-user-check text-success"
+            elif 'concluí' in desc_lower or 'concluida' in desc_lower:
+                icone_ev = "fas fa-check-circle text-success"
             elif 'aceito' in desc_lower or 'aceita' in desc_lower:
                 icone_ev = "fas fa-check-circle text-success"
+            elif 'devolvida' in desc_lower:
+                icone_ev = "fas fa-undo text-warning"
+            elif 'relatório' in desc_lower or 'relatorio' in desc_lower:
+                icone_ev = "fas fa-file-alt text-info"
+            elif 'editada' in desc_lower or 'editado' in desc_lower:
+                icone_ev = "fas fa-pencil-alt text-warning"
+            elif 'criada' in desc_lower or 'criado' in desc_lower:
+                icone_ev = "fas fa-plus-circle text-primary"
             else:
-                icone_ev = "fas fa-plus-circle text-info"
+                icone_ev = "fas fa-info-circle text-info"
             eventos_html.append(html.Div([
                 html.I(className=f"{icone_ev} me-2"),
                 html.Span(desc, className="me-2"),
@@ -321,6 +333,7 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                 meta_children.append(html.Span(" · ", className="text-muted"))
 
         # Botões de ação (ícone-apenas para máxima densidade)
+        _validada = (status_validacao_gestor == 'aprovado')
         botoes = []
         if not concluido and hist_id:
             botoes.append(dbc.Button(
@@ -330,14 +343,17 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                 title="Concluir subtarefa"
             ))
         if hist_id:
+            _log_disabled = concluido or _validada
             botoes.append(dbc.Button(
                 html.I(className="fas fa-file-alt"),
                 id={"type": "btn-add-log", "index": hist_id},
                 color="info", size="sm", outline=True,
-                title="Preencher Relatório" if not concluido else "Subtarefa concluída",
-                disabled=concluido
+                title=("Atividade validada — bloqueada" if _validada
+                       else "Preencher Relatório" if not concluido
+                       else "Subtarefa concluída"),
+                disabled=_log_disabled
             ))
-        if user_level >= 3 and hist_id:
+        if user_level >= 3 and hist_id and not _validada:
             botoes.append(dbc.Button(
                 html.I(className="fas fa-pencil-alt"),
                 id={"type": "btn-edit-subtarefa", "index": hist_id},
@@ -1218,7 +1234,7 @@ def register_workflow_callbacks(app):
         from datetime import datetime as _dt
 
         data_execucao = _dt.fromisoformat(data_execucao_str)
-        sucesso = marcar_subtarefa_concluida(hist_id, data_execucao=data_execucao)
+        sucesso = marcar_subtarefa_concluida(hist_id, data_execucao=data_execucao, editado_por=username_atual)
 
         df_pend, df_hist = carregar_dados_csv()
         nova_tabela, store_data = reconstruir_tabela_com_filtros(

@@ -643,7 +643,8 @@ class TestCriarSubtarefaPrioridade:
                    side_effect=self._side_effect(mock_pend, mock_hist)):
             from src.utils.workflow_db import criar_subtarefa
             criar_subtarefa('WF001', 'Título', 'Análise de Falha', 'u1', '', 'u1')
-        doc = mock_hist.insert_one.call_args[0][0]
+        # call_args_list[0] = doc da atividade; [1] = evento de timeline
+        doc = mock_hist.insert_one.call_args_list[0][0][0]
         assert doc.get('prioridade') == 'normal'
 
     def test_prioridade_alta_salva_corretamente(self):
@@ -654,7 +655,7 @@ class TestCriarSubtarefaPrioridade:
             from src.utils.workflow_db import criar_subtarefa
             criar_subtarefa('WF001', 'Título', 'Análise de Falha', 'u1', '', 'u1',
                             prioridade='alta')
-        doc = mock_hist.insert_one.call_args[0][0]
+        doc = mock_hist.insert_one.call_args_list[0][0][0]
         assert doc.get('prioridade') == 'alta'
 
     def test_prioridade_urgente_salva_corretamente(self):
@@ -664,7 +665,7 @@ class TestCriarSubtarefaPrioridade:
             from src.utils.workflow_db import criar_subtarefa
             criar_subtarefa('WF001', 'Título', 'Análise de Falha', 'u1', '', 'u1',
                             prioridade='urgente')
-        doc = mock_hist.insert_one.call_args[0][0]
+        doc = mock_hist.insert_one.call_args_list[0][0][0]
         assert doc.get('prioridade') == 'urgente'
 
 
@@ -779,7 +780,8 @@ class TestCriarSubtarefaDataPlanejada:
         with patch('src.utils.workflow_db.get_mongo_connection', side_effect=self._side(mp, mh)):
             from src.utils.workflow_db import criar_subtarefa
             criar_subtarefa('WF001', 'T', 'Análise de Falha', 'u', '', 'admin')
-        doc = mh.insert_one.call_args[0][0]
+        # call_args_list[0] = doc da atividade; [1] = evento de timeline
+        doc = mh.insert_one.call_args_list[0][0][0]
         assert doc.get('data_planejada') is None
 
     def test_data_planejada_salva_quando_fornecida(self):
@@ -789,7 +791,7 @@ class TestCriarSubtarefaDataPlanejada:
         with patch('src.utils.workflow_db.get_mongo_connection', side_effect=self._side(mp, mh)):
             from src.utils.workflow_db import criar_subtarefa
             criar_subtarefa('WF001', 'T', 'Análise de Falha', 'u', '', 'admin', data_planejada=data)
-        doc = mh.insert_one.call_args[0][0]
+        doc = mh.insert_one.call_args_list[0][0][0]
         assert doc.get('data_planejada') == data
 
 
@@ -1018,3 +1020,141 @@ class TestDevolverAtividade:
             from src.utils.workflow_db import devolver_atividade
             resultado = devolver_atividade(oid, 'Nota', 'gestor1')
         assert resultado is False
+
+
+class TestGuardValidacaoEditar:
+    """Testa que editar_subtarefa bloqueia atividades já validadas pelo gestor."""
+
+    def _make_mock_aprovado(self):
+        from bson import ObjectId
+        mock = MagicMock()
+        mock.find_one.return_value = {'status_validacao_gestor': 'aprovado',
+                                      'titulo': 'Ativ X', 'MaintenanceWF_id': 'AMG_WF001'}
+        return mock, str(ObjectId())
+
+    def _make_mock_nao_aprovado(self):
+        from bson import ObjectId
+        mock = MagicMock()
+        mock.find_one.return_value = {'status_validacao_gestor': 'pendente',
+                                      'titulo': 'Ativ X', 'MaintenanceWF_id': 'AMG_WF001'}
+        mock.update_one.return_value = MagicMock(matched_count=1)
+        return mock, str(ObjectId())
+
+    def test_editar_subtarefa_bloqueada_se_aprovada(self):
+        mock, oid = self._make_mock_aprovado()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import editar_subtarefa
+            sucesso, msg = editar_subtarefa(hist_id=oid, prioridade='urgente')
+        assert sucesso is False
+        assert 'validada' in msg.lower()
+
+    def test_editar_subtarefa_permitida_se_nao_aprovada(self):
+        mock, oid = self._make_mock_nao_aprovado()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import editar_subtarefa
+            sucesso, _ = editar_subtarefa(hist_id=oid, prioridade='urgente')
+        assert sucesso is True
+
+
+class TestGuardValidacaoDeletar:
+    """Testa que deletar_subtarefa bloqueia atividades já validadas pelo gestor."""
+
+    def _make_mock_aprovado(self):
+        from bson import ObjectId
+        mock = MagicMock()
+        mock.find_one.return_value = {'status_validacao_gestor': 'aprovado',
+                                      'titulo': 'Ativ X', 'MaintenanceWF_id': 'AMG_WF001'}
+        return mock, str(ObjectId())
+
+    def _make_mock_nao_aprovado(self):
+        from bson import ObjectId
+        mock = MagicMock()
+        mock.find_one.return_value = {'status_validacao_gestor': None,
+                                      'titulo': 'Ativ X', 'MaintenanceWF_id': 'AMG_WF001'}
+        mock.delete_one.return_value = MagicMock(deleted_count=1)
+        mock.delete_many.return_value = MagicMock()
+        return mock, str(ObjectId())
+
+    def test_deletar_bloqueado_se_aprovada(self):
+        mock, oid = self._make_mock_aprovado()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import deletar_subtarefa
+            sucesso, msg = deletar_subtarefa(oid)
+        assert sucesso is False
+        assert 'validada' in msg.lower()
+
+    def test_deletar_permitido_se_nao_aprovada(self):
+        mock, oid = self._make_mock_nao_aprovado()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import deletar_subtarefa
+            sucesso, _ = deletar_subtarefa(oid)
+        assert sucesso is True
+
+
+class TestGuardValidacaoAdicionarLog:
+    """Testa que adicionar_log bloqueia quando a subtarefa-pai está validada."""
+
+    def _make_mock_pai_aprovado(self):
+        from bson import ObjectId
+        oid_sub = str(ObjectId())
+        mock = MagicMock()
+        mock.find_one.return_value = {'status_validacao_gestor': 'aprovado',
+                                      'titulo': 'Ativ X', 'MaintenanceWF_id': 'AMG_WF001'}
+        return mock, oid_sub
+
+    def _make_mock_pai_livre(self):
+        from bson import ObjectId
+        oid_sub = str(ObjectId())
+        mock = MagicMock()
+        mock.find_one.return_value = {'status_validacao_gestor': None,
+                                      'titulo': 'Ativ X', 'MaintenanceWF_id': 'AMG_WF001'}
+        mock.insert_one.return_value = MagicMock()
+        return mock, oid_sub
+
+    def test_adicionar_log_bloqueado_se_pai_aprovado(self):
+        mock, oid = self._make_mock_pai_aprovado()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import adicionar_log
+            sucesso, msg = adicionar_log(oid, 'AMG_WF001', 'texto', 'user1')
+        assert sucesso is False
+        assert 'validada' in msg.lower()
+
+    def test_adicionar_log_permitido_se_pai_livre(self):
+        mock, oid = self._make_mock_pai_livre()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import adicionar_log
+            sucesso, _ = adicionar_log(oid, 'AMG_WF001', 'texto', 'user1')
+        assert sucesso is True
+
+
+class TestTimelineEventos:
+    """Testa que eventos de auditoria são registrados na linha do tempo."""
+
+    def _make_mock_validar(self):
+        from bson import ObjectId
+        oid = str(ObjectId())
+        mock = MagicMock()
+        mock.find_one.return_value = {'titulo': 'T1', 'MaintenanceWF_id': 'AMG_WF001',
+                                      'descricao': 'T1'}
+        mock.update_one.return_value = MagicMock(modified_count=1)
+        return mock, oid
+
+    def test_validar_atividade_insere_evento_timeline(self):
+        mock, oid = self._make_mock_validar()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import validar_atividade
+            validar_atividade(oid, 'gestor1')
+        assert mock.insert_one.called
+        inserted = mock.insert_one.call_args[0][0]
+        assert inserted['record_type'] == 'criacao'
+        assert 'validada' in inserted['descricao'].lower()
+
+    def test_devolver_atividade_insere_evento_timeline(self):
+        mock, oid = self._make_mock_validar()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import devolver_atividade
+            devolver_atividade(oid, 'Revisar', 'gestor1')
+        assert mock.insert_one.called
+        inserted = mock.insert_one.call_args[0][0]
+        assert inserted['record_type'] == 'criacao'
+        assert 'devolvida' in inserted['descricao'].lower()

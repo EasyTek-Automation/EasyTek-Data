@@ -630,6 +630,7 @@ def register_subtask_callbacks(app):
             update_data_planejada=True,
             data_execucao=data_execucao_dt,
             update_data_execucao=True,
+            editado_por=username,
         )
 
         from src.pages.workflow.dashboard import carregar_dados_csv
@@ -715,7 +716,7 @@ def register_subtask_callbacks(app):
         if not hist_id:
             raise PreventUpdate
 
-        sucesso, mensagem = deletar_subtarefa(hist_id)
+        sucesso, mensagem = deletar_subtarefa(hist_id, editado_por=username)
 
         from src.pages.workflow.dashboard import carregar_dados_csv
         df_pend, df_hist = carregar_dados_csv()
@@ -769,7 +770,7 @@ def register_subtask_callbacks(app):
             raise PreventUpdate
         hist_id, nova_prioridade = parts
 
-        sucesso, mensagem = editar_subtarefa(hist_id=hist_id, prioridade=nova_prioridade)
+        sucesso, mensagem = editar_subtarefa(hist_id=hist_id, prioridade=nova_prioridade, editado_por=username)
 
         from src.pages.workflow.dashboard import carregar_dados_csv
         df_pend, df_hist = carregar_dados_csv()
@@ -1070,7 +1071,7 @@ def register_subtask_callbacks(app):
 
         horas_val = hhmm_para_float(horas) if horas else None
 
-        sucesso, mensagem = editar_log(hist_id, horas_val, obs.strip())
+        sucesso, mensagem = editar_log(hist_id, horas_val, obs.strip(), editado_por=username)
 
         from src.pages.workflow.dashboard import carregar_dados_csv
         df_pend, df_hist = carregar_dados_csv()
