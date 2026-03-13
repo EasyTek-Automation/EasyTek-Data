@@ -1,117 +1,139 @@
 /**
- * Workflow PDF Export
+ * Workflow PDF Export — Janela de impressão isolada
  *
- * Estratégia: em vez de depender de @media print para esconder elementos
- * (fraco contra estilos inline e alta especificidade do Dash/Bootstrap),
- * o JS manipula o DOM diretamente antes de window.print() e restaura tudo
- * via evento afterprint.
+ * Estratégia: abre uma nova janela limpa contendo apenas os cards KPI
+ * e a tabela de demandas, copiando os estilos CSS da página atual.
+ * Isso elimina completamente a interferência do layout do Dash:
+ * navbar, sidebar, overflow-y, duplicação de camadas, etc.
  *
- * Responsabilidades:
- *   JS  → ocultar/mostrar elementos da aplicação, remover overflow do layout
- *   CSS → formatação visual da tabela e quebras de página (@media print)
+ * A página original não é modificada em momento algum.
  */
 document.addEventListener('click', function (e) {
     if (!e.target.closest('#btn-export')) return;
 
-    /* ---------------------------------------------------------------
-       1. Cabeçalho de impressão
-    --------------------------------------------------------------- */
+    var kpiEl   = document.getElementById('container-cards-kpi');
+    var tableEl = document.getElementById('container-tabela');
+    if (!kpiEl || !tableEl) return;
+
     var now = new Date().toLocaleString('pt-BR', {
         day: '2-digit', month: '2-digit', year: 'numeric',
         hour: '2-digit', minute: '2-digit'
     });
-    var header = document.createElement('div');
-    header.id = 'workflow-print-header';
-    header.innerHTML =
-        '<div style="display:flex;justify-content:space-between;align-items:center;' +
-        'border-bottom:2px solid #333;padding-bottom:8px;margin-bottom:16px;">' +
-        '<strong style="font-size:16px;">AMG \u2014 Relat\u00f3rio de Demandas</strong>' +
-        '<span style="font-size:12px;color:#555;">Emitido em: ' + now + '</span>' +
-        '</div>';
 
-    var page = document.querySelector('.workflow-page');
-    if (page) page.insertBefore(header, page.firstChild);
-
-    /* ---------------------------------------------------------------
-       2. Ocultar elementos da aplicação (chrome)
-          Guardar estilos originais para restaurar depois.
-    --------------------------------------------------------------- */
-    var toHide = [
-        document.querySelector('.navbar'),
-        document.querySelector('nav.navbar'),
-        document.querySelector('#sidebar-column'),
-        document.querySelector('#sidebar-overlay'),
-        document.getElementById('workflow-header-row'),
-        document.getElementById('alert-container-workflow'),
-        document.querySelector('.workflow-filters'),
-        document.getElementById('loading-overlay'),
-    ];
-    var origDisplays = toHide.map(function (el) {
-        if (!el) return null;
-        var orig = el.style.display;
-        el.style.setProperty('display', 'none', 'important');
-        return orig;
+    /* ----------------------------------------------------------------
+       Coletar <link rel="stylesheet"> da página atual.
+       São URLs absolutas (http://localhost:8050/assets/...) que
+       funcionam corretamente em qualquer janela do mesmo origin.
+    ---------------------------------------------------------------- */
+    var linkTags = '';
+    Array.from(document.querySelectorAll('link[rel="stylesheet"]')).forEach(function (l) {
+        linkTags += '<link rel="stylesheet" href="' + l.href + '">\n';
     });
 
-    /* ---------------------------------------------------------------
-       3. Remover overflow do content-column para evitar duplicação
-          O scrollable container impresso sem correção gera páginas duplas.
-    --------------------------------------------------------------- */
-    var contentCol = document.getElementById('content-column');
-    var origContent = {};
-    if (contentCol) {
-        origContent.overflow   = contentCol.style.overflow;
-        origContent.height     = contentCol.style.height;
-        origContent.maxHeight  = contentCol.style.maxHeight;
-        origContent.width      = contentCol.style.width;
-        origContent.flex       = contentCol.style.flex;
-        contentCol.style.setProperty('overflow',   'visible', 'important');
-        contentCol.style.setProperty('height',     'auto',    'important');
-        contentCol.style.setProperty('max-height', 'none',    'important');
-        contentCol.style.setProperty('width',      '100%',    'important');
-        contentCol.style.setProperty('flex',       '0 0 100%','important');
+    var html = [
+        '<!DOCTYPE html>',
+        '<html lang="pt-BR">',
+        '<head>',
+        '<meta charset="UTF-8">',
+        '<title>AMG \u2014 Relat\u00f3rio de Demandas</title>',
+        linkTags,
+        '<style>',
+
+        /* Página A4 paisagem */
+        '@page { size: A4 landscape; margin: 1.5cm 1cm; }',
+
+        /* Preservar cores exatas (evita que o browser remova backgrounds em @media print) */
+        '* { -webkit-print-color-adjust: exact !important;',
+        '    print-color-adjust: exact !important; }',
+
+        /* Reset limpo */
+        'html, body { margin: 0; padding: 0; background: white;',
+        '  font-size: 11px; }',
+
+        /* Cabeçalho do relatório */
+        '#amg-print-header {',
+        '  display: flex; justify-content: space-between; align-items: center;',
+        '  border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px;',
+        '}',
+        '#amg-print-header strong { font-size: 15px; }',
+        '#amg-print-header span   { font-size: 11px; color: #555; }',
+
+        /* KPI cards: forçar 3 colunas (Bootstrap reseta para block em @media print) */
+        '#kpi-wrap .row { display: flex !important; flex-wrap: nowrap !important; }',
+        '#kpi-wrap [class*="col-"] {',
+        '  width: 33.33% !important; max-width: 33.33% !important;',
+        '  flex: 0 0 33.33% !important; }',
+        '#kpi-wrap .card { break-inside: avoid !important; }',
+        '#kpi-wrap { margin-bottom: 16px; }',
+
+        /* Tabela: resolver overflow do wrapper responsivo */
+        '.table-responsive { overflow: visible !important; }',
+
+        /* Compactar fontes e padding */
+        '.workflow-table th, .workflow-table td {',
+        '  padding: 4px 8px !important; font-size: 11px !important;',
+        '  vertical-align: middle; }',
+        '.workflow-table th { font-size: 10px !important; }',
+
+        /* Ocultar colunas de interação: chevron (1ª) e ações (última) */
+        '.workflow-table th:first-child, .workflow-table td:first-child,',
+        '.workflow-table th:last-child,  .workflow-table td:last-child {',
+        '  display: none !important; }',
+
+        /* Botões viram texto puro */
+        '.workflow-table .btn {',
+        '  color: inherit !important; background: none !important;',
+        '  border: none !important; padding: 0 !important;',
+        '  font-weight: 600; text-decoration: none !important;',
+        '  box-shadow: none !important; }',
+
+        /* Quebras de página:
+           break-after:avoid nas linhas ÍMPARES (linha principal da demanda)
+           → impede que a linha de detalhe fique órfã no topo da próxima página.
+           break-inside:avoid na mesma linha
+           → impede que o conteúdo da linha seja cortado no meio. */
+        '.workflow-table tbody tr:nth-child(2n+1) {',
+        '  break-after: avoid !important; page-break-after: avoid !important;',
+        '  break-inside: avoid !important; page-break-inside: avoid !important; }',
+
+        /* Painel expandido: não cortar no meio */
+        '.workflow-table .collapse.show { overflow: visible !important; }',
+        '.workflow-subtask-panel {',
+        '  break-inside: avoid !important; page-break-inside: avoid !important; }',
+
+        '</style>',
+        '</head>',
+        '<body>',
+
+        /* Cabeçalho do relatório */
+        '<div id="amg-print-header">',
+        '  <strong>AMG \u2014 Relat\u00f3rio de Demandas</strong>',
+        '  <span>Emitido em: ' + now + '</span>',
+        '</div>',
+
+        /* KPI cards */
+        '<div id="kpi-wrap">' + kpiEl.outerHTML + '</div>',
+
+        /* Tabela de demandas */
+        tableEl.outerHTML,
+
+        /* Aguarda estilos carregarem, então abre diálogo de impressão */
+        '<script>',
+        'window.addEventListener("load", function () {',
+        '  setTimeout(function () { window.print(); }, 700);',
+        '});',
+        'window.addEventListener("afterprint", function () { window.close(); });',
+        '</scr' + 'ipt>',   /* separar tag para evitar parsing prematuro */
+
+        '</body>',
+        '</html>'
+    ].join('\n');
+
+    var pw = window.open('', '_blank', 'width=1400,height=900');
+    if (!pw) {
+        alert('Exportação bloqueada pelo navegador. Permita pop-ups para este site e tente novamente.');
+        return;
     }
-
-    /* Também garantir que a linha Bootstrap que contém sidebar + content
-       não limite o layout */
-    var layoutRow = contentCol && contentCol.parentElement;
-    var origRowOverflow = '';
-    if (layoutRow) {
-        origRowOverflow = layoutRow.style.overflow;
-        layoutRow.style.setProperty('overflow', 'visible', 'important');
-    }
-
-    /* ---------------------------------------------------------------
-       4. Imprimir
-    --------------------------------------------------------------- */
-    window.print();
-
-    /* ---------------------------------------------------------------
-       5. Restaurar tudo após o diálogo de impressão fechar
-    --------------------------------------------------------------- */
-    window.addEventListener('afterprint', function cleanup() {
-        // Remove cabeçalho
-        var h = document.getElementById('workflow-print-header');
-        if (h) h.parentNode.removeChild(h);
-
-        // Restaura elementos ocultados
-        toHide.forEach(function (el, i) {
-            if (!el) return;
-            el.style.display = origDisplays[i];
-        });
-
-        // Restaura content-column
-        if (contentCol) {
-            contentCol.style.overflow  = origContent.overflow;
-            contentCol.style.height    = origContent.height;
-            contentCol.style.maxHeight = origContent.maxHeight;
-            contentCol.style.width     = origContent.width;
-            contentCol.style.flex      = origContent.flex;
-        }
-        if (layoutRow) {
-            layoutRow.style.overflow = origRowOverflow;
-        }
-
-        window.removeEventListener('afterprint', cleanup);
-    });
+    pw.document.write(html);
+    pw.document.close();
 });
