@@ -1251,7 +1251,17 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
                 className="p-0 text-decoration-none"
             )
         ], style={"width": "40px", "textAlign": "center"}),
-        html.Td(pend_id),
+        html.Td(
+            dbc.Button(
+                pend_id,
+                id={"type": "btn-expand-id", "index": index},
+                color="link",
+                size="sm",
+                className="p-0 text-decoration-none fw-semibold",
+                style={"color": "inherit", "boxShadow": "none",
+                       "fontFamily": "inherit", "fontSize": "inherit"},
+            )
+        ),
         html.Td(desc_content),
         html.Td(responsavel),
         html.Td(criar_badge_status(pendencia['status'])),

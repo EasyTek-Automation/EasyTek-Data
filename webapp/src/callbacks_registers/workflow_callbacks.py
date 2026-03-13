@@ -954,6 +954,7 @@ def register_workflow_callbacks(app):
         Output({"type": "chevron-icon", "index": MATCH}, "className"),
         Output({"type": "historico-content", "index": MATCH}, "children"),
         Input({"type": "btn-expand", "index": MATCH}, "n_clicks"),
+        Input({"type": "btn-expand-id", "index": MATCH}, "n_clicks"),
         State({"type": "collapse-historico", "index": MATCH}, "is_open"),
         State("store-pendencias", "data"),
         State("store-historico", "data"),
@@ -962,10 +963,10 @@ def register_workflow_callbacks(app):
         State("store-filtros-ativos", "data"),
         prevent_initial_call=True
     )
-    def toggle_linha_historico(n_clicks, is_open, pendencias_data, historico_data,
+    def toggle_linha_historico(n_clicks, n_clicks_id, is_open, pendencias_data, historico_data,
                                username_atual, user_level, filtros_ativos):
         """Expande/colapsa uma linha individual e carrega o histórico."""
-        if not n_clicks:
+        if not (n_clicks or n_clicks_id):
             raise PreventUpdate
 
         df_pendencias = pd.DataFrame(pendencias_data)
