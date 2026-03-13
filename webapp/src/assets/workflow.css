@@ -162,8 +162,9 @@
 
 /* ================================================================
    IMPRESSÃO / EXPORT PDF
-   @media print: garante que os elementos não sejam cortados
-   no meio ao mudar de página. Acionado via window.print().
+   Responsabilidade do CSS: apenas formatação visual (fontes, quebras,
+   layout da tabela). O workflow_print.js cuida de ocultar/mostrar
+   elementos da aplicação via manipulação direta do DOM.
    ================================================================ */
 @media print {
 
@@ -173,29 +174,13 @@
         margin: 1.5cm 1cm;
     }
 
-    /* --- Ocultar chrome da aplicação --- */
-    .navbar,
-    #sidebar-column,
-    #workflow-header-row,
-    #alert-container-workflow,
-    .workflow-filters {
-        display: none !important;
-    }
-
-    /* --- Layout: expandir área de conteúdo para tela cheia --- */
-    #content-column {
-        width: 100% !important;
-        max-width: 100% !important;
-        flex: 0 0 100% !important;
-        padding: 0 !important;
-    }
-
+    /* --- Fonte compacta para a página inteira no print --- */
     .workflow-page {
         padding: 0 !important;
         font-size: 11px !important;
     }
 
-    /* --- Tabela responsiva: evitar overflow oculto --- */
+    /* --- Tabela responsiva: evitar overflow oculto que corta conteúdo --- */
     .table-responsive {
         overflow: visible !important;
     }
@@ -211,7 +196,7 @@
         font-size: 10px !important;
     }
 
-    /* --- Ocultar colunas de interação (chevron e ações) --- */
+    /* --- Ocultar colunas de interação (chevron col e ações col) --- */
     .workflow-table th:first-child,
     .workflow-table td:first-child,
     .workflow-table th:last-child,
@@ -232,10 +217,10 @@
         box-shadow: none !important;
     }
 
-    /* --- Quebra de página: manter par (linha principal + detalhe) junto ---
-         break-after: avoid na linha principal (ímpar) impede que a linha de
-         detalhe fique isolada no topo da próxima página.
-         break-inside: avoid impede que uma única linha seja cortada no meio. */
+    /* --- Quebra de página: manter par (linha principal + detalhe) junto.
+         break-after: avoid na linha principal (ímpar) impede que a linha
+         de detalhe fique isolada no topo da página seguinte.
+         break-inside: avoid impede que a linha seja cortada no meio. --- */
     .workflow-table tbody tr:nth-child(2n+1) {
         break-after: avoid !important;
         page-break-after: avoid !important;
@@ -253,7 +238,8 @@
         page-break-inside: avoid !important;
     }
 
-    /* --- KPI cards: forçar layout em linha no print --- */
+    /* --- KPI cards: forçar layout em linha 3 colunas no print ---
+         Bootstrap reseta colunas para display:block em @media print. --- */
     #container-cards-kpi .row {
         display: flex !important;
         flex-wrap: nowrap !important;
