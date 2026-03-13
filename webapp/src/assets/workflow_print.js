@@ -20,7 +20,11 @@ document.addEventListener('click', function (e) {
         day: '2-digit', month: '2-digit', year: 'numeric',
         hour: '2-digit', minute: '2-digit'
     });
-    var periodo = periodoEl ? periodoEl.textContent.trim() : '';
+    var periodo  = periodoEl ? periodoEl.textContent.trim() : '';
+    /* URLs absolutas dos logos — funciona tanto em blob: quanto em about:blank */
+    var base      = window.location.origin;
+    var logoAMG   = base + '/assets/LogoAMG.png';
+    var logoTek   = base + '/assets/logo.png';
 
     /* ----------------------------------------------------------------
        Clonar a tabela e forçar visibilidade em collapses abertos.
@@ -73,9 +77,23 @@ document.addEventListener('click', function (e) {
         /* Cabeçalho do relatório */
         '#amg-print-header {',
         '  display: flex; justify-content: space-between; align-items: center;',
-        '  border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px;',
+        '  border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 16px;',
         '}',
-        '#amg-print-header strong { font-size: 15px; }',
+        /* Logos — lado esquerdo, discretos e alinhados */
+        '#amg-print-header .hdr-logos {',
+        '  display: flex; align-items: center; gap: 14px; flex-shrink: 0;',
+        '}',
+        '#amg-print-header .hdr-logos img { display: block; opacity: 0.88; }',
+        /* Informações — lado direito */
+        '#amg-print-header .hdr-info {',
+        '  text-align: right; line-height: 1.55;',
+        '}',
+        '#amg-print-header .hdr-title {',
+        '  font-size: 16px; font-weight: 700; margin-bottom: 2px;',
+        '}',
+        '#amg-print-header .hdr-meta {',
+        '  font-size: 13px; color: #555;',
+        '}',
 
         /* KPI cards: forçar 3 colunas (Bootstrap reseta para block em @media print) */
         '#kpi-wrap .row { display: flex !important; flex-wrap: nowrap !important; }',
@@ -129,10 +147,14 @@ document.addEventListener('click', function (e) {
 
         /* Cabeçalho do relatório */
         '<div id="amg-print-header">',
-        '  <strong>AMG \u2014 Relat\u00f3rio de Demandas</strong>',
-        '  <div style="text-align:right;font-size:11px;color:#555;line-height:1.6">',
-        '    <div>Emitido em: ' + now + '</div>',
-        (periodo ? '    <div>Per\u00edodo: ' + periodo + '</div>' : ''),
+        '  <div class="hdr-logos">',
+        '    <img src="' + logoAMG + '" height="38" alt="AMG">',
+        '    <img src="' + logoTek + '" height="28" alt="Tekmont">',
+        '  </div>',
+        '  <div class="hdr-info">',
+        '    <div class="hdr-title">AMG \u2014 Relat\u00f3rio de Demandas</div>',
+        '    <div class="hdr-meta">Emitido em: ' + now + '</div>',
+        (periodo ? '    <div class="hdr-meta">Per\u00edodo: ' + periodo + '</div>' : ''),
         '  </div>',
         '</div>',
 
