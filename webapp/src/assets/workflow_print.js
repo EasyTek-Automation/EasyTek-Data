@@ -74,26 +74,31 @@ document.addEventListener('click', function (e) {
            sem margens negativas vazando para fora da área impressa */
         '#print-root { width: 100%; padding: 0 8px; box-sizing: border-box; }',
 
-        /* Cabeçalho do relatório */
+        /* Cabeçalho */
         '#amg-print-header {',
         '  display: flex; justify-content: space-between; align-items: center;',
         '  border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 16px;',
         '}',
-        /* Logos — lado esquerdo, discretos e alinhados */
-        '#amg-print-header .hdr-logos {',
-        '  display: flex; align-items: center; gap: 14px; flex-shrink: 0;',
+        '#amg-print-header .hdr-logo img { display: block; opacity: 0.90; }',
+        '#amg-print-header .hdr-info { text-align: right; line-height: 1.55; }',
+        '#amg-print-header .hdr-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }',
+        '#amg-print-header .hdr-meta  { font-size: 13px; color: #555; }',
+
+        /* Rodapé fixo — aparece em todas as páginas impressas */
+        '#amg-print-footer {',
+        '  position: fixed; bottom: 0; left: 0; right: 0;',
+        '  display: flex; align-items: flex-end; justify-content: flex-end; gap: 8px;',
+        '  padding: 6px 8px;',
+        '  border-top: 1px solid #dee2e6;',
+        '  background: white;',
         '}',
-        '#amg-print-header .hdr-logos img { display: block; opacity: 0.88; }',
-        /* Informações — lado direito */
-        '#amg-print-header .hdr-info {',
-        '  text-align: right; line-height: 1.55;',
+        '#amg-print-footer .ftr-text {',
+        '  font-size: 0.72rem; color: #6c757d; opacity: 0.7; line-height: 1;',
         '}',
-        '#amg-print-header .hdr-title {',
-        '  font-size: 16px; font-weight: 700; margin-bottom: 2px;',
-        '}',
-        '#amg-print-header .hdr-meta {',
-        '  font-size: 13px; color: #555;',
-        '}',
+        '#amg-print-footer .ftr-logo { height: 26px; width: auto; opacity: 0.65; }',
+
+        /* Espaço na base do conteúdo para não sobrepor o rodapé */
+        '#print-root { padding-bottom: 44px; }',
 
         /* KPI cards: forçar 3 colunas (Bootstrap reseta para block em @media print) */
         '#kpi-wrap .row { display: flex !important; flex-wrap: nowrap !important; }',
@@ -145,17 +150,20 @@ document.addEventListener('click', function (e) {
         /* Wrapper principal: garante alinhamento correto das .row do Bootstrap */
         '<div id="print-root">',
 
-        /* Cabeçalho do relatório */
+        /* Cabeçalho */
         '<div id="amg-print-header">',
-        '  <div class="hdr-logos">',
-        '    <img src="' + logoAMG + '" height="38" alt="AMG">',
-        '    <img src="' + logoTek + '" height="28" alt="Tekmont">',
-        '  </div>',
+        '  <div class="hdr-logo"><img src="' + logoAMG + '" height="54" alt="AMG"></div>',
         '  <div class="hdr-info">',
         '    <div class="hdr-title">AMG \u2014 Relat\u00f3rio de Demandas</div>',
         '    <div class="hdr-meta">Emitido em: ' + now + '</div>',
         (periodo ? '    <div class="hdr-meta">Per\u00edodo: ' + periodo + '</div>' : ''),
         '  </div>',
+        '</div>',
+
+        /* Rodapé fixo — estilo "Powered by" dos mega menus */
+        '<div id="amg-print-footer">',
+        '  <span class="ftr-text">Powered by</span>',
+        '  <img src="' + logoTek + '" class="ftr-logo" alt="Tekmont">',
         '</div>',
 
         /* KPI cards */
