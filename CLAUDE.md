@@ -274,6 +274,8 @@ ROUTE_ALIASES = {
   - **Terminologia**: **Demanda** = tarefa/pendência (collection `Maintenance_workflow`); **Atividade** = subtarefa (record_type='subtarefa' em `MaintenanceHistory_workflow`)
   - Campo `prioridade` nas Atividades: `'urgente'` | `'alta'` | `'normal'` | `'baixa'` (retrocompat: sem campo → `'normal'`)
   - Filtros: responsável, status, busca, aceite, datas, horas úteis, prioridade das atividades
+  - Campo `status_validacao_gestor` nas Atividades: `'pendente'` | `'aprovado'` | `'devolvido'` — quando `'aprovado'`, atividade é **imutável** (compliance lock)
+  - **Ver seção "11. Workflow Module Architecture"** para contratos de stores, padrões de KPI e audit trail
 - `/maintenance/work-orders`: Work orders management (in development)
 - `/maintenance/schedule`: Maintenance planning (in development)
 - `/maintenance/history`: Intervention history (in development)
@@ -526,6 +528,69 @@ if should_show_demo_badge(page_path="/production/oee"):
 - Alert range configuration (tolerance percentage)
 - Real-time preview of color coding impact
 
+#### 11. Workflow Module Architecture (`/workflow/dashboard`)
+
+**Stores e seus contratos — leia antes de tocar em qualquer callback do workflow:**
+
+| Store | Conteúdo | Quem escreve |
+|-------|----------|-------------|
+| `store-pendencias` | **View atual** — apenas as demandas visíveis (filtradas ou todas) | CB2 (aplicar filtros), CB3 (refresh), CB10/CB11 (aceitar/rejeitar), subtask CBs |
+| `store-historico` | **Sempre completo** — todo o histórico do MongoDB | CB3 (refresh), CB7 (concluir), CB2 (aplicar filtros) |
+| `store-filtros-ativos` | Dict com filtros aplicados atualmente | CB2, CB3, CB12 (limpar filtros) |
+
+**Regra crítica — `_kpi_filtrado` vs `criar_cards_kpi`:**
+
+Nunca chamar `criar_cards_kpi(df_pend, df_historico, username)` diretamente em callbacks que têm contexto de filtro. Usar sempre `_kpi_filtrado(df_pend, df_historico, username)` porque:
+- `store-historico` é sempre completo (full scan do MongoDB)
+- `_kpi_filtrado` restringe o histórico aos IDs presentes em `df_pend` (que já é a view filtrada)
+- Chamar `criar_cards_kpi` com historico completo mostra KPIs inflados ignorando os filtros
+
+```python
+# ERRADO — usa historico completo, ignora filtro ativo
+return criar_cards_kpi(df_pendencias, df_historico, username)
+
+# CORRETO — escopa historico pelos IDs de df_pendencias (já filtrado)
+return _kpi_filtrado(df_pendencias, df_historico, username)
+```
+
+**Problema clássico com `allow_duplicate=True` — callback reativo sobrescrevendo:**
+
+CB5 (`atualizar_cards_kpi`) reage a `Input("store-pendencias")` e `Input("store-historico")`. Qualquer callback que escreva nesses stores dispara CB5 em seguida. Se CB5 usar lógica errada, **sobrescreve** os valores corretos que o callback anterior calculou. Sintoma: "atualiza e volta ao estado sem filtro".
+
+Diagnóstico: buscar todos os `Output("container-xyz")` no codebase. Se CB_A escreve o valor correto e CB_B (reativo a um store que CB_A também escreveu) escreve um valor errado, CB_B vai sobrescrever.
+
+**Compliance lock — atividades validadas pelo gestor:**
+
+Atividades com `status_validacao_gestor='aprovado'` são **imutáveis**. Toda função de escrita em `workflow_db.py` que afete atividades deve fazer `find_one` antes de `update_one`/`delete_one`:
+
+```python
+doc = collection_hist.find_one({'_id': ObjectId(hist_id)})
+if doc and doc.get('status_validacao_gestor') == 'aprovado':
+    return False  # bloqueado
+```
+
+Funções que implementam o guard: `editar_subtarefa`, `deletar_subtarefa`, `adicionar_log`, `editar_log`.
+
+Na UI: quando `status_validacao_gestor == 'aprovado'`, botões editar/deletar são ocultados e elementos interativos (ex: badge de prioridade `dbc.DropdownMenu`) são substituídos por `html.Span` estático. **Calcular `_validada` ANTES de construir qualquer componente que dependa dele.**
+
+**Audit trail — linha do tempo do sistema:**
+
+Helper `_criar_evento_timeline(collection_hist, pend_id, descricao, tipo_evento, editado_por, ...)` em `workflow_db.py` insere um documento `record_type='criacao'` em `MaintenanceHistory_workflow`. Esses documentos aparecem automaticamente na seção "Linha do tempo do sistema" sem código adicional na UI.
+
+Chamar o helper após cada operação bem-sucedida de: criar subtarefa, editar subtarefa, concluir, validar, devolver, deletar, adicionar log, editar log.
+
+**Testes com `insert_one` chamado múltiplas vezes:**
+
+Quando uma função chama `insert_one` mais de uma vez (ex: `criar_subtarefa` insere o doc da atividade e depois o evento de timeline), usar `call_args_list[0][0][0]` (primeira chamada) em vez de `call_args[0][0]` (última chamada):
+
+```python
+# ERRADO se insert_one é chamado 2x — pega a última chamada (evento timeline)
+doc = mock_hist.insert_one.call_args[0][0]
+
+# CORRETO — pega a primeira chamada (doc da atividade)
+doc = mock_hist.insert_one.call_args_list[0][0][0]
+```
+
 ### Application Initialization Flow
 
 1. **app.py**: Initialize Flask server, Dash app, Flask-Login
@@ -596,6 +661,24 @@ Não é necessário perguntar confirmação — executar diretamente.
 - Never hardcode permission checks in individual pages
 - Use `check_access()` from `utils/permissions.py` for programmatic checks
 - Menu visibility controlled via `MENU_ACCESS` configuration
+
+### Working with Workflow Module
+
+**Antes de adicionar ou modificar qualquer callback do workflow, verificar:**
+
+1. Qual store o callback lê (`Input`) e qual store escreve (`Output`)
+2. Se o callback escreve em `container-cards-kpi`, usar `_kpi_filtrado` (nunca `criar_cards_kpi` direto)
+3. Se o callback escreve em `store-pendencias` ou `store-historico`, lembrar que CB5 (`atualizar_cards_kpi`) **dispara automaticamente** em seguida — CB5 também usa `_kpi_filtrado`, então está correto
+4. Operações em atividades aprovadas (`status_validacao_gestor='aprovado'`) devem retornar `False` sem modificar o documento
+
+**Ao adicionar nova operação de escrita em atividades (`workflow_db.py`):**
+1. Adicionar `find_one` guard para `status_validacao_gestor == 'aprovado'`
+2. Chamar `_criar_evento_timeline(...)` após sucesso
+3. Passar `editado_por` como parâmetro da função e repassar ao helper
+
+**Ao renderizar UI de uma atividade:**
+- Calcular `_validada = (status_validacao_gestor == 'aprovado')` **antes** de qualquer componente que use essa flag
+- Elementos clicáveis (dropdowns, botões) → substituir por `html.Span` estático quando `_validada`
 
 ### Working with MongoDB
 
