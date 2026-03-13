@@ -1168,26 +1168,14 @@ def register_workflow_callbacks(app):
         State("user-username-store", "data")
     )
     def atualizar_cards_kpi(pendencias_data, historico_data, username_atual):
-        """Atualiza os cards KPI quando os dados mudam."""
-        df_pendencias = None
-        df_historico = None
+        """Atualiza os cards KPI quando os dados mudam.
 
-        if pendencias_data:
-            df_pendencias = pd.DataFrame(pendencias_data)
-            if not df_pendencias.empty:
-                if 'data_criacao' in df_pendencias.columns:
-                    df_pendencias['data_criacao'] = pd.to_datetime(
-                        df_pendencias['data_criacao'], format='mixed'
-                    )
-                if 'ultima_atualizacao' in df_pendencias.columns:
-                    df_pendencias['ultima_atualizacao'] = pd.to_datetime(
-                        df_pendencias['ultima_atualizacao'], format='mixed'
-                    )
-
-        if historico_data:
-            df_historico = pd.DataFrame(historico_data)
-
-        return criar_cards_kpi(df_pendencias, df_historico, username_atual)
+        store-pendencias já contém apenas as pendências do filtro ativo (ou todas se sem filtro).
+        Usa _kpi_filtrado para garantir que o histórico seja escopo dos mesmos IDs.
+        """
+        df_pendencias = pd.DataFrame(pendencias_data) if pendencias_data else None
+        df_historico = pd.DataFrame(historico_data) if historico_data else None
+        return _kpi_filtrado(df_pendencias, df_historico, username_atual)
 
 
     # ==================================================================================
