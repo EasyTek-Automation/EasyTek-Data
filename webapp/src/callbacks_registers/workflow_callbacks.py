@@ -1160,19 +1160,26 @@ def register_workflow_callbacks(app):
 
 
     # ==================================================================================
-    # CALLBACK 4b: Toggle colapso do painel de filtros
+    # CALLBACK 4b: Toggle colapso do painel de filtros (com persistência local)
     # ==================================================================================
     @app.callback(
         Output("filtros-collapse", "is_open"),
         Output("filtros-chevron", "className"),
+        Output("store-filtros-collapse", "data"),
         Input("btn-toggle-filtros", "n_clicks"),
-        State("filtros-collapse", "is_open"),
-        prevent_initial_call=True
+        State("store-filtros-collapse", "data"),
+        prevent_initial_call=False  # dispara no load para restaurar o estado salvo
     )
-    def toggle_filtros_collapse(n_clicks, is_open):
-        novo_estado = not is_open
-        chevron = "fas fa-chevron-up" if novo_estado else "fas fa-chevron-down"
-        return novo_estado, chevron
+    def toggle_filtros_collapse(n_clicks, store_data):
+        estado_salvo = store_data if store_data is not None else False
+        if n_clicks:
+            # Clique: inverte o estado atual
+            novo_estado = not estado_salvo
+        else:
+            # Load inicial: restaura do store local
+            novo_estado = estado_salvo
+        chevron = "fas fa-chevron-up me-2" if novo_estado else "fas fa-chevron-down me-2"
+        return novo_estado, chevron, novo_estado
 
 
     # ==================================================================================

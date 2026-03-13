@@ -813,21 +813,20 @@ def criar_painel_filtros(username_inicial="todos"):
         # Header — sempre visível
         dbc.CardHeader(
             html.Div([
-                # Esquerda: toggle + título
-                html.Div([
-                    dbc.Button(
-                        html.I(className="fas fa-chevron-up", id="filtros-chevron"),
-                        id="btn-toggle-filtros",
-                        color="link",
-                        size="sm",
-                        className="p-0 me-2 text-decoration-none text-muted",
-                    ),
-                    html.Span([
-                        html.I(className="fas fa-filter me-2 text-muted",
-                               style={"fontSize": "0.85rem"}),
+                # Esquerda: área clicável unificada (chevron + ícone + label)
+                dbc.Button(
+                    [
+                        html.I(className="fas fa-chevron-down me-2", id="filtros-chevron"),
+                        html.I(className="fas fa-filter me-2",
+                               style={"fontSize": "0.85rem", "opacity": "0.6"}),
                         "Filtros",
-                    ], className="fw-semibold", style={"fontSize": "0.95rem"}),
-                ], className="d-flex align-items-center"),
+                    ],
+                    id="btn-toggle-filtros",
+                    color="link",
+                    size="sm",
+                    className="p-0 text-decoration-none fw-semibold",
+                    style={"fontSize": "0.95rem", "color": "inherit", "boxShadow": "none"},
+                ),
                 # Direita: botões de ação
                 dbc.ButtonGroup([
                     dbc.Button(
@@ -847,7 +846,7 @@ def criar_painel_filtros(username_inicial="todos"):
             ], className="d-flex justify-content-between align-items-center"),
             className="py-2 px-3"
         ),
-        # Corpo colapsável
+        # Corpo colapsável — default fechado; estado restaurado pelo callback via store local
         dbc.Collapse(
             dbc.CardBody([
                 # Linha 1 — Notificações centralizadas (conteúdo reativo via CB5)
@@ -868,7 +867,7 @@ def criar_painel_filtros(username_inicial="todos"):
                 ], className="d-flex flex-wrap gap-2"),
             ], className="p-3"),
             id="filtros-collapse",
-            is_open=True,
+            is_open=False,
         ),
     ], className="shadow-sm mb-3 workflow-filters")
 
@@ -1430,6 +1429,9 @@ def layout():
 
         # Store para hist_id pendente de confirmação de conclusão
         dcc.Store(id="store-subtarefa-concluir-pending"),
+
+        # Store local para persistir estado do painel de filtros (colapsado/expandido)
+        dcc.Store(id="store-filtros-collapse", storage_type="local", data=False),
 
         # Store para filtros ativos — inicializado com filtro pelo usuário logado
         dcc.Store(id="store-filtros-ativos", data={
