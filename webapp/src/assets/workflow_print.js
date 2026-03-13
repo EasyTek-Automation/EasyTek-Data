@@ -152,11 +152,22 @@ document.addEventListener('click', function (e) {
         '</html>'
     ].join('\n');
 
-    var pw = window.open('', '_blank', 'width=1400,height=900');
+    /* ----------------------------------------------------------------
+       Abrir a janela de impressão via Blob URL em vez de document.write().
+       document.write() é síncrono e, em Chrome, pode congelar brevemente
+       a aba pai (mesmo processo de renderização quando mesmo origin).
+       Blob URL carrega de forma assíncrona, sem bloquear a aba original.
+    ---------------------------------------------------------------- */
+    var blob = new Blob([html], { type: 'text/html; charset=utf-8' });
+    var blobUrl = URL.createObjectURL(blob);
+    var pw = window.open(blobUrl, '_blank', 'width=1400,height=900');
     if (!pw) {
+        URL.revokeObjectURL(blobUrl);
         alert('Exportação bloqueada pelo navegador. Permita pop-ups para este site e tente novamente.');
         return;
     }
-    pw.document.write(html);
-    pw.document.close();
+    /* Liberar memória do blob após a janela carregar o conteúdo */
+    pw.addEventListener('load', function () {
+        URL.revokeObjectURL(blobUrl);
+    });
 });
