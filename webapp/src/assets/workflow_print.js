@@ -21,6 +21,20 @@ document.addEventListener('click', function (e) {
     });
 
     /* ----------------------------------------------------------------
+       Clonar a tabela e forçar visibilidade em collapses abertos.
+       Ao copiar outerHTML, elementos .collapse.show podem ter height
+       inline remanescente da animação Bootstrap que os mantém ocultos
+       na nova janela (onde não há JS Bootstrap para completar a transição).
+    ---------------------------------------------------------------- */
+    var tableClone = tableEl.cloneNode(true);
+    tableClone.querySelectorAll('.collapse.show').forEach(function (el) {
+        el.style.display   = 'block';
+        el.style.height    = 'auto';
+        el.style.overflow  = 'visible';
+        el.style.visibility = 'visible';
+    });
+
+    /* ----------------------------------------------------------------
        Coletar <link rel="stylesheet"> da página atual.
        São URLs absolutas (http://localhost:8050/assets/...) que
        funcionam corretamente em qualquer janela do mesmo origin.
@@ -46,9 +60,13 @@ document.addEventListener('click', function (e) {
         '* { -webkit-print-color-adjust: exact !important;',
         '    print-color-adjust: exact !important; }',
 
-        /* Reset limpo */
-        'html, body { margin: 0; padding: 0; background: white;',
+        /* Reset limpo — largura 100% para o conteúdo preencher a página */
+        'html, body { margin: 0; padding: 0; background: white; width: 100%;',
         '  font-size: 11px; }',
+
+        /* Container principal: garante que .row Bootstrap use largura total
+           sem margens negativas vazando para fora da área impressa */
+        '#print-root { width: 100%; padding: 0 8px; box-sizing: border-box; }',
 
         /* Cabeçalho do relatório */
         '#amg-print-header {',
@@ -105,6 +123,9 @@ document.addEventListener('click', function (e) {
         '</head>',
         '<body>',
 
+        /* Wrapper principal: garante alinhamento correto das .row do Bootstrap */
+        '<div id="print-root">',
+
         /* Cabeçalho do relatório */
         '<div id="amg-print-header">',
         '  <strong>AMG \u2014 Relat\u00f3rio de Demandas</strong>',
@@ -114,8 +135,10 @@ document.addEventListener('click', function (e) {
         /* KPI cards */
         '<div id="kpi-wrap">' + kpiEl.outerHTML + '</div>',
 
-        /* Tabela de demandas */
-        tableEl.outerHTML,
+        /* Tabela de demandas (clone com collapses abertos forçados) */
+        tableClone.outerHTML,
+
+        '</div>',
 
         /* Aguarda estilos carregarem, então abre diálogo de impressão */
         '<script>',
