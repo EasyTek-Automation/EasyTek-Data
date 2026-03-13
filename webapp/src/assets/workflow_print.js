@@ -149,7 +149,7 @@ document.addEventListener('click', function (e) {
 
         /* Cabeçalho */
         '<div id="amg-print-header">',
-        '  <div class="hdr-logo"><img src="' + logoAMG + '" height="54" alt="AMG"></div>',
+        '  <div class="hdr-logo"><img src="' + logoAMG + '" height="81" alt="AMG"></div>',
         '  <div class="hdr-info">',
         '    <div class="hdr-title">AMG \u2014 Relat\u00f3rio de Demandas</div>',
         '    <div class="hdr-meta">Emitido em: ' + now + '</div>',
