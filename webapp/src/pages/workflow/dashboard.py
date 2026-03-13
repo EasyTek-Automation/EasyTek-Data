@@ -822,10 +822,10 @@ def criar_painel_filtros(username_inicial="todos"):
             html.Hr(className="my-2"),
             # Linha 2 — Sub-cards de filtro por categoria
             html.Div([
-                card_dropdowns,
-                card_periodo,
                 card_busca,
                 card_flags,
+                card_periodo,
+                card_dropdowns,
             ], className="d-flex flex-wrap gap-2 mb-3"),
             # Botões
             html.Div(
