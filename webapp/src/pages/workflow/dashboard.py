@@ -1505,6 +1505,9 @@ def layout():
             ], width=12, md=6, className="text-end")
         ], id="workflow-header-row", className="mb-4 align-items-center"),
 
+        # Metadados para exportação PDF (oculto, populado via callback)
+        html.Div(id="pdf-periodo-data", style={"display": "none"}),
+
         # Container de Alertas
         html.Div(id="alert-container-workflow", className="mb-3"),
 

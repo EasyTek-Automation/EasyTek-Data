@@ -11,14 +11,16 @@
 document.addEventListener('click', function (e) {
     if (!e.target.closest('#btn-export')) return;
 
-    var kpiEl   = document.getElementById('container-cards-kpi');
-    var tableEl = document.getElementById('container-tabela');
+    var kpiEl     = document.getElementById('container-cards-kpi');
+    var tableEl   = document.getElementById('container-tabela');
+    var periodoEl = document.getElementById('pdf-periodo-data');
     if (!kpiEl || !tableEl) return;
 
     var now = new Date().toLocaleString('pt-BR', {
         day: '2-digit', month: '2-digit', year: 'numeric',
         hour: '2-digit', minute: '2-digit'
     });
+    var periodo = periodoEl ? periodoEl.textContent.trim() : '';
 
     /* ----------------------------------------------------------------
        Clonar a tabela e forçar visibilidade em collapses abertos.
@@ -74,7 +76,6 @@ document.addEventListener('click', function (e) {
         '  border-bottom: 2px solid #333; padding-bottom: 8px; margin-bottom: 16px;',
         '}',
         '#amg-print-header strong { font-size: 15px; }',
-        '#amg-print-header span   { font-size: 11px; color: #555; }',
 
         /* KPI cards: forçar 3 colunas (Bootstrap reseta para block em @media print) */
         '#kpi-wrap .row { display: flex !important; flex-wrap: nowrap !important; }',
@@ -129,7 +130,10 @@ document.addEventListener('click', function (e) {
         /* Cabeçalho do relatório */
         '<div id="amg-print-header">',
         '  <strong>AMG \u2014 Relat\u00f3rio de Demandas</strong>',
-        '  <span>Emitido em: ' + now + '</span>',
+        '  <div style="text-align:right;font-size:11px;color:#555;line-height:1.6">',
+        '    <div>Emitido em: ' + now + '</div>',
+        (periodo ? '    <div>Per\u00edodo: ' + periodo + '</div>' : ''),
+        '  </div>',
         '</div>',
 
         /* KPI cards */

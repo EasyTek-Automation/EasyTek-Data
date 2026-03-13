@@ -1208,6 +1208,33 @@ def register_workflow_callbacks(app):
 
 
     # ==================================================================================
+    # CALLBACK 5b: Período do relatório PDF (div oculto lido pelo workflow_print.js)
+    # ==================================================================================
+    @app.callback(
+        Output("pdf-periodo-data", "children"),
+        Input("store-pendencias", "data"),
+    )
+    def atualizar_periodo_pdf(pendencias_data):
+        """Calcula o período (data_criacao mais antiga → mais recente) das demandas
+        visíveis. Sempre reflete a view atual — filtrada ou completa."""
+        if not pendencias_data:
+            return ""
+        try:
+            df = pd.DataFrame(pendencias_data)
+            if "data_criacao" not in df.columns:
+                return ""
+            datas = pd.to_datetime(df["data_criacao"], errors="coerce").dropna()
+            if datas.empty:
+                return ""
+            brt = pd.Timedelta(hours=-3)
+            d_min = (datas.min() + brt).strftime("%d/%m/%Y")
+            d_max = (datas.max() + brt).strftime("%d/%m/%Y")
+            return f"{d_min} → {d_max}"
+        except Exception:
+            return ""
+
+
+    # ==================================================================================
     # CALLBACK 6: Abrir/fechar modal de confirmação para concluir subatividade
     # O confirm é tratado apenas pelo callback 7 para evitar duplo Input
     # ==================================================================================
