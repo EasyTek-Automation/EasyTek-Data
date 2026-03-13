@@ -553,237 +553,298 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):  # n
         ], className="p-3")
     ], className="shadow-sm h-100")
 
-    # ============================================================
-    # NOTIFICAÇÕES PESSOAIS (compacto)
-    # ============================================================
-    def _notif_item(icone, label, valor, cor_key=None, destaque=False):
-        num_style = {
-            "fontSize": "1.6rem",
-            "fontWeight": "800",
-            "lineHeight": "1.1",
-            "color": COR.get(cor_key, "#212529") if cor_key else "#212529",
-        }
-        return html.Div([
-            html.Div([
-                html.I(className=f"{icone} me-1 text-muted",
-                       style={"fontSize": "0.75rem"}),
-                html.Span(label, style={"fontSize": "0.75rem", "color": "#6c757d"}),
-            ]),
-            html.Div(str(valor), style=num_style),
-        ], className="text-center px-4 py-2", style={
-            "borderLeft": "1px solid #dee2e6",
-            "minWidth": "80px",
-        })
-
-    notif_items = []
-    if username_atual:
-        notif_items.append(_notif_item(
-            "fas fa-inbox", "Para Aceitar", aguardando_aceite,
-            cor_key="secondary" if aguardando_aceite else None
-        ))
-        notif_items.append(_notif_item(
-            "fas fa-clock", "Para Aprovar", aguardando_aprovacao,
-            cor_key="warning" if aguardando_aprovacao else None
-        ))
-        notif_items.append(_notif_item(
-            "fas fa-folder-open", "Criadas p/ Mim", abertos_por_mim
-        ))
-        notif_items.append(_notif_item(
-            "fas fa-check-circle", "Aceitas", abertos_aceitos,
-            cor_key="success" if abertos_aceitos else None
-        ))
-        notif_items.append(_notif_item(
-            "fas fa-times-circle", "Rejeitadas", abertos_rejeitados,
-            cor_key="danger" if abertos_rejeitados else None
-        ))
-
-    notif_card = None
-    if notif_items:
-        notif_card = dbc.Card([
-            dbc.CardBody([
-                html.Div([
-                    html.Div([
-                        html.I(className="fas fa-user-circle me-2",
-                               style={"color": COR['primary']}),
-                        html.Span("Suas notificações", className="fw-semibold",
-                                   style={"fontSize": "0.85rem", "color": "#6c757d"}),
-                    ], className="px-3 py-2",
-                       style={"borderBottom": "1px solid #dee2e6"}),
-                    html.Div([
-                        # Remove a borda esquerda do primeiro item
-                        html.Div(notif_items[0].children, className="text-center px-4 py-2",
-                                 style={"minWidth": "80px"}),
-                        *notif_items[1:],
-                    ], className="d-flex align-items-center flex-wrap"),
-                ])
-            ], className="p-0")
-        ], className="shadow-sm mb-3")
-
-    tres_cards = dbc.Row([
+    return dbc.Row([
         dbc.Col(card_demandas,   width=12, lg=4, className="mb-3"),
         dbc.Col(card_atividades, width=12, lg=4, className="mb-3"),
         dbc.Col(card_horas,      width=12, lg=4, className="mb-3"),
-    ], className="g-3 mb-0")
+    ], className="g-3 mb-3")
 
-    children = [tres_cards]
-    if notif_card:
-        children.append(notif_card)
 
-    return html.Div(children, className="mb-3")
+def criar_notificacoes(df_pendencias=None, df_historico=None, username_atual=None):
+    """
+    Cria a seção de notificações pessoais (para exibição reativa no painel de filtros).
+
+    Returns:
+        html.Div com itens centralizados, ou mensagem vazia se sem usuário.
+    """
+    if not username_atual:
+        return html.Div()
+
+    COR = {
+        'primary':   'var(--bs-primary)',
+        'success':   'var(--bs-success)',
+        'warning':   'var(--bs-warning)',
+        'danger':    'var(--bs-danger)',
+        'secondary': 'var(--bs-secondary)',
+    }
+
+    # Calcular métricas
+    aguardando_aceite = 0
+    abertos_por_mim = abertos_aceitos = abertos_rejeitados = 0
+    aguardando_aprovacao = 0
+
+    if df_pendencias is not None and not df_pendencias.empty:
+        if 'status_aceite' in df_pendencias.columns and 'responsavel' in df_pendencias.columns:
+            mask_aceite = (
+                (df_pendencias['responsavel'] == username_atual) &
+                (df_pendencias['status_aceite'] != 'aceito')
+            )
+            aguardando_aceite = int(mask_aceite.sum())
+
+        if 'criado_por' in df_pendencias.columns:
+            mask_meus = df_pendencias['criado_por'] == username_atual
+            abertos_por_mim = int(mask_meus.sum())
+            if 'status_aceite' in df_pendencias.columns:
+                abertos_aceitos = int(
+                    (mask_meus & (df_pendencias['status_aceite'] == 'aceito')).sum()
+                )
+                abertos_rejeitados = int(
+                    (mask_meus & (df_pendencias['status_aceite'] == 'rejeitado')).sum()
+                )
+
+    if df_historico is not None and not df_historico.empty:
+        if 'aprovador' in df_historico.columns and 'status_aprovacao' in df_historico.columns:
+            mask = (
+                (df_historico['aprovador'] == username_atual) &
+                (df_historico['status_aprovacao'] == 'pendente')
+            )
+            aguardando_aprovacao = int(mask.sum())
+
+    def _item(icone, label, valor, cor_key=None):
+        cor_css = COR.get(cor_key, '#212529') if cor_key else '#212529'
+        return html.Div([
+            html.I(className=icone, style={"fontSize": "1.1rem", "color": cor_css}),
+            html.Div(str(valor), style={
+                "fontSize": "1.8rem",
+                "fontWeight": "800",
+                "lineHeight": "1",
+                "color": cor_css,
+                "margin": "4px 0 2px",
+            }),
+            html.Div(label, style={"fontSize": "0.72rem", "color": "#6c757d"}),
+        ], className="text-center px-4 py-2", style={"minWidth": "80px"})
+
+    return html.Div([
+        html.Div([
+            html.I(className="fas fa-bell me-2",
+                   style={"color": COR['primary'], "fontSize": "0.85rem"}),
+            html.Span("Suas Notificações", className="fw-semibold",
+                      style={"fontSize": "0.85rem", "color": "#6c757d"}),
+        ], className="text-center mb-2"),
+        html.Div([
+            _item("fas fa-inbox",       "Para Aceitar",    aguardando_aceite,
+                  cor_key="secondary" if aguardando_aceite else None),
+            _item("fas fa-clock",       "Para Aprovar",    aguardando_aprovacao,
+                  cor_key="warning" if aguardando_aprovacao else None),
+            _item("fas fa-folder-open", "Minhas Demandas", abertos_por_mim),
+            _item("fas fa-check-circle","Aceitas",         abertos_aceitos,
+                  cor_key="success" if abertos_aceitos else None),
+            _item("fas fa-times-circle","Rejeitadas",      abertos_rejeitados,
+                  cor_key="danger" if abertos_rejeitados else None),
+        ], className="d-flex justify-content-center flex-wrap"),
+    ])
 
 
 def criar_painel_filtros(username_inicial="todos"):
-    """Cria o painel de filtros sempre visível."""
+    """Cria o card unificado de Filtros e Notificações."""
+
+    _lbl = {"fontSize": "0.78rem", "fontWeight": "600", "color": "#495057"}
+    _header = {"className": "py-1 px-2", "style": {"backgroundColor": "transparent"}}
+
+    # ------------------------------------------------------------------
+    # Sub-card: Dropdowns — Responsável, Status, Aceite, Prioridade
+    # ------------------------------------------------------------------
+    card_dropdowns = dbc.Card([
+        dbc.CardHeader(
+            html.Small([html.I(className="fas fa-sliders-h me-1"), "Demandas"],
+                       className="fw-semibold text-muted"),
+            **_header
+        ),
+        dbc.CardBody([
+            html.Label("Responsável:", style=_lbl, className="mb-1"),
+            dcc.Dropdown(
+                id="filtro-responsavel",
+                options=[{"label": "Todos", "value": "todos"}],
+                value=username_inicial,
+                clearable=False,
+                className="mb-2"
+            ),
+            html.Label("Status:", style=_lbl, className="mb-1"),
+            dcc.Dropdown(
+                id="filtro-status",
+                options=[
+                    {"label": "Em Fila (Planejamento)", "value": "Em Fila (Planejamento)"},
+                    {"label": "Pendente",               "value": "Pendente"},
+                    {"label": "Em Andamento",           "value": "Em Andamento"},
+                    {"label": "Bloqueado",              "value": "Bloqueado"},
+                    {"label": "Concluído",              "value": "Concluído"},
+                ],
+                multi=True,
+                placeholder="Todos os status",
+                className="mb-2"
+            ),
+            html.Label("Aceite:", style=_lbl, className="mb-1"),
+            dcc.Dropdown(
+                id="filtro-status-aceite",
+                options=[
+                    {"label": "Aguard. Aceite", "value": "pendente"},
+                    {"label": "Aceito",         "value": "aceito"},
+                    {"label": "Rejeitado",      "value": "rejeitado"},
+                ],
+                multi=True,
+                placeholder="Todos",
+                className="mb-2"
+            ),
+            html.Label("Prioridade das Atividades:", style=_lbl, className="mb-1"),
+            dcc.Dropdown(
+                id="filtro-prioridade",
+                options=[
+                    {"label": "● Urgente", "value": "urgente"},
+                    {"label": "● Alta",    "value": "alta"},
+                    {"label": "● Normal",  "value": "normal"},
+                    {"label": "● Baixa",   "value": "baixa"},
+                ],
+                multi=True,
+                placeholder="Todas as prioridades",
+            ),
+        ], className="p-2"),
+    ], style={"flex": "2", "minWidth": "220px"})
+
+    # ------------------------------------------------------------------
+    # Sub-card: Período — DatePickers + checklist Referência
+    # ------------------------------------------------------------------
+    card_periodo = dbc.Card([
+        dbc.CardHeader(
+            html.Small([html.I(className="fas fa-calendar-alt me-1"), "Período"],
+                       className="fw-semibold text-muted"),
+            **_header
+        ),
+        dbc.CardBody([
+            html.Label("Referência:", style=_lbl, className="mb-1"),
+            dbc.Checklist(
+                id="filtro-tipo-data",
+                options=[
+                    {"label": "Demanda",   "value": "tarefa"},
+                    {"label": "Atividade", "value": "subtarefa"},
+                    {"label": "Planejada", "value": "planejada"},
+                ],
+                value=["tarefa", "subtarefa"],
+                inline=True,
+                className="mb-2",
+                style={"fontSize": "0.8rem"}
+            ),
+            html.Label("De:", style=_lbl, className="mb-1"),
+            dcc.DatePickerSingle(
+                id="filtro-data-inicio",
+                placeholder="Data inicial",
+                display_format="DD/MM/YYYY",
+                first_day_of_week=0,
+                clearable=True,
+                className="w-100 mb-2"
+            ),
+            html.Label("Até:", style=_lbl, className="mb-1"),
+            dcc.DatePickerSingle(
+                id="filtro-data-fim",
+                placeholder="Data final",
+                display_format="DD/MM/YYYY",
+                first_day_of_week=0,
+                clearable=True,
+                className="w-100"
+            ),
+        ], className="p-2"),
+    ], style={"flex": "1", "minWidth": "190px"})
+
+    # ------------------------------------------------------------------
+    # Sub-card: Busca — text input
+    # ------------------------------------------------------------------
+    card_busca = dbc.Card([
+        dbc.CardHeader(
+            html.Small([html.I(className="fas fa-search me-1"), "Busca"],
+                       className="fw-semibold text-muted"),
+            **_header
+        ),
+        dbc.CardBody([
+            html.Label("Texto:", style=_lbl, className="mb-1"),
+            dbc.Input(
+                id="filtro-busca",
+                type="text",
+                placeholder="ID, descrição ou nota GAM...",
+            ),
+        ], className="p-2"),
+    ], style={"flex": "1", "minWidth": "180px"})
+
+    # ------------------------------------------------------------------
+    # Sub-card: Flags — Switch + Validação Gestor checklist
+    # ------------------------------------------------------------------
+    card_flags = dbc.Card([
+        dbc.CardHeader(
+            html.Small([html.I(className="fas fa-toggle-on me-1"), "Flags"],
+                       className="fw-semibold text-muted"),
+            **_header
+        ),
+        dbc.CardBody([
+            html.Label("Horas:", style=_lbl, className="mb-1"),
+            dbc.Switch(
+                id="filtro-horas-uteis",
+                label="Com horas registradas",
+                value=False,
+                className="mb-3",
+                style={"fontSize": "0.8rem"}
+            ),
+            html.Label("Validação Gestor:", style=_lbl, className="mb-1"),
+            dbc.Checklist(
+                id="filtro-validacao-gestor",
+                options=[
+                    {"label": "Ag. Validação", "value": "pendente"},
+                    {"label": "Aprovadas",     "value": "aprovado"},
+                    {"label": "Devolvidas",    "value": "devolvido"},
+                ],
+                value=[],
+                inline=True,
+                style={"fontSize": "0.8rem"}
+            ),
+        ], className="p-2"),
+    ], style={"flex": "1", "minWidth": "180px"})
+
+    # ------------------------------------------------------------------
+    # Card principal
+    # ------------------------------------------------------------------
     return dbc.Card([
         dbc.CardBody([
+            # Linha 1 — Notificações centralizadas (conteúdo reativo via CB5)
             dbc.Row([
-                dbc.Col([
-                    html.Label("Responsável:", className="fw-bold mb-2"),
-                    dcc.Dropdown(
-                        id="filtro-responsavel",
-                        options=[{"label": "Todos", "value": "todos"}],
-                        value=username_inicial,
-                        clearable=False
-                    )
-                ], width=12, md=4, className="mb-3"),
-
-                dbc.Col([
-                    html.Label("Status:", className="fw-bold mb-2"),
-                    dcc.Dropdown(
-                        id="filtro-status",
-                        options=[
-                            {"label": "Em Fila (Planejamento)", "value": "Em Fila (Planejamento)"},
-                            {"label": "Pendente", "value": "Pendente"},
-                            {"label": "Em Andamento", "value": "Em Andamento"},
-                            {"label": "Bloqueado", "value": "Bloqueado"},
-                            {"label": "Concluído", "value": "Concluído"}
-                        ],
-                        multi=True,
-                        placeholder="Todos os status"
-                    )
-                ], width=12, md=4, className="mb-3"),
-
-                dbc.Col([
-                    html.Label("Buscar:", className="fw-bold mb-2"),
-                    dbc.Input(
-                        id="filtro-busca",
-                        type="text",
-                        placeholder="ID, descrição ou nota GAM..."
-                    )
-                ], width=12, md=4, className="mb-3"),
+                dbc.Col(
+                    html.Div(id="container-notificacoes"),
+                    width=12,
+                    className="text-center"
+                )
             ]),
-            dbc.Row([
-                dbc.Col([
-                    html.Label("Aceite:", className="fw-bold mb-2"),
-                    dcc.Dropdown(
-                        id="filtro-status-aceite",
-                        options=[
-                            {"label": "Aguard. Aceite", "value": "pendente"},
-                            {"label": "Aceito", "value": "aceito"},
-                            {"label": "Rejeitado", "value": "rejeitado"},
-                        ],
-                        multi=True,
-                        placeholder="Todos"
-                    )
-                ], width=12, md=2, className="mb-3"),
-
-                dbc.Col([
-                    html.Label("Horas:", className="fw-bold mb-2"),
-                    dbc.Switch(
-                        id="filtro-horas-uteis",
-                        label="Com horas",
-                        value=False,
-                        className="mt-1"
-                    )
-                ], width=12, md=1, className="mb-3"),
-
-                dbc.Col([
-                    html.Label("Referência:", className="fw-bold mb-2"),
-                    dbc.Checklist(
-                        id="filtro-tipo-data",
-                        options=[
-                            {"label": "Demanda", "value": "tarefa"},
-                            {"label": "Atividade", "value": "subtarefa"},
-                            {"label": "Planejada", "value": "planejada"},
-                        ],
-                        value=["tarefa", "subtarefa"],
-                        inline=True,
-                        className="mt-1"
-                    )
-                ], width=12, md=2, className="mb-3"),
-
-                dbc.Col([
-                    html.Label("De:", className="fw-bold mb-2"),
-                    dcc.DatePickerSingle(
-                        id="filtro-data-inicio",
-                        placeholder="Data inicial",
-                        display_format="DD/MM/YYYY",
-                        first_day_of_week=0,
-                        clearable=True,
-                        className="w-100"
-                    )
-                ], width=12, md=2, className="mb-3"),
-
-                dbc.Col([
-                    html.Label("Até:", className="fw-bold mb-2"),
-                    dcc.DatePickerSingle(
-                        id="filtro-data-fim",
-                        placeholder="Data final",
-                        display_format="DD/MM/YYYY",
-                        first_day_of_week=0,
-                        clearable=True,
-                        className="w-100"
-                    )
-                ], width=12, md=2, className="mb-3"),
-
-                dbc.Col([
-                    html.Label("\u00a0", className="fw-bold mb-2 d-block"),
-                    dbc.ButtonGroup([
-                        dbc.Button(
-                            "Aplicar Filtros",
-                            id="btn-aplicar-filtros",
-                            color="primary",
-                        ),
-                        dbc.Button(
-                            [html.I(className="fas fa-times me-1"), "Limpar"],
-                            id="btn-limpar-filtros",
-                            color="secondary",
-                            outline=True,
-                        ),
-                    ], className="w-100")
-                ], width=12, md=3)
-            ]),
-            dbc.Row([
-                dbc.Col([
-                    html.Label("Prioridade das atividades:", className="fw-bold mb-2"),
-                    dcc.Dropdown(
-                        id="filtro-prioridade",
-                        options=[
-                            {"label": "● Urgente", "value": "urgente"},
-                            {"label": "● Alta",    "value": "alta"},
-                            {"label": "● Normal",  "value": "normal"},
-                            {"label": "● Baixa",   "value": "baixa"},
-                        ],
-                        multi=True,
-                        placeholder="Todas as prioridades"
-                    )
-                ], width=12, md=4, className="mb-3"),
-                dbc.Col([
-                    html.Label("Validação Gestor:", className="fw-bold mb-2"),
-                    dbc.Checklist(
-                        id="filtro-validacao-gestor",
-                        options=[
-                            {"label": "Ag. Validação", "value": "pendente"},
-                            {"label": "Aprovadas",     "value": "aprovado"},
-                            {"label": "Devolvidas",    "value": "devolvido"},
-                        ],
-                        value=[],
-                        inline=True,
-                        className="mt-1"
-                    )
-                ], width=12, md=4, className="mb-3"),
-            ])
-        ])
+            html.Hr(className="my-2"),
+            # Linha 2 — Sub-cards de filtro por categoria
+            html.Div([
+                card_dropdowns,
+                card_periodo,
+                card_busca,
+                card_flags,
+            ], className="d-flex flex-wrap gap-2 mb-3"),
+            # Botões
+            html.Div(
+                dbc.ButtonGroup([
+                    dbc.Button(
+                        [html.I(className="fas fa-filter me-1"), "Aplicar Filtros"],
+                        id="btn-aplicar-filtros",
+                        color="primary",
+                    ),
+                    dbc.Button(
+                        [html.I(className="fas fa-times me-1"), "Limpar"],
+                        id="btn-limpar-filtros",
+                        color="secondary",
+                        outline=True,
+                    ),
+                ]),
+                className="text-end"
+            ),
+        ], className="p-3"),
     ], className="shadow-sm mb-3 workflow-filters")
 
 

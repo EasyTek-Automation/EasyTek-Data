@@ -109,14 +109,14 @@ class TestCriarCardsKpi:
         resultado = criar_cards_kpi(None, None)
         assert resultado is not None
 
-    def test_retorna_div_com_filhos(self, df_pendencias_vazio, df_historico_vazio):
-        """Deve retornar html.Div com pelo menos 1 filho (row de 3 cards KPI)."""
+    def test_retorna_row_com_filhos(self, df_pendencias_vazio, df_historico_vazio):
+        """Deve retornar dbc.Row com 3 colunas (cards KPI)."""
+        import dash_bootstrap_components as dbc
         from src.pages.workflow.dashboard import criar_cards_kpi
-        from dash import html
         resultado = criar_cards_kpi(df_pendencias_vazio, df_historico_vazio)
         assert resultado is not None
-        assert isinstance(resultado, html.Div)
-        assert len(resultado.children) >= 1
+        assert isinstance(resultado, dbc.Row)
+        assert len(resultado.children) == 3
 
     def test_conta_pendentes_corretamente(self, df_pendencias_com_dados, df_historico_vazio):
         """Com 1 pendência com status 'Pendente', o card de Pendentes deve refletir 1."""

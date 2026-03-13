@@ -19,6 +19,7 @@ from src.pages.workflow.dashboard import (
     carregar_dados_csv,
     criar_tabela_pendencias,
     criar_cards_kpi,
+    criar_notificacoes,
     float_para_hhmm
 )
 
@@ -1163,19 +1164,23 @@ def register_workflow_callbacks(app):
     # ==================================================================================
     @app.callback(
         Output("container-cards-kpi", "children"),
+        Output("container-notificacoes", "children"),
         Input("store-pendencias", "data"),
         Input("store-historico", "data"),
         State("user-username-store", "data")
     )
     def atualizar_cards_kpi(pendencias_data, historico_data, username_atual):
-        """Atualiza os cards KPI quando os dados mudam.
+        """Atualiza os cards KPI e notificações quando os dados mudam.
 
         store-pendencias já contém apenas as pendências do filtro ativo (ou todas se sem filtro).
         Usa _kpi_filtrado para garantir que o histórico seja escopo dos mesmos IDs.
         """
         df_pendencias = pd.DataFrame(pendencias_data) if pendencias_data else None
         df_historico = pd.DataFrame(historico_data) if historico_data else None
-        return _kpi_filtrado(df_pendencias, df_historico, username_atual)
+        return (
+            _kpi_filtrado(df_pendencias, df_historico, username_atual),
+            criar_notificacoes(df_pendencias, df_historico, username_atual),
+        )
 
 
     # ==================================================================================
