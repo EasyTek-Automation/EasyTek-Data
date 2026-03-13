@@ -216,8 +216,19 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
         except (ValueError, TypeError):
             horas_val = None
 
-        # Badge de prioridade ClickUp-style
-        badge_prioridade = dbc.DropdownMenu(
+        _validada = (status_validacao_gestor == 'aprovado')
+
+        # Badge de prioridade ClickUp-style (estático quando validada — bloqueio de compliance)
+        if _validada:
+            badge_prioridade = html.Span(
+                "●",
+                title=f"Prioridade: {_LABEL_PRIO.get(prioridade, 'Normal')} (validada — bloqueada)",
+                style={"color": _COR_PRIO.get(prioridade, _COR_PRIO["normal"]),
+                       "fontSize": "3.5rem", "lineHeight": "1", "cursor": "default",
+                       "marginRight": "4px"},
+            )
+        else:
+            badge_prioridade = dbc.DropdownMenu(
             [
                 dbc.DropdownMenuItem([
                     html.Span("●", style={"color": _COR_PRIO["urgente"], "marginRight": "6px"}),
@@ -333,7 +344,6 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                 meta_children.append(html.Span(" · ", className="text-muted"))
 
         # Botões de ação (ícone-apenas para máxima densidade)
-        _validada = (status_validacao_gestor == 'aprovado')
         botoes = []
         if not concluido and hist_id:
             botoes.append(dbc.Button(
