@@ -40,4 +40,5 @@ gunicorn
 dash-bootstrap-templates
 markdown==3.7
 PyYAML
+weasyprint
 

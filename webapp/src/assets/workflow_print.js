@@ -197,34 +197,57 @@ document.addEventListener('click', function (e) {
         '</tbody>',
         '</table>',   /* #outer-layout */
 
-        /* Aguarda estilos carregarem, então abre diálogo de impressão */
-        '<script>',
-        'window.addEventListener("load", function () {',
-        '  setTimeout(function () { window.print(); }, 700);',
-        '});',
-        'window.addEventListener("afterprint", function () { window.close(); });',
-        '</scr' + 'ipt>',   /* separar tag para evitar parsing prematuro */
-
         '</body>',
         '</html>'
     ].join('\n');
 
     /* ----------------------------------------------------------------
-       Abrir a janela de impressão via Blob URL em vez de document.write().
-       document.write() é síncrono e, em Chrome, pode congelar brevemente
-       a aba pai (mesmo processo de renderização quando mesmo origin).
-       Blob URL carrega de forma assíncrona, sem bloquear a aba original.
+       Enviar HTML ao servidor → WeasyPrint gera PDF A4 paisagem de forma
+       100% confiável (ignora configurações do browser).
+       Botão fica desabilitado enquanto aguarda; download automático no retorno.
     ---------------------------------------------------------------- */
-    var blob = new Blob([html], { type: 'text/html; charset=utf-8' });
-    var blobUrl = URL.createObjectURL(blob);
-    var pw = window.open(blobUrl, '_blank', 'width=1400,height=900');
-    if (!pw) {
-        URL.revokeObjectURL(blobUrl);
-        alert('Exportação bloqueada pelo navegador. Permita pop-ups para este site e tente novamente.');
-        return;
-    }
-    /* Liberar memória do blob após a janela carregar o conteúdo */
-    pw.addEventListener('load', function () {
-        URL.revokeObjectURL(blobUrl);
+    var btn = document.getElementById('btn-export');
+    var originalHtml = btn.innerHTML;
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin me-2"></i>Gerando PDF...';
+
+    fetch('/workflow/export-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/html; charset=utf-8' },
+        body: html,
+    })
+    .then(function (response) {
+        if (!response.ok) {
+            return response.text().then(function (msg) { throw new Error(msg); });
+        }
+        return response.blob();
+    })
+    .then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        var a   = document.createElement('a');
+        a.href  = url;
+        a.download = 'relatorio-demandas.pdf';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    })
+    .catch(function (err) {
+        /* Fallback: abre diálogo de impressão (desenvolvimento sem WeasyPrint).
+           Em produção (Docker com Pango instalado) este bloco nunca é atingido. */
+        console.warn('PDF server-side falhou (' + err.message + '). Abrindo diálogo de impressão.');
+        var blob   = new Blob([html], { type: 'text/html; charset=utf-8' });
+        var blobUrl = URL.createObjectURL(blob);
+        var pw = window.open(blobUrl, '_blank', 'width=1400,height=900');
+        if (!pw) {
+            URL.revokeObjectURL(blobUrl);
+            alert('Exportação bloqueada pelo navegador. Permita pop-ups para este site e tente novamente.');
+            return;
+        }
+        pw.addEventListener('load', function () { URL.revokeObjectURL(blobUrl); });
+    })
+    .finally(function () {
+        btn.disabled    = false;
+        btn.innerHTML   = originalHtml;
     });
 });
