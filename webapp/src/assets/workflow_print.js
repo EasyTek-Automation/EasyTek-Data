@@ -45,49 +45,77 @@ document.addEventListener('click', function (e) {
         el.style.visibility = 'visible';
     });
 
-    /* Remover fisicamente 1ª coluna (chevron) e última (ações) de cada linha.
-       WeasyPrint ignora display:none/visibility:hidden em células de tabela e
-       mantém o espaço alocado — remoção do DOM é a única forma confiável.
+    /* Reconstruir a tabela de demandas com apenas 5 colunas (sem chevron e sem ações).
+       Abordagem de REBUILD em vez de remoção in-place: cria uma nova <table> limpa
+       copiando as células por índice (1 até N-2), sem depender de .remove() no DOM
+       React — que pode não funcionar confiavelmente em certos contextos.
 
-       IMPORTANTE: usar tr.children (filhos diretos) em vez de querySelectorAll,
-       pois querySelectorAll('th, td') captura células de tabelas ANINHADAS dentro
-       do painel de subtarefas, inflando a contagem e removendo células erradas.
+       Estrutura das 7 colunas originais:
+         [0] chevron | [1] ID | [2] Desc | [3] Resp | [4] Status | [5] Prog | [6] Ações
+       Resultado (5 colunas): ID | Desc | Resp | Status | Prog
 
-       Expand rows têm 1 filho direto <td colspan=7>: ajustar colspan para 5
-       em vez de remover, mantendo consistência estrutural com as demais linhas. */
-    tableClone.querySelectorAll('tr').forEach(function (tr) {
-        var cells = Array.from(tr.children).filter(function (el) {
-            return el.tagName === 'TD' || el.tagName === 'TH';
-        });
-        if (cells.length === 0) return;
-
-        if (cells.length === 1) {
-            /* Expand row: único filho direto tem colspan=7 → ajustar para 5 */
-            var span = parseInt(cells[0].getAttribute('colspan') || '1', 10);
-            cells[0].setAttribute('colspan', Math.max(1, span - 2));
-            return;
+       Expand rows têm 1 filho direto <td colspan=7>: é clonada com colspan=5.
+       colgroup + table-layout:fixed garante alinhamento exato no WeasyPrint. */
+    var origTable = tableClone.querySelector('table.workflow-table');
+    if (origTable) {
+        var newTable = document.createElement('table');
+        newTable.className = origTable.className;
+        if (origTable.getAttribute('style')) {
+            newTable.setAttribute('style', origTable.getAttribute('style'));
         }
 
-        /* Main row / thead: remover última (ações) e primeira (chevron) */
-        cells[cells.length - 1].remove();
-        cells[0].remove();
-    });
-
-    /* Inserir <colgroup> com larguras explícitas após remoção das colunas.
-       No WeasyPrint, colgroup é mais confiável que CSS selectors para
-       definir larguras — especialmente quando combinado com table-layout:fixed.
-       Colunas restantes: ID | Descrição | Responsável | Status | Progresso */
-    var tbl = tableClone.querySelector('table.workflow-table');
-    if (tbl) {
-        var existingCg = tbl.querySelector('colgroup');
-        if (existingCg) existingCg.parentNode.removeChild(existingCg);
+        /* colgroup com larguras explícitas das 5 colunas */
         var cg = document.createElement('colgroup');
         ['110px', null, '155px', '155px', '110px'].forEach(function (w) {
             var col = document.createElement('col');
             if (w) col.style.width = w;
             cg.appendChild(col);
         });
-        tbl.insertBefore(cg, tbl.firstChild);
+        newTable.appendChild(cg);
+
+        /* Reconstruir thead e tbody usando apenas filhos diretos */
+        ['thead', 'tbody'].forEach(function (secTag) {
+            var origSec = origTable.querySelector(secTag);
+            if (!origSec) return;
+            var newSec = document.createElement(secTag);
+
+            /* Iterar apenas trs filhos DIRETOS da seção (ignora nested tables) */
+            Array.from(origSec.children).forEach(function (tr) {
+                if (tr.tagName !== 'TR') return;
+
+                /* Células filhas DIRETAS do tr */
+                var directCells = Array.from(tr.children).filter(function (el) {
+                    return el.tagName === 'TD' || el.tagName === 'TH';
+                });
+                if (directCells.length === 0) return;
+
+                var newTr = document.createElement('tr');
+                if (tr.getAttribute('style')) {
+                    newTr.setAttribute('style', tr.getAttribute('style'));
+                }
+                newTr.className = tr.className;
+
+                if (directCells.length === 1) {
+                    /* Expand row: 1 td colspan=7 → clone com colspan=5 */
+                    var cellClone = directCells[0].cloneNode(true);
+                    var span = parseInt(cellClone.getAttribute('colspan') || '1', 10);
+                    cellClone.setAttribute('colspan', Math.max(1, span - 2));
+                    newTr.appendChild(cellClone);
+                } else {
+                    /* Linha principal / thead: copiar células 1 a N-2 (pular chevron e ações) */
+                    for (var i = 1; i < directCells.length - 1; i++) {
+                        newTr.appendChild(directCells[i].cloneNode(true));
+                    }
+                }
+
+                newSec.appendChild(newTr);
+            });
+
+            newTable.appendChild(newSec);
+        });
+
+        /* Substituir a tabela original pela reconstruída no clone */
+        origTable.parentNode.replaceChild(newTable, origTable);
     }
 
     /* ----------------------------------------------------------------
