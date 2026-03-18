@@ -10,17 +10,18 @@ WORKDIR /app
 #    - build-essential: Para compilação de pacotes.
 #    - dnsutils: Para a resolução de nomes SRV do MongoDB Atlas.
 #    - libgssapi-krb5-2: Dependência para autenticação GSSAPI do pymongo.
+#    - libpango*/libharfbuzz*/libfontconfig1: WeasyPrint (PDF server-side)
+#    - fonts-liberation: fontes base para o PDF
 RUN apt-get update && apt-get install -y \
     build-essential \
     dnsutils \
     libgssapi-krb5-2 \
     libkrb5-dev \
-    # WeasyPrint: Pango text rendering + fonts
     libpango-1.0-0 \
     libharfbuzz0b \
     libpangoft2-1.0-0 \
     libpangocairo-1.0-0 \
-    libgdk-pixbuf2.0-0 \
+    libfontconfig1 \
     fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
