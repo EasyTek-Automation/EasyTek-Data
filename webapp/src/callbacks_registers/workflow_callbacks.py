@@ -808,7 +808,7 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
                               data_inicio=None, data_fim=None,
                               tipo_data="tarefa", df_historico=None, horas_uteis=False,
                               prioridade_list=None, validacao_gestor_list=None,
-                              sem_planejamento=False):
+                              sem_planejamento=False, atrasadas=False):
     """Aplica filtros ao DataFrame de pendências."""
     from datetime import datetime as _dt, timedelta
 
@@ -935,6 +935,23 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
             ids_sem_plan = set(df_h[col_id].dropna().astype(str).unique())
             df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_sem_plan)]
 
+    if atrasadas and df_historico is not None and not df_historico.empty:
+        # Atividades atrasadas: data_planejada anterior ao 1º dia do mês atual e não concluídas
+        hoje = _dt.now()
+        primeiro_do_mes = _dt(hoje.year, hoje.month, 1)
+        df_h = df_historico.copy()
+        if 'record_type' in df_h.columns:
+            df_h = df_h[df_h['record_type'] == 'subtarefa']
+        if 'data_planejada' in df_h.columns:
+            df_h['_dp'] = pd.to_datetime(df_h['data_planejada'], errors='coerce')
+            df_h = df_h[df_h['_dp'].notna() & (df_h['_dp'] < primeiro_do_mes)]
+        if 'concluido' in df_h.columns:
+            df_h = df_h[df_h['concluido'] != True]
+        col_id = 'pendencia_id' if 'pendencia_id' in df_h.columns else 'MaintenanceWF_id'
+        if col_id in df_h.columns:
+            ids_atrasadas = set(df_h[col_id].dropna().astype(str).unique())
+            df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_atrasadas)]
+
     return df_filtrado
 
 
@@ -980,6 +997,7 @@ def reconstruir_tabela_com_filtros(df_pendencias, df_historico, filtros, user_le
             prioridade_list=filtros.get("prioridade"),
             validacao_gestor_list=filtros.get("validacao_gestor"),
             sem_planejamento=filtros.get("sem_planejamento", False),
+            atrasadas=filtros.get("atrasadas", False),
         )
     else:
         df_filtrado = df_pendencias
@@ -1116,13 +1134,14 @@ def register_workflow_callbacks(app):
         State("filtro-prioridade", "value"),
         State("filtro-validacao-gestor", "value"),
         State("filtro-sem-planejamento", "value"),
+        State("filtro-atrasadas", "value"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
         prevent_initial_call=True
     )
     def aplicar_filtros(n_clicks, responsavel, status_list, busca, status_aceite_list,
                         tipo_data, data_inicio, data_fim, horas_uteis, prioridade_list,
-                        validacao_gestor_list, sem_planejamento, user_level, username_atual):
+                        validacao_gestor_list, sem_planejamento, atrasadas, user_level, username_atual):
         """Aplica os filtros selecionados e reconstrói a tabela."""
         if not n_clicks:
             raise PreventUpdate
@@ -1144,6 +1163,7 @@ def register_workflow_callbacks(app):
             "prioridade": prioridade_list or [],
             "validacao_gestor": validacao_gestor_list or [],
             "sem_planejamento": sem_planejamento or False,
+            "atrasadas": atrasadas or False,
         }
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
             df_pendencias, df_historico, filtros, user_level, username_atual
@@ -1177,12 +1197,13 @@ def register_workflow_callbacks(app):
         State("filtro-prioridade", "value"),
         State("filtro-validacao-gestor", "value"),
         State("filtro-sem-planejamento", "value"),
+        State("filtro-atrasadas", "value"),
         prevent_initial_call=True
     )
     def refresh_dados(n_clicks, user_level, username_atual,
                       responsavel, status_list, busca, status_aceite_list,
                       tipo_data, data_inicio, data_fim, horas_uteis,
-                      prioridade_list, validacao_gestor_list, sem_planejamento):
+                      prioridade_list, validacao_gestor_list, sem_planejamento, atrasadas):
         """Recarrega dados do MongoDB e reconstrói a tabela preservando todos os filtros atuais."""
         if not n_clicks:
             raise PreventUpdate
@@ -1204,6 +1225,7 @@ def register_workflow_callbacks(app):
             "prioridade": prioridade_list or [],
             "validacao_gestor": validacao_gestor_list or [],
             "sem_planejamento": sem_planejamento or False,
+            "atrasadas": atrasadas or False,
         }
 
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
@@ -1587,6 +1609,7 @@ def register_workflow_callbacks(app):
         Output("filtro-prioridade", "value"),
         Output("filtro-validacao-gestor", "value"),
         Output("filtro-sem-planejamento", "value"),
+        Output("filtro-atrasadas", "value"),
         Output("store-filtros-ativos", "data", allow_duplicate=True),
         Output("container-tabela", "children", allow_duplicate=True),
         Output("store-pendencias", "data", allow_duplicate=True),
@@ -1612,6 +1635,7 @@ def register_workflow_callbacks(app):
         return (
             "todos", [], "", [], ["tarefa", "subtarefa"], None, None, False, [], [],  # resetar UI dos filtros + datas + validacao
             False,                                       # sem_planejamento resetado
+            False,                                       # atrasadas resetado
             None,                                        # limpar store de filtros
             nova_tabela,
             df_pendencias.to_dict('records')

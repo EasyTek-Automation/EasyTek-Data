@@ -804,6 +804,13 @@ def criar_painel_filtros(username_inicial="todos"):
                 className="mb-3",
                 style={"fontSize": "0.8rem"}
             ),
+            dbc.Switch(
+                id="filtro-atrasadas",
+                label="Atividades atrasadas",
+                value=False,
+                className="mb-3",
+                style={"fontSize": "0.8rem"}
+            ),
             html.Label("Validação Gestor:", style=_lbl, className="mb-1"),
             dbc.Checklist(
                 id="filtro-validacao-gestor",
