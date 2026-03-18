@@ -48,14 +48,21 @@ document.addEventListener('click', function (e) {
     /* Remover fisicamente 1ª coluna (chevron) e última (ações) de cada linha.
        WeasyPrint ignora display:none/visibility:hidden em células de tabela e
        mantém o espaço alocado — remoção do DOM é a única forma confiável.
-       Expand rows têm apenas 1 célula com colspan=7: não remover a célula,
-       apenas ajustar o colspan (7→5) para manter consistência com as demais. */
+
+       IMPORTANTE: usar tr.children (filhos diretos) em vez de querySelectorAll,
+       pois querySelectorAll('th, td') captura células de tabelas ANINHADAS dentro
+       do painel de subtarefas, inflando a contagem e removendo células erradas.
+
+       Expand rows têm 1 filho direto <td colspan=7>: ajustar colspan para 5
+       em vez de remover, mantendo consistência estrutural com as demais linhas. */
     tableClone.querySelectorAll('tr').forEach(function (tr) {
-        var cells = tr.querySelectorAll('th, td');
+        var cells = Array.from(tr.children).filter(function (el) {
+            return el.tagName === 'TD' || el.tagName === 'TH';
+        });
         if (cells.length === 0) return;
 
         if (cells.length === 1) {
-            /* Expand row: única célula tem colspan=7 → ajustar para 5 */
+            /* Expand row: único filho direto tem colspan=7 → ajustar para 5 */
             var span = parseInt(cells[0].getAttribute('colspan') || '1', 10);
             cells[0].setAttribute('colspan', Math.max(1, span - 2));
             return;
@@ -63,8 +70,7 @@ document.addEventListener('click', function (e) {
 
         /* Main row / thead: remover última (ações) e primeira (chevron) */
         cells[cells.length - 1].remove();
-        cells = tr.querySelectorAll('th, td');
-        if (cells.length > 0) cells[0].remove();
+        cells[0].remove();
     });
 
     /* ----------------------------------------------------------------
