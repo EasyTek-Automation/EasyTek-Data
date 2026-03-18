@@ -129,14 +129,19 @@ document.addEventListener('click', function (e) {
         '  vertical-align: middle; }',
         '.workflow-table th { font-size: 10px !important; }',
 
-        /* Ocultar colunas de interação: chevron (1ª) e ações (última) */
+        /* Colapsar colunas de interação: chevron (1ª) e ações (última).
+           WeasyPrint ignora display:none em células de tabela e mantém o espaço —
+           usar width:0 + padding:0 + overflow:hidden garante o colapso real. */
         '.workflow-table th:first-child, .workflow-table td:first-child,',
         '.workflow-table th:last-child,  .workflow-table td:last-child {',
-        '  display: none !important; }',
+        '  width: 0 !important; max-width: 0 !important;',
+        '  padding: 0 !important; border: none !important;',
+        '  overflow: hidden !important; visibility: hidden !important; }',
 
-        /* Coluna ID: largura compacta (1ª coluna visível = nth-child(2), pois a 1ª está oculta) */
+        /* Coluna ID: largura fixa com overflow oculto para não invadir a Descrição */
         '.workflow-table th:nth-child(2), .workflow-table td:nth-child(2) {',
-        '  width: 90px !important; max-width: 90px !important; white-space: nowrap; }',
+        '  width: 110px !important; max-width: 110px !important;',
+        '  white-space: nowrap; overflow: hidden !important; }',
 
         /* Botões viram texto puro */
         '.workflow-table .btn {',
