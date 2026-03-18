@@ -1191,7 +1191,7 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
             dbc.Badge(
                 [html.I(className="fas fa-hashtag me-1"), nota_gam],
                 color="light",
-                className="ms-2 align-middle border border-secondary text-secondary",
+                className="ms-2 align-middle border border-secondary text-secondary nota-gam-badge",
                 style={"fontSize": "0.75rem", "fontWeight": "500"}
             )
         )

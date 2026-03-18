@@ -93,7 +93,10 @@ document.addEventListener('click', function (e) {
         '  display: flex; justify-content: space-between; align-items: center;',
         '  border-bottom: 2px solid #333; padding-bottom: 10px; margin-bottom: 16px;',
         '}',
-        '#amg-print-header .hdr-logo img { display: block; opacity: 0.90; }',
+        /* Logo: tamanho fixo com !important sobrepõe qualquer regra Bootstrap (ex: img { width:100% }) */
+        '#amg-print-header .hdr-logo img {',
+        '  display: block; opacity: 0.90;',
+        '  height: 60px !important; width: auto !important; max-width: 240px !important; }',
         '#amg-print-header .hdr-info { text-align: right; line-height: 1.55; }',
         '#amg-print-header .hdr-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }',
         '#amg-print-header .hdr-meta  { font-size: 13px; color: #555; }',
@@ -130,6 +133,9 @@ document.addEventListener('click', function (e) {
         '.workflow-table th:first-child, .workflow-table td:first-child,',
         '.workflow-table th:last-child,  .workflow-table td:last-child {',
         '  display: none !important; }',
+
+        /* Ocultar badge de nota GAM (interativo, irrelevante no PDF) */
+        '.nota-gam-badge { display: none !important; }',
 
         /* Botões viram texto puro */
         '.workflow-table .btn {',
