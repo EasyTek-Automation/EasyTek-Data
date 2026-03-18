@@ -472,3 +472,201 @@ class TestAplicarFiltrosDataframePrioridade:
             df_historico=None, prioridade_list=["urgente"]
         )
         assert len(resultado) == 3
+
+
+# =============================================================================
+# TESTES: Filtro por data (demanda, atividade, planejada)
+# =============================================================================
+
+class TestFiltroDataframe_Data:
+    @pytest.fixture
+    def df_pend(self):
+        return pd.DataFrame([
+            {'id': 'WF001', 'descricao': 'D1', 'responsavel': 'u1', 'status': 'Pendente',
+             'data_criacao': datetime(2026, 3, 5), 'nota_gam': None},
+            {'id': 'WF002', 'descricao': 'D2', 'responsavel': 'u1', 'status': 'Pendente',
+             'data_criacao': datetime(2026, 3, 10), 'nota_gam': None},
+            {'id': 'WF003', 'descricao': 'D3', 'responsavel': 'u1', 'status': 'Pendente',
+             'data_criacao': datetime(2026, 2, 15), 'nota_gam': None},
+        ])
+
+    @pytest.fixture
+    def df_hist(self):
+        return pd.DataFrame([
+            {'hist_id': 'h1', 'pendencia_id': 'WF001', 'record_type': 'subtarefa',
+             'data': datetime(2026, 3, 6), 'data_planejada': datetime(2026, 3, 7)},
+            {'hist_id': 'h2', 'pendencia_id': 'WF002', 'record_type': 'subtarefa',
+             'data': datetime(2026, 2, 20), 'data_planejada': datetime(2026, 3, 12)},
+            {'hist_id': 'h3', 'pendencia_id': 'WF003', 'record_type': 'subtarefa',
+             'data': datetime(2026, 2, 10), 'data_planejada': datetime(2026, 2, 11)},
+        ])
+
+    def test_filtro_por_demanda_dentro_periodo(self, df_pend, df_hist):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            data_inicio='2026-03-01', data_fim='2026-03-18',
+            tipo_data=['tarefa'], df_historico=df_hist
+        )
+        assert set(resultado['id']) == {'WF001', 'WF002'}
+
+    def test_filtro_por_demanda_exclui_fora_periodo(self, df_pend, df_hist):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            data_inicio='2026-03-01', data_fim='2026-03-18',
+            tipo_data=['tarefa'], df_historico=df_hist
+        )
+        assert 'WF003' not in resultado['id'].values
+
+    def test_filtro_por_atividade_dentro_periodo(self, df_pend, df_hist):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            data_inicio='2026-03-01', data_fim='2026-03-18',
+            tipo_data=['subtarefa'], df_historico=df_hist
+        )
+        assert set(resultado['id']) == {'WF001'}
+
+    def test_filtro_por_atividade_exclui_demanda_sem_atividade_no_range(self, df_pend, df_hist):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            data_inicio='2026-03-01', data_fim='2026-03-18',
+            tipo_data=['subtarefa'], df_historico=df_hist
+        )
+        assert 'WF002' not in resultado['id'].values
+        assert 'WF003' not in resultado['id'].values
+
+    def test_filtro_por_planejada_dentro_periodo(self, df_pend, df_hist):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            data_inicio='2026-03-01', data_fim='2026-03-18',
+            tipo_data=['planejada'], df_historico=df_hist
+        )
+        assert set(resultado['id']) == {'WF001', 'WF002'}
+
+    def test_sem_datas_retorna_todos(self, df_pend, df_hist):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            data_inicio=None, data_fim=None,
+            tipo_data=['tarefa'], df_historico=df_hist
+        )
+        assert len(resultado) == 3
+
+
+# =============================================================================
+# TESTES: Filtro "sem data planejada"
+# =============================================================================
+
+class TestFiltroDataframe_SemPlanejamento:
+    @pytest.fixture
+    def df_pend(self):
+        return pd.DataFrame([
+            {'id': 'WF001', 'descricao': 'D1', 'responsavel': 'u1', 'status': 'Pendente',
+             'data_criacao': datetime(2026, 3, 5), 'nota_gam': None},
+            {'id': 'WF002', 'descricao': 'D2', 'responsavel': 'u1', 'status': 'Pendente',
+             'data_criacao': datetime(2026, 3, 10), 'nota_gam': None},
+        ])
+
+    @pytest.fixture
+    def df_hist(self):
+        return pd.DataFrame([
+            {'hist_id': 'h1', 'pendencia_id': 'WF001', 'record_type': 'subtarefa',
+             'data': datetime(2026, 3, 6), 'data_planejada': None},
+            {'hist_id': 'h2', 'pendencia_id': 'WF002', 'record_type': 'subtarefa',
+             'data': datetime(2026, 3, 8), 'data_planejada': datetime(2026, 3, 10)},
+        ])
+
+    def test_sem_planejamento_ativo_retorna_so_nao_planejadas(self, df_pend, df_hist):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            df_historico=df_hist, sem_planejamento=True
+        )
+        assert list(resultado['id']) == ['WF001']
+
+    def test_sem_planejamento_inativo_retorna_todos(self, df_pend, df_hist):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            df_historico=df_hist, sem_planejamento=False
+        )
+        assert len(resultado) == 2
+
+    def test_sem_planejamento_sem_historico_nao_filtra(self, df_pend):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            df_historico=None, sem_planejamento=True
+        )
+        assert len(resultado) == 2
+
+    def test_sem_planejamento_todos_tem_data_retorna_vazio(self, df_pend):
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        df_hist_planejado = pd.DataFrame([
+            {'hist_id': 'h1', 'pendencia_id': 'WF001', 'record_type': 'subtarefa',
+             'data': datetime(2026, 3, 6), 'data_planejada': datetime(2026, 3, 7)},
+            {'hist_id': 'h2', 'pendencia_id': 'WF002', 'record_type': 'subtarefa',
+             'data': datetime(2026, 3, 8), 'data_planejada': datetime(2026, 3, 10)},
+        ])
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            df_historico=df_hist_planejado, sem_planejamento=True
+        )
+        assert len(resultado) == 0
+
+
+# =============================================================================
+# TESTES: _calcular_periodo_pdf helper
+# =============================================================================
+
+class TestCalcularPeriodoPdf:
+    def test_usa_datas_do_filtro_quando_ativas(self):
+        from src.callbacks_registers.workflow_callbacks import _calcular_periodo_pdf
+        filtros = {'data_inicio': '2026-03-01', 'data_fim': '2026-03-18'}
+        resultado = _calcular_periodo_pdf([], filtros)
+        assert resultado == '01/03/2026 → 18/03/2026'
+
+    def test_usa_so_data_inicio_sem_fim(self):
+        from src.callbacks_registers.workflow_callbacks import _calcular_periodo_pdf
+        filtros = {'data_inicio': '2026-03-01', 'data_fim': None}
+        resultado = _calcular_periodo_pdf([], filtros)
+        assert resultado == '01/03/2026 → ?'
+
+    def test_usa_so_data_fim_sem_inicio(self):
+        from src.callbacks_registers.workflow_callbacks import _calcular_periodo_pdf
+        filtros = {'data_inicio': None, 'data_fim': '2026-03-18'}
+        resultado = _calcular_periodo_pdf([], filtros)
+        assert resultado == '? → 18/03/2026'
+
+    def test_sem_filtro_calcula_minmax(self):
+        from src.callbacks_registers.workflow_callbacks import _calcular_periodo_pdf
+        import pandas as pd
+        pendencias = [
+            {'data_criacao': pd.Timestamp('2026-03-01', tz='UTC')},
+            {'data_criacao': pd.Timestamp('2026-03-15', tz='UTC')},
+        ]
+        filtros = {'data_inicio': None, 'data_fim': None}
+        resultado = _calcular_periodo_pdf(pendencias, filtros)
+        # min UTC 2026-03-01 → BRT 2026-02-28; max UTC 2026-03-15 → BRT 2026-03-14
+        assert '→' in resultado
+        assert resultado != ''
+
+    def test_pendencias_vazias_retorna_string_vazia(self):
+        from src.callbacks_registers.workflow_callbacks import _calcular_periodo_pdf
+        resultado = _calcular_periodo_pdf([], {'data_inicio': None, 'data_fim': None})
+        assert resultado == ''
+
+    def test_filtros_none_calcula_minmax(self):
+        from src.callbacks_registers.workflow_callbacks import _calcular_periodo_pdf
+        import pandas as pd
+        pendencias = [
+            {'data_criacao': pd.Timestamp('2026-03-05', tz='UTC')},
+            {'data_criacao': pd.Timestamp('2026-03-10', tz='UTC')},
+        ]
+        resultado = _calcular_periodo_pdf(pendencias, None)
+        assert '→' in resultado
+        assert resultado != ''

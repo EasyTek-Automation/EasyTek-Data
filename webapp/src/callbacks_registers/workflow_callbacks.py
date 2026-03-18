@@ -750,10 +750,36 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
     )
 
 
+def _calcular_periodo_pdf(pendencias_data, filtros):
+    """Período para o relatório PDF.
+    - Com filtro de data ativo: usa data_inicio/data_fim do filtro
+    - Sem filtro de data: min/max de data_criacao das demandas visíveis
+    """
+    if filtros and (filtros.get("data_inicio") or filtros.get("data_fim")):
+        inicio = filtros.get("data_inicio")
+        fim    = filtros.get("data_fim")
+        from datetime import datetime as _dt
+        d_ini = _dt.fromisoformat(inicio).strftime("%d/%m/%Y") if inicio else "?"
+        d_fim = _dt.fromisoformat(fim).strftime("%d/%m/%Y")   if fim    else "?"
+        return f"{d_ini} → {d_fim}"
+    # Fallback: min/max de data_criacao
+    if not pendencias_data:
+        return ""
+    df = pd.DataFrame(pendencias_data)
+    if "data_criacao" not in df.columns:
+        return ""
+    datas = pd.to_datetime(df["data_criacao"], errors="coerce").dropna()
+    if datas.empty:
+        return ""
+    brt = pd.Timedelta(hours=-3)
+    return f"{(datas.min()+brt).strftime('%d/%m/%Y')} → {(datas.max()+brt).strftime('%d/%m/%Y')}"
+
+
 def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite_list=None,
                               data_inicio=None, data_fim=None,
                               tipo_data="tarefa", df_historico=None, horas_uteis=False,
-                              prioridade_list=None, validacao_gestor_list=None):
+                              prioridade_list=None, validacao_gestor_list=None,
+                              sem_planejamento=False):
     """Aplica filtros ao DataFrame de pendências."""
     from datetime import datetime as _dt, timedelta
 
@@ -865,6 +891,17 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
                 ids_com_validacao = set(df_h[col_id].dropna().astype(str).unique())
                 df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_com_validacao)]
 
+    if sem_planejamento and df_historico is not None and not df_historico.empty:
+        df_h = df_historico.copy()
+        if 'record_type' in df_h.columns:
+            df_h = df_h[df_h['record_type'] == 'subtarefa']
+        if 'data_planejada' in df_h.columns:
+            df_h = df_h[df_h['data_planejada'].isna() | (df_h['data_planejada'] == '')]
+        col_id = 'pendencia_id' if 'pendencia_id' in df_h.columns else 'MaintenanceWF_id'
+        if col_id in df_h.columns:
+            ids_sem_plan = set(df_h[col_id].dropna().astype(str).unique())
+            df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_sem_plan)]
+
     return df_filtrado
 
 
@@ -909,6 +946,7 @@ def reconstruir_tabela_com_filtros(df_pendencias, df_historico, filtros, user_le
             horas_uteis=filtros.get("horas_uteis", False),
             prioridade_list=filtros.get("prioridade"),
             validacao_gestor_list=filtros.get("validacao_gestor"),
+            sem_planejamento=filtros.get("sem_planejamento", False),
         )
     else:
         df_filtrado = df_pendencias
@@ -1038,13 +1076,14 @@ def register_workflow_callbacks(app):
         State("filtro-horas-uteis", "value"),
         State("filtro-prioridade", "value"),
         State("filtro-validacao-gestor", "value"),
+        State("filtro-sem-planejamento", "value"),
         State("user-level-store", "data"),
         State("user-username-store", "data"),
         prevent_initial_call=True
     )
     def aplicar_filtros(n_clicks, responsavel, status_list, busca, status_aceite_list,
                         tipo_data, data_inicio, data_fim, horas_uteis, prioridade_list,
-                        validacao_gestor_list, user_level, username_atual):
+                        validacao_gestor_list, sem_planejamento, user_level, username_atual):
         """Aplica os filtros selecionados e reconstrói a tabela."""
         if not n_clicks:
             raise PreventUpdate
@@ -1065,6 +1104,7 @@ def register_workflow_callbacks(app):
             "horas_uteis": horas_uteis or False,
             "prioridade": prioridade_list or [],
             "validacao_gestor": validacao_gestor_list or [],
+            "sem_planejamento": sem_planejamento or False,
         }
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
             df_pendencias, df_historico, filtros, user_level, username_atual
@@ -1097,12 +1137,13 @@ def register_workflow_callbacks(app):
         State("filtro-horas-uteis", "value"),
         State("filtro-prioridade", "value"),
         State("filtro-validacao-gestor", "value"),
+        State("filtro-sem-planejamento", "value"),
         prevent_initial_call=True
     )
     def refresh_dados(n_clicks, user_level, username_atual,
                       responsavel, status_list, busca, status_aceite_list,
                       tipo_data, data_inicio, data_fim, horas_uteis,
-                      prioridade_list, validacao_gestor_list):
+                      prioridade_list, validacao_gestor_list, sem_planejamento):
         """Recarrega dados do MongoDB e reconstrói a tabela preservando todos os filtros atuais."""
         if not n_clicks:
             raise PreventUpdate
@@ -1123,6 +1164,7 @@ def register_workflow_callbacks(app):
             "horas_uteis": horas_uteis or False,
             "prioridade": prioridade_list or [],
             "validacao_gestor": validacao_gestor_list or [],
+            "sem_planejamento": sem_planejamento or False,
         }
 
         nova_tabela, store_data = reconstruir_tabela_com_filtros(
@@ -1213,23 +1255,15 @@ def register_workflow_callbacks(app):
     @app.callback(
         Output("pdf-periodo-data", "children"),
         Input("store-pendencias", "data"),
+        State("store-filtros-ativos", "data"),
     )
-    def atualizar_periodo_pdf(pendencias_data):
-        """Calcula o período (data_criacao mais antiga → mais recente) das demandas
-        visíveis. Sempre reflete a view atual — filtrada ou completa."""
-        if not pendencias_data:
-            return ""
+    def atualizar_periodo_pdf(pendencias_data, filtros_ativos):
+        """Período do relatório PDF.
+        - Com filtro de data ativo: usa data_inicio/data_fim do filtro
+        - Sem filtro de data: min/max de data_criacao das demandas visíveis
+        """
         try:
-            df = pd.DataFrame(pendencias_data)
-            if "data_criacao" not in df.columns:
-                return ""
-            datas = pd.to_datetime(df["data_criacao"], errors="coerce").dropna()
-            if datas.empty:
-                return ""
-            brt = pd.Timedelta(hours=-3)
-            d_min = (datas.min() + brt).strftime("%d/%m/%Y")
-            d_max = (datas.max() + brt).strftime("%d/%m/%Y")
-            return f"{d_min} → {d_max}"
+            return _calcular_periodo_pdf(pendencias_data, filtros_ativos)
         except Exception:
             return ""
 
@@ -1506,6 +1540,7 @@ def register_workflow_callbacks(app):
         Output("filtro-horas-uteis", "value"),
         Output("filtro-prioridade", "value"),
         Output("filtro-validacao-gestor", "value"),
+        Output("filtro-sem-planejamento", "value"),
         Output("store-filtros-ativos", "data", allow_duplicate=True),
         Output("container-tabela", "children", allow_duplicate=True),
         Output("store-pendencias", "data", allow_duplicate=True),
@@ -1530,6 +1565,7 @@ def register_workflow_callbacks(app):
         )
         return (
             "todos", [], "", [], ["tarefa", "subtarefa"], None, None, False, [], [],  # resetar UI dos filtros + datas + validacao
+            False,                                       # sem_planejamento resetado
             None,                                        # limpar store de filtros
             nova_tabela,
             df_pendencias.to_dict('records')

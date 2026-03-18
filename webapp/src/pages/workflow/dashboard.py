@@ -791,6 +791,13 @@ def criar_painel_filtros(username_inicial="todos"):
                 className="mb-3",
                 style={"fontSize": "0.8rem"}
             ),
+            dbc.Switch(
+                id="filtro-sem-planejamento",
+                label="Atividades sem data planejada",
+                value=False,
+                className="mb-3",
+                style={"fontSize": "0.8rem"}
+            ),
             html.Label("Validação Gestor:", style=_lbl, className="mb-1"),
             dbc.Checklist(
                 id="filtro-validacao-gestor",
@@ -1455,6 +1462,7 @@ def layout():
             "horas_uteis": False,
             "prioridade": [],
             "validacao_gestor": [],
+            "sem_planejamento": False,
         }),
 
         # Store para contexto de subtarefa (pend_id + subtarefa_id)
