@@ -575,9 +575,9 @@ class TestFiltroDataframe_SemPlanejamento:
     def df_hist(self):
         return pd.DataFrame([
             {'hist_id': 'h1', 'pendencia_id': 'WF001', 'record_type': 'subtarefa',
-             'data': datetime(2026, 3, 6), 'data_planejada': None},
+             'data': datetime(2026, 3, 6), 'data_planejada': None, 'concluido': False},
             {'hist_id': 'h2', 'pendencia_id': 'WF002', 'record_type': 'subtarefa',
-             'data': datetime(2026, 3, 8), 'data_planejada': datetime(2026, 3, 10)},
+             'data': datetime(2026, 3, 8), 'data_planejada': datetime(2026, 3, 10), 'concluido': False},
         ])
 
     def test_sem_planejamento_ativo_retorna_so_nao_planejadas(self, df_pend, df_hist):
@@ -608,15 +608,43 @@ class TestFiltroDataframe_SemPlanejamento:
         from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
         df_hist_planejado = pd.DataFrame([
             {'hist_id': 'h1', 'pendencia_id': 'WF001', 'record_type': 'subtarefa',
-             'data': datetime(2026, 3, 6), 'data_planejada': datetime(2026, 3, 7)},
+             'data': datetime(2026, 3, 6), 'data_planejada': datetime(2026, 3, 7), 'concluido': False},
             {'hist_id': 'h2', 'pendencia_id': 'WF002', 'record_type': 'subtarefa',
-             'data': datetime(2026, 3, 8), 'data_planejada': datetime(2026, 3, 10)},
+             'data': datetime(2026, 3, 8), 'data_planejada': datetime(2026, 3, 10), 'concluido': False},
         ])
         resultado = aplicar_filtros_dataframe(
             df_pend, "todos", None, None,
             df_historico=df_hist_planejado, sem_planejamento=True
         )
         assert len(resultado) == 0
+
+    def test_sem_planejamento_ignora_concluidas(self, df_pend):
+        """Atividade sem data_planejada mas já concluída não deve puxar a demanda."""
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        df_hist_concluido = pd.DataFrame([
+            {'hist_id': 'h1', 'pendencia_id': 'WF001', 'record_type': 'subtarefa',
+             'data': datetime(2026, 3, 6), 'data_planejada': None, 'concluido': True},
+            {'hist_id': 'h2', 'pendencia_id': 'WF002', 'record_type': 'subtarefa',
+             'data': datetime(2026, 3, 8), 'data_planejada': None, 'concluido': False},
+        ])
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            df_historico=df_hist_concluido, sem_planejamento=True
+        )
+        assert list(resultado['id']) == ['WF002']
+
+    def test_sem_planejamento_retrocompat_sem_campo_concluido(self, df_pend):
+        """Docs antigos sem campo concluido devem funcionar (tratados como não concluídos)."""
+        from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
+        df_hist_sem_campo = pd.DataFrame([
+            {'hist_id': 'h1', 'pendencia_id': 'WF001', 'record_type': 'subtarefa',
+             'data': datetime(2026, 3, 6), 'data_planejada': None},
+        ])
+        resultado = aplicar_filtros_dataframe(
+            df_pend, "todos", None, None,
+            df_historico=df_hist_sem_campo, sem_planejamento=True
+        )
+        assert list(resultado['id']) == ['WF001']
 
 
 # =============================================================================

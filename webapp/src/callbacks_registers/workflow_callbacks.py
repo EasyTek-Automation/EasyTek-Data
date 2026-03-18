@@ -897,6 +897,9 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
             df_h = df_h[df_h['record_type'] == 'subtarefa']
         if 'data_planejada' in df_h.columns:
             df_h = df_h[df_h['data_planejada'].isna() | (df_h['data_planejada'] == '')]
+        # Excluir atividades já concluídas — só interessa planejar as pendentes
+        if 'concluido' in df_h.columns:
+            df_h = df_h[df_h['concluido'] != True]
         col_id = 'pendencia_id' if 'pendencia_id' in df_h.columns else 'MaintenanceWF_id'
         if col_id in df_h.columns:
             ids_sem_plan = set(df_h[col_id].dropna().astype(str).unique())
