@@ -155,9 +155,7 @@ class ZPPScheduler:
             # Atualizar log
             log_update = update_processing_log(
                 current_log=log_doc,
-                files_processed=results,
-                status="success",
-                error_message=None
+                files_processed=results
             )
 
             self.db[config.LOGS_COLLECTION].update_one(

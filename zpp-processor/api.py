@@ -91,11 +91,10 @@ def process_in_background(job_id: str, triggered_by: str = None):
         # Fechar processador
         processor.close()
 
-        # Atualizar log
+        # Atualizar log (status derivado dos arquivos pelo update_processing_log)
         log_update = update_processing_log(
             current_log=log_doc,
             files_processed=results,
-            status="success" if results else "failed",
             error_message=None if results else "Nenhum arquivo encontrado para processar"
         )
 
@@ -282,29 +281,34 @@ def get_processing_history():
     Lista histórico de processamentos
 
     Query Params:
-        limit: Número de registros (default: 50)
-        offset: Offset para paginação (default: 0)
+        page: Página (default: 1)
+        per_page: Registros por página (default: 20, max: 100)
 
     Response:
         {
             "total": 100,
-            "limit": 50,
-            "offset": 0,
+            "page": 1,
+            "per_page": 20,
+            "total_pages": 5,
+            "has_next": true,
+            "has_prev": false,
             "logs": [...]
         }
     """
     try:
-        limit = int(request.args.get('limit', 50))
-        offset = int(request.args.get('offset', 0))
+        per_page = min(int(request.args.get('per_page', 20)), 100)
+        page = max(int(request.args.get('page', 1)), 1)
+        offset = (page - 1) * per_page
 
         db = get_db()
         collection = db[config.LOGS_COLLECTION]
 
         # Contar total
         total = collection.count_documents({})
+        total_pages = max((total + per_page - 1) // per_page, 1)
 
         # Buscar logs ordenados por data
-        logs_cursor = collection.find().sort("started_at", DESCENDING).skip(offset).limit(limit)
+        logs_cursor = collection.find().sort("started_at", DESCENDING).skip(offset).limit(per_page)
 
         logs = []
         for log in logs_cursor:
@@ -331,8 +335,11 @@ def get_processing_history():
 
         return jsonify({
             "total": total,
-            "limit": limit,
-            "offset": offset,
+            "page": page,
+            "per_page": per_page,
+            "total_pages": total_pages,
+            "has_next": page < total_pages,
+            "has_prev": page > 1,
             "logs": logs
         }), 200
 

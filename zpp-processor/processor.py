@@ -339,6 +339,7 @@ class ZPPProcessor:
         logger.info(f"  Lotes: {total_batches}")
 
         total_skipped = 0
+        dup_log = []
 
         for i in range(0, total_records, batch_size):
             batch = records[i:i + batch_size]
@@ -360,10 +361,12 @@ class ZPPProcessor:
                                    f"{len(dup_errors)} duplicata(s) ignorada(s)")
                     for err in dup_errors:
                         op = err.get('op', {})
-                        logger.warning(f"      SKIP dup: {op.get('centro_de_trabalho')} | "
-                                       f"ordem={op.get('ordem')} | "
-                                       f"hora={op.get('inicio_real_hora')} | "
-                                       f"causa={op.get('causa_do_desvio')}")
+                        msg = (f"SKIP dup: {op.get('centro_de_trabalho')} | "
+                               f"ordem={op.get('ordem')} | "
+                               f"hora={op.get('inicio_real_hora')} | "
+                               f"causa={op.get('causa_do_desvio')}")
+                        logger.warning(f"      {msg}")
+                        dup_log.append(msg)
                 if other_errors:
                     logger.error(f"  [X] Lote {batch_num}: {len(other_errors)} erro(s) não-duplicata")
                     for err in other_errors:
@@ -391,15 +394,31 @@ class ZPPProcessor:
             logger.info("Arquivando...")
             archive_path = self.move_to_archive(file_path)
 
+        # Determinar status do arquivo
+        if total_inserted == 0:
+            file_status = 'failed'
+            file_error = 'Nenhum registro inserido'
+        elif total_skipped > 0:
+            file_status = 'partial'
+            file_error = f'{total_skipped} registro(s) ignorado(s) por chave duplicada'
+        else:
+            file_status = 'success'
+            file_error = None
+
+        if file_status != 'success':
+            logger.warning(f"  [!] Status do arquivo: {file_status} — {file_error}")
+
         # Retornar entrada para log (formato create_file_entry)
         return create_file_entry(
             filename=file_name,
             file_type=file_type,
             collection_name=collection_name,
             uploaded_rows=total_inserted,
-            status='success' if total_inserted > 0 else 'failed',
-            error_message=None if total_inserted > 0 else 'Nenhum registro inserido',
-            replaced_rows=replaced_count
+            status=file_status,
+            error_message=file_error,
+            replaced_rows=replaced_count,
+            skipped_rows=total_skipped,
+            warnings=dup_log if dup_log else None
         )
 
     def process_directory(self, directory: Path, batch_size: int = 1000,
