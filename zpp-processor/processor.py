@@ -4,6 +4,7 @@ Processador unificado de planilhas ZPP com integração para logs MongoDB
 """
 import pandas as pd
 from pymongo import MongoClient, ASCENDING, DESCENDING
+from pymongo.errors import BulkWriteError
 from datetime import datetime, time as datetime_time, timedelta
 from pathlib import Path
 import logging
@@ -152,7 +153,7 @@ class ZPPProcessor:
         indexes = [
             ([('centro_de_trabalho', ASCENDING), ('inicio_execucao', DESCENDING)], 'idx_linha_data', {}),
             ([('ordem', ASCENDING)], 'idx_ordem', {'sparse': True}),
-            ([('centro_de_trabalho', ASCENDING), ('inicio_execucao', ASCENDING), ('inicio_real_hora', ASCENDING), ('ordem', ASCENDING)],
+            ([('centro_de_trabalho', ASCENDING), ('inicio_execucao', ASCENDING), ('inicio_real_hora', ASCENDING), ('ordem', ASCENDING), ('causa_do_desvio', ASCENDING)],
              'idx_parada_unique', {'unique': True, 'sparse': True}),
             ([('causa_do_desvio', ASCENDING)], 'idx_motivo', {}),
             ([('inicio_execucao', ASCENDING), ('fim_execucao', ASCENDING)], 'idx_range_datas', {}),
@@ -337,33 +338,41 @@ class ZPPProcessor:
         total_batches = (total_records - 1) // batch_size + 1 if total_records else 0
         logger.info(f"  Lotes: {total_batches}")
 
-        try:
-            for i in range(0, total_records, batch_size):
-                batch = records[i:i + batch_size]
-                batch_num = i // batch_size + 1
+        total_skipped = 0
 
+        for i in range(0, total_records, batch_size):
+            batch = records[i:i + batch_size]
+            batch_num = i // batch_size + 1
+
+            try:
                 result = collection.insert_many(batch, ordered=False)
                 total_inserted += len(result.inserted_ids)
 
-                percent = ((i + len(batch)) / total_records) * 100
-                logger.info(f"  -> Lote {batch_num:>3}/{total_batches}: "
-                            f"{total_inserted:>6}/{total_records} ({percent:>5.1f}%)")
+            except BulkWriteError as bwe:
+                inserted_in_batch = bwe.details.get('nInserted', 0)
+                total_inserted += inserted_in_batch
+                dup_errors = [e for e in bwe.details.get('writeErrors', []) if e.get('code') == 11000]
+                other_errors = [e for e in bwe.details.get('writeErrors', []) if e.get('code') != 11000]
+                total_skipped += len(dup_errors)
 
-        except Exception as e:
-            logger.error(f"  [X] Erro no upload: {e}")
+                if dup_errors:
+                    logger.warning(f"  [!] Lote {batch_num}: {inserted_in_batch} inseridos, "
+                                   f"{len(dup_errors)} duplicata(s) ignorada(s)")
+                    for err in dup_errors:
+                        op = err.get('op', {})
+                        logger.warning(f"      SKIP dup: {op.get('centro_de_trabalho')} | "
+                                       f"ordem={op.get('ordem')} | "
+                                       f"hora={op.get('inicio_real_hora')} | "
+                                       f"causa={op.get('causa_do_desvio')}")
+                if other_errors:
+                    logger.error(f"  [X] Lote {batch_num}: {len(other_errors)} erro(s) não-duplicata")
+                    for err in other_errors:
+                        logger.error(f"      {err.get('errmsg')}")
 
-            # ── Rollback: restaurar backup ───────────────────────────────────
-            if backup:
-                logger.warning(f"  [!] Iniciando rollback — restaurando {len(backup)} registros...")
-                try:
-                    for doc in backup:
-                        doc.pop('_id', None)
-                    collection.insert_many(backup, ordered=False)
-                    logger.info(f"  [OK] Rollback concluído — dados originais restaurados")
-                except Exception as restore_err:
-                    logger.error(f"  [XX] Falha no rollback: {restore_err}")
-                    logger.error(f"  [XX] ATENÇÃO: dados podem estar inconsistentes na collection {collection_name}")
-            raise
+            percent = ((i + len(batch)) / total_records) * 100
+            logger.info(f"  -> Lote {batch_num:>3}/{total_batches}: "
+                        f"{total_inserted:>6}/{total_records} ({percent:>5.1f}%) "
+                        f"[skip={total_skipped}]")
 
         logger.info(f"  [OK] Upload concluído: {total_inserted:,} inseridos, "
                     f"{replaced_count:,} substituídos\n")
