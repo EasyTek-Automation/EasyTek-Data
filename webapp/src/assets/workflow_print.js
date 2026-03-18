@@ -96,7 +96,7 @@ document.addEventListener('click', function (e) {
         /* Logo: tamanho fixo com !important sobrepõe qualquer regra Bootstrap (ex: img { width:100% }) */
         '#amg-print-header .hdr-logo img {',
         '  display: block; opacity: 0.90;',
-        '  height: 69px !important; width: auto !important; max-width: 280px !important; }',
+        '  height: 76px !important; width: auto !important; max-width: 300px !important; }',
         '#amg-print-header .hdr-info { text-align: right; line-height: 1.55; }',
         '#amg-print-header .hdr-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }',
         '#amg-print-header .hdr-meta  { font-size: 13px; color: #555; }',
