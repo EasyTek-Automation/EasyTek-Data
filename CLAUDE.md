@@ -597,6 +597,38 @@ doc = mock_hist.insert_one.call_args[0][0]
 doc = mock_hist.insert_one.call_args_list[0][0][0]
 ```
 
+#### 12. ZPP Processor Service (`zpp-processor/`)
+
+Serviço independente que processa planilhas Excel exportadas do SAP e carrega no MongoDB.
+
+**Arquivos principais:**
+- `processor.py` — `ZPPProcessor`: detecta tipo, limpa, faz upload (delete+reinsert) e arquiva
+- `scheduler.py` — `ZPPScheduler`: executa processamento automático por intervalo configurável
+- `api.py` — API REST Flask para trigger manual e consulta de histórico
+- `models/processing_log.py` — schemas dos documentos de log no MongoDB
+- `cleaner.py` — limpeza e detecção de tipo das planilhas (`zppprd` ou `zppparadas`)
+
+**Status de processamento (por arquivo e por job):**
+- `success` — todos os registros inseridos sem problemas
+- `partial` — inserção concluída mas com duplicatas ignoradas (`skipped_rows > 0`)
+- `failed` — nenhum registro inserido
+
+**Índice único `idx_parada_unique` (collection `ZPP_Paradas`):**
+
+Campos: `(centro_de_trabalho, inicio_execucao, inicio_real_hora, ordem, causa_do_desvio)`
+
+Inclui `causa_do_desvio` porque o SAP gera **dupla codificação** — mesmo equipamento/ordem/hora com causas diferentes (ex: `301` e `S201` simultâneos). Sem esse campo, o segundo registro seria rejeitado como duplicata, potencialmente descartando um código de avaria válido.
+
+**Warnings persistidos no MongoDB:**
+
+Duplicatas ignoradas ficam gravadas em `files_processed[].warnings` (lista de strings) no documento do job. Campo `skipped_rows` indica a contagem total. Não interrompem o processamento — arquivo é arquivado normalmente.
+
+**API de histórico paginada:**
+
+`GET /api/zpp/history?page=1&per_page=20`
+
+Retorna: `total`, `page`, `per_page`, `total_pages`, `has_next`, `has_prev`, `logs`
+
 ### Application Initialization Flow
 
 1. **app.py**: Initialize Flask server, Dash app, Flask-Login

@@ -147,7 +147,8 @@ class ZPPProcessor:
         logger.info("  [OK] Índices de Produção configurados")
 
     def create_indexes_paradas(self, collection):
-        """Cria índices otimizados para Paradas"""
+        """Cria índices otimizados para Paradas. idx_parada_unique inclui causa_do_desvio
+        porque o SAP gera dupla codificação legítima (mesma hora/ordem, causas diferentes)."""
         logger.info("  Criando índices para Paradas...")
 
         indexes = [

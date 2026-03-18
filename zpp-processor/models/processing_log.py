@@ -93,16 +93,11 @@ def update_processing_log(
     error_message: Optional[str] = None
 ) -> Dict:
     """
-    Atualiza o log de processamento ao final
+    Atualiza o log de processamento ao final, derivando o status do job a partir dos arquivos.
 
-    Args:
-        current_log: Log atual
-        files_processed: Lista de arquivos processados
-        status: "success" ou "failed"
-        error_message: Mensagem de erro (se houver)
-
-    Returns:
-        Log atualizado para update no MongoDB
+    Status derivado: 'failed' se qualquer arquivo falhou, 'partial' se houve duplicatas
+    ignoradas, 'success' apenas se todos os arquivos foram inseridos sem ressalvas.
+    O parâmetro `status` é ignorado — use `error_message` para erros de job sem arquivos.
     """
     completed_at = datetime.now()
     duration_seconds = (completed_at - current_log["started_at"]).total_seconds()
