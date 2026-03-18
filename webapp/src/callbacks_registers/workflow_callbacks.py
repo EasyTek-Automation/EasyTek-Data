@@ -627,6 +627,9 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
         hist_ids_validos = ids_sub_data
 
         def _manter(row):
+            """Retorna True se o registro de histórico deve ser mantido após filtro de data.
+            Registros 'criacao' sempre passam; 'subtarefa' passa se o hist_id está no
+            conjunto válido; 'log' passa se o subtarefa_id pai está no conjunto válido."""
             rt = row.get('record_type') or 'subtarefa'
             if rt == 'criacao':
                 return True
@@ -652,6 +655,9 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
             hist_ids_prioridade = set(df_subs_p['hist_id'].dropna().astype(str).tolist())
 
             def _manter_prioridade(row):
+                """Retorna True se o registro deve ser mantido após filtro de prioridade.
+                Mesma lógica de _manter: 'criacao' sempre passa; 'subtarefa' e 'log'
+                passam apenas se pertencem a uma subtarefa com a prioridade filtrada."""
                 rt = row.get('record_type') or 'subtarefa'
                 if rt == 'criacao':
                     return True
@@ -676,6 +682,9 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
             hist_ids_validacao = set(df_subs_v['hist_id'].dropna().astype(str).tolist())
 
             def _manter_validacao(row):
+                """Retorna True se o registro deve ser mantido após filtro de validação gestor.
+                Mesma lógica de _manter: 'criacao' sempre passa; 'subtarefa' e 'log'
+                passam apenas se pertencem a uma subtarefa com o status de validação filtrado."""
                 rt = row.get('record_type') or 'subtarefa'
                 if rt == 'criacao':
                     return True
@@ -700,6 +709,7 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
         concluido_val = row.get('concluido') is True
 
         def _str_or_none(v):
+            """Converte valor para string, retornando None se for None ou 'nan'."""
             return str(v) if v is not None and str(v) != 'nan' else None
 
         historico_items.append({
@@ -859,6 +869,7 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
         if 'record_type' in df_h.columns:
             df_h = df_h[df_h['record_type'] != 'criacao']
         def _tem_horas(h):
+            """Retorna True se o valor representa um número de horas positivo e válido."""
             try:
                 return h is not None and str(h) != 'nan' and float(h) > 0
             except (ValueError, TypeError):
@@ -981,6 +992,7 @@ def register_workflow_callbacks(app):
         prevent_initial_call=True
     )
     def toggle_subtask_collapse(n_clicks, is_open):
+        """Alterna a visibilidade do painel de detalhes de uma subtarefa individual."""
         if not n_clicks:
             raise PreventUpdate
         new_open = not is_open
@@ -1217,6 +1229,7 @@ def register_workflow_callbacks(app):
         prevent_initial_call=False  # dispara no load para restaurar o estado salvo
     )
     def toggle_filtros_collapse(n_clicks, store_data):
+        """Abre/fecha o painel de filtros, persistindo o estado no store local."""
         estado_salvo = store_data if store_data is not None else False
         if n_clicks:
             # Clique: inverte o estado atual

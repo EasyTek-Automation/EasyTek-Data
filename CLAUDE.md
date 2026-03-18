@@ -13,6 +13,12 @@ AMG_Data is an industrial IoT data platform built with Dash/Plotly for real-time
 
 The platform provides dashboards for production monitoring (OEE), energy consumption, maintenance alarms, supervisory control, and utility management.
 
+## Docstrings
+
+Durante qualquer trabalho nos arquivos Python, ao encontrar funções ou métodos sem docstring, adicioná-la imediatamente — mesmo que a função não esteja sendo modificada no contexto atual.
+
+A docstring deve ser concisa (1–2 linhas), descrevendo **o que** a função faz e, quando não óbvio, **por que** existe ou qual o comportamento esperado em casos especiais (retrocompat, edge cases, etc.).
+
 ## Testes
 
 Antes de alterar qualquer função existente:
