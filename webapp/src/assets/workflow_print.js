@@ -64,9 +64,10 @@ document.addEventListener('click', function (e) {
         linkTags,
         '<style>',
 
-        /* Página A4 paisagem — dimensões explícitas (largura > altura) forçam
-           orientação paisagem independente das configurações do sistema/impressora */
-        '@page { size: 297mm 210mm; margin: 1.5cm 1cm; }',
+        /* Página A4 paisagem — keyword "landscape" é mais confiável que apenas
+           dimensões numéricas; alguns browsers ignoram 297mm x 210mm mas
+           respeitam o keyword explícito */
+        '@page { size: A4 landscape; margin: 1.5cm 1cm; }',
 
         /* Preservar cores exatas (evita que o browser remova backgrounds em @media print) */
         '* { -webkit-print-color-adjust: exact !important;',
