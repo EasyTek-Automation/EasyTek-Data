@@ -921,19 +921,35 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
                 ids_com_validacao = set(df_h[col_id].dropna().astype(str).unique())
                 df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_com_validacao)]
 
-    if sem_planejamento and df_historico is not None and not df_historico.empty:
-        df_h = df_historico.copy()
-        if 'record_type' in df_h.columns:
-            df_h = df_h[df_h['record_type'] == 'subtarefa']
-        if 'data_planejada' in df_h.columns:
-            df_h = df_h[df_h['data_planejada'].isna() | (df_h['data_planejada'] == '')]
-        # Excluir atividades já concluídas — só interessa planejar as pendentes
-        if 'concluido' in df_h.columns:
-            df_h = df_h[df_h['concluido'] != True]
-        col_id = 'pendencia_id' if 'pendencia_id' in df_h.columns else 'MaintenanceWF_id'
-        if col_id in df_h.columns:
-            ids_sem_plan = set(df_h[col_id].dropna().astype(str).unique())
-            df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_sem_plan)]
+    if sem_planejamento:
+        col_id = 'pendencia_id' if (df_historico is not None and 'pendencia_id' in df_historico.columns) else 'MaintenanceWF_id'
+        ids_filtrado = set(df_filtrado['id'].astype(str).unique())
+
+        # Demandas SEM nenhuma atividade cadastrada
+        if df_historico is not None and not df_historico.empty:
+            df_h_sub = df_historico.copy()
+            if 'record_type' in df_h_sub.columns:
+                df_h_sub = df_h_sub[df_h_sub['record_type'] == 'subtarefa']
+            ids_com_atividade = set(df_h_sub[col_id].dropna().astype(str).unique()) if col_id in df_h_sub.columns else set()
+        else:
+            ids_com_atividade = set()
+        ids_sem_atividade = ids_filtrado - ids_com_atividade
+
+        # Demandas com atividades não concluídas sem data_planejada
+        ids_ativ_sem_data = set()
+        if df_historico is not None and not df_historico.empty:
+            df_h = df_historico.copy()
+            if 'record_type' in df_h.columns:
+                df_h = df_h[df_h['record_type'] == 'subtarefa']
+            if 'data_planejada' in df_h.columns:
+                df_h = df_h[df_h['data_planejada'].isna() | (df_h['data_planejada'] == '')]
+            if 'concluido' in df_h.columns:
+                df_h = df_h[df_h['concluido'] != True]
+            if col_id in df_h.columns:
+                ids_ativ_sem_data = set(df_h[col_id].dropna().astype(str).unique())
+
+        ids_sem_plan = ids_sem_atividade | ids_ativ_sem_data
+        df_filtrado = df_filtrado[df_filtrado['id'].astype(str).isin(ids_sem_plan)]
 
     if atrasadas and df_historico is not None and not df_historico.empty:
         # Atividades atrasadas: data_planejada anterior ao 1º dia do mês atual e não concluídas
