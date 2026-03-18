@@ -374,14 +374,16 @@ def criar_cards_kpi(df_pendencias, df_historico=None, username_atual=None):  # n
         return html.Div(spans, className="d-flex flex-wrap mt-2")
 
     def _num(valor, cor_key=None, tamanho="2.6rem"):
-        """Renderiza um número grande destacado para uso em cards KPI."""
+        """Closure de criar_cards_kpi — renderiza o valor numérico principal (grande) de um card KPI.
+        Captura COR do escopo pai. Cada card usa _num como primeira linha do corpo."""
         style = {"lineHeight": "1", "fontWeight": "800", "fontSize": tamanho}
         if cor_key:
             style["color"] = COR.get(cor_key, f'var(--bs-{cor_key})')
         return html.Div(str(valor), style=style)
 
     def _sub(valor, label, cor_key):
-        """Renderiza um número secundário com label colorida para sub-indicadores KPI."""
+        """Closure de criar_cards_kpi — renderiza sub-indicador KPI: número menor + label descritiva colorida.
+        Captura COR do escopo pai. Usado como linhas secundárias abaixo do _num principal nos cards."""
         return html.Div([
             html.Span(str(valor), style={
                 "fontSize": "1.4rem",
@@ -613,7 +615,8 @@ def criar_notificacoes(df_pendencias=None, df_historico=None, username_atual=Non
             aguardando_aprovacao = int(mask.sum())
 
     def _item(icone, label, valor, cor_key=None):
-        """Renderiza um item de card KPI com ícone, valor numérico grande e label descritiva."""
+        """Closure de criar_notificacoes — renderiza uma coluna de notificação: ícone + número grande + label.
+        Captura COR do escopo pai. Cada métrica do card "Suas Notificações" é um _item."""
         cor_css = COR.get(cor_key, '#212529') if cor_key else '#212529'
         return html.Div([
             html.I(className=icone, style={"fontSize": "1.1rem", "color": cor_css}),

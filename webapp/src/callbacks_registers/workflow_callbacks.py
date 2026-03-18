@@ -627,9 +627,17 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
         hist_ids_validos = ids_sub_data
 
         def _manter(row):
-            """Retorna True se o registro de histórico deve ser mantido após filtro de data.
-            Registros 'criacao' sempre passam; 'subtarefa' passa se o hist_id está no
-            conjunto válido; 'log' passa se o subtarefa_id pai está no conjunto válido."""
+            """Closure: decide se um registro de histórico passa pelo filtro de data.
+
+            Captura `hist_ids_validos` do escopo pai (set de hist_ids de subtarefas
+            cujo campo `data` está dentro do período filtrado).
+
+            Regras por record_type:
+            - 'criacao': sempre mantido (eventos de linha do tempo não têm data de atividade)
+            - 'subtarefa': mantido se hist_id está em hist_ids_validos
+            - 'log': mantido se subtarefa_id pai está em hist_ids_validos (log segue a subtarefa)
+            - outros: mantido por padrão (retrocompat com tipos desconhecidos)
+            """
             rt = row.get('record_type') or 'subtarefa'
             if rt == 'criacao':
                 return True
@@ -655,9 +663,15 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
             hist_ids_prioridade = set(df_subs_p['hist_id'].dropna().astype(str).tolist())
 
             def _manter_prioridade(row):
-                """Retorna True se o registro deve ser mantido após filtro de prioridade.
-                Mesma lógica de _manter: 'criacao' sempre passa; 'subtarefa' e 'log'
-                passam apenas se pertencem a uma subtarefa com a prioridade filtrada."""
+                """Closure: decide se um registro passa pelo filtro de prioridade.
+
+                Captura `hist_ids_prioridade` do escopo pai (set de hist_ids de subtarefas
+                com prioridade dentro da lista filtrada).
+
+                Mesma estrutura de _manter: 'criacao' sempre passa; 'subtarefa' filtra
+                por hist_id; 'log' filtra pelo subtarefa_id pai — garantindo que logs
+                órfãos (cuja subtarefa foi removida pelo filtro) também sejam descartados.
+                """
                 rt = row.get('record_type') or 'subtarefa'
                 if rt == 'criacao':
                     return True
@@ -682,9 +696,14 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
             hist_ids_validacao = set(df_subs_v['hist_id'].dropna().astype(str).tolist())
 
             def _manter_validacao(row):
-                """Retorna True se o registro deve ser mantido após filtro de validação gestor.
-                Mesma lógica de _manter: 'criacao' sempre passa; 'subtarefa' e 'log'
-                passam apenas se pertencem a uma subtarefa com o status de validação filtrado."""
+                """Closure: decide se um registro passa pelo filtro de validação gestor.
+
+                Captura `hist_ids_validacao` do escopo pai (set de hist_ids de subtarefas
+                com status_validacao_gestor dentro da lista filtrada).
+
+                Mesma estrutura de _manter: 'criacao' sempre passa; 'subtarefa' filtra
+                por hist_id; 'log' filtra pelo subtarefa_id pai.
+                """
                 rt = row.get('record_type') or 'subtarefa'
                 if rt == 'criacao':
                     return True
@@ -992,7 +1011,12 @@ def register_workflow_callbacks(app):
         prevent_initial_call=True
     )
     def toggle_subtask_collapse(n_clicks, is_open):
-        """Alterna a visibilidade do painel de detalhes de uma subtarefa individual."""
+        """Alterna a visibilidade do painel de detalhes de uma subtarefa individual.
+
+        Usa pattern-matching (MATCH) — um callback único gerencia todos os botões
+        de expansão de subtarefa na tabela sem precisar de um callback por linha.
+        Retorna (is_open, chevron_className).
+        """
         if not n_clicks:
             raise PreventUpdate
         new_open = not is_open
@@ -1229,7 +1253,13 @@ def register_workflow_callbacks(app):
         prevent_initial_call=False  # dispara no load para restaurar o estado salvo
     )
     def toggle_filtros_collapse(n_clicks, store_data):
-        """Abre/fecha o painel de filtros, persistindo o estado no store local."""
+        """Abre/fecha o painel de filtros e persiste o estado em store-filtros-collapse (localStorage).
+
+        prevent_initial_call=False é intencional: dispara no load da página para
+        restaurar o estado salvo (aberto/fechado) da sessão anterior do usuário.
+        Quando n_clicks é None (load inicial), usa o valor do store sem inverter.
+        Retorna (is_open, chevron_className, store_data).
+        """
         estado_salvo = store_data if store_data is not None else False
         if n_clicks:
             # Clique: inverte o estado atual
