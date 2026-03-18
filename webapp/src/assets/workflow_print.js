@@ -45,6 +45,17 @@ document.addEventListener('click', function (e) {
         el.style.visibility = 'visible';
     });
 
+    /* Remover fisicamente 1ª coluna (chevron) e última (ações) de cada linha.
+       WeasyPrint ignora display:none/visibility:hidden em células de tabela e
+       mantém o espaço alocado — remoção do DOM é a única forma confiável. */
+    tableClone.querySelectorAll('tr').forEach(function (tr) {
+        var cells = tr.querySelectorAll('th, td');
+        if (cells.length === 0) return;
+        cells[cells.length - 1].remove();          /* última: ações */
+        cells = tr.querySelectorAll('th, td');
+        if (cells.length > 0) cells[0].remove();   /* primeira: chevron */
+    });
+
     /* ----------------------------------------------------------------
        Coletar <link rel="stylesheet"> da página atual.
        São URLs absolutas (http://localhost:8050/assets/...) que
@@ -96,7 +107,7 @@ document.addEventListener('click', function (e) {
         /* Logo: tamanho fixo com !important sobrepõe qualquer regra Bootstrap (ex: img { width:100% }) */
         '#amg-print-header .hdr-logo img {',
         '  display: block; opacity: 0.90;',
-        '  height: 76px !important; width: auto !important; max-width: 300px !important; }',
+        '  height: 91px !important; width: auto !important; max-width: 340px !important; }',
         '#amg-print-header .hdr-info { text-align: right; line-height: 1.55; }',
         '#amg-print-header .hdr-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }',
         '#amg-print-header .hdr-meta  { font-size: 13px; color: #555; }',
@@ -129,17 +140,9 @@ document.addEventListener('click', function (e) {
         '  vertical-align: middle; }',
         '.workflow-table th { font-size: 10px !important; }',
 
-        /* Colapsar colunas de interação: chevron (1ª) e ações (última).
-           WeasyPrint ignora display:none em células de tabela e mantém o espaço —
-           usar width:0 + padding:0 + overflow:hidden garante o colapso real. */
-        '.workflow-table th:first-child, .workflow-table td:first-child,',
-        '.workflow-table th:last-child,  .workflow-table td:last-child {',
-        '  width: 0 !important; max-width: 0 !important;',
-        '  padding: 0 !important; border: none !important;',
-        '  overflow: hidden !important; visibility: hidden !important; }',
-
-        /* Coluna ID: largura fixa com overflow oculto para não invadir a Descrição */
-        '.workflow-table th:nth-child(2), .workflow-table td:nth-child(2) {',
+        /* Coluna ID (1ª coluna visível após remoção do chevron no DOM):
+           largura fixa com overflow oculto para não invadir a Descrição */
+        '.workflow-table th:first-child, .workflow-table td:first-child {',
         '  width: 110px !important; max-width: 110px !important;',
         '  white-space: nowrap; overflow: hidden !important; }',
 
