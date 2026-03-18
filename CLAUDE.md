@@ -279,7 +279,7 @@ ROUTE_ALIASES = {
 - `/workflow/dashboard`: Workflow management - Pending tasks dashboard (integrated in Maintenance menu)
   - **Terminologia**: **Demanda** = tarefa/pendência (collection `Maintenance_workflow`); **Atividade** = subtarefa (record_type='subtarefa' em `MaintenanceHistory_workflow`)
   - Campo `prioridade` nas Atividades: `'urgente'` | `'alta'` | `'normal'` | `'baixa'` (retrocompat: sem campo → `'normal'`)
-  - Filtros: responsável, status, busca, aceite, datas, horas úteis, prioridade das atividades
+  - Filtros: responsável, status, busca, aceite, datas, horas úteis, prioridade das atividades, sem data planejada, atividades atrasadas
   - Campo `status_validacao_gestor` nas Atividades: `'pendente'` | `'aprovado'` | `'devolvido'` — quando `'aprovado'`, atividade é **imutável** (compliance lock)
   - **Ver seção "11. Workflow Module Architecture"** para contratos de stores, padrões de KPI e audit trail
 - `/maintenance/work-orders`: Work orders management (in development)
