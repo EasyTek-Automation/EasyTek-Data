@@ -47,13 +47,24 @@ document.addEventListener('click', function (e) {
 
     /* Remover fisicamente 1ª coluna (chevron) e última (ações) de cada linha.
        WeasyPrint ignora display:none/visibility:hidden em células de tabela e
-       mantém o espaço alocado — remoção do DOM é a única forma confiável. */
+       mantém o espaço alocado — remoção do DOM é a única forma confiável.
+       Expand rows têm apenas 1 célula com colspan=7: não remover a célula,
+       apenas ajustar o colspan (7→5) para manter consistência com as demais. */
     tableClone.querySelectorAll('tr').forEach(function (tr) {
         var cells = tr.querySelectorAll('th, td');
         if (cells.length === 0) return;
-        cells[cells.length - 1].remove();          /* última: ações */
+
+        if (cells.length === 1) {
+            /* Expand row: única célula tem colspan=7 → ajustar para 5 */
+            var span = parseInt(cells[0].getAttribute('colspan') || '1', 10);
+            cells[0].setAttribute('colspan', Math.max(1, span - 2));
+            return;
+        }
+
+        /* Main row / thead: remover última (ações) e primeira (chevron) */
+        cells[cells.length - 1].remove();
         cells = tr.querySelectorAll('th, td');
-        if (cells.length > 0) cells[0].remove();   /* primeira: chevron */
+        if (cells.length > 0) cells[0].remove();
     });
 
     /* ----------------------------------------------------------------
@@ -107,7 +118,7 @@ document.addEventListener('click', function (e) {
         /* Logo: tamanho fixo com !important sobrepõe qualquer regra Bootstrap (ex: img { width:100% }) */
         '#amg-print-header .hdr-logo img {',
         '  display: block; opacity: 0.90;',
-        '  height: 91px !important; width: auto !important; max-width: 340px !important; }',
+        '  height: 109px !important; width: auto !important; max-width: 400px !important; }',
         '#amg-print-header .hdr-info { text-align: right; line-height: 1.55; }',
         '#amg-print-header .hdr-title { font-size: 16px; font-weight: 700; margin-bottom: 2px; }',
         '#amg-print-header .hdr-meta  { font-size: 13px; color: #555; }',
