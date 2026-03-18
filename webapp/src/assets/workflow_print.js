@@ -134,8 +134,9 @@ document.addEventListener('click', function (e) {
         '.workflow-table th:last-child,  .workflow-table td:last-child {',
         '  display: none !important; }',
 
-        /* Ocultar badge de nota GAM (interativo, irrelevante no PDF) */
-        '.nota-gam-badge { display: none !important; }',
+        /* Coluna ID: largura compacta (1ª coluna visível = nth-child(2), pois a 1ª está oculta) */
+        '.workflow-table th:nth-child(2), .workflow-table td:nth-child(2) {',
+        '  width: 90px !important; max-width: 90px !important; white-space: nowrap; }',
 
         /* Botões viram texto puro */
         '.workflow-table .btn {',
