@@ -73,6 +73,23 @@ document.addEventListener('click', function (e) {
         cells[0].remove();
     });
 
+    /* Inserir <colgroup> com larguras explícitas após remoção das colunas.
+       No WeasyPrint, colgroup é mais confiável que CSS selectors para
+       definir larguras — especialmente quando combinado com table-layout:fixed.
+       Colunas restantes: ID | Descrição | Responsável | Status | Progresso */
+    var tbl = tableClone.querySelector('table.workflow-table');
+    if (tbl) {
+        var existingCg = tbl.querySelector('colgroup');
+        if (existingCg) existingCg.parentNode.removeChild(existingCg);
+        var cg = document.createElement('colgroup');
+        ['110px', null, '155px', '155px', '110px'].forEach(function (w) {
+            var col = document.createElement('col');
+            if (w) col.style.width = w;
+            cg.appendChild(col);
+        });
+        tbl.insertBefore(cg, tbl.firstChild);
+    }
+
     /* ----------------------------------------------------------------
        Coletar <link rel="stylesheet"> da página atual.
        São URLs absolutas (http://localhost:8050/assets/...) que
@@ -150,6 +167,10 @@ document.addEventListener('click', function (e) {
 
         /* Tabela: resolver overflow do wrapper responsivo */
         '.table-responsive { overflow: visible !important; }',
+
+        /* table-layout:fixed garante que o WeasyPrint use as larguras do
+           <colgroup> sem tentar recalcular baseado no conteúdo */
+        '.workflow-table { table-layout: fixed !important; width: 100% !important; }',
 
         /* Compactar fontes e padding */
         '.workflow-table th, .workflow-table td {',
