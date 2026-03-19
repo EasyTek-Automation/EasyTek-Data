@@ -200,6 +200,76 @@ class TestCriarTabelaPendencias:
         assert resultado is not None
 
 
+class TestCriarTabelaPendenciasComFiltros:
+    """Testa que filtros de data são aplicados ao histórico da barra de horas."""
+
+    @pytest.fixture
+    def df_hist_duas_datas(self):
+        """Histórico com atividade em 10/03 (2h) e em 18/03 (3.5h) para a mesma demanda."""
+        from datetime import datetime
+        return pd.DataFrame([
+            {
+                'hist_id': 'h1', 'MaintenanceWF_id': 'AMG_WF001', 'pendencia_id': 'AMG_WF001',
+                'descricao': 'Inspeção', 'data': datetime(2026, 3, 10, 8, 0),
+                'responsavel': 'user1', 'tipo_evento': 'Manutenção Preventiva',
+                'editado_por': 'user1', 'observacoes': '', 'alteracoes': '',
+                'horas': 2.0, 'concluido': False, 'aprovador': None,
+                'status_aprovacao': None, 'data_aprovacao': None,
+                'record_type': 'subtarefa', 'subtarefa_id': None,
+                'prioridade': 'normal', 'data_planejada': None,
+            },
+            {
+                'hist_id': 'h2', 'MaintenanceWF_id': 'AMG_WF001', 'pendencia_id': 'AMG_WF001',
+                'descricao': 'Substituição', 'data': datetime(2026, 3, 18, 8, 0),
+                'responsavel': 'user1', 'tipo_evento': 'Manutenção Preventiva',
+                'editado_por': 'user1', 'observacoes': '', 'alteracoes': '',
+                'horas': 3.5, 'concluido': False, 'aprovador': None,
+                'status_aprovacao': None, 'data_aprovacao': None,
+                'record_type': 'subtarefa', 'subtarefa_id': None,
+                'prioridade': 'normal', 'data_planejada': None,
+            },
+        ])
+
+    def test_sem_filtros_exibe_total_completo(self, df_pendencias_com_dados, df_hist_duas_datas):
+        """Sem filtros, barra deve totalizar todas as atividades (5:30)."""
+        from src.pages.workflow.dashboard import criar_tabela_pendencias
+        resultado = criar_tabela_pendencias(df_pendencias_com_dados, df_hist_duas_datas)
+        assert '5:30' in str(resultado)
+
+    def test_filtro_data_restringe_horas_na_barra(self, df_pendencias_com_dados, df_hist_duas_datas):
+        """Com filtro de data 18/03, barra deve exibir apenas 3:30 (não 5:30)."""
+        from src.pages.workflow.dashboard import criar_tabela_pendencias
+        import dash_bootstrap_components as dbc
+        filtros = {
+            'tipo_data': ['subtarefa'],
+            'data_inicio': '2026-03-18',
+            'data_fim': '2026-03-18',
+        }
+        resultado = criar_tabela_pendencias(df_pendencias_com_dados, df_hist_duas_datas, filtros=filtros)
+        assert isinstance(resultado, dbc.Table)
+        resultado_str = str(resultado)
+        assert '3:30' in resultado_str
+        assert '5:30' not in resultado_str
+
+    def test_filtro_sem_tipo_subtarefa_nao_filtra_historico(self, df_pendencias_com_dados, df_hist_duas_datas):
+        """filtros com tipo_data='tarefa' não deve filtrar o histórico interno (total permanece 5:30)."""
+        from src.pages.workflow.dashboard import criar_tabela_pendencias
+        filtros = {
+            'tipo_data': ['tarefa'],
+            'data_inicio': '2026-03-18',
+            'data_fim': '2026-03-18',
+        }
+        resultado = criar_tabela_pendencias(df_pendencias_com_dados, df_hist_duas_datas, filtros=filtros)
+        assert '5:30' in str(resultado)
+
+    def test_filtro_sem_datas_nao_filtra_historico(self, df_pendencias_com_dados, df_hist_duas_datas):
+        """filtros sem data_inicio/fim não deve alterar o histórico (total permanece 5:30)."""
+        from src.pages.workflow.dashboard import criar_tabela_pendencias
+        filtros = {'tipo_data': ['subtarefa'], 'data_inicio': None, 'data_fim': None}
+        resultado = criar_tabela_pendencias(df_pendencias_com_dados, df_hist_duas_datas, filtros=filtros)
+        assert '5:30' in str(resultado)
+
+
 # =============================================================================
 # TESTES: criar_linha_pendencia()
 # =============================================================================

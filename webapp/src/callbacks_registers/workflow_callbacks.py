@@ -1021,7 +1021,8 @@ def reconstruir_tabela_com_filtros(df_pendencias, df_historico, filtros, user_le
     nova_tabela = criar_tabela_pendencias(
         df_filtrado, df_historico,
         user_level=user_level or 1,
-        username_atual=username
+        username_atual=username,
+        filtros=filtros if filtros else None,
     )
     store_data = df_filtrado.to_dict('records') if df_filtrado is not None else []
     return nova_tabela, store_data

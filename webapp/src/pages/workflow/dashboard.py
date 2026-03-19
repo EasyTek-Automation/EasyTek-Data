@@ -1308,7 +1308,82 @@ def criar_linha_pendencia(pendencia, index, historico_pendencia=None,
     return [linha_principal, linha_historico]
 
 
-def criar_tabela_pendencias(df_pendencias, df_historico=None, user_level=1, username_atual=None):
+def _filtrar_hist_df_por_filtros(hist_df, filtros):
+    """
+    Aplica filtros de data e prioridade a um DataFrame de histórico de uma única demanda.
+
+    Quando tipo_data inclui 'subtarefa' ou 'planejada' e há data_inicio/data_fim, mantém
+    apenas as subtarefas do período e seus logs vinculados. Registros de criação são sempre
+    mantidos. Reflete a mesma lógica de criar_conteudo_historico para garantir que a barra
+    de horas exiba apenas as atividades visíveis no filtro ativo.
+
+    Args:
+        hist_df: DataFrame de histórico já pré-filtrado para uma pendência
+        filtros: Dict de filtros ativos (pode ser None)
+
+    Returns:
+        DataFrame filtrado (pode ser o mesmo objeto se nenhum filtro se aplica)
+    """
+    if not filtros or hist_df.empty:
+        return hist_df
+
+    from datetime import datetime as _dt, timedelta as _td
+
+    _tipos = filtros.get('tipo_data') or []
+    if isinstance(_tipos, str):
+        _tipos = [_tipos]
+
+    usar_sub = 'subtarefa' in _tipos
+    usar_plan = 'planejada' in _tipos
+    _di = filtros.get('data_inicio')
+    _df_fim = filtros.get('data_fim')
+
+    if (usar_sub or usar_plan) and (_di or _df_fim):
+        hist_df = hist_df.copy()
+        if 'record_type' not in hist_df.columns:
+            hist_df['record_type'] = 'subtarefa'
+        hist_df['record_type'] = hist_df['record_type'].fillna('subtarefa')
+
+        mask_sub = hist_df['record_type'] == 'subtarefa'
+        df_subs = hist_df[mask_sub].copy()
+
+        ids_validos = set()
+        if usar_sub and 'data' in df_subs.columns:
+            df_tmp = df_subs.copy()
+            df_tmp['_d'] = pd.to_datetime(df_tmp['data'], errors='coerce')
+            if _di:
+                df_tmp = df_tmp[df_tmp['_d'] >= _dt.fromisoformat(_di)]
+            if _df_fim:
+                df_tmp = df_tmp[df_tmp['_d'] < _dt.fromisoformat(_df_fim) + _td(days=1)]
+            ids_validos |= set(df_tmp['hist_id'].dropna().astype(str).tolist())
+
+        if usar_plan and 'data_planejada' in df_subs.columns:
+            df_tmp = df_subs.copy()
+            df_tmp['_dp'] = pd.to_datetime(df_tmp['data_planejada'], errors='coerce')
+            df_tmp = df_tmp[df_tmp['_dp'].notna()]
+            if _di:
+                df_tmp = df_tmp[df_tmp['_dp'] >= _dt.fromisoformat(_di)]
+            if _df_fim:
+                df_tmp = df_tmp[df_tmp['_dp'] < _dt.fromisoformat(_df_fim) + _td(days=1)]
+            ids_validos |= set(df_tmp['hist_id'].dropna().astype(str).tolist())
+
+        def _manter(row):
+            """Mantém criacao sempre; subtarefa/log apenas se dentro do período filtrado."""
+            rt = row.get('record_type') or 'subtarefa'
+            if rt == 'criacao':
+                return True
+            if rt == 'subtarefa':
+                return str(row.get('hist_id', '')) in ids_validos
+            if rt == 'log':
+                return str(row.get('subtarefa_id', '')) in ids_validos
+            return True
+
+        hist_df = hist_df[hist_df.apply(_manter, axis=1)]
+
+    return hist_df
+
+
+def criar_tabela_pendencias(df_pendencias, df_historico=None, user_level=1, username_atual=None, filtros=None):
     """
     Cria a tabela Bootstrap com todas as pendências.
 
@@ -1317,6 +1392,9 @@ def criar_tabela_pendencias(df_pendencias, df_historico=None, user_level=1, user
         df_historico: DataFrame com o histórico (para barra de horas e badges)
         user_level: Nível do usuário logado (1, 2 ou 3)
         username_atual: Username do usuário logado
+        filtros: Dict de filtros ativos — quando tipo_data inclui 'subtarefa' ou 'planejada'
+                 e há data_inicio/data_fim, o histórico usado na barra de horas é restrito
+                 ao mesmo período, refletindo apenas as atividades visíveis.
 
     Returns:
         dbc.Table: Tabela com pendências expansíveis
@@ -1353,7 +1431,8 @@ def criar_tabela_pendencias(df_pendencias, df_historico=None, user_level=1, user
             col_id = 'pendencia_id' if 'pendencia_id' in df_historico.columns else 'MaintenanceWF_id'
             hist_df = df_historico[df_historico[col_id] == pendencia['id']]
             if not hist_df.empty:
-                hist_items = hist_df.to_dict('records')
+                hist_df = _filtrar_hist_df_por_filtros(hist_df, filtros)
+                hist_items = hist_df.to_dict('records') if not hist_df.empty else None
 
         linhas.extend(criar_linha_pendencia(
             pendencia, index, hist_items,
