@@ -77,6 +77,11 @@
 }
 
 /* --- Tabela principal de pendências --- */
+.workflow-table {
+    table-layout: fixed;
+    width: 100%;
+}
+
 .workflow-table td,
 .workflow-table th {
     padding: 5px 10px !important;

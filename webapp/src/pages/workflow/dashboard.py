@@ -1441,8 +1441,18 @@ def criar_tabela_pendencias(df_pendencias, df_historico=None, user_level=1, user
 
     tbody = html.Tbody(linhas)
 
+    colgroup = html.Colgroup([
+        html.Col(style={"width": "40px"}),
+        html.Col(style={"width": "100px"}),
+        html.Col(),
+        html.Col(style={"width": "150px"}),
+        html.Col(style={"width": "150px"}),
+        html.Col(style={"width": "100px"}),
+        html.Col(style={"width": "120px"}),
+    ])
+
     return dbc.Table(
-        [thead, tbody],
+        [colgroup, thead, tbody],
         bordered=False,
         hover=True,
         responsive=True,
