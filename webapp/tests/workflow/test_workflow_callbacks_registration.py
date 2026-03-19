@@ -10,6 +10,8 @@ Este teste pega exatamente a classe de erro que os testes de unidade não
 cobrem: erros de inicialização do app Dash em runtime.
 """
 import pytest
+import pandas as pd
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 
@@ -157,3 +159,59 @@ class TestRegistroCallbacksWorkflow:
                 "Callbacks inválidos (allow_duplicate sem prevent_initial_call):\n"
                 + "\n".join(violacoes)
             )
+
+
+# =============================================================================
+# TESTES: _kpi_filtrado() — filtros de data no card de horas
+# =============================================================================
+
+class TestKpiFiltrado:
+    """Testa que _kpi_filtrado aplica filtros de data ao histórico dos cards KPI."""
+
+    @pytest.fixture
+    def df_pend(self):
+        return pd.DataFrame([{
+            'id': 'WF001', 'descricao': 'Demanda teste', 'responsavel': 'user1',
+            'status': 'Em Andamento', 'data_criacao': datetime(2026, 3, 1),
+            'status_aceite': 'aceito',
+        }])
+
+    @pytest.fixture
+    def df_hist(self):
+        """Histórico com atividade em 10/03 (2h) e em 18/03 (3.5h)."""
+        return pd.DataFrame([
+            {
+                'hist_id': 'h1', 'pendencia_id': 'WF001', 'MaintenanceWF_id': 'WF001',
+                'record_type': 'subtarefa', 'data': datetime(2026, 3, 10, 8, 0),
+                'horas': 2.0, 'concluido': False, 'subtarefa_id': None,
+                'aprovador': None, 'status_aprovacao': None, 'data_planejada': None,
+            },
+            {
+                'hist_id': 'h2', 'pendencia_id': 'WF001', 'MaintenanceWF_id': 'WF001',
+                'record_type': 'subtarefa', 'data': datetime(2026, 3, 18, 8, 0),
+                'horas': 3.5, 'concluido': False, 'subtarefa_id': None,
+                'aprovador': None, 'status_aprovacao': None, 'data_planejada': None,
+            },
+        ])
+
+    def test_sem_filtros_totaliza_todas_horas(self, df_pend, df_hist):
+        """Sem filtros, card horas deve exibir total de todas as atividades (5:30)."""
+        from src.callbacks_registers.workflow_callbacks import _kpi_filtrado
+        resultado = _kpi_filtrado(df_pend, df_hist, None)
+        assert '5:30' in str(resultado)
+
+    def test_com_filtro_data_totaliza_apenas_horas_do_periodo(self, df_pend, df_hist):
+        """Com filtro 18/03, card horas deve exibir apenas 3:30 (não 5:30)."""
+        from src.callbacks_registers.workflow_callbacks import _kpi_filtrado
+        filtros = {'tipo_data': ['subtarefa'], 'data_inicio': '2026-03-18', 'data_fim': '2026-03-18'}
+        resultado = _kpi_filtrado(df_pend, df_hist, None, filtros=filtros)
+        resultado_str = str(resultado)
+        assert '3:30' in resultado_str
+        assert '5:30' not in resultado_str
+
+    def test_filtro_tipo_tarefa_nao_filtra_historico(self, df_pend, df_hist):
+        """filtros com tipo_data='tarefa' não deve filtrar as horas do histórico."""
+        from src.callbacks_registers.workflow_callbacks import _kpi_filtrado
+        filtros = {'tipo_data': ['tarefa'], 'data_inicio': '2026-03-18', 'data_fim': '2026-03-18'}
+        resultado = _kpi_filtrado(df_pend, df_hist, None, filtros=filtros)
+        assert '5:30' in str(resultado)

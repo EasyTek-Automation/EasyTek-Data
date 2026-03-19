@@ -20,7 +20,8 @@ from src.pages.workflow.dashboard import (
     criar_tabela_pendencias,
     criar_cards_kpi,
     criar_notificacoes,
-    float_para_hhmm
+    float_para_hhmm,
+    _filtrar_hist_df_por_filtros,
 )
 
 
@@ -971,8 +972,13 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
     return df_filtrado
 
 
-def _kpi_filtrado(df_filtrado, df_historico, username):
-    """Calcula KPI cards restringindo o histórico às pendências do df_filtrado."""
+def _kpi_filtrado(df_filtrado, df_historico, username, filtros=None):
+    """Calcula KPI cards restringindo o histórico às pendências do df_filtrado.
+
+    Quando filtros inclui tipo_data 'subtarefa' ou 'planejada' com datas, aplica
+    o mesmo filtro de período ao histórico, garantindo que o card de horas exiba
+    apenas as horas das atividades visíveis no filtro ativo.
+    """
     if df_filtrado is None or df_filtrado.empty:
         return criar_cards_kpi(df_filtrado, None, username)
     ids = set(df_filtrado['id'].dropna().tolist()) if 'id' in df_filtrado.columns else set()
@@ -981,6 +987,8 @@ def _kpi_filtrado(df_filtrado, df_historico, username):
     df_hist_kpi = (df_historico[df_historico[col].isin(ids)]
                    if df_historico is not None and not df_historico.empty and ids
                    else df_historico)
+    if filtros and df_hist_kpi is not None and not df_hist_kpi.empty:
+        df_hist_kpi = _filtrar_hist_df_por_filtros(df_hist_kpi, filtros)
     return criar_cards_kpi(df_filtrado, df_hist_kpi, username)
 
 
@@ -1187,7 +1195,7 @@ def register_workflow_callbacks(app):
         )
         hist_store = df_historico.to_dict('records') if df_historico is not None else []
         df_filtrado = pd.DataFrame(store_data) if store_data else pd.DataFrame()
-        novos_kpis = _kpi_filtrado(df_filtrado, df_historico, username_atual)
+        novos_kpis = _kpi_filtrado(df_filtrado, df_historico, username_atual, filtros=filtros)
         return nova_tabela, store_data, filtros, hist_store, novos_kpis
 
 
@@ -1249,7 +1257,7 @@ def register_workflow_callbacks(app):
             df_pendencias, df_historico, filtros, user_level, username_atual
         )
         df_filtrado = pd.DataFrame(store_data) if store_data else pd.DataFrame()
-        novos_kpis = _kpi_filtrado(df_filtrado, df_historico, username_atual)
+        novos_kpis = _kpi_filtrado(df_filtrado, df_historico, username_atual, filtros=filtros)
         return nova_tabela, store_data, df_historico.to_dict('records'), filtros, novos_kpis
 
 
@@ -1318,18 +1326,20 @@ def register_workflow_callbacks(app):
         Output("container-notificacoes", "children"),
         Input("store-pendencias", "data"),
         Input("store-historico", "data"),
-        State("user-username-store", "data")
+        State("user-username-store", "data"),
+        State("store-filtros-ativos", "data"),
     )
-    def atualizar_cards_kpi(pendencias_data, historico_data, username_atual):
+    def atualizar_cards_kpi(pendencias_data, historico_data, username_atual, filtros_ativos):
         """Atualiza os cards KPI e notificações quando os dados mudam.
 
         store-pendencias já contém apenas as pendências do filtro ativo (ou todas se sem filtro).
-        Usa _kpi_filtrado para garantir que o histórico seja escopo dos mesmos IDs.
+        Usa _kpi_filtrado com filtros_ativos para que o card de horas reflita apenas
+        as atividades visíveis no período filtrado.
         """
         df_pendencias = pd.DataFrame(pendencias_data) if pendencias_data else None
         df_historico = pd.DataFrame(historico_data) if historico_data else None
         return (
-            _kpi_filtrado(df_pendencias, df_historico, username_atual),
+            _kpi_filtrado(df_pendencias, df_historico, username_atual, filtros=filtros_ativos),
             criar_notificacoes(df_pendencias, df_historico, username_atual),
         )
 
@@ -1589,7 +1599,7 @@ def register_workflow_callbacks(app):
             df_pend, df_hist, filtros, user_level, username_atual
         )
         df_filtrado = pd.DataFrame(store_data) if store_data else pd.DataFrame()
-        novos_kpis = _kpi_filtrado(df_filtrado, df_hist, username_atual)
+        novos_kpis = _kpi_filtrado(df_filtrado, df_hist, username_atual, filtros=filtros)
 
         if sucesso:
             alerta = dbc.Alert([
@@ -1692,7 +1702,7 @@ def register_workflow_callbacks(app):
             df_pend, df_hist, filtros, user_level, username_atual
         )
         df_filtrado = pd.DataFrame(store_data) if store_data else pd.DataFrame()
-        novos_kpis = _kpi_filtrado(df_filtrado, df_hist, username_atual)
+        novos_kpis = _kpi_filtrado(df_filtrado, df_hist, username_atual, filtros=filtros)
 
         if sucesso:
             alerta = dbc.Alert([
