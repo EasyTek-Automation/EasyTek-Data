@@ -1347,24 +1347,37 @@ def _filtrar_hist_df_por_filtros(hist_df, filtros):
         mask_sub = hist_df['record_type'] == 'subtarefa'
         df_subs = hist_df[mask_sub].copy()
 
+        # Limites de comparação tz-naive (UTC implícito)
+        _di_dt  = _dt.fromisoformat(_di) if _di else None
+        _df_dt  = _dt.fromisoformat(_df_fim) + _td(days=1) if _df_fim else None
+
+        def _normalizar_datas(series):
+            """Converte série de datas para tz-naive UTC, tratando tz-aware e tz-naive uniformemente.
+
+            MongoDB retorna datetimes tz-aware (UTC). Após roundtrip pelo store JSON, podem chegar
+            como Timestamps tz-aware. Normalizar evita TypeError na comparação com limites tz-naive.
+            """
+            dt = pd.to_datetime(series, errors='coerce', utc=True)
+            return dt.dt.tz_convert(None)
+
         ids_validos = set()
         if usar_sub and 'data' in df_subs.columns:
             df_tmp = df_subs.copy()
-            df_tmp['_d'] = pd.to_datetime(df_tmp['data'], errors='coerce')
-            if _di:
-                df_tmp = df_tmp[df_tmp['_d'] >= _dt.fromisoformat(_di)]
-            if _df_fim:
-                df_tmp = df_tmp[df_tmp['_d'] < _dt.fromisoformat(_df_fim) + _td(days=1)]
+            df_tmp['_d'] = _normalizar_datas(df_tmp['data'])
+            if _di_dt:
+                df_tmp = df_tmp[df_tmp['_d'] >= _di_dt]
+            if _df_dt:
+                df_tmp = df_tmp[df_tmp['_d'] < _df_dt]
             ids_validos |= set(df_tmp['hist_id'].dropna().astype(str).tolist())
 
         if usar_plan and 'data_planejada' in df_subs.columns:
             df_tmp = df_subs.copy()
-            df_tmp['_dp'] = pd.to_datetime(df_tmp['data_planejada'], errors='coerce')
+            df_tmp['_dp'] = _normalizar_datas(df_tmp['data_planejada'])
             df_tmp = df_tmp[df_tmp['_dp'].notna()]
-            if _di:
-                df_tmp = df_tmp[df_tmp['_dp'] >= _dt.fromisoformat(_di)]
-            if _df_fim:
-                df_tmp = df_tmp[df_tmp['_dp'] < _dt.fromisoformat(_df_fim) + _td(days=1)]
+            if _di_dt:
+                df_tmp = df_tmp[df_tmp['_dp'] >= _di_dt]
+            if _df_dt:
+                df_tmp = df_tmp[df_tmp['_dp'] < _df_dt]
             ids_validos |= set(df_tmp['hist_id'].dropna().astype(str).tolist())
 
         def _manter(row):
@@ -1378,7 +1391,23 @@ def _filtrar_hist_df_por_filtros(hist_df, filtros):
                 return str(row.get('subtarefa_id', '')) in ids_validos
             return True
 
+        hist_df_original = hist_df  # referência antes do filtro para a rede de segurança
         hist_df = hist_df[hist_df.apply(_manter, axis=1)]
+
+        # Rede de segurança: garante que logs de atividades incluídas nunca sejam excluídos.
+        # Logs têm data auto-gerada (datetime.now()) e não aceitam retroativo — sua data de
+        # criação não deve ser critério de exclusão quando a atividade-pai está no período.
+        ids_subs_incluidas = set(
+            hist_df[hist_df['record_type'] == 'subtarefa']['hist_id'].dropna().astype(str)
+        )
+        if ids_subs_incluidas:
+            mask_logs_ausentes = (
+                (hist_df_original['record_type'] == 'log') &
+                (hist_df_original['subtarefa_id'].astype(str).isin(ids_subs_incluidas)) &
+                (~hist_df_original.index.isin(hist_df.index))
+            )
+            if mask_logs_ausentes.any():
+                hist_df = pd.concat([hist_df, hist_df_original[mask_logs_ausentes]])
 
     return hist_df
 

@@ -704,7 +704,12 @@ class TestFiltroDataframe_SemPlanejamento:
         assert list(resultado['id']) == ['WF002']
 
     def test_sem_planejamento_retrocompat_sem_campo_concluido(self, df_pend):
-        """Docs antigos sem campo concluido devem funcionar (tratados como não concluídos)."""
+        """Docs antigos sem campo concluido devem funcionar (tratados como não concluídos).
+
+        WF001: tem atividade sem data_planejada e sem concluido → incluído.
+        WF002: não tem nenhuma atividade → também incluído (sem planejamento = sem atividades
+        cadastradas OU com atividades não concluídas sem data_planejada).
+        """
         from src.callbacks_registers.workflow_callbacks import aplicar_filtros_dataframe
         df_hist_sem_campo = pd.DataFrame([
             {'hist_id': 'h1', 'pendencia_id': 'WF001', 'record_type': 'subtarefa',
@@ -714,7 +719,7 @@ class TestFiltroDataframe_SemPlanejamento:
             df_pend, "todos", None, None,
             df_historico=df_hist_sem_campo, sem_planejamento=True
         )
-        assert list(resultado['id']) == ['WF001']
+        assert set(resultado['id']) == {'WF001', 'WF002'}
 
 
 # =============================================================================
@@ -767,4 +772,229 @@ class TestCalcularPeriodoPdf:
         ]
         resultado = _calcular_periodo_pdf(pendencias, None)
         assert '→' in resultado
-        assert resultado != ''
+
+
+# =============================================================================
+# TESTES: _filtrar_hist_df_por_filtros
+# =============================================================================
+
+class TestFiltrarHistDfPorFiltros:
+    """Garante o invariante: logs de atividades incluídas nunca são excluídos por data."""
+
+    def _make_df(self, records):
+        return pd.DataFrame(records)
+
+    def test_log_fora_do_periodo_incluido_quando_atividade_no_periodo(self):
+        """Log criado APÓS o fim do período deve ser incluído se a atividade-pai está no período."""
+        from src.pages.workflow.dashboard import _filtrar_hist_df_por_filtros
+
+        hist_df = self._make_df([
+            {
+                'hist_id': 'sub001', 'MaintenanceWF_id': 'WF063',
+                'record_type': 'subtarefa',
+                'data': datetime(2026, 3, 19, 10, 0),  # retroativa, dentro do período
+                'data_planejada': None,
+                'horas': None, 'concluido': False, 'subtarefa_id': None,
+            },
+            {
+                'hist_id': 'log001', 'MaintenanceWF_id': 'WF063',
+                'record_type': 'log',
+                'data': datetime(2026, 3, 25, 14, 0),  # FORA do período (25/03 > 23/03)
+                'data_planejada': None,
+                'horas': 9.93, 'concluido': False, 'subtarefa_id': 'sub001',
+            },
+        ])
+
+        filtros = {
+            'tipo_data': ['subtarefa'],
+            'data_inicio': '2026-02-24',
+            'data_fim': '2026-03-23',
+        }
+
+        resultado = _filtrar_hist_df_por_filtros(hist_df, filtros)
+
+        assert 'log001' in resultado['hist_id'].values, \
+            "Log fora do período deve ser incluído quando a atividade-pai está no período"
+        assert resultado[resultado['hist_id'] == 'log001']['horas'].iloc[0] == 9.93
+
+    def test_log_fora_do_periodo_incluido_via_filtro_planejada(self):
+        """Log fora do período incluído quando atividade tem data_planejada no período."""
+        from src.pages.workflow.dashboard import _filtrar_hist_df_por_filtros
+
+        hist_df = self._make_df([
+            {
+                'hist_id': 'sub002', 'MaintenanceWF_id': 'WF063',
+                'record_type': 'subtarefa',
+                'data': datetime(2026, 3, 25, 8, 0),  # data de inserção FORA do período
+                'data_planejada': datetime(2026, 3, 20),  # data planejada DENTRO do período
+                'horas': None, 'concluido': False, 'subtarefa_id': None,
+            },
+            {
+                'hist_id': 'log002', 'MaintenanceWF_id': 'WF063',
+                'record_type': 'log',
+                'data': datetime(2026, 3, 25, 14, 0),  # FORA do período
+                'data_planejada': None,
+                'horas': 8.5, 'concluido': False, 'subtarefa_id': 'sub002',
+            },
+        ])
+
+        filtros = {
+            'tipo_data': ['planejada'],
+            'data_inicio': '2026-02-24',
+            'data_fim': '2026-03-23',
+        }
+
+        resultado = _filtrar_hist_df_por_filtros(hist_df, filtros)
+
+        assert 'log002' in resultado['hist_id'].values, \
+            "Log fora do período deve ser incluído quando data_planejada da atividade está no período"
+        assert resultado[resultado['hist_id'] == 'log002']['horas'].iloc[0] == 8.5
+
+    def test_log_de_atividade_fora_do_periodo_excluido(self):
+        """Log de atividade com data FORA do período deve ser excluído."""
+        from src.pages.workflow.dashboard import _filtrar_hist_df_por_filtros
+
+        hist_df = self._make_df([
+            {
+                'hist_id': 'sub003', 'MaintenanceWF_id': 'WF099',
+                'record_type': 'subtarefa',
+                'data': datetime(2026, 4, 5, 10, 0),  # FORA do período
+                'data_planejada': None,
+                'horas': None, 'concluido': False, 'subtarefa_id': None,
+            },
+            {
+                'hist_id': 'log003', 'MaintenanceWF_id': 'WF099',
+                'record_type': 'log',
+                'data': datetime(2026, 4, 5, 14, 0),
+                'data_planejada': None,
+                'horas': 5.0, 'concluido': False, 'subtarefa_id': 'sub003',
+            },
+        ])
+
+        filtros = {
+            'tipo_data': ['subtarefa'],
+            'data_inicio': '2026-02-24',
+            'data_fim': '2026-03-23',
+        }
+
+        resultado = _filtrar_hist_df_por_filtros(hist_df, filtros)
+
+        assert 'sub003' not in resultado['hist_id'].values
+        assert 'log003' not in resultado['hist_id'].values
+
+    def test_multiplos_logs_todos_incluidos_quando_atividade_no_periodo(self):
+        """Múltiplos logs de uma atividade devem ser todos incluídos."""
+        from src.pages.workflow.dashboard import _filtrar_hist_df_por_filtros
+
+        hist_df = self._make_df([
+            {
+                'hist_id': 'sub004', 'MaintenanceWF_id': 'WF063',
+                'record_type': 'subtarefa',
+                'data': datetime(2026, 3, 19, 10, 0),
+                'data_planejada': None,
+                'horas': None, 'concluido': False, 'subtarefa_id': None,
+            },
+            {
+                'hist_id': 'log004a', 'MaintenanceWF_id': 'WF063',
+                'record_type': 'log',
+                'data': datetime(2026, 3, 25, 14, 0),  # FORA do período
+                'data_planejada': None,
+                'horas': 9.93, 'concluido': False, 'subtarefa_id': 'sub004',
+            },
+            {
+                'hist_id': 'log004b', 'MaintenanceWF_id': 'WF063',
+                'record_type': 'log',
+                'data': datetime(2026, 3, 26, 9, 0),  # FORA do período
+                'data_planejada': None,
+                'horas': 3.5, 'concluido': False, 'subtarefa_id': 'sub004',
+            },
+        ])
+
+        filtros = {
+            'tipo_data': ['subtarefa'],
+            'data_inicio': '2026-02-24',
+            'data_fim': '2026-03-23',
+        }
+
+        resultado = _filtrar_hist_df_por_filtros(hist_df, filtros)
+        logs = resultado[resultado['record_type'] == 'log']
+
+        assert len(logs) == 2, "Todos os logs da atividade devem ser incluídos"
+        assert set(logs['hist_id'].tolist()) == {'log004a', 'log004b'}
+
+    def test_sem_filtro_de_data_retorna_tudo(self):
+        """Sem data_inicio nem data_fim, retorna o df sem modificações."""
+        from src.pages.workflow.dashboard import _filtrar_hist_df_por_filtros
+
+        hist_df = self._make_df([
+            {
+                'hist_id': 'sub005', 'MaintenanceWF_id': 'WF001',
+                'record_type': 'subtarefa', 'data': datetime(2026, 1, 1),
+                'data_planejada': None, 'horas': None, 'concluido': False, 'subtarefa_id': None,
+            },
+        ])
+
+        filtros = {'tipo_data': ['subtarefa'], 'data_inicio': None, 'data_fim': None}
+        resultado = _filtrar_hist_df_por_filtros(hist_df, filtros)
+
+        assert len(resultado) == len(hist_df)
+
+    def test_criacao_sempre_incluida(self):
+        """Registros record_type='criacao' são sempre mantidos independente de data."""
+        from src.pages.workflow.dashboard import _filtrar_hist_df_por_filtros
+
+        hist_df = self._make_df([
+            {
+                'hist_id': 'cri001', 'MaintenanceWF_id': 'WF001',
+                'record_type': 'criacao', 'data': datetime(2026, 1, 15),
+                'data_planejada': None, 'horas': None, 'concluido': False, 'subtarefa_id': None,
+            },
+        ])
+
+        filtros = {
+            'tipo_data': ['subtarefa'],
+            'data_inicio': '2026-03-01',
+            'data_fim': '2026-03-31',
+        }
+
+        resultado = _filtrar_hist_df_por_filtros(hist_df, filtros)
+        assert 'cri001' in resultado['hist_id'].values
+
+    def test_log_fora_do_periodo_com_datas_tz_aware(self):
+        """Simula o cenário real: datas tz-aware (como retornadas pelo MongoDB via store JSON)."""
+        from src.pages.workflow.dashboard import _filtrar_hist_df_por_filtros
+
+        # Simula serialização JSON e reconstrução (store roundtrip):
+        # MongoDB retorna tz-aware UTC datetimes → pd.to_datetime preserva tz
+        tz_aware_19 = pd.Timestamp('2026-03-19 10:00:00', tz='UTC')
+        tz_aware_25 = pd.Timestamp('2026-03-25 14:00:00', tz='UTC')
+
+        hist_df = self._make_df([
+            {
+                'hist_id': 'sub_tz', 'MaintenanceWF_id': 'WF063',
+                'record_type': 'subtarefa',
+                'data': tz_aware_19,  # retroativa, dentro do período
+                'data_planejada': None,
+                'horas': None, 'concluido': False, 'subtarefa_id': None,
+            },
+            {
+                'hist_id': 'log_tz', 'MaintenanceWF_id': 'WF063',
+                'record_type': 'log',
+                'data': tz_aware_25,  # FORA do período, tz-aware
+                'data_planejada': None,
+                'horas': 9.93, 'concluido': False, 'subtarefa_id': 'sub_tz',
+            },
+        ])
+
+        filtros = {
+            'tipo_data': ['subtarefa'],
+            'data_inicio': '2026-02-24',
+            'data_fim': '2026-03-23',
+        }
+
+        resultado = _filtrar_hist_df_por_filtros(hist_df, filtros)
+
+        assert 'sub_tz' in resultado['hist_id'].values, \
+            "Atividade com data tz-aware dentro do período deve ser incluída"
+        assert 'log_tz' in resultado['hist_id'].values, \
+            "Log tz-aware deve ser incluído quando a atividade-pai está no período"
