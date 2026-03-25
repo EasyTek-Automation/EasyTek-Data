@@ -1326,11 +1326,16 @@ def register_workflow_callbacks(app):
         Output("container-notificacoes", "children"),
         Input("store-pendencias", "data"),
         Input("store-historico", "data"),
+        Input("store-filtros-ativos", "data"),
         State("user-username-store", "data"),
-        State("store-filtros-ativos", "data"),
     )
-    def atualizar_cards_kpi(pendencias_data, historico_data, username_atual, filtros_ativos):
-        """Atualiza os cards KPI e notificações quando os dados mudam.
+    def atualizar_cards_kpi(pendencias_data, historico_data, filtros_ativos, username_atual):
+        """Atualiza os cards KPI e notificações quando os dados ou filtros mudam.
+
+        store-filtros-ativos é Input (não State) para garantir que quando CB2 atualiza
+        store-pendencias, store-historico e store-filtros-ativos na mesma batch, CB5 receba
+        todos os valores novos juntos — evitando race condition onde o filtro ainda seria
+        o valor anterior no momento da leitura.
 
         store-pendencias já contém apenas as pendências do filtro ativo (ou todas se sem filtro).
         Usa _kpi_filtrado com filtros_ativos para que o card de horas reflita apenas
@@ -1350,7 +1355,7 @@ def register_workflow_callbacks(app):
     @app.callback(
         Output("pdf-periodo-data", "children"),
         Input("store-pendencias", "data"),
-        State("store-filtros-ativos", "data"),
+        Input("store-filtros-ativos", "data"),
     )
     def atualizar_periodo_pdf(pendencias_data, filtros_ativos):
         """Período do relatório PDF.

@@ -998,3 +998,143 @@ class TestFiltrarHistDfPorFiltros:
             "Atividade com data tz-aware dentro do período deve ser incluída"
         assert 'log_tz' in resultado['hist_id'].values, \
             "Log tz-aware deve ser incluído quando a atividade-pai está no período"
+
+    def test_log_fora_do_periodo_com_datas_iso_string(self):
+        """Simula roundtrip JSON do dcc.Store: data como string ISO (Plotly serializa via .isoformat()).
+
+        No CB5 (atualizar_cards_kpi), o df_historico vem de pd.DataFrame(historico_data) onde
+        historico_data foi serializado pelo dcc.Store. O Plotly JSON encoder usa .isoformat()
+        para pd.Timestamp, então datas chegam como strings ISO sem timezone.
+        Este teste garante que _filtrar_hist_df_por_filtros funciona corretamente nesse path.
+        """
+        from src.pages.workflow.dashboard import _filtrar_hist_df_por_filtros
+
+        # Simular o que pd.DataFrame(historico_data) produz após roundtrip JSON via dcc.Store
+        # Plotly serializa pd.Timestamp('2026-03-19 10:00:00') → "2026-03-19T10:00:00"
+        hist_df = self._make_df([
+            {
+                'hist_id': 'sub_iso', 'MaintenanceWF_id': 'WF063',
+                'record_type': 'subtarefa',
+                'data': '2026-03-19T10:00:00',  # string ISO tz-naive (roundtrip tz-naive)
+                'data_planejada': None,
+                'horas': None, 'concluido': False, 'subtarefa_id': None,
+            },
+            {
+                'hist_id': 'log_iso', 'MaintenanceWF_id': 'WF063',
+                'record_type': 'log',
+                'data': '2026-03-25T14:00:00',  # FORA do período, string ISO
+                'data_planejada': None,
+                'horas': 9.93, 'concluido': False, 'subtarefa_id': 'sub_iso',
+            },
+        ])
+
+        filtros = {
+            'tipo_data': ['subtarefa'],
+            'data_inicio': '2026-02-24',
+            'data_fim': '2026-03-23',
+        }
+
+        resultado = _filtrar_hist_df_por_filtros(hist_df, filtros)
+
+        assert 'sub_iso' in resultado['hist_id'].values, \
+            "Atividade com data ISO string dentro do período deve ser incluída"
+        assert 'log_iso' in resultado['hist_id'].values, \
+            "Log ISO string deve ser incluído quando a atividade-pai está no período"
+
+    def test_kpi_filtrado_simula_cb5_roundtrip(self):
+        """Simula o CB5 completo: _kpi_filtrado com dados de roundtrip JSON.
+
+        Reproduz exatamente o que atualizar_cards_kpi (CB5) faz:
+        1. df_pendencias = pd.DataFrame(store-pendencias)  — ISO strings de datas
+        2. df_historico = pd.DataFrame(store-historico)   — ISO strings de datas
+        3. filtros_ativos com data_inicio/data_fim ativos
+        4. _kpi_filtrado(df_pendencias, df_historico, username, filtros=filtros_ativos)
+
+        Garante que o card de Horas conta horas de WF063 (logs em 25/03)
+        quando a atividade-pai (19/03) está dentro do período 24/02–23/03.
+        """
+        from src.pages.workflow.dashboard import _filtrar_hist_df_por_filtros
+
+        # Simular store-pendencias (apenas WF032 e WF063 passaram no filtro de demandas)
+        df_pendencias = pd.DataFrame([
+            {'id': 'WF063', 'descricao': 'Demanda 63', 'status': 'Em Andamento',
+             'responsavel': 'operador1', 'data_criacao': '2026-02-01T00:00:00'},
+            {'id': 'WF032', 'descricao': 'Demanda 32', 'status': 'Concluído',
+             'responsavel': 'operador2', 'data_criacao': '2026-01-15T00:00:00'},
+        ])
+
+        # Simular store-historico completo (ISO strings, como viria do dcc.Store JSON roundtrip)
+        df_historico = pd.DataFrame([
+            # WF063: atividade 1 (retroativa 19/03, dentro do range)
+            {'hist_id': 'sub063a', 'MaintenanceWF_id': 'WF063', 'record_type': 'subtarefa',
+             'data': '2026-03-19T10:00:00', 'data_planejada': None,
+             'horas': None, 'concluido': False, 'subtarefa_id': None},
+            # WF063: log 1 (criado em 25/03, FORA do range mas atividade-pai está no range)
+            {'hist_id': 'log063a', 'MaintenanceWF_id': 'WF063', 'record_type': 'log',
+             'data': '2026-03-25T09:56:00', 'data_planejada': None,
+             'horas': 9.933, 'concluido': False, 'subtarefa_id': 'sub063a'},
+            # WF063: atividade 2 (retroativa 19/03)
+            {'hist_id': 'sub063b', 'MaintenanceWF_id': 'WF063', 'record_type': 'subtarefa',
+             'data': '2026-03-19T10:00:00', 'data_planejada': None,
+             'horas': None, 'concluido': False, 'subtarefa_id': None},
+            # WF063: log 2 (criado em 25/03, FORA do range)
+            {'hist_id': 'log063b', 'MaintenanceWF_id': 'WF063', 'record_type': 'log',
+             'data': '2026-03-25T14:00:00', 'data_planejada': None,
+             'horas': 8.5, 'concluido': False, 'subtarefa_id': 'sub063b'},
+            # WF032: atividade (06/03, dentro do range)
+            {'hist_id': 'sub032', 'MaintenanceWF_id': 'WF032', 'record_type': 'subtarefa',
+             'data': '2026-03-06T09:00:00', 'data_planejada': None,
+             'horas': None, 'concluido': True, 'subtarefa_id': None},
+            # WF032: log (06/03, dentro do range)
+            {'hist_id': 'log032', 'MaintenanceWF_id': 'WF032', 'record_type': 'log',
+             'data': '2026-03-06T09:30:00', 'data_planejada': None,
+             'horas': 4.0, 'concluido': True, 'subtarefa_id': 'sub032'},
+        ])
+
+        # Filtros como chegariam do store-filtros-ativos após CB2
+        filtros_ativos = {
+            'tipo_data': ['subtarefa', 'planejada'],
+            'data_inicio': '2026-02-24',
+            'data_fim': '2026-03-23',
+            'responsavel': 'todos',
+            'status': None,
+            'busca': None,
+        }
+
+        # Simular _kpi_filtrado (como CB5 faz)
+        ids = set(df_pendencias['id'].dropna().tolist())
+        df_hist_kpi = df_historico[df_historico['MaintenanceWF_id'].isin(ids)]
+        df_hist_kpi = _filtrar_hist_df_por_filtros(df_hist_kpi, filtros_ativos)
+
+        hist_ids_resultado = set(df_hist_kpi['hist_id'].values)
+
+        # WF063's atividades (19/03) devem estar no resultado
+        assert 'sub063a' in hist_ids_resultado, "WF063 atividade 1 (19/03) deve ser incluída"
+        assert 'sub063b' in hist_ids_resultado, "WF063 atividade 2 (19/03) deve ser incluída"
+
+        # WF063's logs (25/03, FORA do range) devem ser incluídos via atividade-pai
+        assert 'log063a' in hist_ids_resultado, \
+            "WF063 log 1 (25/03) deve ser incluído porque a atividade-pai (19/03) está no range"
+        assert 'log063b' in hist_ids_resultado, \
+            "WF063 log 2 (25/03) deve ser incluído porque a atividade-pai (19/03) está no range"
+
+        # WF032 deve também estar
+        assert 'sub032' in hist_ids_resultado
+        assert 'log032' in hist_ids_resultado
+
+        # Verificar soma das horas
+        horas_total = 0.0
+        for _, row in df_hist_kpi.iterrows():
+            rt = row.get('record_type', 'subtarefa')
+            if rt == 'criacao':
+                continue
+            h = row.get('horas')
+            if h is not None and str(h) != 'nan':
+                try:
+                    if float(h) > 0:
+                        horas_total += float(h)
+                except (ValueError, TypeError):
+                    pass
+
+        assert abs(horas_total - (9.933 + 8.5 + 4.0)) < 0.001, \
+            f"Horas totais esperadas ~22.43h, obtidas {horas_total}"
