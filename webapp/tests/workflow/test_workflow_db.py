@@ -1127,6 +1127,90 @@ class TestGuardValidacaoAdicionarLog:
         assert sucesso is True
 
 
+class TestAdicionarLogDataHerdada:
+    """Garante que adicionar_log() usa a data da atividade-pai, não datetime.now().
+
+    Esta é a causa raiz do bug KPI-horas: logs criados com datetime.now() tinham
+    data diferente da atividade-pai. O filtro por período excluía esses logs do KPI
+    mesmo quando a atividade-pai estava dentro do período filtrado.
+    """
+
+    def _make_mock_com_data(self, data_pai):
+        """Mock com atividade-pai contendo data específica."""
+        from bson import ObjectId
+        oid_sub = str(ObjectId())
+        mock = MagicMock()
+        mock.find_one.return_value = {
+            'status_validacao_gestor': None,
+            'titulo': 'Ativ X',
+            'MaintenanceWF_id': 'AMG_WF001',
+            'data': data_pai,
+        }
+        mock.insert_one.return_value = MagicMock()
+        return mock, oid_sub
+
+    def test_log_herda_data_da_atividade_pai(self):
+        """Log inserido deve ter a mesma data da atividade-pai, não datetime.now()."""
+        data_retroativa = datetime(2026, 3, 17, 12, 0, 0)
+        mock, oid = self._make_mock_com_data(data_retroativa)
+
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import adicionar_log
+            sucesso, _ = adicionar_log(oid, 'AMG_WF001', 'observacao', 'user1')
+
+        assert sucesso is True
+        # insert_one é chamado 2x: 1ª = doc do log, 2ª = evento de timeline
+        doc_inserido = mock.insert_one.call_args_list[0][0][0]
+        assert doc_inserido['data'] == data_retroativa, \
+            "Log deve herdar exatamente a data da atividade-pai para que o filtro por período funcione"
+
+    def test_log_aplica_shift_noon_para_data_meia_noite(self):
+        """Data 00:00:00 (retroativa salva como meia-noite UTC) deve virar 12:00:00.
+
+        Datas retroativas são salvas como datetime(YYYY, MM, DD, 0, 0, 0).
+        Em BRT (UTC-3) isso exibe como 21:00 do dia anterior. Shift para 12:00 UTC
+        garante que qualquer timezone do Brasil exiba a data no dia correto.
+        """
+        data_meia_noite = datetime(2026, 3, 19, 0, 0, 0)
+        mock, oid = self._make_mock_com_data(data_meia_noite)
+
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import adicionar_log
+            sucesso, _ = adicionar_log(oid, 'AMG_WF001', 'observacao', 'user1')
+
+        assert sucesso is True
+        doc_inserido = mock.insert_one.call_args_list[0][0][0]
+        data_log = doc_inserido['data']
+        assert data_log.hour == 12, \
+            "Data meia-noite deve ser shiftada para 12:00 para exibição correta em BRT"
+        assert data_log.day == 19 and data_log.month == 3 and data_log.year == 2026, \
+            "Shift de hora não deve alterar o dia"
+
+    def test_log_usa_datetime_agora_quando_pai_sem_data(self):
+        """Fallback: log usa data atual quando atividade-pai não tem campo 'data'."""
+        from bson import ObjectId
+        oid_sub = str(ObjectId())
+        mock = MagicMock()
+        mock.find_one.return_value = {
+            'status_validacao_gestor': None,
+            'titulo': 'Ativ X',
+            'MaintenanceWF_id': 'AMG_WF001',
+            # sem campo 'data'
+        }
+        mock.insert_one.return_value = MagicMock()
+
+        antes = datetime.now()
+        with patch('src.utils.workflow_db.get_mongo_connection', return_value=mock):
+            from src.utils.workflow_db import adicionar_log
+            sucesso, _ = adicionar_log(oid_sub, 'AMG_WF001', 'observacao', 'user1')
+        depois = datetime.now()
+
+        assert sucesso is True
+        doc_inserido = mock.insert_one.call_args_list[0][0][0]
+        assert antes <= doc_inserido['data'] <= depois, \
+            "Sem 'data' na atividade-pai, log deve usar datetime.now() como fallback"
+
+
 class TestTimelineEventos:
     """Testa que eventos de auditoria são registrados na linha do tempo."""
 

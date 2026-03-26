@@ -215,3 +215,131 @@ class TestKpiFiltrado:
         filtros = {'tipo_data': ['tarefa'], 'data_inicio': '2026-03-18', 'data_fim': '2026-03-18'}
         resultado = _kpi_filtrado(df_pend, df_hist, None, filtros=filtros)
         assert '5:30' in str(resultado)
+
+    def test_kpi_conta_15h_cenario_do_bug_relatado(self):
+        """Regressão: 1 demanda, 3 atividades retroativas (semana passada), 3 logs de 5h cada.
+        Filtro = semana das atividades. Card deve mostrar 15:00h, não 5:00h.
+
+        Bug original: logs usavam datetime.now() como data (semana atual) e CB5 usava
+        JSON roundtrip do store-historico. _normalizar_datas(utc=True) produzia Timestamps
+        divergentes que excluíam logs válidos, resultando em apenas 5h no card.
+
+        Fix: adicionar_log() herda data da atividade-pai + CB5 usa carregar_dados_csv().
+        """
+        from src.callbacks_registers.workflow_callbacks import _kpi_filtrado
+
+        data_retroativa = datetime(2026, 3, 17, 12, 0, 0)  # semana passada
+
+        df_pend = pd.DataFrame([{
+            'id': 'WF001', 'descricao': 'Demanda', 'responsavel': 'user1',
+            'status': 'Em Andamento', 'data_criacao': data_retroativa,
+            'status_aceite': 'aceito',
+        }])
+
+        df_hist = pd.DataFrame([
+            # A1: atividade retroativa semana passada
+            {'hist_id': 'a1', 'MaintenanceWF_id': 'WF001', 'record_type': 'subtarefa',
+             'data': data_retroativa, 'horas': None, 'concluido': False, 'subtarefa_id': None,
+             'aprovador': None, 'status_aprovacao': None, 'data_planejada': None},
+            # L1: log herda data da atividade-pai (semana passada, 5h)
+            {'hist_id': 'l1', 'MaintenanceWF_id': 'WF001', 'record_type': 'log',
+             'data': data_retroativa, 'horas': 5.0, 'concluido': False, 'subtarefa_id': 'a1',
+             'aprovador': None, 'status_aprovacao': None, 'data_planejada': None},
+            # A2: atividade retroativa semana passada
+            {'hist_id': 'a2', 'MaintenanceWF_id': 'WF001', 'record_type': 'subtarefa',
+             'data': data_retroativa, 'horas': None, 'concluido': False, 'subtarefa_id': None,
+             'aprovador': None, 'status_aprovacao': None, 'data_planejada': None},
+            # L2: log herda data da atividade-pai (semana passada, 5h)
+            {'hist_id': 'l2', 'MaintenanceWF_id': 'WF001', 'record_type': 'log',
+             'data': data_retroativa, 'horas': 5.0, 'concluido': False, 'subtarefa_id': 'a2',
+             'aprovador': None, 'status_aprovacao': None, 'data_planejada': None},
+            # A3: atividade retroativa semana passada
+            {'hist_id': 'a3', 'MaintenanceWF_id': 'WF001', 'record_type': 'subtarefa',
+             'data': data_retroativa, 'horas': None, 'concluido': False, 'subtarefa_id': None,
+             'aprovador': None, 'status_aprovacao': None, 'data_planejada': None},
+            # L3: log herda data da atividade-pai (semana passada, 5h)
+            {'hist_id': 'l3', 'MaintenanceWF_id': 'WF001', 'record_type': 'log',
+             'data': data_retroativa, 'horas': 5.0, 'concluido': False, 'subtarefa_id': 'a3',
+             'aprovador': None, 'status_aprovacao': None, 'data_planejada': None},
+        ])
+
+        filtros = {
+            'tipo_data': ['subtarefa'],
+            'data_inicio': '2026-03-16',
+            'data_fim': '2026-03-22',
+        }
+        resultado = _kpi_filtrado(df_pend, df_hist, None, filtros=filtros)
+        assert '15:00' in str(resultado), \
+            f"Card deve mostrar 15:00h (3 logs × 5h), mas retornou: {resultado}"
+
+
+# =============================================================================
+# TESTES: CB5 — contrato arquitetural (não usar JSON roundtrip para df_historico)
+# =============================================================================
+
+class TestCB5UsaDadosFrescos:
+    """Verifica que atualizar_cards_kpi (CB5) carrega o histórico direto do MongoDB.
+
+    Regressão: a versão buggada usava pd.DataFrame(historico_data), onde historico_data
+    vinha do dcc.Store via JSON roundtrip. Isso fazia _normalizar_datas(utc=True) produzir
+    Timestamps diferentes dos do MongoDB fresco, excluindo logs válidos do cálculo de KPI.
+
+    Fix: CB5 chama carregar_dados_csv() diretamente, ignorando o conteúdo de historico_data
+    para construir df_historico (o parâmetro historico_data ainda é usado como Input para
+    disparar o callback quando os dados mudam).
+    """
+
+    def _get_cb5_body(self):
+        """Lê e retorna o corpo da função atualizar_cards_kpi como string."""
+        import os
+        filepath = os.path.join(
+            os.path.dirname(__file__), '..', '..', 'src',
+            'callbacks_registers', 'workflow_callbacks.py'
+        )
+        with open(filepath, 'r', encoding='utf-8') as f:
+            lines = f.readlines()
+
+        # Localiza a definição da função
+        func_start = None
+        for i, line in enumerate(lines):
+            if 'def atualizar_cards_kpi(' in line:
+                func_start = i
+                break
+        assert func_start is not None, "Função atualizar_cards_kpi não encontrada no arquivo"
+
+        # Captura o corpo até a próxima def no mesmo nível de indentação
+        indent = len(lines[func_start]) - len(lines[func_start].lstrip())
+        body_lines = []
+        for line in lines[func_start + 1:]:
+            stripped = line.strip()
+            if not stripped:
+                continue
+            current_indent = len(line) - len(line.lstrip())
+            if current_indent <= indent and stripped.startswith('def '):
+                break
+            body_lines.append(line)
+
+        return ''.join(body_lines)
+
+    def test_cb5_usa_carregar_dados_csv_para_df_historico(self):
+        """CB5 deve chamar carregar_dados_csv() para obter df_historico fresco."""
+        body = self._get_cb5_body()
+        assert 'carregar_dados_csv()' in body, (
+            "CB5 (atualizar_cards_kpi) deve chamar carregar_dados_csv() diretamente "
+            "para obter df_historico fresco do MongoDB"
+        )
+
+    def test_cb5_nao_constroi_df_historico_do_store(self):
+        """CB5 NÃO deve usar pd.DataFrame(historico_data) para construir df_historico.
+
+        pd.DataFrame(historico_data) a partir do dcc.Store causa divergência de datas:
+        o JSON roundtrip serializa pd.Timestamp para strings ISO, que _normalizar_datas
+        converte com utc=True, produzindo Timestamps diferentes dos do MongoDB fresco.
+        Resultado: logs válidos ficam fora dos ids_validos em _filtrar_hist_df_por_filtros.
+        """
+        body = self._get_cb5_body()
+        assert 'pd.DataFrame(historico_data)' not in body, (
+            "CB5 não deve usar pd.DataFrame(historico_data) para df_historico — "
+            "isso causa divergência de datas no roundtrip JSON e produz KPIs incorretos. "
+            "Use carregar_dados_csv() para dados frescos do MongoDB."
+        )
