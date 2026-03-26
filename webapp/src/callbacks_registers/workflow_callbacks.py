@@ -1337,12 +1337,12 @@ def register_workflow_callbacks(app):
         todos os valores novos juntos — evitando race condition onde o filtro ainda seria
         o valor anterior no momento da leitura.
 
-        store-pendencias já contém apenas as pendências do filtro ativo (ou todas se sem filtro).
-        Usa _kpi_filtrado com filtros_ativos para que o card de horas reflita apenas
-        as atividades visíveis no período filtrado.
+        O histórico é carregado diretamente do MongoDB (não do store-historico) para evitar
+        divergências de data causadas pelo roundtrip JSON do dcc.Store, que alterava a
+        comparação de datas em _filtrar_hist_df_por_filtros e produzia KPIs incorretos.
         """
         df_pendencias = pd.DataFrame(pendencias_data) if pendencias_data else None
-        df_historico = pd.DataFrame(historico_data) if historico_data else None
+        _, df_historico = carregar_dados_csv()
         return (
             _kpi_filtrado(df_pendencias, df_historico, username_atual, filtros=filtros_ativos),
             criar_notificacoes(df_pendencias, df_historico, username_atual),
