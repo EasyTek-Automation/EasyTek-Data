@@ -79,6 +79,16 @@ def migrar():
             sem_data_pai += 1
             continue
 
+        # Strip timezone (PyMongo pode retornar UTC-aware em versões mais novas)
+        if hasattr(data_pai, 'tzinfo') and data_pai.tzinfo is not None:
+            data_pai = data_pai.replace(tzinfo=None)
+
+        # Datas retroativas são salvas como meia-noite UTC (00:00Z).
+        # Em BRT (UTC-3) isso exibe como 21:00 do dia anterior.
+        # Shift para meio-dia UTC garante exibição no dia correto em qualquer fuso do Brasil.
+        if data_pai.hour == 0 and data_pai.minute == 0 and data_pai.second == 0:
+            data_pai = data_pai.replace(hour=12)
+
         collection.update_one(
             {'_id': log['_id']},
             {'$set': {'data': data_pai}}

@@ -907,7 +907,16 @@ def adicionar_log(subtarefa_hist_id, pend_id, observacoes, editado_por, horas=No
 
         # O log herda a data da atividade-pai para garantir consistência no filtro por data.
         # O momento real de criação é registrado pela linha do tempo do sistema (_criar_evento_timeline).
-        data_log = sub_doc.get('data', agora) if sub_doc else agora
+        # Datas retroativas são salvas como meia-noite UTC (00:00Z); em BRT (UTC-3) isso exibe
+        # como 21:00 do dia anterior. Shift para meio-dia UTC garante exibição no dia correto.
+        data_log = sub_doc.get('data') if sub_doc else None
+        if data_log is None:
+            data_log = agora
+        else:
+            if hasattr(data_log, 'tzinfo') and data_log.tzinfo is not None:
+                data_log = data_log.replace(tzinfo=None)
+            if data_log.hour == 0 and data_log.minute == 0 and data_log.second == 0:
+                data_log = data_log.replace(hour=12)
 
         doc = {
             'MaintenanceWF_id': pend_id,
