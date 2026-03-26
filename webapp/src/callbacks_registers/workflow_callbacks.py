@@ -46,6 +46,25 @@ def _fmt_data_str(valor):
         return ''
 
 
+def _fmt_data_only(valor):
+    """Converte date/datetime/string para string dd/mm/yyyy. Retorna None se inválido.
+
+    Diferente de _fmt_data_str: não aplica offset UTC-3 (campos de data pura, não
+    timestamp) e retorna None em vez de '' para manter checagens de falsiness.
+    Aceita datetime, pd.Timestamp, string ISO e similares — incluindo valores após
+    roundtrip JSON pelo dcc.Store, onde datetimes viram strings.
+    """
+    if valor is None or str(valor).strip() in ('nan', 'NaT', ''):
+        return None
+    try:
+        ts = pd.Timestamp(valor)
+        if pd.isna(ts):
+            return None
+        return ts.strftime('%d/%m/%Y')
+    except Exception:
+        return None
+
+
 def _processar_historico_validacao(raw):
     """
     Recebe o campo historico_validacao do MongoDB (lista de dicts com datetimes brutos)
@@ -777,16 +796,8 @@ def criar_conteudo_historico(pendencia_id, df_historico, username_atual=None, us
             'record_type': row.get('record_type', 'subtarefa') or 'subtarefa',
             'subtarefa_id': _str_or_none(row.get('subtarefa_id')),
             'prioridade': _str_or_none(row.get('prioridade')) or 'normal',
-            'data_planejada': (row['data_planejada'].strftime("%d/%m/%Y")
-                               if row.get('data_planejada') is not None
-                               and str(row.get('data_planejada')) != 'nan'
-                               and hasattr(row['data_planejada'], 'strftime')
-                               else None),
-            'data_execucao': (row['data_execucao'].strftime("%d/%m/%Y")
-                              if row.get('data_execucao') is not None
-                              and str(row.get('data_execucao')) != 'nan'
-                              and hasattr(row['data_execucao'], 'strftime')
-                              else None),
+            'data_planejada': _fmt_data_only(row.get('data_planejada')),
+            'data_execucao': _fmt_data_only(row.get('data_execucao')),
             'status_validacao_gestor': _str_or_none(row.get('status_validacao_gestor')),
             'nota_devolucao': _str_or_none(row.get('nota_devolucao')),
             'devolvido_por': _str_or_none(row.get('devolvido_por')),

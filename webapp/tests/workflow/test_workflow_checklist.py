@@ -224,3 +224,54 @@ class TestToggleSubtaskCollapseContrato:
             "toggle_subtask_collapse deve verificar ambos os inputs antes de "
             "PreventUpdate, senão cliques no título serão ignorados"
         )
+
+
+# =============================================================================
+# TESTES: _fmt_data_only() — regressão roundtrip JSON dcc.Store
+# =============================================================================
+
+class TestFmtDataOnly:
+    """_fmt_data_only deve formatar datas independente do tipo (datetime ou string).
+
+    Regressão: data_planejada/data_execucao usavam hasattr(..., 'strftime'), que
+    retorna False para strings. Após roundtrip JSON pelo dcc.Store, datetimes viram
+    strings e os campos eram descartados (None), fazendo as datas sumirem do cabeçalho.
+    """
+
+    def test_datetime_retorna_dd_mm_yyyy(self):
+        """datetime object deve retornar string dd/mm/yyyy."""
+        from datetime import datetime
+        from src.callbacks_registers.workflow_callbacks import _fmt_data_only
+        assert _fmt_data_only(datetime(2026, 3, 25)) == "25/03/2026"
+
+    def test_string_iso_retorna_dd_mm_yyyy(self):
+        """String ISO (formato do roundtrip JSON) deve retornar dd/mm/yyyy."""
+        from src.callbacks_registers.workflow_callbacks import _fmt_data_only
+        assert _fmt_data_only("2026-03-25 00:00:00") == "25/03/2026"
+
+    def test_string_iso_com_t_retorna_dd_mm_yyyy(self):
+        """String ISO com T (outro formato comum de JSON) deve retornar dd/mm/yyyy."""
+        from src.callbacks_registers.workflow_callbacks import _fmt_data_only
+        assert _fmt_data_only("2026-03-25T00:00:00") == "25/03/2026"
+
+    def test_none_retorna_none(self):
+        """None deve retornar None (não string vazia) para manter checagens de falsiness."""
+        from src.callbacks_registers.workflow_callbacks import _fmt_data_only
+        assert _fmt_data_only(None) is None
+
+    def test_nan_retorna_none(self):
+        """String 'nan' (valor pandas ausente serializado) deve retornar None."""
+        from src.callbacks_registers.workflow_callbacks import _fmt_data_only
+        assert _fmt_data_only("nan") is None
+
+    def test_string_vazia_retorna_none(self):
+        """String vazia deve retornar None."""
+        from src.callbacks_registers.workflow_callbacks import _fmt_data_only
+        assert _fmt_data_only("") is None
+
+    def test_nao_aplica_offset_utc(self):
+        """Não deve aplicar offset UTC-3 — data_planejada é campo de data, não timestamp."""
+        from datetime import datetime
+        from src.callbacks_registers.workflow_callbacks import _fmt_data_only
+        # Meia-noite UTC — se aplicasse -3h viraria dia anterior
+        assert _fmt_data_only(datetime(2026, 3, 25, 0, 0, 0)) == "25/03/2026"
