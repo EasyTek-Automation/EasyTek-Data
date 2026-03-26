@@ -200,19 +200,14 @@ class TestKpiFiltrado:
         resultado = _kpi_filtrado(df_pend, df_hist, None)
         assert '5:30' in str(resultado)
 
-    def test_com_filtro_data_exibe_todas_horas_da_demanda_visivel(self, df_pend, df_hist):
-        """Com filtro 18/03, card deve exibir TODAS as horas da demanda visível (5:30, não 3:30).
-
-        O filtro de data determina quais demandas aparecem — WF001 aparece porque tem
-        atividade em 18/03. Uma vez visível, o KPI soma TODAS as suas horas (10/03 + 18/03 = 5:30).
-        Filtrar o histórico por data dentro do card causava o bug relatado em 2026-03-26:
-        logs com data=hoje eram excluídos mesmo com atividade-pai dentro do período.
-        """
+    def test_com_filtro_data_totaliza_apenas_horas_do_periodo(self, df_pend, df_hist):
+        """Com filtro 18/03, card horas deve exibir apenas 3:30 (não 5:30)."""
         from src.callbacks_registers.workflow_callbacks import _kpi_filtrado
         filtros = {'tipo_data': ['subtarefa'], 'data_inicio': '2026-03-18', 'data_fim': '2026-03-18'}
         resultado = _kpi_filtrado(df_pend, df_hist, None, filtros=filtros)
         resultado_str = str(resultado)
-        assert '5:30' in resultado_str
+        assert '3:30' in resultado_str
+        assert '5:30' not in resultado_str
 
     def test_filtro_tipo_tarefa_nao_filtra_historico(self, df_pend, df_hist):
         """filtros com tipo_data='tarefa' não deve filtrar as horas do histórico."""
