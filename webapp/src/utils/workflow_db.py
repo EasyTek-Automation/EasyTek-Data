@@ -905,10 +905,14 @@ def adicionar_log(subtarefa_hist_id, pend_id, observacoes, editado_por, horas=No
             if sub_doc else subtarefa_hist_id
         )
 
+        # O log herda a data da atividade-pai para garantir consistência no filtro por data.
+        # O momento real de criação é registrado pela linha do tempo do sistema (_criar_evento_timeline).
+        data_log = sub_doc.get('data', agora) if sub_doc else agora
+
         doc = {
             'MaintenanceWF_id': pend_id,
             'descricao': 'Relatório',
-            'data': agora,
+            'data': data_log,
             'responsavel': editado_por,
             'tipo_evento': 'log',
             'editado_por': editado_por,
