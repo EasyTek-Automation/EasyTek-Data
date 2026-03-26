@@ -541,13 +541,25 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                 html.Div(icone_status,
                          style={"width": "20px", "flexShrink": "0", "marginLeft": "4px"}),
                 html.Div([
-                    html.Span(
+                    dbc.Button(
                         titulo,
-                        className="fw-semibold me-2" + (" text-muted" if concluido else ""),
+                        id={"type": "btn-expand-subtask-title", "index": hist_id},
+                        color="link", size="sm",
+                        disabled=not tem_corpo,
+                        className="fw-semibold me-2 p-0 text-decoration-none" + (" text-muted" if concluido else ""),
                         style={"textDecoration": "line-through" if concluido else "none",
-                               "fontSize": "1.02rem"}
+                               "fontSize": "1.02rem", "color": "inherit",
+                               "boxShadow": "none", "fontFamily": "inherit",
+                               "cursor": "pointer" if tem_corpo else "default"}
                     ),
-                    *badges
+                    *badges,
+                    html.Div([
+                        html.Span([html.I(className="fas fa-calendar-alt me-1"), f"Plan.: {data_planejada}"],
+                                  className="me-2") if data_planejada else None,
+                        html.Span([html.I(className="fas fa-calendar-check me-1"), f"Exec.: {data_execucao}"],
+                                  className=("text-success fw-semibold" if concluido else "")) if data_execucao else None,
+                    ], className="text-muted w-100", style={"fontSize": "0.78rem"})
+                    if (data_planejada or data_execucao) else None,
                 ], className="flex-grow-1 d-flex align-items-center flex-wrap ms-2"),
                 html.Div(
                     html.Div(botoes, className="d-flex gap-1 flex-wrap"),
@@ -1050,17 +1062,19 @@ def register_workflow_callbacks(app):
         Output({"type": "collapse-subtask", "index": MATCH}, "is_open"),
         Output({"type": "chevron-subtask", "index": MATCH}, "className"),
         Input({"type": "btn-expand-subtask", "index": MATCH}, "n_clicks"),
+        Input({"type": "btn-expand-subtask-title", "index": MATCH}, "n_clicks"),
         State({"type": "collapse-subtask", "index": MATCH}, "is_open"),
         prevent_initial_call=True
     )
-    def toggle_subtask_collapse(n_clicks, is_open):
+    def toggle_subtask_collapse(n_clicks, n_clicks_title, is_open):
         """Alterna a visibilidade do painel de detalhes de uma subtarefa individual.
 
         Usa pattern-matching (MATCH) — um callback único gerencia todos os botões
         de expansão de subtarefa na tabela sem precisar de um callback por linha.
+        Aceita clique no chevron ou no título da atividade.
         Retorna (is_open, chevron_className).
         """
-        if not n_clicks:
+        if not (n_clicks or n_clicks_title):
             raise PreventUpdate
         new_open = not is_open
         chevron = "fas fa-chevron-down" if new_open else "fas fa-chevron-right"
