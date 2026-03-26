@@ -554,12 +554,14 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                     ),
                     *badges,
                     html.Div([
+                        html.Span([html.I(className="fas fa-calendar me-1"), data[:10]],
+                                  className="me-2") if data else None,
                         html.Span([html.I(className="fas fa-calendar-alt me-1"), f"Plan.: {data_planejada}"],
                                   className="me-2") if data_planejada else None,
                         html.Span([html.I(className="fas fa-calendar-check me-1"), f"Exec.: {data_execucao}"],
                                   className=("text-success fw-semibold" if concluido else "")) if data_execucao else None,
                     ], className="text-muted w-100", style={"fontSize": "0.78rem"})
-                    if (data_planejada or data_execucao) else None,
+                    if (data or data_planejada or data_execucao) else None,
                 ], className="flex-grow-1 d-flex align-items-center flex-wrap ms-2"),
                 html.Div(
                     html.Div(botoes, className="d-flex gap-1 flex-wrap"),

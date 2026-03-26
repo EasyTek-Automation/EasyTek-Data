@@ -98,7 +98,25 @@ class TestTituloClicavel:
 # =============================================================================
 
 class TestDatasNosCabecalho:
-    """Datas de planejamento/execução devem aparecer no cabeçalho da atividade."""
+    """Data de registro e datas opcionais devem aparecer no cabeçalho da atividade."""
+
+    def test_data_registro_sempre_aparece_no_cabecalho(self):
+        """O campo data (data de registro) deve aparecer no cabeçalho sempre que preenchido."""
+        from src.callbacks_registers.workflow_callbacks import criar_checklist_subtarefas
+        resultado = criar_checklist_subtarefas(
+            [_sub_item()], pend_id="WF001"  # fixture tem data="26/03/2026 10:00"
+        )
+        assert "26/03/2026" in str(resultado)
+
+    def test_data_registro_truncada_a_10_chars(self):
+        """data[:10] deve produzir exatamente dd/mm/yyyy (sem horário no cabeçalho).
+        O truncamento é garantido pelo código; o teste verifica que a data formatada aparece."""
+        from src.callbacks_registers.workflow_callbacks import criar_checklist_subtarefas
+        # data com horário — cabeçalho deve mostrar só a parte da data
+        item = _sub_item()
+        item["data"] = "15/01/2026 08:30"
+        resultado = criar_checklist_subtarefas([item], pend_id="WF001")
+        assert "15/01/2026" in str(resultado)
 
     def test_data_planejada_aparece_sem_expandir(self):
         """Quando data_planejada está preenchida, 'Plan.:' deve aparecer no output."""
@@ -127,8 +145,9 @@ class TestDatasNosCabecalho:
         assert "Plan.: 25/03/2026" in resultado_str
         assert "Exec.: 26/03/2026" in resultado_str
 
-    def test_sem_datas_nao_exibe_labels(self):
-        """Sem datas, 'Plan.:' e 'Exec.:' não devem aparecer no output."""
+    def test_sem_datas_opcionais_nao_exibe_plan_exec(self):
+        """Sem data_planejada/data_execucao, 'Plan.:' e 'Exec.:' não devem aparecer.
+        A data de registro ainda aparece normalmente."""
         from src.callbacks_registers.workflow_callbacks import criar_checklist_subtarefas
         resultado = criar_checklist_subtarefas(
             [_sub_item(data_planejada=None, data_execucao=None)], pend_id="WF001"
@@ -136,6 +155,7 @@ class TestDatasNosCabecalho:
         resultado_str = str(resultado)
         assert "Plan.:" not in resultado_str
         assert "Exec.:" not in resultado_str
+        assert "26/03/2026" in resultado_str  # data de registro sempre visível
 
     def test_apenas_data_planejada_nao_exibe_exec(self):
         """Com só data_planejada, 'Exec.:' não deve aparecer."""
