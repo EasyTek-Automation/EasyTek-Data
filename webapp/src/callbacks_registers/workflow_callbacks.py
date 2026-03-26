@@ -555,19 +555,21 @@ def criar_checklist_subtarefas(historico_items, username_atual=None,
                     *badges,
                     html.Div([
                         html.Span([html.I(className="fas fa-calendar me-1"), data[:10]],
-                                  className="me-2"),
+                                  className="me-2",
+                                  style={"fontStyle": "normal"}),
                         html.Span("·", className="text-muted me-2"),
                         html.Span([html.I(className="fas fa-calendar-alt me-1"),
                                    f"Plan.: {data_planejada or '—'}"],
-                                  className="me-2" + ("" if data_planejada else " opacity-50 fst-italic")),
+                                  className="me-2",
+                                  style={"fontStyle": "italic" if not data_planejada else "normal",
+                                         "opacity": "0.5" if not data_planejada else "1"}),
                         html.Span("·", className="text-muted me-2"),
                         html.Span([html.I(className="fas fa-calendar-check me-1"),
                                    f"Exec.: {data_execucao or '—'}"],
-                                  className=(
-                                      "text-success fw-semibold" if (data_execucao and concluido)
-                                      else ("" if data_execucao else "opacity-50 fst-italic")
-                                  )),
-                    ], className="text-muted w-100", style={"fontSize": "0.78rem"})
+                                  className="text-success fw-semibold" if (data_execucao and concluido) else "",
+                                  style={"fontStyle": "italic" if not data_execucao else "normal",
+                                         "opacity": "0.5" if not data_execucao else "1"}),
+                    ], className="text-muted w-100", style={"fontSize": "0.78rem", "fontStyle": "normal"})
                     if data else None,
                 ], className="flex-grow-1 d-flex align-items-center flex-wrap ms-2"),
                 html.Div(
