@@ -104,7 +104,27 @@ document.addEventListener('click', function (e) {
                 } else {
                     /* Linha principal / thead: copiar células 1 a N-2 (pular chevron e ações) */
                     for (var i = 1; i < directCells.length - 1; i++) {
-                        newTr.appendChild(directCells[i].cloneNode(true));
+                        var cellClone = directCells[i].cloneNode(true);
+                        /* Coluna ID (i=1 = 1ª célula copiada):
+                           WeasyPrint renderiza <button> como elemento de bloco e herda
+                           text-align:center do Bootstrap, centralizando o texto no meio
+                           dos 110px da coluna. O cabeçalho "ID" fica alinhado à esquerda,
+                           causando o deslocamento visual.
+                           Fix: substituir o <button> por <span> (inline puro) com o
+                           mesmo texto — comportamento garantido em qualquer renderizador. */
+                        if (i === 1) {
+                            var idBtn = cellClone.querySelector('button, .btn');
+                            if (idBtn) {
+                                var idSpan = document.createElement('span');
+                                idSpan.className = 'fw-semibold';
+                                idSpan.textContent = idBtn.textContent.trim();
+                                while (cellClone.firstChild) {
+                                    cellClone.removeChild(cellClone.firstChild);
+                                }
+                                cellClone.appendChild(idSpan);
+                            }
+                        }
+                        newTr.appendChild(cellClone);
                     }
                 }
 
