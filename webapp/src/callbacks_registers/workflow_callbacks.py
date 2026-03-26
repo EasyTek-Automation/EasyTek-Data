@@ -975,9 +975,15 @@ def aplicar_filtros_dataframe(df, responsavel, status_list, busca, status_aceite
 def _kpi_filtrado(df_filtrado, df_historico, username, filtros=None):
     """Calcula KPI cards restringindo o histórico às pendências do df_filtrado.
 
-    Quando filtros inclui tipo_data 'subtarefa' ou 'planejada' com datas, aplica
-    o mesmo filtro de período ao histórico, garantindo que o card de horas exiba
-    apenas as horas das atividades visíveis no filtro ativo.
+    O filtro de data determina QUAIS DEMANDAS aparecem — feito por aplicar_filtros_dataframe
+    antes desta função ser chamada. df_filtrado já contém apenas as demandas visíveis.
+    O KPI soma TODAS as horas dessas demandas, independente da data dos logs individuais,
+    garantindo paridade com a barra de horas exibida na tabela.
+
+    Não aplica _filtrar_hist_df_por_filtros aqui: logs são vinculados à data da
+    atividade-pai (não à data própria), e re-filtrar o histórico excluiria logs
+    com data fora do período mesmo quando a atividade-pai está no período — bug
+    que causava card KPI menor que a soma das barras da tabela.
     """
     if df_filtrado is None or df_filtrado.empty:
         return criar_cards_kpi(df_filtrado, None, username)
@@ -987,8 +993,6 @@ def _kpi_filtrado(df_filtrado, df_historico, username, filtros=None):
     df_hist_kpi = (df_historico[df_historico[col].isin(ids)]
                    if df_historico is not None and not df_historico.empty and ids
                    else df_historico)
-    if filtros and df_hist_kpi is not None and not df_hist_kpi.empty:
-        df_hist_kpi = _filtrar_hist_df_por_filtros(df_hist_kpi, filtros)
     return criar_cards_kpi(df_filtrado, df_hist_kpi, username)
 
 
