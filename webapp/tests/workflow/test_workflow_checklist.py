@@ -118,24 +118,49 @@ class TestDatasNosCabecalho:
         resultado = criar_checklist_subtarefas([item], pend_id="WF001")
         assert "15/01/2026" in str(resultado)
 
-    def test_data_planejada_aparece_sem_expandir(self):
-        """Quando data_planejada está preenchida, 'Plan.:' deve aparecer no output."""
+    def test_tres_datas_sempre_visiveis_no_cabecalho(self):
+        """As 3 datas (registro, planejada, execução) devem aparecer no cabeçalho sempre."""
+        from src.callbacks_registers.workflow_callbacks import criar_checklist_subtarefas
+        resultado = criar_checklist_subtarefas([_sub_item()], pend_id="WF001")
+        resultado_str = str(resultado)
+        assert "26/03/2026" in resultado_str   # data de registro
+        assert "Plan.:" in resultado_str        # label planejada sempre visível
+        assert "Exec.:" in resultado_str        # label execução sempre visível
+
+    def test_data_planejada_preenchida_exibe_valor(self):
+        """Com data_planejada preenchida, exibe o valor real."""
         from src.callbacks_registers.workflow_callbacks import criar_checklist_subtarefas
         resultado = criar_checklist_subtarefas(
             [_sub_item(data_planejada="28/03/2026")], pend_id="WF001"
         )
         assert "Plan.: 28/03/2026" in str(resultado)
 
-    def test_data_execucao_aparece_sem_expandir(self):
-        """Quando data_execucao está preenchida, 'Exec.:' deve aparecer no output."""
+    def test_data_execucao_preenchida_exibe_valor(self):
+        """Com data_execucao preenchida, exibe o valor real."""
         from src.callbacks_registers.workflow_callbacks import criar_checklist_subtarefas
         resultado = criar_checklist_subtarefas(
             [_sub_item(data_execucao="26/03/2026")], pend_id="WF001"
         )
         assert "Exec.: 26/03/2026" in str(resultado)
 
-    def test_ambas_datas_aparecem_juntas(self):
-        """Com as duas datas preenchidas, ambas devem aparecer no output."""
+    def test_data_planejada_ausente_exibe_traco(self):
+        """Sem data_planejada, exibe 'Plan.: —' (esmaecido)."""
+        from src.callbacks_registers.workflow_callbacks import criar_checklist_subtarefas
+        resultado = criar_checklist_subtarefas(
+            [_sub_item(data_planejada=None)], pend_id="WF001"
+        )
+        assert "Plan.: —" in str(resultado)
+
+    def test_data_execucao_ausente_exibe_traco(self):
+        """Sem data_execucao, exibe 'Exec.: —' (esmaecido)."""
+        from src.callbacks_registers.workflow_callbacks import criar_checklist_subtarefas
+        resultado = criar_checklist_subtarefas(
+            [_sub_item(data_execucao=None)], pend_id="WF001"
+        )
+        assert "Exec.: —" in str(resultado)
+
+    def test_todas_preenchidas_exibe_tres_valores(self):
+        """Com todas as datas preenchidas, as três aparecem sem traço."""
         from src.callbacks_registers.workflow_callbacks import criar_checklist_subtarefas
         resultado = criar_checklist_subtarefas(
             [_sub_item(data_planejada="25/03/2026", data_execucao="26/03/2026")],
@@ -144,38 +169,7 @@ class TestDatasNosCabecalho:
         resultado_str = str(resultado)
         assert "Plan.: 25/03/2026" in resultado_str
         assert "Exec.: 26/03/2026" in resultado_str
-
-    def test_sem_datas_opcionais_nao_exibe_plan_exec(self):
-        """Sem data_planejada/data_execucao, 'Plan.:' e 'Exec.:' não devem aparecer.
-        A data de registro ainda aparece normalmente."""
-        from src.callbacks_registers.workflow_callbacks import criar_checklist_subtarefas
-        resultado = criar_checklist_subtarefas(
-            [_sub_item(data_planejada=None, data_execucao=None)], pend_id="WF001"
-        )
-        resultado_str = str(resultado)
-        assert "Plan.:" not in resultado_str
-        assert "Exec.:" not in resultado_str
-        assert "26/03/2026" in resultado_str  # data de registro sempre visível
-
-    def test_apenas_data_planejada_nao_exibe_exec(self):
-        """Com só data_planejada, 'Exec.:' não deve aparecer."""
-        from src.callbacks_registers.workflow_callbacks import criar_checklist_subtarefas
-        resultado = criar_checklist_subtarefas(
-            [_sub_item(data_planejada="25/03/2026", data_execucao=None)], pend_id="WF001"
-        )
-        resultado_str = str(resultado)
-        assert "Plan.: 25/03/2026" in resultado_str
-        assert "Exec.:" not in resultado_str
-
-    def test_apenas_data_execucao_nao_exibe_plan(self):
-        """Com só data_execucao, 'Plan.:' não deve aparecer."""
-        from src.callbacks_registers.workflow_callbacks import criar_checklist_subtarefas
-        resultado = criar_checklist_subtarefas(
-            [_sub_item(data_planejada=None, data_execucao="26/03/2026")], pend_id="WF001"
-        )
-        resultado_str = str(resultado)
-        assert "Exec.: 26/03/2026" in resultado_str
-        assert "Plan.:" not in resultado_str
+        assert "—" not in resultado_str
 
 
 # =============================================================================
