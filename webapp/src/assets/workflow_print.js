@@ -207,10 +207,14 @@ document.addEventListener('click', function (e) {
         '.workflow-table th { font-size: 10px !important; }',
 
         /* Coluna ID (1ª coluna visível após remoção do chevron no DOM):
-           largura fixa com overflow oculto para não invadir a Descrição */
+           largura fixa com overflow oculto para não invadir a Descrição.
+           vertical-align: top alinha o ID com o título da demanda (1ª linha
+           da célula de Descrição) — sem isso o ID fica no centro da linha
+           e aparece deslocado para baixo, alinhado com a barra de horas. */
         '.workflow-table th:first-child, .workflow-table td:first-child {',
         '  width: 110px !important; max-width: 110px !important;',
-        '  white-space: nowrap; overflow: hidden !important; }',
+        '  white-space: nowrap; overflow: hidden !important;',
+        '  vertical-align: top !important; }',
 
         /* Botões viram texto puro */
         '.workflow-table .btn {',
