@@ -396,39 +396,47 @@ def _detect_overlaps(records: list[dict]) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 def ensure_indexes(db, collection_name: str, tipo: str) -> None:
+    from pymongo.errors import DuplicateKeyError, OperationFailure
+
+    def _safe_create(col, keys, **kwargs):
+        try:
+            col.create_index(keys, **kwargs)
+        except (DuplicateKeyError, OperationFailure) as e:
+            logger.warning(f"  Índice {kwargs.get('name')} não criado (dados legados): {e}")
+
     collection = db[collection_name]
 
     if tipo == "zppprd":
-        collection.create_index(
+        _safe_create(collection,
             [("centro_de_trabalho", ASCENDING), ("ordem", ASCENDING)],
             name="idx_unique_producao", unique=True, sparse=True
         )
-        collection.create_index("mes_referencia", name="idx_mes_ref")
-        collection.create_index(
+        _safe_create(collection, "mes_referencia", name="idx_mes_ref")
+        _safe_create(collection,
             [("centro_de_trabalho", ASCENDING), ("fininotif", DESCENDING)],
             name="idx_equipamento_data"
         )
-        collection.create_index(
+        _safe_create(collection,
             [("fininotif", ASCENDING), ("ffinnotif", ASCENDING)],
             name="idx_range_datas"
         )
     else:
-        collection.create_index(
+        _safe_create(collection,
             [("centro_de_trabalho", ASCENDING), ("ordem", ASCENDING),
              ("inicio_real_hora", ASCENDING), ("causa_do_desvio", ASCENDING)],
             name="idx_unique_paradas", unique=True, sparse=True
         )
-        collection.create_index("mes_referencia", name="idx_mes_ref")
-        collection.create_index(
+        _safe_create(collection, "mes_referencia", name="idx_mes_ref")
+        _safe_create(collection,
             [("centro_de_trabalho", ASCENDING), ("inicio_execucao", DESCENDING)],
             name="idx_linha_data"
         )
-        collection.create_index(
+        _safe_create(collection,
             [("inicio_execucao", ASCENDING), ("fim_execucao", ASCENDING)],
             name="idx_range_datas"
         )
-        collection.create_index("causa_do_desvio", name="idx_motivo")
-        collection.create_index([("duration_min", DESCENDING)], name="idx_duracao")
+        _safe_create(collection, "causa_do_desvio", name="idx_motivo")
+        _safe_create(collection, [("duration_min", DESCENDING)], name="idx_duracao")
 
 
 # ---------------------------------------------------------------------------

@@ -60,13 +60,32 @@ def _verify_replica_set(client: MongoClient) -> None:
 
 def _ensure_indexes(client: MongoClient) -> None:
     from pipeline import ensure_indexes
+    from pymongo.errors import OperationFailure
+
     db = client[config.DB_NAME]
+    logger = logging.getLogger(__name__)
+
+    # Dropar índices antigos que mudaram de estrutura (migration única)
+    _old_indexes = {
+        "ZPP_Producao": ["idx_equipamento_data", "idx_equipamento_producao",
+                         "idx_ordem_unique", "idx_range_datas"],
+        "ZPP_Paradas":  ["idx_parada_unique", "idx_linha_data", "idx_range_datas"],
+    }
+    for col_name, idx_names in _old_indexes.items():
+        col = db[col_name]
+        for idx in idx_names:
+            try:
+                col.drop_index(idx)
+                logger.info(f"  Índice antigo removido: {col_name}.{idx}")
+            except OperationFailure:
+                pass  # índice não existe — tudo bem
+
     ensure_indexes(db, "ZPP_Producao", "zppprd")
     ensure_indexes(db, "ZPP_Paradas", "zppparadas")
     db[config.LOGS_COLLECTION].create_index(
         [("iniciado_em", DESCENDING)], name="idx_iniciado_em"
     )
-    logging.getLogger(__name__).info("Índices MongoDB verificados ✓")
+    logger.info("Índices MongoDB verificados ✓")
 
 
 def initialize_app() -> None:
