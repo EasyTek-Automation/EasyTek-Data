@@ -1,42 +1,40 @@
 """
-Validação de sessão via endpoint interno do webapp.
-O zpp-processor não gerencia autenticação própria — delega ao webapp.
+Autenticação do zpp-processor.
+
+Chamadas server-side do webapp usam shared secret + headers.
+Chamadas diretas do browser (futuro) usariam relay de cookie.
 """
 import logging
-import requests
-
-import config
+import os
 
 logger = logging.getLogger(__name__)
 
+# Secret compartilhado entre webapp e zpp-processor
+INTERNAL_SECRET = os.getenv("ZPP_INTERNAL_SECRET", "")
 
-def validate_session(cookie: str, min_level: int) -> tuple[bool, dict | None]:
+
+def validate_internal_headers(headers, min_level: int) -> tuple[bool, dict | None]:
     """
-    Valida cookie de sessão consultando o webapp.
-
-    Retorna (True, user_info) se sessão válida e nível suficiente.
-    Retorna (False, None) caso contrário.
+    Valida chamada interna originada do webapp via headers.
+    Retorna (True, user_info) se secret correto e nível suficiente.
     """
-    try:
-        resp = requests.get(
-            f"{config.WEBAPP_INTERNAL_URL}/internal/validate-session",
-            cookies={"session": cookie},
-            timeout=5,
-        )
-
-        if resp.status_code != 200:
-            return False, None
-
-        data = resp.json()
-
-        if not data.get("valid"):
-            return False, None
-
-        if data.get("level", 0) < min_level:
-            return False, None
-
-        return True, data
-
-    except requests.RequestException as e:
-        logger.error(f"[auth] Erro ao validar sessão com o webapp: {e}")
+    if not INTERNAL_SECRET:
+        logger.warning("[auth] ZPP_INTERNAL_SECRET não configurado — chamadas internas bloqueadas")
         return False, None
+
+    secret = headers.get("X-ZPP-Secret", "")
+    if secret != INTERNAL_SECRET:
+        return False, None
+
+    try:
+        level = int(headers.get("X-ZPP-Level", "0"))
+    except ValueError:
+        return False, None
+
+    if level < min_level:
+        return False, None
+
+    return True, {
+        "username": headers.get("X-ZPP-User", "desconhecido"),
+        "level": level,
+    }

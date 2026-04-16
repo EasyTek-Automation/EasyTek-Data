@@ -16,6 +16,7 @@ from pymongo import MongoClient, DESCENDING
 
 import auth
 import config
+from auth import validate_internal_headers
 from models.processing_log import BRTFormatter
 from pipeline import process_file, RejectionError
 from locks import LockActiveError
@@ -129,12 +130,9 @@ def require_level(min_level: int):
     def decorator(f):
         @wraps(f)
         def wrapped(*args, **kwargs):
-            cookie = request.cookies.get("session", "")
-            if not cookie:
-                return jsonify({"status": "error", "motivo": "Não autenticado."}), 401
-            ok, user = auth.validate_session(cookie, min_level)
+            ok, user = validate_internal_headers(request.headers, min_level)
             if not ok:
-                return jsonify({"status": "error", "motivo": "Acesso negado."}), 403
+                return jsonify({"status": "error", "motivo": "Não autenticado ou acesso negado."}), 401
             return f(*args, user=user, **kwargs)
         return wrapped
     return decorator

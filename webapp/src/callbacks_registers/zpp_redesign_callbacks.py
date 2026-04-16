@@ -13,22 +13,25 @@ import requests
 from dash import Output, Input, State, html, no_update, clientside_callback
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
-from flask import request as flask_request
+from flask_login import current_user
 
 logger = logging.getLogger(__name__)
 
 ZPP_API_URL = os.getenv("ZPP_PROCESSOR_URL", "http://zpp-processor:5002")
+ZPP_INTERNAL_SECRET = os.getenv("ZPP_INTERNAL_SECRET", "")
 PER_PAGE = 20
 
 _MESES = ["Jan","Fev","Mar","Abr","Mai","Jun",
           "Jul","Ago","Set","Out","Nov","Dez"]
 
 
-def _session_cookie() -> str:
-    try:
-        return flask_request.cookies.get("session", "")
-    except RuntimeError:
-        return ""
+def _internal_headers() -> dict:
+    """Headers de autenticação interna para chamadas ao zpp-processor."""
+    return {
+        "X-ZPP-Secret": ZPP_INTERNAL_SECRET,
+        "X-ZPP-User":   getattr(current_user, "username", "desconhecido"),
+        "X-ZPP-Level":  str(getattr(current_user, "level", 0)),
+    }
 
 
 def _status_badge(status: str):
@@ -118,13 +121,12 @@ def register_zpp_redesign_callbacks(app):
         except Exception as e:
             return dbc.Alert(f"Erro ao ler o arquivo: {e}", color="danger"), False
 
-        cookie = _session_cookie()
         try:
             resp = requests.post(
                 f"{ZPP_API_URL}/upload/retroativo",
                 data={"ano": ano, "mes": mes, "justificativa": justificativa},
                 files={"file": (filename, io.BytesIO(file_bytes))},
-                cookies={"session": cookie},
+                headers=_internal_headers(),
                 timeout=60,
             )
         except requests.RequestException as e:
@@ -196,12 +198,11 @@ def register_zpp_redesign_callbacks(app):
         if status: params["status"] = status
         if mes:    params["mes"]    = mes
 
-        cookie = _session_cookie()
         try:
             resp = requests.get(
                 f"{ZPP_API_URL}/logs",
                 params=params,
-                cookies={"session": cookie},
+                headers=_internal_headers(),
                 timeout=10,
             )
             resp.raise_for_status()
