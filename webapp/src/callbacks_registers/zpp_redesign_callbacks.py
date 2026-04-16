@@ -8,8 +8,9 @@ import logging
 import os
 from datetime import datetime
 
+import dash
 import requests
-from dash import Output, Input, State, html, no_update, clientside_callback, ClientsideFunction
+from dash import Output, Input, State, html, no_update, clientside_callback
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
 from flask import request as flask_request
@@ -162,3 +163,217 @@ def register_zpp_redesign_callbacks(app):
             return dbc.Alert("Sessão expirada. Recarregue a página.", color="danger"), False
 
         return dbc.Alert("Erro interno no servidor. Contate o administrador.", color="danger"), False
+
+    # ------------------------------------------------------------------
+    # CB-4 — Carregar tabela de logs
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("tabela-logs-zpp-container", "children"),
+        Output("paginacao-logs-zpp", "children"),
+        Output("store-logs-page", "data"),
+        Input("zpp-tabs", "active_tab"),
+        Input("filter-tipo-logs", "value"),
+        Input("filter-canal-logs", "value"),
+        Input("filter-status-logs", "value"),
+        Input("filter-mes-logs", "value"),
+        Input("store-logs-page", "data"),
+        prevent_initial_call=True,
+    )
+    def carregar_logs(active_tab, tipo, canal, status, mes, page):
+        if active_tab != "tab-historico-logs":
+            raise PreventUpdate
+
+        from dash import callback_context
+        trigger = callback_context.triggered_id
+        # Filtro mudou → volta para página 1
+        if trigger in ("filter-tipo-logs", "filter-canal-logs",
+                       "filter-status-logs", "filter-mes-logs"):
+            page = 1
+
+        params = {"page": page, "per_page": PER_PAGE}
+        if tipo:   params["tipo"]   = tipo
+        if canal:  params["canal"]  = canal
+        if status: params["status"] = status
+        if mes:    params["mes"]    = mes
+
+        cookie = _session_cookie()
+        try:
+            resp = requests.get(
+                f"{ZPP_API_URL}/logs",
+                params=params,
+                cookies={"session": cookie},
+                timeout=10,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+        except Exception as e:
+            return dbc.Alert(f"Erro ao carregar logs: {e}", color="danger"), None, page
+
+        items = data.get("items", [])
+        total = data.get("total", 0)
+        total_pages = max((total + PER_PAGE - 1) // PER_PAGE, 1)
+
+        if not items:
+            tabela = html.P("Nenhum registro encontrado.", className="text-muted text-center py-4")
+        else:
+            rows = []
+            for i, item in enumerate(items):
+                rows.append(html.Tr([
+                    html.Td(_fmt_dt(item.get("iniciado_em", "")), className="small"),
+                    html.Td(item.get("arquivo", ""), className="small text-truncate",
+                            style={"maxWidth": "200px"}),
+                    html.Td(item.get("tipo", ""), className="small"),
+                    html.Td("Padrão" if item.get("canal") == "padrao" else "Retroativo",
+                            className="small"),
+                    html.Td(_fmt_mes(item.get("mes_referencia", "")), className="small"),
+                    html.Td(_status_badge(item.get("status", "")), className="small"),
+                    html.Td(str(item.get("registros_inseridos", "")), className="small text-end"),
+                    html.Td(str(item.get("registros_deletados", "")), className="small text-end"),
+                    html.Td(
+                        dbc.Button("Ver", size="sm", color="link", className="p-0",
+                                   id={"type": "btn-ver-log", "index": i}),
+                    ),
+                ], className="align-middle"))
+
+            tabela = dbc.Table([
+                html.Thead(html.Tr([
+                    html.Th("Data"), html.Th("Arquivo"), html.Th("Tipo"),
+                    html.Th("Canal"), html.Th("Mês"), html.Th("Status"),
+                    html.Th("Inseridos", className="text-end"),
+                    html.Th("Deletados", className="text-end"),
+                    html.Th(""),
+                ])),
+                html.Tbody(rows),
+            ], bordered=True, hover=True, responsive=True, size="sm",
+               id="tabela-logs-zpp", **{"data-items": str(items)})
+
+        # Paginação
+        pag_items = []
+        pag_items.append(dbc.PaginationItem(
+            "‹", active=page > 1,
+            id={"type": "page-btn", "index": page - 1},
+            disabled=page <= 1,
+        ))
+        for p in range(max(1, page - 2), min(total_pages + 1, page + 3)):
+            pag_items.append(dbc.PaginationItem(
+                str(p), active=p == page,
+                id={"type": "page-btn", "index": p},
+            ))
+        pag_items.append(dbc.PaginationItem(
+            "›", active=page < total_pages,
+            id={"type": "page-btn", "index": page + 1},
+            disabled=page >= total_pages,
+        ))
+        paginacao = dbc.Pagination(pag_items, size="sm")
+
+        return tabela, paginacao, page
+
+    # ------------------------------------------------------------------
+    # CB-5 — Navegar entre páginas
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("store-logs-page", "data", allow_duplicate=True),
+        Input({"type": "page-btn", "index": dash.ALL}, "n_clicks"),
+        State({"type": "page-btn", "index": dash.ALL}, "id"),
+        prevent_initial_call=True,
+    )
+    def mudar_pagina(n_clicks_list, ids):
+        from dash import callback_context
+        if not any(n_clicks_list):
+            raise PreventUpdate
+        triggered = callback_context.triggered_id
+        if triggered:
+            return triggered["index"]
+        raise PreventUpdate
+
+    # ------------------------------------------------------------------
+    # CB-6 — Abrir modal de detalhe
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("modal-detalhe-log", "is_open"),
+        Output("modal-log-title", "children"),
+        Output("modal-log-body", "children"),
+        Input({"type": "btn-ver-log", "index": dash.ALL}, "n_clicks"),
+        State("tabela-logs-zpp", "data-items"),
+        prevent_initial_call=True,
+    )
+    def abrir_modal(n_clicks_list, items_str):
+        from dash import callback_context
+        if not any(n for n in n_clicks_list if n):
+            raise PreventUpdate
+
+        import ast
+        triggered = callback_context.triggered_id
+        if not triggered:
+            raise PreventUpdate
+
+        try:
+            items = ast.literal_eval(items_str)
+            item = items[triggered["index"]]
+        except Exception:
+            raise PreventUpdate
+
+        titulo = f"{item.get('arquivo', '')} — {_fmt_dt(item.get('iniciado_em', ''))}"
+
+        corpo = [
+            dbc.Row([
+                dbc.Col([html.Strong("Tipo: "), item.get("tipo", "")], md=3),
+                dbc.Col([html.Strong("Canal: "),
+                         "Padrão" if item.get("canal") == "padrao" else "Retroativo"], md=3),
+                dbc.Col([html.Strong("Mês: "), _fmt_mes(item.get("mes_referencia", ""))], md=3),
+                dbc.Col([html.Strong("Status: "), _status_badge(item.get("status", ""))], md=3),
+            ], className="mb-3"),
+            dbc.Row([
+                dbc.Col([html.Strong("Operador: "), item.get("operador", "")], md=4),
+                dbc.Col([html.Strong("Inseridos: "), str(item.get("registros_inseridos", ""))], md=4),
+                dbc.Col([html.Strong("Deletados: "), str(item.get("registros_deletados", ""))], md=4),
+            ], className="mb-2"),
+        ]
+
+        if item.get("canal") == "retroativo":
+            corpo.append(dbc.Row([
+                dbc.Col([html.Strong("Justificativa: "), item.get("justificativa", "")]),
+            ], className="mb-2"))
+
+        if item.get("strays_descartados"):
+            corpo.append(html.Div([
+                html.Strong("Strays descartados:"),
+                html.Ul([html.Li(f"{s['mes']}: {s['quantidade']} registros")
+                         for s in item["strays_descartados"]]),
+            ], className="mb-2"))
+
+        if item.get("inconsistencias"):
+            corpo.append(html.Div([
+                html.Strong("Inconsistências:"),
+                html.Ul([
+                    html.Li(f"{inc.get('equipamento')} | Ordem {inc.get('ordem')} | "
+                            f"{inc.get('sobreposicao_min')} min de sobreposição")
+                    for inc in item["inconsistencias"]
+                ]),
+            ], className="mb-2"))
+
+        if item.get("motivo_rejeicao"):
+            corpo.append(dbc.Alert(
+                [html.Strong("Motivo de rejeição: "), item["motivo_rejeicao"]],
+                color="warning", className="mb-2"
+            ))
+
+        if item.get("erro"):
+            corpo.append(html.Div([
+                html.Strong("Erro interno:"),
+                dbc.Textarea(value=item["erro"], readOnly=True, rows=8,
+                             className="font-monospace small mt-1"),
+            ]))
+
+        return True, titulo, corpo
+
+    # ------------------------------------------------------------------
+    # CB-7 — Fechar modal
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("modal-detalhe-log", "is_open", allow_duplicate=True),
+        Input("btn-fechar-modal-log", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def fechar_modal(n):
+        return False
