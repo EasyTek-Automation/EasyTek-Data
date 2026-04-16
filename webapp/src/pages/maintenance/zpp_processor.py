@@ -1,165 +1,202 @@
 """
-Página de Processamento de Planilhas ZPP
-Interface para processamento manual e configuração do serviço
+Página de Processamento de Planilhas ZPP.
+Acesso restrito a usuários nível 3+.
 """
 from dash import html, dcc
 import dash_bootstrap_components as dbc
-from src.components.zpp_processor_components import (
-    create_process_button,
-    create_file_list_card,
-    create_config_panel,
-    create_history_table,
-    create_log_detail_modal
-)
+from flask_login import current_user
+
+from src.components.zpp_processor_components import create_file_list_card
+
+
+def _build_upload_tab():
+    return dbc.Card(dbc.CardBody([
+        html.H5("Upload Retroativo", className="card-title mb-4"),
+        html.P(
+            "Envie um arquivo Excel para um mês histórico. "
+            "O mês de destino é definido por você — os dados do SAP são ignorados para esse cálculo.",
+            className="text-muted mb-4"
+        ),
+
+        dbc.Row([
+            # Upload area
+            dbc.Col([
+                dcc.Upload(
+                    id="upload-zpp-retroativo",
+                    children=html.Div([
+                        html.I(className="bi bi-cloud-upload fs-3 d-block mb-2"),
+                        html.Span("Arraste o arquivo ou "),
+                        html.A("clique para selecionar", href="#"),
+                        html.Br(),
+                        html.Small(".xlsx ou .xls", className="text-muted"),
+                    ]),
+                    accept=".xlsx,.xls",
+                    className="border border-dashed rounded p-4 text-center",
+                    style={"cursor": "pointer"},
+                ),
+                html.Div(id="upload-zpp-filename", className="text-muted small mt-1"),
+            ], md=12, className="mb-3"),
+        ]),
+
+        dbc.Row([
+            dbc.Col([
+                dbc.Label("Ano"),
+                dbc.Select(
+                    id="select-ano-retroativo",
+                    options=[{"label": str(y), "value": str(y)} for y in range(2020, 2030)],
+                    placeholder="Selecione...",
+                ),
+            ], md=3),
+            dbc.Col([
+                dbc.Label("Mês"),
+                dbc.Select(
+                    id="select-mes-retroativo",
+                    options=[
+                        {"label": m, "value": str(i+1)}
+                        for i, m in enumerate([
+                            "Janeiro","Fevereiro","Março","Abril","Maio","Junho",
+                            "Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"
+                        ])
+                    ],
+                    placeholder="Selecione...",
+                ),
+            ], md=3),
+        ], className="mb-3"),
+
+        dbc.Row([
+            dbc.Col([
+                dbc.Label("Justificativa"),
+                dbc.Textarea(
+                    id="textarea-justificativa-retroativo",
+                    placeholder="Descreva o motivo do upload retroativo (mínimo 10 caracteres)...",
+                    rows=3,
+                ),
+            ], md=12),
+        ], className="mb-4"),
+
+        dbc.Button(
+            [html.I(className="bi bi-upload me-2"), "Enviar"],
+            id="btn-enviar-retroativo",
+            color="primary",
+            disabled=True,
+        ),
+        dbc.Spinner(
+            html.Div(id="spinner-upload-retroativo"),
+            size="sm",
+            color="primary",
+            spinner_class_name="ms-2",
+        ),
+
+        html.Div(id="resultado-upload-retroativo", className="mt-4"),
+    ]))
+
+
+def _build_logs_tab():
+    return dbc.Card(dbc.CardBody([
+        html.H5("Histórico de Processamentos", className="card-title mb-4"),
+
+        # Filtros
+        dbc.Row([
+            dbc.Col([
+                dbc.Label("Tipo", className="small"),
+                dbc.Select(
+                    id="filter-tipo-logs",
+                    options=[
+                        {"label": "Todos", "value": ""},
+                        {"label": "ZPP Produção", "value": "zppprd"},
+                        {"label": "ZPP Paradas", "value": "zppparadas"},
+                    ],
+                    value="",
+                ),
+            ], md=3),
+            dbc.Col([
+                dbc.Label("Canal", className="small"),
+                dbc.Select(
+                    id="filter-canal-logs",
+                    options=[
+                        {"label": "Todos", "value": ""},
+                        {"label": "Padrão", "value": "padrao"},
+                        {"label": "Retroativo", "value": "retroativo"},
+                    ],
+                    value="",
+                ),
+            ], md=3),
+            dbc.Col([
+                dbc.Label("Status", className="small"),
+                dbc.Select(
+                    id="filter-status-logs",
+                    options=[
+                        {"label": "Todos", "value": ""},
+                        {"label": "Sucesso", "value": "success"},
+                        {"label": "Rejeitado", "value": "rejected"},
+                        {"label": "Erro", "value": "failed"},
+                    ],
+                    value="",
+                ),
+            ], md=3),
+            dbc.Col([
+                dbc.Label("Mês (AAAA-MM)", className="small"),
+                dbc.Input(
+                    id="filter-mes-logs",
+                    type="month",
+                    debounce=True,
+                ),
+            ], md=3),
+        ], className="mb-3 g-2"),
+
+        # Tabela
+        html.Div(id="tabela-logs-zpp-container", children=[
+            dbc.Spinner(color="primary", size="sm"),
+        ]),
+
+        # Paginação
+        html.Div(id="paginacao-logs-zpp", className="d-flex justify-content-center mt-3"),
+
+        # Store de página atual
+        dcc.Store(id="store-logs-page", data=1),
+    ]))
 
 
 def layout():
-    """
-    Layout da página de Processamento ZPP
-
-    Estrutura:
-    - Header com título e botões
-    - Linha 1: Botão processar + Arquivos pendentes + Arquivos processados
-    - Linha 2: Painel de configurações (collapsible)
-    - Linha 3: Tabela de histórico
-    """
+    """Layout da página ZPP — restrito a nível 3+."""
+    if not current_user.is_authenticated or current_user.level < 3:
+        return html.Div()
 
     return dbc.Container([
-        # ==================== HEADER ====================
+        # Header
         dbc.Row([
             dbc.Col([
                 html.H2([
-                    html.I(
-                        className="bi bi-file-earmark-spreadsheet me-3",
-                        style={"color": "#0d6efd"}
-                    ),
-                    "Processamento de Planilhas ZPP"
-                ], className="mb-2"),
-                html.P(
-                    "Processamento automático de planilhas SAP (Produção e Paradas)",
-                    className="text-muted"
-                )
-            ], width=8),
-            dbc.Col([
-                dbc.ButtonGroup([
-                    dbc.Button(
-                        [html.I(className="bi bi-arrow-clockwise me-2"), "Atualizar"],
-                        id="btn-refresh-zpp",
-                        color="primary",
-                        size="sm",
-                        outline=True
-                    ),
-                    dbc.Button(
-                        [html.I(className="bi bi-question-circle me-2"), "Ajuda"],
-                        id="btn-help-zpp",
-                        color="secondary",
-                        size="sm",
-                        outline=True
-                    )
-                ])
-            ], width=4, className="text-end d-flex align-items-center justify-content-end")
+                    html.I(className="bi bi-file-earmark-spreadsheet me-3",
+                           style={"color": "#0d6efd"}),
+                    "Processamento de Planilhas ZPP",
+                ], className="mb-1"),
+                html.P("Processamento automático de planilhas SAP (Produção e Paradas)",
+                       className="text-muted"),
+            ]),
         ], className="mb-4"),
 
-        # ==================== LINHA 1: PROCESSAMENTO E ARQUIVOS ====================
+        # Cards de arquivos pendentes / processados
         dbc.Row([
-            # Botão de processamento
-            dbc.Col([
-                create_process_button()
-            ], xs=12, md=4, className="mb-3"),
-
-            # Arquivos pendentes
-            dbc.Col([
-                create_file_list_card("input")
-            ], xs=12, md=4, className="mb-3"),
-
-            # Arquivos processados
-            dbc.Col([
-                create_file_list_card("output")
-            ], xs=12, md=4, className="mb-3")
+            dbc.Col(create_file_list_card("input"),  md=6, className="mb-3"),
+            dbc.Col(create_file_list_card("output"), md=6, className="mb-3"),
         ], className="g-3 mb-4"),
 
-        # ==================== LINHA 2: CONFIGURAÇÕES ====================
-        dbc.Row([
-            dbc.Col([
-                create_config_panel()
-            ], width=12)
-        ]),
+        # Tabs: Upload Retroativo + Histórico
+        dbc.Tabs([
+            dbc.Tab(_build_upload_tab(), label="Upload Retroativo",
+                    tab_id="tab-upload-retroativo"),
+            dbc.Tab(_build_logs_tab(),   label="Histórico de Logs",
+                    tab_id="tab-historico-logs"),
+        ], id="zpp-tabs", active_tab="tab-upload-retroativo", className="mb-3"),
 
-        # ==================== LINHA 3: HISTÓRICO ====================
-        dbc.Row([
-            dbc.Col([
-                create_history_table()
-            ], width=12)
-        ]),
-
-        # ==================== STORES E INTERVALS ====================
-        # Store para job_id em processamento
-        dcc.Store(id='store-zpp-job-id', data=None),
-
-        # Store para configuração atual
-        dcc.Store(id='store-zpp-config', data=None),
-
-        # Interval para polling de status (apenas quando processando)
-        dcc.Interval(
-            id='interval-zpp-status',
-            interval=2000,  # 2 segundos
-            n_intervals=0,
-            disabled=True  # Inicia desabilitado
-        ),
-
-        # Interval para refresh de arquivos e histórico
-        dcc.Interval(
-            id='interval-zpp-refresh',
-            interval=10000,  # 10 segundos
-            n_intervals=0,
-            disabled=False
-        ),
-
-        # Interval para auto-load inicial
-        dcc.Interval(
-            id='interval-zpp-autoload',
-            interval=500,  # 0.5 segundo
-            n_intervals=0,
-            max_intervals=1  # Executa apenas 1 vez
-        ),
-
-        # ==================== MODAL DE DETALHES ====================
-        create_log_detail_modal(),
-
-        # ==================== TOAST DE AJUDA ====================
-        dbc.Toast(
-            [
-                html.P([
-                    html.Strong("Como usar:"), html.Br(),
-                    "1. Coloque arquivos .xlsx na pasta ", html.Code("volumes/zpp/input/"), html.Br(),
-                    "2. Clique em 'Processar Agora' ou aguarde processamento automático", html.Br(),
-                    "3. Arquivos processados são movidos para ", html.Code("volumes/zpp/output/"), html.Br(),
-                    html.Br(),
-                    html.Strong("Tipos suportados:"), html.Br(),
-                    "• ZPP PRD (Produção)", html.Br(),
-                    "• ZPP Paradas", html.Br(),
-                    html.Br(),
-                    html.Small("O tipo é detectado automaticamente pela estrutura das colunas", className="text-muted")
-                ]),
-            ],
-            id="toast-help-zpp",
-            header="Ajuda - Processamento ZPP",
-            is_open=False,
-            dismissable=True,
-            icon="info",
-            duration=10000,
-            style={"position": "fixed", "top": 80, "right": 10, "width": 400, "zIndex": 9999}
-        ),
-
-        # ==================== TOAST DE NOTIFICAÇÕES ====================
-        dbc.Toast(
-            id="toast-notification-zpp",
-            header="Notificação",
-            is_open=False,
-            dismissable=True,
-            duration=4000,
-            icon="success",
-            style={"position": "fixed", "top": 80, "right": 10, "width": 350, "zIndex": 9999}
-        )
+        # Modal de detalhe de log
+        dbc.Modal([
+            dbc.ModalHeader(dbc.ModalTitle(id="modal-log-title")),
+            dbc.ModalBody(id="modal-log-body"),
+            dbc.ModalFooter(
+                dbc.Button("Fechar", id="btn-fechar-modal-log", color="secondary", size="sm")
+            ),
+        ], id="modal-detalhe-log", size="lg", scrollable=True),
 
     ], fluid=True, className="p-4")
