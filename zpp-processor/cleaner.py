@@ -11,43 +11,42 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 
-def detect_file_type(file_path: str) -> Optional[str]:
+class UnknownFileTypeError(Exception):
+    """Arquivo rejeitado por tipo não reconhecido (SP-01)."""
+    pass
+
+
+def detect_file_type(file_path: str) -> str:
     """
-    Detecta automaticamente o tipo de arquivo ZPP baseado nas colunas.
+    Detecta o tipo do arquivo ZPP pela coluna obrigatória (SP-01).
+    Detecção case-insensitive e tolerante a espaços extras.
 
-    Args:
-        file_path: Caminho para o arquivo Excel
-
-    Returns:
-        'zppprd', 'zppparadas' ou None se não reconhecido
+    Retorna 'zppprd' ou 'zppparadas'.
+    Lança UnknownFileTypeError se nenhuma coluna obrigatória for encontrada.
     """
     try:
-        # Ler apenas as primeiras linhas para verificar colunas
         df_sample = pd.read_excel(file_path, nrows=5)
-        columns = set(df_sample.columns)
+        cols = {c.strip().lower() for c in df_sample.columns}
 
-        # Assinaturas de colunas por tipo
-        signatures = {
-            'zppprd': {'Pto.Trab.', 'Kg.Proc.', 'HorasAct.', 'FIniNotif', 'FFinNotif'},
-            'zppparadas': {'Centro de trabalho', 'Início execução', 'Fim execução', 'Causa do desvio', 'Duration (min)'}
-        }
+        if "ffinnotif" in cols:
+            logger.info("  -> Tipo detectado: zppprd")
+            return "zppprd"
 
-        # Verificar qual assinatura corresponde melhor
-        for file_type, signature in signatures.items():
-            # Se pelo menos 80% das colunas da assinatura estão presentes
-            matching_cols = signature & columns
-            match_ratio = len(matching_cols) / len(signature)
+        if "fim execução" in cols:
+            logger.info("  -> Tipo detectado: zppparadas")
+            return "zppparadas"
 
-            if match_ratio >= 0.8:
-                logger.info(f"  -> Tipo detectado: {file_type} (confiança: {match_ratio*100:.0f}%)")
-                return file_type
+        logger.error(f"  -> Tipo não reconhecido. Colunas: {list(df_sample.columns)[:8]}")
+        raise UnknownFileTypeError(
+            "Arquivo rejeitado: tipo de planilha não reconhecido. "
+            "Colunas esperadas: 'FFinNotif' (zppprd) ou 'Fim execução' (zppparadas)."
+        )
 
-        logger.warning(f"  -> Tipo não reconhecido. Colunas encontradas: {list(columns)[:5]}...")
-        return None
-
+    except UnknownFileTypeError:
+        raise
     except Exception as e:
         logger.error(f"  -> Erro ao detectar tipo: {e}")
-        return None
+        raise UnknownFileTypeError(f"Erro ao inspecionar colunas do arquivo: {e}")
 
 
 def find_excel_files(directory: str) -> list:
