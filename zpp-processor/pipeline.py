@@ -286,6 +286,7 @@ def _prepare_df(df: pd.DataFrame, mes_referencia: str) -> list[dict]:
 
     df = df.where(pd.notna(df), None)
     df["mes_referencia"] = mes_referencia
+    df["_processed"] = True
     return df.to_dict("records")
 
 
