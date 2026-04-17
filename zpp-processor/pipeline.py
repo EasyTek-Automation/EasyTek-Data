@@ -294,7 +294,7 @@ def _prepare_df(df: pd.DataFrame, mes_referencia: str) -> list[dict]:
 # ---------------------------------------------------------------------------
 
 _UNIQUE_KEYS = {
-    "zppprd":      ("pto_trab", "ordem"),
+    "zppprd":      ("pto_trab", "ordem", "mes_referencia"),
     "zppparadas":  ("centro_de_trabalho", "ordem", "inicio_real_hora", "causa_do_desvio"),
 }
 
@@ -422,7 +422,7 @@ def ensure_indexes(db, collection_name: str, tipo: str) -> None:
 
     if tipo == "zppprd":
         _safe_create(collection,
-            [("pto_trab", ASCENDING), ("ordem", ASCENDING)],
+            [("pto_trab", ASCENDING), ("ordem", ASCENDING), ("mes_referencia", ASCENDING)],
             name="idx_unique_producao", unique=True, sparse=True
         )
         _safe_create(collection, "mes_referencia", name="idx_mes_ref")
