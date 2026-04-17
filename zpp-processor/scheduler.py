@@ -21,10 +21,17 @@ logger = logging.getLogger(__name__)
 _BRT = ZoneInfo("America/Sao_Paulo")
 
 
+def _clean_stem(stem: str) -> str:
+    """Remove sufixos de processamento anteriores (_YYYYMMDD_HHMMSS_Rejected/InternalError)."""
+    import re
+    return re.sub(r"(_\d{8}_\d{6}(_Rejected|_InternalError))+$", "", stem)
+
+
 def _move_file(src: Path, dest_dir: Path, suffix: str = "") -> Path:
-    """Move arquivo com timestamp BRT no nome."""
+    """Move arquivo com timestamp BRT no nome, removendo sufixos anteriores."""
     ts = datetime.now(tz=_BRT).strftime("%Y%m%d_%H%M%S")
-    dest = dest_dir / f"{src.stem}_{ts}{suffix}{src.suffix}"
+    clean = _clean_stem(src.stem)
+    dest = dest_dir / f"{clean}_{ts}{suffix}{src.suffix}"
     shutil.move(str(src), str(dest))
     return dest
 
