@@ -69,7 +69,7 @@ def _ensure_indexes(client: MongoClient) -> None:
     # Dropar índices antigos que mudaram de estrutura (migration única)
     _old_indexes = {
         "ZPP_Producao": ["idx_equipamento_data", "idx_equipamento_producao",
-                         "idx_ordem_unique", "idx_range_datas"],
+                         "idx_ordem_unique", "idx_range_datas", "idx_unique_producao"],
         "ZPP_Paradas":  ["idx_parada_unique", "idx_linha_data", "idx_range_datas"],
     }
     for col_name, idx_names in _old_indexes.items():

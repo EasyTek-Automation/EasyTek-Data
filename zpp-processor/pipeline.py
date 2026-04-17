@@ -293,44 +293,58 @@ def _prepare_df(df: pd.DataFrame, mes_referencia: str) -> list[dict]:
 # Etapa 9 — Substituição atômica
 # ---------------------------------------------------------------------------
 
+_UNIQUE_KEYS = {
+    "zppprd":      ("pto_trab", "ordem"),
+    "zppparadas":  ("centro_de_trabalho", "ordem", "inicio_real_hora", "causa_do_desvio"),
+}
+
+
+def _dedup_records(records: list[dict], tipo: str) -> tuple[list[dict], int]:
+    """Remove duplicatas dentro do próprio batch, mantendo última ocorrência."""
+    key_fields = _UNIQUE_KEYS.get(tipo)
+    if not key_fields:
+        return records, 0
+    seen: dict = {}
+    for rec in records:
+        k = tuple(rec.get(f) for f in key_fields)
+        seen[k] = rec
+    deduped = list(seen.values())
+    return deduped, len(records) - len(deduped)
+
+
 def _substitute_atomic(client: MongoClient, db_name: str, collection_name: str,
                         records: list[dict], mes_referencia: str,
-                        batch_size: int) -> tuple[int, int, int]:
+                        batch_size: int, tipo: str) -> tuple[int, int, int]:
     """
     Delete + insert em transaction MongoDB (SP-05).
+    Deduplica os records antes de inserir para evitar BulkWriteError dentro da transaction.
     Retorna (inseridos, deletados, duplicatas_ignoradas).
     """
+    records, duplicatas = _dedup_records(records, tipo)
+    if duplicatas:
+        logger.warning(f"  {duplicatas} duplicata(s) removida(s) antes da inserção")
+
     db = client[db_name]
     collection = db[collection_name]
 
     deletados = collection.count_documents({"mes_referencia": mes_referencia})
 
-    if deletados < len(records):
-        pass  # inserção maior ou igual — normal
-    else:
-        pct = (1 - len(records) / deletados) * 100 if deletados else 0
+    if deletados > 0 and len(records) < deletados:
+        pct = (1 - len(records) / deletados) * 100
         logger.warning(
             f"  Atenção: arquivo contém {len(records)} registros; "
             f"substituindo {deletados} existentes (redução de {pct:.0f}%)."
         )
 
     inseridos = 0
-    duplicatas = 0
 
     with client.start_session() as session:
         with session.start_transaction():
             collection.delete_many({"mes_referencia": mes_referencia}, session=session)
             for i in range(0, len(records), batch_size):
                 batch = records[i:i + batch_size]
-                try:
-                    result = collection.insert_many(batch, ordered=False, session=session)
-                    inseridos += len(result.inserted_ids)
-                except BulkWriteError as bwe:
-                    inseridos += bwe.details.get("nInserted", 0)
-                    dups = [e for e in bwe.details.get("writeErrors", []) if e.get("code") == 11000]
-                    duplicatas += len(dups)
-                    if dups:
-                        logger.warning(f"  {len(dups)} duplicata(s) ignorada(s) no lote {i // batch_size + 1}")
+                result = collection.insert_many(batch, session=session)
+                inseridos += len(result.inserted_ids)
 
     return inseridos, deletados, duplicatas
 
@@ -408,12 +422,12 @@ def ensure_indexes(db, collection_name: str, tipo: str) -> None:
 
     if tipo == "zppprd":
         _safe_create(collection,
-            [("centro_de_trabalho", ASCENDING), ("ordem", ASCENDING)],
+            [("pto_trab", ASCENDING), ("ordem", ASCENDING)],
             name="idx_unique_producao", unique=True, sparse=True
         )
         _safe_create(collection, "mes_referencia", name="idx_mes_ref")
         _safe_create(collection,
-            [("centro_de_trabalho", ASCENDING), ("fininotif", DESCENDING)],
+            [("pto_trab", ASCENDING), ("fininotif", DESCENDING)],
             name="idx_equipamento_data"
         )
         _safe_create(collection,
@@ -506,7 +520,7 @@ def process_file(
         with acquire_lock(tipo):
             inseridos, deletados, duplicatas = _substitute_atomic(
                 client, config.DB_NAME, collection_name,
-                records, mes_referencia, config.BATCH_SIZE
+                records, mes_referencia, config.BATCH_SIZE, tipo
             )
 
         # Etapa 10 — Pós-processamento
