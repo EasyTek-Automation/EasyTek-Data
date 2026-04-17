@@ -312,12 +312,30 @@ def _dedup_records(records: list[dict], tipo: str) -> tuple[list[dict], int]:
     return deduped, len(records) - len(deduped)
 
 
+def _legacy_date_filter(mes_referencia: str, tipo: str) -> dict:
+    """
+    Filtro de data para deletar registros legados (sem mes_referencia) do mesmo mês.
+    Usa o campo de âncora do MONTH_BOUNDARY_RULE para identificar o mês.
+    """
+    import calendar
+    year, month = int(mes_referencia[:4]), int(mes_referencia[5:7])
+    start = datetime(year, month, 1, tzinfo=_BRT)
+    last_day = calendar.monthrange(year, month)[1]
+    end = datetime(year, month, last_day, 23, 59, 59, tzinfo=_BRT)
+    date_field = config.get_reference_field(tipo)
+    return {
+        "mes_referencia": {"$exists": False},
+        date_field: {"$gte": start.replace(tzinfo=None), "$lte": end.replace(tzinfo=None)},
+    }
+
+
 def _substitute_atomic(client: MongoClient, db_name: str, collection_name: str,
                         records: list[dict], mes_referencia: str,
                         batch_size: int, tipo: str) -> tuple[int, int, int]:
     """
     Delete + insert em transaction MongoDB (SP-05).
-    Deduplica os records antes de inserir para evitar BulkWriteError dentro da transaction.
+    Apaga tanto registros novos (por mes_referencia) quanto legados (por range de data)
+    para evitar duplicação durante a migração do pipeline antigo para o novo.
     Retorna (inseridos, deletados, duplicatas_ignoradas).
     """
     records, duplicatas = _dedup_records(records, tipo)
@@ -327,7 +345,13 @@ def _substitute_atomic(client: MongoClient, db_name: str, collection_name: str,
     db = client[db_name]
     collection = db[collection_name]
 
-    deletados = collection.count_documents({"mes_referencia": mes_referencia})
+    legacy_filter = _legacy_date_filter(mes_referencia, tipo)
+    deletados_novos = collection.count_documents({"mes_referencia": mes_referencia})
+    deletados_legados = collection.count_documents(legacy_filter)
+    deletados = deletados_novos + deletados_legados
+
+    if deletados_legados:
+        logger.info(f"  {deletados_legados} registro(s) legado(s) sem mes_referencia serão removidos")
 
     if deletados > 0 and len(records) < deletados:
         pct = (1 - len(records) / deletados) * 100
@@ -341,6 +365,7 @@ def _substitute_atomic(client: MongoClient, db_name: str, collection_name: str,
     with client.start_session() as session:
         with session.start_transaction():
             collection.delete_many({"mes_referencia": mes_referencia}, session=session)
+            collection.delete_many(legacy_filter, session=session)
             for i in range(0, len(records), batch_size):
                 batch = records[i:i + batch_size]
                 result = collection.insert_many(batch, session=session)
