@@ -26,7 +26,7 @@ def detect_file_type(file_path: str) -> str:
     """
     try:
         df_sample = pd.read_excel(file_path, nrows=5)
-        cols = {c.strip().lower() for c in df_sample.columns}
+        cols = {str(c).strip().lower() for c in df_sample.columns}
 
         if "ffinnotif" in cols:
             logger.info("  -> Tipo detectado: zppprd")
