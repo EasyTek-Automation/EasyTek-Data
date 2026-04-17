@@ -171,8 +171,11 @@ def register_zpp_redesign_callbacks(app):
     # ------------------------------------------------------------------
     @app.callback(
         Output("tabela-logs-zpp-container", "children"),
-        Output("paginacao-logs-zpp", "children"),
         Output("store-logs-page", "data"),
+        Output("store-logs-items", "data"),
+        Output("btn-logs-prev", "disabled"),
+        Output("btn-logs-next", "disabled"),
+        Output("txt-logs-page", "children"),
         Input("zpp-tabs", "active_tab"),
         Input("filter-tipo-logs", "value"),
         Input("filter-canal-logs", "value"),
@@ -187,10 +190,11 @@ def register_zpp_redesign_callbacks(app):
 
         from dash import callback_context
         trigger = callback_context.triggered_id
-        # Filtro mudou → volta para página 1
         if trigger in ("filter-tipo-logs", "filter-canal-logs",
                        "filter-status-logs", "filter-mes-logs"):
             page = 1
+
+        page = page or 1
 
         params = {"page": page, "per_page": PER_PAGE}
         if tipo:   params["tipo"]   = tipo
@@ -208,7 +212,8 @@ def register_zpp_redesign_callbacks(app):
             resp.raise_for_status()
             data = resp.json()
         except Exception as e:
-            return dbc.Alert(f"Erro ao carregar logs: {e}", color="danger"), None, page
+            return (dbc.Alert(f"Erro ao carregar logs: {e}", color="danger"),
+                    page, [], True, True, "")
 
         items = data.get("items", [])
         total = data.get("total", 0)
@@ -245,46 +250,30 @@ def register_zpp_redesign_callbacks(app):
                     html.Th(""),
                 ])),
                 html.Tbody(rows),
-            ], bordered=True, hover=True, responsive=True, size="sm",
-               id="tabela-logs-zpp", **{"data-items": str(items)})
+            ], bordered=True, hover=True, responsive=True, size="sm")
 
-        # Paginação
-        pag_items = []
-        pag_items.append(dbc.PaginationItem(
-            "‹", active=page > 1,
-            id={"type": "page-btn", "index": page - 1},
-            disabled=page <= 1,
-        ))
-        for p in range(max(1, page - 2), min(total_pages + 1, page + 3)):
-            pag_items.append(dbc.PaginationItem(
-                str(p), active=p == page,
-                id={"type": "page-btn", "index": p},
-            ))
-        pag_items.append(dbc.PaginationItem(
-            "›", active=page < total_pages,
-            id={"type": "page-btn", "index": page + 1},
-            disabled=page >= total_pages,
-        ))
-        paginacao = dbc.Pagination(pag_items, size="sm")
-
-        return tabela, paginacao, page
+        txt_page = f"Página {page} de {total_pages}" if total > 0 else ""
+        return (tabela, page, items,
+                page <= 1, page >= total_pages, txt_page)
 
     # ------------------------------------------------------------------
-    # CB-5 — Navegar entre páginas
+    # CB-5 — Navegar entre páginas (botões fixos prev/next)
     # ------------------------------------------------------------------
     @app.callback(
         Output("store-logs-page", "data", allow_duplicate=True),
-        Input({"type": "page-btn", "index": dash.ALL}, "n_clicks"),
-        State({"type": "page-btn", "index": dash.ALL}, "id"),
+        Input("btn-logs-prev", "n_clicks"),
+        Input("btn-logs-next", "n_clicks"),
+        State("store-logs-page", "data"),
         prevent_initial_call=True,
     )
-    def mudar_pagina(n_clicks_list, ids):
+    def mudar_pagina(n_prev, n_next, page):
         from dash import callback_context
-        if not any(n_clicks_list):
-            raise PreventUpdate
-        triggered = callback_context.triggered_id
-        if triggered:
-            return triggered["index"]
+        trigger = callback_context.triggered_id
+        page = page or 1
+        if trigger == "btn-logs-prev":
+            return max(1, page - 1)
+        if trigger == "btn-logs-next":
+            return page + 1
         raise PreventUpdate
 
     # ------------------------------------------------------------------
@@ -295,21 +284,19 @@ def register_zpp_redesign_callbacks(app):
         Output("modal-log-title", "children"),
         Output("modal-log-body", "children"),
         Input({"type": "btn-ver-log", "index": dash.ALL}, "n_clicks"),
-        State("tabela-logs-zpp", "data-items"),
+        State("store-logs-items", "data"),
         prevent_initial_call=True,
     )
-    def abrir_modal(n_clicks_list, items_str):
+    def abrir_modal(n_clicks_list, items):
         from dash import callback_context
         if not any(n for n in n_clicks_list if n):
             raise PreventUpdate
 
-        import ast
         triggered = callback_context.triggered_id
         if not triggered:
             raise PreventUpdate
 
         try:
-            items = ast.literal_eval(items_str)
             item = items[triggered["index"]]
         except Exception:
             raise PreventUpdate

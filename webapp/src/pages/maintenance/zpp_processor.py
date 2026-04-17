@@ -149,11 +149,18 @@ def _build_logs_tab():
             dbc.Spinner(color="primary", size="sm"),
         ]),
 
-        # Paginação
-        html.Div(id="paginacao-logs-zpp", className="d-flex justify-content-center mt-3"),
+        # Paginação com botões fixos (sem pattern-matching)
+        html.Div([
+            dbc.Button("‹", id="btn-logs-prev", size="sm", outline=True,
+                       color="secondary", disabled=True, className="me-2"),
+            html.Span("", id="txt-logs-page", className="small text-muted align-self-center"),
+            dbc.Button("›", id="btn-logs-next", size="sm", outline=True,
+                       color="secondary", disabled=True, className="ms-2"),
+        ], className="d-flex justify-content-center align-items-center mt-3"),
 
-        # Store de página atual
+        # Stores
         dcc.Store(id="store-logs-page", data=1),
+        dcc.Store(id="store-logs-items", data=[]),
     ]))
 
 

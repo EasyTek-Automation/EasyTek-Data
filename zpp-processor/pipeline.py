@@ -360,10 +360,10 @@ def _detect_overlaps(records: list[dict]) -> list[dict]:
         for i in range(len(regs)):
             for j in range(i + 1, len(regs)):
                 a, b = regs[i], regs[j]
-                ini_a = a.get("inicio_real_hora")
-                fim_a = a.get("fim_real_hora") or a.get("fim_execucao")
-                ini_b = b.get("inicio_real_hora")
-                fim_b = b.get("fim_real_hora") or b.get("fim_execucao")
+                ini_a = a.get("inicio_execucao")
+                fim_a = a.get("fim_execucao")
+                ini_b = b.get("inicio_execucao")
+                fim_b = b.get("fim_execucao")
                 causa_a = a.get("causa_do_desvio")
                 causa_b = b.get("causa_do_desvio")
 
@@ -472,8 +472,11 @@ def process_file(
         cleaner.load_data()
         df = cleaner.get_cleaned_dataframe()
 
+        # Normalizar colunas aqui para que etapas 3-7 usem nomes snake_case consistentes
+        df.columns = [_normalize_col(c) for c in df.columns]
+
         # Etapa 3 — Filtro EMBAL (antes do threshold)
-        equip_col = "Pto.Trab." if tipo == "zppprd" else "Centro de trabalho"
+        equip_col = "pto_trab" if tipo == "zppprd" else "centro_de_trabalho"
         if equip_col in df.columns:
             mask = ~df[equip_col].astype(str).str.upper().str.startswith(_IGNORE_PREFIXES)
             removidos = (~mask).sum()
