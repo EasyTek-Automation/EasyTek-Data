@@ -129,6 +129,10 @@ def register_callbacks(app):
     register_subtask_callbacks(app)   # Workflow CRUD - Subtarefas e Logs
     register_workflow_export_routes(app.server)  # Rota Flask PDF export
 
+    # Gantt Management callbacks
+    from src.callbacks_registers.gantt_callbacks import register_gantt_callbacks
+    register_gantt_callbacks(app)
+
     # Database error handling callbacks
     register_database_error_callbacks(app)
 
