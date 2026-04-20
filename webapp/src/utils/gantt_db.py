@@ -38,12 +38,51 @@ PROJECT_TIPOS = [
 ]
 
 
-def get_all_projects():
-    """Retorna todos os projetos ordenados por data de criação."""
+def get_all_projects(include_archived=False):
+    """
+    Retorna projetos ordenados por data de criação.
+    Por padrão exclui arquivados. Passe include_archived=True para incluir todos.
+    """
     col = _col("gantt_projects")
     if col is None:
         return []
-    return [_serialize(d) for d in col.find().sort("criado_em", 1)]
+    query = {} if include_archived else {"arquivado": {"$ne": True}}
+    return [_serialize(d) for d in col.find(query).sort("criado_em", 1)]
+
+
+def get_archived_projects():
+    """Retorna apenas projetos arquivados, ordenados por arquivado_em decrescente."""
+    col = _col("gantt_projects")
+    if col is None:
+        return []
+    return [_serialize(d) for d in col.find({"arquivado": True}).sort("arquivado_em", -1)]
+
+
+def archive_project(project_id):
+    """Marca projeto como arquivado (não exclui — reversível via unarchive_project)."""
+    col = _col("gantt_projects")
+    if col is None:
+        return False
+    now = _now()
+    result = col.update_one(
+        {"_id": ObjectId(project_id)},
+        {"$set": {"arquivado": True, "arquivado_em": now, "atualizado_em": now}},
+    )
+    return result.modified_count > 0
+
+
+def unarchive_project(project_id):
+    """Restaura projeto arquivado, removendo a flag arquivado e arquivado_em."""
+    col = _col("gantt_projects")
+    if col is None:
+        return False
+    now = _now()
+    result = col.update_one(
+        {"_id": ObjectId(project_id)},
+        {"$set":   {"arquivado": False, "atualizado_em": now},
+         "$unset": {"arquivado_em": ""}},
+    )
+    return result.modified_count > 0
 
 
 def get_project_by_id(project_id):

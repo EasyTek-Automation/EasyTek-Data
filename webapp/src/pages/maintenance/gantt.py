@@ -213,6 +213,22 @@ def _modal_confirm_delete():
     ], id="modal-confirm-delete", is_open=False, backdrop="static")
 
 
+def _modal_archived_projects():
+    return dbc.Modal([
+        dbc.ModalHeader(dbc.ModalTitle([
+            html.I(className="bi bi-archive-fill me-2"),
+            "Projetos Arquivados",
+        ])),
+        dbc.ModalBody(
+            html.Div(id="div-archived-projects-content", className="pt-1"),
+        ),
+        dbc.ModalFooter(
+            dbc.Button("Fechar", id="btn-close-archived-projects",
+                       color="secondary", outline=True),
+        ),
+    ], id="modal-archived-projects", is_open=False, size="lg")
+
+
 def _modal_block_info():
     return dbc.Modal([
         dbc.ModalHeader(dbc.ModalTitle(id="text-block-info-title")),
@@ -272,6 +288,13 @@ def layout():
                     dbc.Button(
                         [html.I(className="bi bi-person-plus me-1"), "Funcionários"],
                         id="btn-open-employee-list",
+                        color="secondary",
+                        outline=True,
+                        size="sm",
+                    ),
+                    dbc.Button(
+                        [html.I(className="bi bi-archive me-1"), "Arquivados"],
+                        id="btn-open-archived-projects",
                         color="secondary",
                         outline=True,
                         size="sm",
@@ -382,6 +405,7 @@ def layout():
         _modal_activity(),
         _modal_assignment(),
         _modal_employee_management(),
+        _modal_archived_projects(),
         _modal_validation_errors(),
         _modal_confirm_delete(),
         _modal_block_info(),

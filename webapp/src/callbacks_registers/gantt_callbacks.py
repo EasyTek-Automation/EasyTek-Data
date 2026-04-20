@@ -94,10 +94,20 @@ def register_gantt_callbacks(app):
     )
     def render_gantt(refresh, granularity, projects_state, categories_state,
                      activities_state, hour_offset, filter_query):
-        projects    = gantt_db.get_all_projects()
-        categories  = gantt_db.get_all_categories()
-        activities  = gantt_db.get_all_activities()
-        employees   = gantt_db.get_all_employees()
+        projects   = gantt_db.get_all_projects()  # exclui arquivados
+        employees  = gantt_db.get_all_employees()
+
+        # Cascata: só renderizar categorias/atividades de projetos ativos
+        active_proj_ids = {str(p["_id"]) for p in projects}
+        categories = [
+            c for c in gantt_db.get_all_categories()
+            if str(c.get("projeto_id", "")) in active_proj_ids
+        ]
+        active_cat_ids = {str(c["_id"]) for c in categories}
+        activities = [
+            a for a in gantt_db.get_all_activities()
+            if str(a.get("categoria_id", "")) in active_cat_ids
+        ]
         all_assignments = []
         for act in activities:
             all_assignments.extend(gantt_db.get_assignments_by_activity(act["_id"]))
@@ -1039,6 +1049,111 @@ def register_gantt_callbacks(app):
             True, proj["nome"],
             False, no_update, no_update,
         )
+
+    # ------------------------------------------------------------------
+    # CB-26 — Arquivar projeto (ação direta, sem modal de confirmação)
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("store-gantt-refresh", "data", allow_duplicate=True),
+        Input({"type": "btn-archive-project", "index": ALL}, "n_clicks"),
+        State("store-gantt-refresh", "data"),
+        prevent_initial_call=True,
+    )
+    def archive_project_action(n_clicks_list, refresh):
+        if not any(n_clicks_list):
+            raise PreventUpdate
+        triggered_id = ctx.triggered_id
+        if not isinstance(triggered_id, dict):
+            raise PreventUpdate
+        if current_user.level < 2:
+            raise PreventUpdate
+        proj_id = triggered_id["index"]
+        proj = gantt_db.get_project_by_id(proj_id)
+        if not proj:
+            raise PreventUpdate
+        gantt_db.archive_project(proj_id)
+        _log("arquivamento", "projeto", proj_id, proj["nome"])
+        return (refresh or 0) + 1
+
+    # ------------------------------------------------------------------
+    # CB-27 — Abrir/fechar modal de projetos arquivados
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("modal-archived-projects", "is_open"),
+        Input("btn-open-archived-projects", "n_clicks"),
+        Input("btn-close-archived-projects", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def toggle_archived_projects_modal(open_clicks, close_clicks):
+        return ctx.triggered_id == "btn-open-archived-projects"
+
+    # ------------------------------------------------------------------
+    # CB-28 — Carregar lista de projetos arquivados
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("div-archived-projects-content", "children"),
+        Input("modal-archived-projects", "is_open"),
+        Input("store-gantt-refresh", "data"),
+        prevent_initial_call=True,
+    )
+    def load_archived_projects(is_open, refresh):
+        if not is_open:
+            raise PreventUpdate
+        projects = gantt_db.get_archived_projects()
+        if not projects:
+            return html.P("Nenhum projeto arquivado.", className="text-muted")
+        rows = []
+        for p in projects:
+            pid = str(p["_id"])
+            arq_em = p.get("arquivado_em")
+            arq_str = arq_em.strftime("%d/%m/%Y %H:%M") if isinstance(arq_em, datetime) else "—"
+            rows.append(html.Tr([
+                html.Td(p["nome"]),
+                html.Td(p.get("tipo", "—")),
+                html.Td(arq_str),
+                html.Td(
+                    html.Button(
+                        [html.I(className="bi bi-arrow-counterclockwise me-1"), "Restaurar"],
+                        id={"type": "btn-unarchive-project", "index": pid},
+                        className="btn btn-sm btn-outline-success",
+                        style={"fontSize": "0.78rem"},
+                    ),
+                ),
+            ]))
+        return dbc.Table(
+            [
+                html.Thead(html.Tr([
+                    html.Th("Nome"), html.Th("Tipo"), html.Th("Arquivado em"), html.Th("Ações"),
+                ])),
+                html.Tbody(rows),
+            ],
+            bordered=True, hover=True, size="sm", responsive=True,
+        )
+
+    # ------------------------------------------------------------------
+    # CB-29 — Restaurar projeto arquivado
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("store-gantt-refresh", "data", allow_duplicate=True),
+        Input({"type": "btn-unarchive-project", "index": ALL}, "n_clicks"),
+        State("store-gantt-refresh", "data"),
+        prevent_initial_call=True,
+    )
+    def unarchive_project_action(n_clicks_list, refresh):
+        if not any(n_clicks_list):
+            raise PreventUpdate
+        triggered_id = ctx.triggered_id
+        if not isinstance(triggered_id, dict):
+            raise PreventUpdate
+        if current_user.level < 2:
+            raise PreventUpdate
+        proj_id = triggered_id["index"]
+        proj = gantt_db.get_project_by_id(proj_id)
+        if not proj:
+            raise PreventUpdate
+        gantt_db.unarchive_project(proj_id)
+        _log("restauracao", "projeto", proj_id, proj["nome"])
+        return (refresh or 0) + 1
 
     # ------------------------------------------------------------------
     # CB-21 — Toggle expand/collapse de atividade (atribuições)
