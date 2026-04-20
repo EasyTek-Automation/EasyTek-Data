@@ -27,6 +27,162 @@ def _now():
 
 
 # ---------------------------------------------------------------------------
+# gantt_projects
+# ---------------------------------------------------------------------------
+
+PROJECT_TIPOS = [
+    "Parada Preventiva",
+    "Parada Corretiva",
+    "Projeto de Melhoria",
+    "Outro",
+]
+
+
+def get_all_projects():
+    """Retorna todos os projetos ordenados por data de criação."""
+    col = _col("gantt_projects")
+    if col is None:
+        return []
+    return [_serialize(d) for d in col.find().sort("criado_em", 1)]
+
+
+def get_project_by_id(project_id):
+    """Retorna projeto por ID ou None."""
+    col = _col("gantt_projects")
+    if col is None:
+        return None
+    doc = col.find_one({"_id": ObjectId(project_id)})
+    return _serialize(doc)
+
+
+def create_project(data):
+    """
+    Insere novo projeto. Retorna o ID gerado como string.
+    data: {"nome", "tipo", "data_hora_inicio", "data_hora_fim", "observacoes"(opt)}
+    """
+    col = _col("gantt_projects")
+    if col is None:
+        return None
+    doc = {
+        "nome":             data["nome"],
+        "tipo":             data["tipo"],
+        "data_hora_inicio": data["data_hora_inicio"],
+        "data_hora_fim":    data["data_hora_fim"],
+        "observacoes":      data.get("observacoes", ""),
+        "criado_em":        _now(),
+        "atualizado_em":    _now(),
+    }
+    result = col.insert_one(doc)
+    return str(result.inserted_id)
+
+
+def update_project(project_id, data):
+    """Atualiza campos do projeto. Retorna True se modificou."""
+    col = _col("gantt_projects")
+    if col is None:
+        return False
+    allowed = ("nome", "tipo", "observacoes", "data_hora_inicio", "data_hora_fim")
+    update_fields = {k: v for k, v in data.items() if k in allowed}
+    update_fields["atualizado_em"] = _now()
+    result = col.update_one({"_id": ObjectId(project_id)}, {"$set": update_fields})
+    return result.modified_count > 0
+
+
+def delete_project(project_id):
+    """
+    Exclui projeto se não tiver categorias vinculadas.
+    Retorna True se excluiu, ou string de erro se bloqueado.
+    """
+    col = _col("gantt_projects")
+    if col is None:
+        return "Sem conexão com o banco de dados."
+    count = count_categories_in_project(project_id)
+    if count > 0:
+        return f"O projeto possui {count} categoria(s) vinculada(s) e não pode ser excluído."
+    result = col.delete_one({"_id": ObjectId(project_id)})
+    return result.deleted_count > 0
+
+
+def count_categories_in_project(project_id):
+    """Retorna número de categorias vinculadas a um projeto."""
+    col = _col("gantt_categories")
+    if col is None:
+        return 0
+    return col.count_documents({"projeto_id": ObjectId(project_id)})
+
+
+def migrate_to_default_project():
+    """
+    Garante que toda categoria tenha projeto_id.
+    SÓ cria o projeto 'Geral' se houver categorias órfãs para migrar.
+    Idempotente e safe para concorrência (usa upsert + índice único em nome).
+    """
+    col_proj = _col("gantt_projects")
+    col_cat  = _col("gantt_categories")
+    if col_proj is None or col_cat is None:
+        return None
+    now = _now()
+
+    # Índice único em nome para blindar contra futuras duplicatas
+    try:
+        col_proj.create_index("nome", unique=True, background=True)
+    except Exception:
+        pass
+
+    # Se não há categorias órfãs, nada a fazer
+    orphan_count = col_cat.count_documents({"projeto_id": {"$exists": False}})
+    proj_id = None
+    if orphan_count > 0:
+        # Upsert atômico do projeto 'Geral' apenas quando necessário
+        col_proj.update_one(
+            {"nome": "Geral"},
+            {
+                "$setOnInsert": {
+                    "nome":             "Geral",
+                    "tipo":             "Outro",
+                    "data_hora_inicio": now,
+                    "data_hora_fim":    now,
+                    "observacoes":      "Projeto padrão criado automaticamente para categorias migradas.",
+                    "criado_em":        now,
+                    "atualizado_em":    now,
+                },
+            },
+            upsert=True,
+        )
+        proj_id = col_proj.find_one({"nome": "Geral"}, {"_id": 1})["_id"]
+        col_cat.update_many(
+            {"projeto_id": {"$exists": False}},
+            {"$set": {"projeto_id": proj_id, "atualizado_em": now}},
+        )
+
+    # Backfill datas para projetos antigos (sem data_hora_inicio/fim)
+    for proj in col_proj.find({"$or": [
+        {"data_hora_inicio": {"$exists": False}},
+        {"data_hora_fim":    {"$exists": False}},
+    ]}):
+        cats = list(col_cat.find({"projeto_id": proj["_id"]}))
+        if cats:
+            starts = [c["data_hora_inicio"] for c in cats if c.get("data_hora_inicio")]
+            ends   = [c["data_hora_fim"]    for c in cats if c.get("data_hora_fim")]
+            if starts and ends:
+                col_proj.update_one(
+                    {"_id": proj["_id"]},
+                    {"$set": {
+                        "data_hora_inicio": min(starts),
+                        "data_hora_fim":    max(ends),
+                        "atualizado_em":    now,
+                    }},
+                )
+                continue
+        col_proj.update_one(
+            {"_id": proj["_id"]},
+            {"$set": {"data_hora_inicio": now, "data_hora_fim": now, "atualizado_em": now}},
+        )
+
+    return str(proj_id)
+
+
+# ---------------------------------------------------------------------------
 # gantt_categories
 # ---------------------------------------------------------------------------
 
@@ -50,13 +206,14 @@ def get_category_by_id(category_id):
 def create_category(data):
     """
     Insere nova categoria. Retorna o ID gerado como string.
-    data: {"nome", "data_hora_inicio", "data_hora_fim"}
+    data: {"nome", "projeto_id", "data_hora_inicio", "data_hora_fim"}
     """
     col = _col("gantt_categories")
     if col is None:
         return None
     doc = {
         "nome":             data["nome"],
+        "projeto_id":       ObjectId(data["projeto_id"]),
         "data_hora_inicio": data["data_hora_inicio"],
         "data_hora_fim":    data["data_hora_fim"],
         "criado_em":        _now(),
@@ -74,8 +231,10 @@ def update_category(category_id, data):
     col = _col("gantt_categories")
     if col is None:
         return False
-    allowed = ("nome", "data_hora_inicio", "data_hora_fim")
+    allowed = ("nome", "projeto_id", "data_hora_inicio", "data_hora_fim")
     update_fields = {k: v for k, v in data.items() if k in allowed}
+    if "projeto_id" in update_fields:
+        update_fields["projeto_id"] = ObjectId(update_fields["projeto_id"])
     update_fields["atualizado_em"] = _now()
     result = col.update_one({"_id": ObjectId(category_id)}, {"$set": update_fields})
     return result.modified_count > 0
