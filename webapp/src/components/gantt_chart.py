@@ -209,9 +209,9 @@ def _activity_status_color(activity):
     progresso_real     = float(activity.get("progresso_real", 0) or 0)
     delta = progresso_real - progresso_esperado
 
-    if delta < -STATUS_TOLERANCE_PCT:
+    if delta <= -STATUS_TOLERANCE_PCT:
         return STATUS_COLOR_ATRASADA
-    if delta >  STATUS_TOLERANCE_PCT:
+    if delta >=  STATUS_TOLERANCE_PCT:
         return STATUS_COLOR_ADIANTADA
     return STATUS_COLOR_NO_PRAZO
 
