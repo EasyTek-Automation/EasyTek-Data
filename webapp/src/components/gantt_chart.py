@@ -216,6 +216,20 @@ def _activity_status_color(activity):
     return STATUS_COLOR_NO_PRAZO
 
 
+def _build_now_line(t_start, t_end):
+    """Linha vertical vermelha do 'agora' (Brasília UTC-3) que cruza a altura toda da linha."""
+    now = datetime.utcnow() - timedelta(hours=3)
+    if not (t_start <= now <= t_end):
+        return []
+    left_pct = _to_pct(now, t_start, t_end)
+    return [html.Div(style={
+        "position": "absolute", "left": f"{left_pct:.4f}%",
+        "top": "0", "bottom": "0", "width": "2px",
+        "backgroundColor": "var(--bs-danger)",
+        "zIndex": "4", "pointerEvents": "none",
+    })]
+
+
 def _build_day_stripes(t_start, t_end):
     """Faixas verticais alternadas (zebra) para cada dia dentro do range."""
     stripes = []
@@ -267,13 +281,6 @@ def _build_activity_bar(activity, t_start, t_end, color=None):
         "borderRadius": "999px", "zIndex": "2",
     })
     children = [base_bar, progress_bar]
-    if act_start <= now <= act_end:
-        marker_left = left_pct + _to_pct(now, act_start, act_end) * width_pct / 100.0
-        children.append(html.Div(style={
-            "position": "absolute", "left": f"{marker_left:.4f}%",
-            "top": "0", "bottom": "0", "width": "2px",
-            "backgroundColor": "var(--bs-danger)", "zIndex": "3",
-        }))
     return html.Div(children, style={"position": "relative", "height": "28px", "margin": "2px 0"})
 
 
@@ -413,6 +420,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
         activities_by_category.setdefault(cid, []).append(act)
 
     day_stripes = _build_day_stripes(t_start, t_end)
+    now_line    = _build_now_line(t_start, t_end)
 
     def _make_time_axis_row():
         """Gera uma linha de eixo de tempo fresca (para uso dentro de cada projeto)."""
@@ -424,7 +432,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 "backgroundColor": axis_bg,
             }),
             html.Div(
-                _build_day_stripes(t_start, t_end) + build_time_axis(t_start, t_end, granularity),
+                _build_day_stripes(t_start, t_end) + build_time_axis(t_start, t_end, granularity) + now_line,
                 style={
                     "position": "relative", "flex": "1",
                     "height": f"{_axis_height_for(granularity)}px",
@@ -442,7 +450,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
         cats_by_project.setdefault(pid, []).append(c)
 
     TIPO_COLOR = {
-        "Parada Preventiva":   "var(--bs-warning)",
+        "Parada Preventiva":   "#E96D38",
         "Parada Corretiva":    "var(--bs-danger)",
         "Projeto de Melhoria": "var(--bs-success)",
         "Outro":               "var(--bs-secondary)",
@@ -465,7 +473,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
             proj_bar_children.append(html.Div(style={
                 "position": "absolute", "left": f"{p_left:.4f}%", "top": "15%",
                 "height": "70%", "width": f"{p_width:.4f}%", "minWidth": "4px",
-                "backgroundColor": tipo_color, "opacity": "0.5",
+                "backgroundColor": tipo_color, "opacity": "0.9",
                 "borderRadius": "3px", "border": f"1px solid {tipo_color}",
             }))
         except Exception:
@@ -507,7 +515,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 "backgroundColor": "var(--bs-secondary-bg)",
                 "borderLeft": f"5px solid {tipo_color}",
             }),
-            html.Div(day_stripes + proj_bar_children, style={"position": "relative", "flex": "1", "height": "32px"}),
+            html.Div(day_stripes + proj_bar_children + now_line, style={"position": "relative", "flex": "1", "height": "32px"}),
         ], style={
             "display": "flex", "alignItems": "center", "height": "42px",
             "borderBottom": f"2px solid {tipo_color}",
@@ -564,7 +572,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         "backgroundColor": "#7E57C2", "opacity": "0.75",
                         "borderRadius": "3px",
                     }),
-                ], style={"position": "relative", "flex": "1", "height": "28px"}),
+                ] + now_line, style={"position": "relative", "flex": "1", "height": "28px"}),
             ], style={
                 "display": "flex", "alignItems": "center", "height": "30px",
                 "borderBottom": "1px solid var(--bs-border-color-translucent)",
@@ -613,7 +621,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         "position": "sticky", "left": "0", "zIndex": "5",
                         "backgroundColor": "var(--bs-body-bg)",
                     }),
-                    html.Div(day_stripes + [act_bar], style={"position": "relative", "flex": "1", "height": "28px"}),
+                    html.Div(day_stripes + [act_bar] + now_line, style={"position": "relative", "flex": "1", "height": "28px"}),
                 ], style={
                     "display": "flex", "alignItems": "center", "height": "32px",
                     "borderBottom": "1px solid var(--bs-border-color-translucent)",
@@ -652,7 +660,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                             "backgroundColor": "var(--bs-light-bg-subtle, #f8f9fa)",
                         }),
                         html.Div(
-                            day_stripes + ([asg_bar] if asg_bar else []),
+                            day_stripes + ([asg_bar] if asg_bar else []) + now_line,
                             style={"position": "relative", "flex": "1", "height": "28px"},
                         ),
                     ], style={
