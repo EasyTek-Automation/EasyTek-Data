@@ -8,10 +8,55 @@ import dash_bootstrap_components as dbc
 # Helpers de modal
 # ---------------------------------------------------------------------------
 
+def _modal_project():
+    return dbc.Modal([
+        dbc.ModalHeader(dbc.ModalTitle(id="title-modal-project")),
+        dbc.ModalBody([
+            dbc.Label("Nome *"),
+            dbc.Input(id="input-project-nome", type="text", placeholder="Nome do projeto",
+                      maxLength=150, className="mb-3"),
+            dbc.Label("Tipo *"),
+            dcc.Dropdown(
+                id="dropdown-project-tipo",
+                options=[
+                    {"label": "Parada Preventiva",   "value": "Parada Preventiva"},
+                    {"label": "Parada Corretiva",    "value": "Parada Corretiva"},
+                    {"label": "Projeto de Melhoria", "value": "Projeto de Melhoria"},
+                    {"label": "Outro",               "value": "Outro"},
+                ],
+                placeholder="Selecionar tipo",
+                clearable=False,
+                className="mb-3",
+            ),
+            dbc.Row([
+                dbc.Col([
+                    dbc.Label("Início *"),
+                    dbc.Input(id="input-project-inicio", type="datetime-local"),
+                ], width=6),
+                dbc.Col([
+                    dbc.Label("Fim *"),
+                    dbc.Input(id="input-project-fim", type="datetime-local"),
+                ], width=6),
+            ], className="mb-3"),
+            dbc.Label("Observações"),
+            dbc.Textarea(id="input-project-observacoes",
+                         placeholder="Observações adicionais...",
+                         rows=3, className="mb-2"),
+        ]),
+        dbc.ModalFooter([
+            dbc.Button("Cancelar", id="btn-cancel-project", color="secondary", outline=True),
+            dbc.Button("Salvar",   id="btn-save-project",   color="primary"),
+        ]),
+    ], id="modal-project", is_open=False, backdrop="static")
+
+
 def _modal_category():
     return dbc.Modal([
         dbc.ModalHeader(dbc.ModalTitle(id="title-modal-category")),
         dbc.ModalBody([
+            dbc.Label("Projeto *"),
+            dcc.Dropdown(id="dropdown-category-projeto", placeholder="Selecionar projeto",
+                         clearable=False, className="mb-3"),
             dbc.Label("Nome *"),
             dbc.Input(id="input-category-nome", type="text", placeholder="Nome da categoria",
                       maxLength=120, className="mb-3"),
@@ -40,6 +85,9 @@ def _modal_activity():
             dbc.Label("Título *"),
             dbc.Input(id="input-activity-titulo", type="text", placeholder="Título da atividade",
                       maxLength=200, className="mb-3"),
+            dbc.Label("Projeto *"),
+            dcc.Dropdown(id="dropdown-activity-projeto", placeholder="Selecionar projeto",
+                         clearable=False, className="mb-3"),
             dbc.Label("Categoria *"),
             dcc.Dropdown(id="dropdown-activity-categoria", placeholder="Selecionar categoria",
                          clearable=False, className="mb-3"),
@@ -91,30 +139,47 @@ def _modal_assignment():
     ], id="modal-assignment", is_open=False, backdrop="static")
 
 
-def _modal_employee():
+def _modal_employee_management():
     return dbc.Modal([
-        dbc.ModalHeader(dbc.ModalTitle(id="title-modal-employee")),
-        dbc.ModalBody([
-            dbc.Label("Nome *"),
-            dbc.Input(id="input-employee-nome", type="text", placeholder="Nome do funcionário",
-                      maxLength=120, className="mb-3"),
-            dbc.Label("Turno padrão *"),
-            dbc.RadioItems(
-                id="radio-employee-turno",
-                options=[
-                    {"label": "Turno A (00h–06h)", "value": "A"},
-                    {"label": "Turno B (06h–15h)", "value": "B"},
-                    {"label": "Turno C (15h–00h)", "value": "C"},
-                ],
-                value="B",
-                className="mt-1",
-            ),
-        ]),
-        dbc.ModalFooter([
-            dbc.Button("Cancelar", id="btn-cancel-employee", color="secondary", outline=True),
-            dbc.Button("Salvar",   id="btn-save-employee",   color="primary"),
-        ]),
-    ], id="modal-employee", is_open=False, backdrop="static")
+        dbc.ModalHeader(dbc.ModalTitle("Funcionários")),
+        dbc.ModalBody(
+            dbc.Tabs([
+                dbc.Tab(
+                    html.Div(id="div-employee-list-content", className="pt-3"),
+                    label="Cadastrados",
+                    tab_id="tab-emp-list",
+                ),
+                dbc.Tab(
+                    html.Div([
+                        html.H6("Novo Funcionário", id="employee-form-title", className="mb-3 mt-3 fw-semibold"),
+                        dbc.Label("Nome *"),
+                        dbc.Input(id="input-employee-nome", type="text",
+                                  placeholder="Nome do funcionário",
+                                  maxLength=120, className="mb-3"),
+                        dbc.Label("Turno padrão *"),
+                        dbc.RadioItems(
+                            id="radio-employee-turno",
+                            options=[
+                                {"label": "Turno A (00h–06h)", "value": "A"},
+                                {"label": "Turno B (06h–15h)", "value": "B"},
+                                {"label": "Turno C (15h–00h)", "value": "C"},
+                            ],
+                            value="B",
+                            className="mt-1 mb-4",
+                        ),
+                        dbc.Button("Salvar",   id="btn-save-employee",   color="primary"),
+                        dbc.Button("Cancelar", id="btn-cancel-employee", color="secondary",
+                                   outline=True, className="ms-2"),
+                    ]),
+                    label="Novo / Editar",
+                    tab_id="tab-emp-form",
+                ),
+            ], id="tabs-employee", active_tab="tab-emp-list"),
+        ),
+        dbc.ModalFooter(
+            dbc.Button("Fechar", id="btn-close-employee-list", color="secondary", outline=True),
+        ),
+    ], id="modal-employee-list", is_open=False, size="lg")
 
 
 def _modal_validation_errors():
@@ -166,8 +231,11 @@ def layout():
     """Página principal do Planejamento Gantt."""
     return dbc.Container([
         # Stores
-        dcc.Store(id="store-gantt-granularity",      storage_type="local",  data="dias"),
+        dcc.Store(id="store-gantt-granularity",       storage_type="local",  data="dias"),
+        dcc.Store(id="store-gantt-projects-state",   storage_type="local",  data={}),
         dcc.Store(id="store-gantt-categories-state", storage_type="local",  data={}),
+        dcc.Store(id="store-gantt-activities-state", storage_type="local",  data={}),
+        dcc.Store(id="store-project-editing-id",     storage_type="memory"),
         dcc.Store(id="store-gantt-refresh",          storage_type="memory", data=0),
         dcc.Store(id="store-category-editing-id",    storage_type="memory"),
         dcc.Store(id="store-activity-editing-id",    storage_type="memory"),
@@ -177,16 +245,30 @@ def layout():
         dcc.Store(id="store-validation-errors",      storage_type="memory"),
         dcc.Store(id="store-confirm-delete",         storage_type="memory"),
         dcc.Store(id="store-block-info",             storage_type="memory"),
+        dcc.Store(id="store-gantt-hour-offset",      storage_type="memory", data=0),
+        dcc.Store(id="store-gantt-filter",           storage_type="memory", data=""),
 
         # Header
         dbc.Row([
             dbc.Col([
-                html.H2("Planejamento Gantt"),
-                html.P("Visualização e gerenciamento de atividades por categoria",
-                       className="text-muted"),
+                html.H2([
+                    html.I(className="bi bi-bar-chart-steps me-2",
+                           style={"color": "#66A593"}),
+                    "Planejamento Gantt",
+                ], className="mb-1"),
+                html.P("Visualização e gerenciamento de projetos, categorias e atividades",
+                       className="text-muted mb-0"),
             ], width=8),
             dbc.Col([
                 dbc.ButtonGroup([
+                    dbc.Button(
+                        [html.I(className="bi bi-journal-text me-1"), "Auditoria"],
+                        href="/maintenance/gantt/audit-log",
+                        color="secondary",
+                        outline=True,
+                        size="sm",
+                        external_link=False,
+                    ),
                     dbc.Button(
                         [html.I(className="bi bi-person-plus me-1"), "Funcionários"],
                         id="btn-open-employee-list",
@@ -195,61 +277,111 @@ def layout():
                         size="sm",
                     ),
                     dbc.Button(
-                        [html.I(className="bi bi-plus-lg me-1"), "Nova Categoria"],
-                        id="btn-new-category",
+                        [html.I(className="bi bi-folder-plus me-1"), "Novo Projeto"],
+                        id="btn-new-project",
                         color="primary",
                         size="sm",
                     ),
                 ])
-            ], width=4, className="text-end"),
+            ], width=4, className="text-end d-flex align-items-center justify-content-end"),
         ], className="mb-3"),
 
-        # Controles
-        dbc.Row([
-            dbc.Col([
-                dbc.InputGroup([
-                    dbc.InputGroupText("Escala"),
-                    dcc.Dropdown(
-                        id="dropdown-gantt-granularity",
-                        options=[
-                            {"label": "Horas",   "value": "horas"},
-                            {"label": "Dias",    "value": "dias"},
-                            {"label": "Semanas", "value": "semanas"},
-                            {"label": "Meses",   "value": "meses"},
-                        ],
-                        value="dias",
-                        clearable=False,
-                        style={"minWidth": "120px"},
-                    ),
-                ], size="sm"),
-            ], width="auto"),
-            dbc.Col([
-                dbc.ButtonGroup([
-                    dbc.Button("Expandir tudo",  id="btn-expand-all",   color="secondary",
-                               outline=True, size="sm"),
-                    dbc.Button("Recolher tudo",  id="btn-collapse-all", color="secondary",
-                               outline=True, size="sm"),
-                ]),
-            ], width="auto"),
-            dbc.Col([
-                dbc.Button(
-                    [html.I(className="bi bi-plus me-1"), "Nova Atividade"],
-                    id="btn-new-activity",
-                    color="success",
-                    outline=True,
-                    size="sm",
-                ),
-            ], width="auto"),
-        ], className="mb-3 g-2 align-items-center"),
+        # Toolbar — controles com rótulos
+        dbc.Card(
+            dbc.CardBody(
+                dbc.Row([
+                    dbc.Col([
+                        html.Small("Escala do eixo", className="text-muted fw-semibold d-block mb-1"),
+                        dcc.Dropdown(
+                            id="dropdown-gantt-granularity",
+                            options=[
+                                {"label": "Horas",   "value": "horas"},
+                                {"label": "Dias",    "value": "dias"},
+                                {"label": "Semanas", "value": "semanas"},
+                                {"label": "Meses",   "value": "meses"},
+                            ],
+                            value="dias",
+                            clearable=False,
+                            style={"minWidth": "140px"},
+                        ),
+                    ], width="auto"),
+                    dbc.Col([
+                        html.Small("Visualização da hierarquia",
+                                   className="text-muted fw-semibold d-block mb-1"),
+                        dbc.ButtonGroup([
+                            dbc.Button([html.I(className="bi bi-arrows-expand me-1"), "Expandir tudo"],
+                                       id="btn-expand-all", color="secondary", outline=True, size="sm"),
+                            dbc.Button([html.I(className="bi bi-arrows-collapse me-1"), "Recolher tudo"],
+                                       id="btn-collapse-all", color="secondary", outline=True, size="sm"),
+                        ]),
+                    ], width="auto"),
+                    dbc.Col([
+                        html.Small("Navegação de horas",
+                                   className="text-muted fw-semibold d-block mb-1"),
+                        html.Div([
+                            dbc.ButtonGroup([
+                                dbc.Button("◀",    id="btn-hour-prev",  color="secondary", outline=True, size="sm"),
+                                dbc.Button("Hoje", id="btn-hour-today", color="info",      outline=True, size="sm"),
+                                dbc.Button("▶",    id="btn-hour-next",  color="secondary", outline=True, size="sm"),
+                            ], className="me-2"),
+                            dcc.Dropdown(
+                                id="dropdown-hour-step",
+                                options=[
+                                    {"label": "± 4h",  "value": 4},
+                                    {"label": "± 6h",  "value": 6},
+                                    {"label": "± 12h", "value": 12},
+                                    {"label": "± 24h", "value": 24},
+                                ],
+                                value=6,
+                                clearable=False,
+                                style={"minWidth": "90px"},
+                            ),
+                        ], id="div-hour-nav",
+                           style={"display": "none", "alignItems": "center", "gap": "0"}),
+                    ], width="auto"),
+                    dbc.Col([
+                        html.Small("Buscar",
+                                   className="text-muted fw-semibold d-block mb-1"),
+                        dbc.InputGroup([
+                            dbc.InputGroupText(html.I(className="bi bi-search")),
+                            dbc.Input(
+                                id="input-gantt-filter",
+                                type="search",
+                                placeholder="Projeto, categoria ou atividade...",
+                                debounce=True,
+                                size="sm",
+                            ),
+                        ], size="sm"),
+                    ], width=True),
+                ], className="g-3 align-items-end"),
+                className="py-2 px-3",
+            ),
+            className="mb-3 shadow",
+            style={"border": "1px solid var(--bs-border-color)"},
+        ),
 
-        # Área do Gantt
-        html.Div(id="gantt-chart-container", style={"minHeight": "200px"}),
+        # Card dos projetos
+        dbc.Card([
+            dbc.CardHeader(
+                html.H5([
+                    html.I(className="bi bi-kanban-fill me-2"),
+                    "Projetos & Manutenções",
+                ], className="mb-0 text-white fw-semibold"),
+                style={"backgroundColor": "#66A593", "borderBottom": "none"},
+            ),
+            dbc.CardBody(
+                html.Div(id="gantt-chart-container", style={"minHeight": "200px"}),
+                className="p-2",
+            ),
+        ], className="mb-3 shadow",
+           style={"border": "1px solid var(--bs-border-color)"}),
 
         # Modais
+        _modal_project(),
         _modal_category(),
         _modal_activity(),
         _modal_assignment(),
-        _modal_employee(),
+        _modal_employee_management(),
         _modal_validation_errors(),
         _modal_confirm_delete(),
         _modal_block_info(),
