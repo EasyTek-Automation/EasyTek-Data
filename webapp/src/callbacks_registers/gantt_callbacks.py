@@ -170,6 +170,8 @@ def register_gantt_callbacks(app):
             return True, "Nova Categoria", "", "", "", None
         # edit
         if isinstance(triggered_id, dict) and triggered_id.get("type") == "btn-edit-category":
+            if not any(edit_clicks):
+                raise PreventUpdate
             cat_id = triggered_id["index"]
             cat = gantt_db.get_category_by_id(cat_id)
             if not cat:
@@ -343,6 +345,8 @@ def register_gantt_callbacks(app):
         if triggered_id == "btn-new-activity":
             return True, "Nova Atividade", "", cat_options, None, "", "", 0, hidden, None
         if isinstance(triggered_id, dict) and triggered_id.get("type") == "btn-edit-activity":
+            if not any(edit_clicks):
+                raise PreventUpdate
             act_id = triggered_id["index"]
             act = gantt_db.get_activity_by_id(act_id)
             if not act:
@@ -472,6 +476,8 @@ def register_gantt_callbacks(app):
             act_id = triggered_id["index"]
             return True, "Nova Atribuição", emp_options, None, "", "", None, act_id
         if isinstance(triggered_id, dict) and triggered_id.get("type") == "btn-edit-assignment":
+            if not any(edit_clicks):
+                raise PreventUpdate
             asg_id = triggered_id["index"]
             asg = gantt_db.get_assignment_by_id(asg_id)
             if not asg:
