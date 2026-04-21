@@ -34,6 +34,8 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 6. Copiar o código da aplicação
+# ARG CACHEBUST força invalidação desta camada sem afetar apt/pip acima
+ARG CACHEBUST=1
 COPY . .
 
 # 7. Expor a porta

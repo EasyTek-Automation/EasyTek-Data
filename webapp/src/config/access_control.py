@@ -132,6 +132,18 @@ ROUTE_ACCESS = {
         "min_level": 1,
         "description": "Procedimentos de Manutenção"
     },
+    "/maintenance/gantt": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 1,
+        "description": "Planejamento Gantt"
+    },
+    "/maintenance/gantt/audit-log": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 2,
+        "description": "Log de Auditoria — Gantt"
+    },
     "/maintenance/zpp-processor": {
         "shared": False,
         "perfis": ["manutencao"],

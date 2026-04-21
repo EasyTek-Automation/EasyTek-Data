@@ -127,6 +127,10 @@ def create_header(pathname, user):
                     href="/maintenance/zpp-processor",
                     active=(pathname == "/maintenance/zpp-processor")
                 ),
+                dbc.DropdownMenuItem(
+                    html.Div([html.Span(calendar_icon(), style={"marginRight": "8px"}), "Planejamento Gantt"], className="d-flex align-items-center"),
+                    href="/maintenance/gantt", active=(pathname == "/maintenance/gantt"),
+                ),
                 dbc.DropdownMenuItem(divider=True),
                 dbc.DropdownMenuItem(
                     html.Div([html.Span(history_icon(), style={"marginRight": "8px"}), "Histórico de Intervenções"], className="d-flex align-items-center"),

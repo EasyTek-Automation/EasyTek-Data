@@ -107,3 +107,5 @@ NUL
 .claude
 
 REFATORACAO_ARQUIVOS.md
+# Configuração local do Claude Code (específica por máquina)
+settings.local.json
