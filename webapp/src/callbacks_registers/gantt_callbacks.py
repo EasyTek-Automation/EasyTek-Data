@@ -151,6 +151,81 @@ def register_gantt_callbacks(app):
         )
 
     # ------------------------------------------------------------------
+    # CB-01c — Cards de KPI (resumo rápido do estado atual)
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("row-gantt-kpis", "children"),
+        Input("store-gantt-refresh", "data"),
+        Input("store-gantt-filter", "data"),
+        prevent_initial_call=False,
+    )
+    def render_kpi_cards(refresh, filter_query):
+        from src.components.gantt_chart import _activity_status_color, STATUS_COLOR_ATRASADA, STATUS_COLOR_ADIANTADA
+
+        projects = gantt_db.get_all_projects()  # só ativos (não arquivados)
+        active_proj_ids = {str(p["_id"]) for p in projects}
+        categories = [c for c in gantt_db.get_all_categories()
+                      if str(c.get("projeto_id", "")) in active_proj_ids]
+        active_cat_ids = {str(c["_id"]) for c in categories}
+        activities = [a for a in gantt_db.get_all_activities()
+                      if str(a.get("categoria_id", "")) in active_cat_ids]
+
+        # Aplica filtro se houver
+        q = (filter_query or "").strip().lower()
+        if q:
+            matched_proj = {str(p["_id"]) for p in projects if q in p.get("nome", "").lower()}
+            matched_cat  = {str(c["_id"]) for c in categories if q in c.get("nome", "").lower()}
+            matched_act  = {str(a["_id"]) for a in activities if q in a.get("titulo", "").lower()}
+            for c in categories:
+                if str(c.get("projeto_id", "")) in matched_proj:
+                    matched_cat.add(str(c["_id"]))
+            for a in activities:
+                if (str(a["_id"]) in matched_act
+                        or str(a.get("categoria_id", "")) in matched_cat):
+                    matched_act.add(str(a["_id"]))
+            activities = [a for a in activities if str(a["_id"]) in matched_act]
+
+        # Contadores por status
+        n_atrasadas = n_no_prazo = n_adiantadas = 0
+        for a in activities:
+            c = _activity_status_color(a)
+            if c == STATUS_COLOR_ATRASADA:
+                n_atrasadas += 1
+            elif c == STATUS_COLOR_ADIANTADA:
+                n_adiantadas += 1
+            else:
+                n_no_prazo += 1
+
+        def _card(titulo, valor, icone, cor):
+            return dbc.Col(dbc.Card([
+                dbc.CardBody([
+                    html.Div([
+                        html.I(className=f"bi {icone}",
+                               style={"fontSize": "1.8rem", "color": cor, "opacity": "0.85"}),
+                        html.Div([
+                            html.Div(titulo, className="text-muted small",
+                                     style={"fontSize": "0.72rem", "textTransform": "uppercase",
+                                            "letterSpacing": "0.5px", "fontWeight": "600"}),
+                            html.Div(str(valor), style={
+                                "fontSize": "1.7rem", "fontWeight": "700", "color": cor,
+                                "lineHeight": "1.1",
+                            }),
+                        ], style={"flex": "1", "marginLeft": "12px"}),
+                    ], style={"display": "flex", "alignItems": "center"}),
+                ], className="py-3 px-3"),
+            ], className="shadow-sm",
+               style={"border": "1px solid var(--bs-border-color)",
+                      "borderLeft": f"4px solid {cor}"}),
+                md=3, sm=6)
+
+        return [
+            _card("Projetos ativos", len(projects),     "bi-folder-fill",       "#66A593"),
+            _card("Atividades",      len(activities),   "bi-list-check",        "#1E88E5"),
+            _card("Atrasadas",       n_atrasadas,       "bi-exclamation-triangle-fill", "#E53935"),
+            _card("Adiantadas",      n_adiantadas,      "bi-check-circle-fill", "#43A047"),
+        ]
+
+    # ------------------------------------------------------------------
     # CB-01b — Sincronizar input de busca → store
     # ------------------------------------------------------------------
     @app.callback(

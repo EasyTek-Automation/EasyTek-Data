@@ -416,6 +416,9 @@ def layout():
         ], className="mb-3 shadow",
            style={"border": "1px solid var(--bs-border-color)"}),
 
+        # Cards de KPI — resumo rápido do estado atual
+        dbc.Row(id="row-gantt-kpis", className="mb-3 g-3"),
+
         # Card dos projetos
         dbc.Card([
             dbc.CardHeader(
