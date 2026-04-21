@@ -474,7 +474,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 "position": "absolute", "left": f"{p_left:.4f}%", "top": "15%",
                 "height": "70%", "width": f"{p_width:.4f}%", "minWidth": "4px",
                 "backgroundColor": tipo_color, "opacity": "0.9",
-                "borderRadius": "3px", "border": f"1px solid {tipo_color}",
+                "borderRadius": "999px", "border": f"1px solid {tipo_color}",
             }))
         except Exception:
             pass
@@ -571,7 +571,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         "position": "absolute", "left": f"{left_pct:.4f}%", "top": "20%",
                         "height": "60%", "width": f"{width_pct:.4f}%", "minWidth": "4px",
                         "backgroundColor": "#7E57C2", "opacity": "0.75",
-                        "borderRadius": "3px",
+                        "borderRadius": "999px",
                     }),
                 ] + now_line, style={"position": "relative", "flex": "1", "height": "28px"}),
             ], style={

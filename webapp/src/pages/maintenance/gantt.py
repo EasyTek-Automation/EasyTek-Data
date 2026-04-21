@@ -310,7 +310,14 @@ def layout():
         ], className="mb-3"),
 
         # Toolbar — controles com rótulos
-        dbc.Card(
+        dbc.Card([
+            dbc.CardHeader(
+                html.H5([
+                    html.I(className="bi bi-sliders me-2"),
+                    "Filtros & Visualização",
+                ], className="mb-0 text-white fw-semibold"),
+                style={"backgroundColor": "#66A593", "borderBottom": "none"},
+            ),
             dbc.CardBody(
                 dbc.Row([
                     dbc.Col([
@@ -379,9 +386,8 @@ def layout():
                 ], className="g-3 align-items-end"),
                 className="py-2 px-3",
             ),
-            className="mb-3 shadow",
-            style={"border": "1px solid var(--bs-border-color)"},
-        ),
+        ], className="mb-3 shadow",
+           style={"border": "1px solid var(--bs-border-color)"}),
 
         # Card dos projetos
         dbc.Card([
