@@ -328,6 +328,13 @@ def layout():
                         size="sm",
                     ),
                     dbc.Button(
+                        [html.I(className="bi bi-file-earmark-pdf me-1"), "Exportar PDF"],
+                        id="btn-export-gantt",
+                        color="secondary",
+                        outline=True,
+                        size="sm",
+                    ),
+                    dbc.Button(
                         [html.I(className="bi bi-folder-plus me-1"), "Novo Projeto"],
                         id="btn-new-project",
                         color="primary",

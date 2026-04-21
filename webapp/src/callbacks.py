@@ -43,6 +43,7 @@ from src.callbacks_registers.workflow_create_callbacks import register_create_ca
 from src.callbacks_registers.workflow_edit_callbacks import register_edit_callbacks
 from src.callbacks_registers.workflow_subtask_callbacks import register_subtask_callbacks
 from src.callbacks_registers.workflow_export import register_workflow_export_routes
+from src.callbacks_registers.gantt_export    import register_gantt_export_routes
 
 from src.pages.energy import callbacks as energy_callbacks
 from src.callbacks_registers.se03_telemetry_callbacks import register_se03_telemetry_callbacks
@@ -128,6 +129,7 @@ def register_callbacks(app):
     register_edit_callbacks(app)      # Workflow CRUD - Edição
     register_subtask_callbacks(app)   # Workflow CRUD - Subtarefas e Logs
     register_workflow_export_routes(app.server)  # Rota Flask PDF export
+    register_gantt_export_routes(app.server)     # Rota Flask PDF export do Gantt
 
     # Gantt Management callbacks
     from src.callbacks_registers.gantt_callbacks import register_gantt_callbacks
