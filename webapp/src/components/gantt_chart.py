@@ -342,10 +342,10 @@ def _build_activity_bar(activity, t_start, t_end, color=None):
 
 
 def _build_assignment_bar(assignment, t_start, t_end, activity=None):
-    """Barra de atribuição com faixa de referência da atividade pai.
-
-    Exibe uma faixa translúcida no span da atividade e a barra amarela
-    sobreposta indicando onde a atribuição se encaixa nesse período.
+    """
+    Barra opaca e bem visível da atribuição do funcionário.
+    (Removida a faixa translúcida de referência da atividade pai — estava
+     gerando confusão visual com a barra real da atribuição.)
     """
     try:
         s = _parse_dt(assignment["data_hora_entrada"])
@@ -356,31 +356,13 @@ def _build_assignment_bar(assignment, t_start, t_end, activity=None):
     asg_left  = _to_pct(s, t_start, t_end)
     asg_width = _to_pct(e, t_start, t_end) - asg_left
 
-    children = []
-
-    if activity:
-        try:
-            act_s = _parse_dt(activity["data_hora_inicio"])
-            act_e = _parse_dt(activity["data_hora_fim"])
-            tr_left  = _to_pct(act_s, t_start, t_end)
-            tr_width = _to_pct(act_e, t_start, t_end) - tr_left
-            children.append(html.Div(style={
-                "position": "absolute", "left": f"{tr_left:.4f}%", "top": "25%",
-                "height": "50%", "width": f"{tr_width:.4f}%",
-                "backgroundColor": "var(--bs-info)", "opacity": "0.18",
-                "borderRadius": "2px",
-            }))
-        except Exception:
-            pass
-
-    children.append(html.Div(style={
+    bar = html.Div(style={
         "position": "absolute", "left": f"{asg_left:.4f}%", "top": "20%",
-        "height": "60%", "width": f"{asg_width:.4f}%", "minWidth": "4px",
-        "backgroundColor": "var(--bs-warning)", "opacity": "0.85",
-        "borderRadius": "2px",
-    }))
-
-    return html.Div(children, style={"position": "relative", "height": "100%"})
+        "height": "60%", "width": f"{asg_width:.4f}%", "minWidth": "12px",
+        "backgroundColor": "#FBC02D", "opacity": "0.95",
+        "borderRadius": "999px",
+    })
+    return html.Div([bar], style={"position": "relative", "height": "100%"})
 
 
 # ---------------------------------------------------------------------------
