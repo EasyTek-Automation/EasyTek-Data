@@ -216,6 +216,63 @@ def _activity_status_color(activity):
     return STATUS_COLOR_NO_PRAZO
 
 
+# Paleta determinística para fallback de avatar (iniciais coloridas)
+AVATAR_FALLBACK_PALETTE = [
+    "#EF5350", "#AB47BC", "#5C6BC0", "#29B6F6", "#26A69A",
+    "#66BB6A", "#FFA726", "#FF7043", "#8D6E63", "#78909C",
+]
+
+
+def _initials_from_nome(nome):
+    """Extrai até 2 iniciais do nome para o avatar fallback."""
+    parts = [p for p in (nome or "").strip().split() if p]
+    if not parts:
+        return "?"
+    if len(parts) == 1:
+        return parts[0][:2].upper()
+    return (parts[0][0] + parts[-1][0]).upper()
+
+
+def _avatar_color_for(nome):
+    """Cor determinística pelo hash do nome — mesmo nome sempre mesma cor."""
+    if not nome:
+        return AVATAR_FALLBACK_PALETTE[0]
+    idx = sum(ord(c) for c in nome) % len(AVATAR_FALLBACK_PALETTE)
+    return AVATAR_FALLBACK_PALETTE[idx]
+
+
+def _build_avatar(employee, size=20):
+    """
+    Avatar circular do funcionário. Usa foto servida via rota Flask se existir;
+    caso contrário, iniciais coloridas com hash determinístico do nome.
+    """
+    if not employee:
+        return html.Div(style={"width": f"{size}px", "height": f"{size}px"})
+    emp_id = str(employee.get("_id", ""))
+    nome   = employee.get("nome", "")
+    has_photo = bool(employee.get("foto_bytes")) or employee.get("_has_photo")
+    common = {
+        "width": f"{size}px", "height": f"{size}px",
+        "borderRadius": "50%",
+        "border": "2px solid #ffffff",
+        "boxShadow": "0 0 0 1px rgba(0,0,0,0.15)",
+        "flexShrink": "0",
+    }
+    if has_photo and emp_id:
+        style = {**common,
+                 "backgroundImage": f"url(/api/gantt/employee-photo/{emp_id})",
+                 "backgroundSize": "cover", "backgroundPosition": "center"}
+        return html.Div(title=nome, style=style)
+    style = {**common,
+             "backgroundColor": _avatar_color_for(nome),
+             "color": "#ffffff",
+             "display": "flex", "alignItems": "center", "justifyContent": "center",
+             "fontSize": f"{max(8, int(size*0.45))}px",
+             "fontWeight": "700",
+             "fontFamily": "system-ui, -apple-system, sans-serif"}
+    return html.Div(_initials_from_nome(nome), title=nome, style=style)
+
+
 def _build_now_line(t_start, t_end):
     """Linha vertical vermelha do 'agora' (Brasília UTC-3) que cruza a altura toda da linha."""
     now = datetime.utcnow() - timedelta(hours=3)
@@ -344,7 +401,8 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
     """
     if expanded_state is None:
         expanded_state = {}
-    emp_map = {str(e["_id"]): e["nome"] for e in (employees or [])}
+    emp_map      = {str(e["_id"]): e["nome"] for e in (employees or [])}
+    emp_full_map = {str(e["_id"]): e          for e in (employees or [])}
 
     if not projects and not categories:
         return html.Div("Nenhum projeto cadastrado.", className="text-muted p-3")
@@ -640,12 +698,35 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                     except Exception:
                         time_range = ""
                     asg_bar = _build_assignment_bar(asg, t_start, t_end, activity=act)
+                    emp_doc = emp_full_map.get(str(asg.get("funcionario_id", "")))
+
+                    # Avatar posicionado no início da barra (sobrepondo levemente)
+                    bar_avatar_children = []
+                    try:
+                        asg_s = _parse_dt(asg["data_hora_entrada"])
+                        asg_left_pct = _to_pct(asg_s, t_start, t_end)
+                        bar_avatar_children.append(html.Div(
+                            _build_avatar(emp_doc, size=20),
+                            style={
+                                "position": "absolute", "left": f"{asg_left_pct:.4f}%",
+                                "top": "50%",
+                                "transform": "translate(-6px, -50%)",
+                                "zIndex": "3",
+                            },
+                        ))
+                    except Exception:
+                        pass
+
                     asg_rows.append(html.Div([
                         html.Div([
-                            html.Span(f"↳ {emp_nome}", style={
+                            html.Span("↳", style={"color": "var(--bs-secondary)",
+                                                 "paddingLeft": "36px", "paddingRight": "4px",
+                                                 "fontSize": "0.72rem", "flexShrink": "0"}),
+                            _build_avatar(emp_doc, size=16),
+                            html.Span(emp_nome, style={
                                 "flex": "1", "overflow": "hidden", "textOverflow": "ellipsis",
                                 "whiteSpace": "nowrap", "fontSize": "0.72rem",
-                                "paddingLeft": "36px", "color": "var(--bs-secondary)", "minWidth": "0",
+                                "paddingLeft": "6px", "color": "var(--bs-secondary)", "minWidth": "0",
                             }),
                             html.Span(time_range, style={
                                 "fontSize": "0.68rem", "color": "var(--bs-secondary)",
@@ -661,7 +742,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                             "backgroundColor": "var(--bs-light-bg-subtle, #f8f9fa)",
                         }),
                         html.Div(
-                            day_stripes + ([asg_bar] if asg_bar else []) + now_line,
+                            day_stripes + ([asg_bar] if asg_bar else []) + bar_avatar_children + now_line,
                             style={"position": "relative", "flex": "1", "height": "28px"},
                         ),
                     ], style={

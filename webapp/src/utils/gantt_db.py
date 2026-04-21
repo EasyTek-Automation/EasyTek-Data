@@ -481,11 +481,20 @@ def get_active_employees():
 
 
 def get_all_employees():
-    """Retorna todos os funcionários (ativos e inativos) ordenados por nome."""
+    """
+    Retorna todos os funcionários (ativos e inativos) ordenados por nome.
+    Exclui 'foto_bytes' da projeção e adiciona flag '_has_photo' derivado
+    da presença de 'foto_mime' — avatar é servido via rota dedicada, então
+    não faz sentido carregar os bytes aqui (payload pesado).
+    """
     col = _col("gantt_employees")
     if col is None:
         return []
-    return [_serialize(d) for d in col.find().sort("nome", 1)]
+    docs = []
+    for d in col.find({}, {"foto_bytes": 0}).sort("nome", 1):
+        d["_has_photo"] = bool(d.get("foto_mime"))
+        docs.append(_serialize(d))
+    return docs
 
 
 def get_employee_by_id(employee_id):
@@ -549,6 +558,47 @@ def has_assignments(employee_id):
     if col is None:
         return False
     return col.count_documents({"funcionario_id": ObjectId(employee_id)}) > 0
+
+
+def set_employee_photo(employee_id, photo_bytes, mime_type):
+    """
+    Persiste foto do funcionário como bytes binários + tipo MIME.
+    Servida via rota /api/gantt/employee-photo/<id> para permitir cache de browser.
+    """
+    col = _col("gantt_employees")
+    if col is None:
+        return False
+    result = col.update_one(
+        {"_id": ObjectId(employee_id)},
+        {"$set": {"foto_bytes": photo_bytes, "foto_mime": mime_type,
+                  "atualizado_em": _now()}},
+    )
+    return result.modified_count > 0
+
+
+def clear_employee_photo(employee_id):
+    """Remove foto do funcionário, voltando ao fallback de iniciais coloridas."""
+    col = _col("gantt_employees")
+    if col is None:
+        return False
+    result = col.update_one(
+        {"_id": ObjectId(employee_id)},
+        {"$unset": {"foto_bytes": "", "foto_mime": ""},
+         "$set":   {"atualizado_em": _now()}},
+    )
+    return result.modified_count > 0
+
+
+def has_employee_photo(employee_id):
+    """Retorna True se o funcionário tem foto salva."""
+    col = _col("gantt_employees")
+    if col is None:
+        return False
+    doc = col.find_one(
+        {"_id": ObjectId(employee_id), "foto_bytes": {"$exists": True}},
+        {"_id": 1},
+    )
+    return doc is not None
 
 
 # ---------------------------------------------------------------------------

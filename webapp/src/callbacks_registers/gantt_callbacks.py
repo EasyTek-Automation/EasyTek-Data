@@ -5,7 +5,8 @@ from datetime import datetime, timedelta
 from dash import html, Input, Output, State, ALL, ctx, no_update
 from dash.exceptions import PreventUpdate
 import dash_bootstrap_components as dbc
-from flask_login import current_user
+from flask import Response, abort
+from flask_login import current_user, login_required
 
 from src.utils import gantt_db
 from src.utils.gantt_validation import (
@@ -77,6 +78,32 @@ def register_gantt_callbacks(app):
 
     # Migração idempotente: garante que todas as categorias têm projeto_id
     gantt_db.migrate_to_default_project()
+
+    # ------------------------------------------------------------------
+    # Rota Flask — servir foto do funcionário com cache de browser.
+    # Os bytes ficam no documento mas são entregues via endpoint dedicado
+    # para não inflar os payloads de render do Dash.
+    # ------------------------------------------------------------------
+    @app.server.route("/api/gantt/employee-photo/<emp_id>")
+    @login_required
+    def gantt_employee_photo(emp_id):
+        col = gantt_db._col("gantt_employees")
+        if col is None:
+            abort(503)
+        try:
+            doc = col.find_one(
+                {"_id": gantt_db.ObjectId(emp_id)},
+                {"foto_bytes": 1, "foto_mime": 1},
+            )
+        except Exception:
+            abort(400)
+        if not doc or "foto_bytes" not in doc:
+            abort(404)
+        return Response(
+            doc["foto_bytes"],
+            mimetype=doc.get("foto_mime", "image/jpeg"),
+            headers={"Cache-Control": "public, max-age=3600"},
+        )
 
     # ------------------------------------------------------------------
     # CB-01 — Renderizar Gantt
@@ -810,6 +837,9 @@ def register_gantt_callbacks(app):
         Output("input-employee-nome", "value"),
         Output("radio-employee-turno", "value"),
         Output("store-employee-editing-id", "data"),
+        Output("div-employee-photo-preview", "children"),
+        Output("btn-clear-employee-photo", "style"),
+        Output("store-employee-photo-staged", "data"),
         Input({"type": "btn-edit-employee", "index": ALL}, "n_clicks"),
         Input("btn-cancel-employee", "n_clicks"),
         prevent_initial_call=True,
@@ -819,7 +849,8 @@ def register_gantt_callbacks(app):
         if triggered_id is None:
             raise PreventUpdate
         if triggered_id == "btn-cancel-employee":
-            return "tab-emp-list", no_update, no_update, no_update, no_update
+            return ("tab-emp-list", no_update, no_update, no_update, no_update,
+                    no_update, no_update, no_update)
         if isinstance(triggered_id, dict) and triggered_id.get("type") == "btn-edit-employee":
             if not any(edit_clicks):
                 raise PreventUpdate
@@ -827,7 +858,19 @@ def register_gantt_callbacks(app):
             emp = gantt_db.get_employee_by_id(emp_id)
             if not emp:
                 raise PreventUpdate
-            return "tab-emp-form", "Editar Funcionário", emp["nome"], emp.get("turno_padrao", "B"), emp_id
+            if gantt_db.has_employee_photo(emp_id):
+                preview = html.Img(
+                    src=f"/api/gantt/employee-photo/{emp_id}?t={int(datetime.utcnow().timestamp())}",
+                    style={"width": "64px", "height": "64px", "borderRadius": "50%",
+                           "objectFit": "cover", "border": "2px solid var(--bs-border-color)"},
+                )
+                btn_style = {"display": "inline-block"}
+            else:
+                preview = ""
+                btn_style = {"display": "none"}
+            return ("tab-emp-form", "Editar Funcionário", emp["nome"],
+                    emp.get("turno_padrao", "B"), emp_id,
+                    preview, btn_style, None)
         raise PreventUpdate
 
     # ------------------------------------------------------------------
@@ -866,36 +909,104 @@ def register_gantt_callbacks(app):
         Output("input-employee-nome", "value", allow_duplicate=True),
         Output("radio-employee-turno", "value", allow_duplicate=True),
         Output("store-employee-editing-id", "data", allow_duplicate=True),
+        Output("store-employee-photo-staged", "data", allow_duplicate=True),
         Input("btn-save-employee", "n_clicks"),
         State("input-employee-nome", "value"),
         State("radio-employee-turno", "value"),
         State("store-employee-editing-id", "data"),
         State("store-gantt-refresh", "data"),
+        State("store-employee-photo-staged", "data"),
         prevent_initial_call=True,
     )
-    def save_employee(n_clicks, nome, turno, editing_id, refresh):
+    def save_employee(n_clicks, nome, turno, editing_id, refresh, photo_staged):
         if not n_clicks:
             raise PreventUpdate
         if current_user.level < 2:
             raise PreventUpdate
         if not nome or not turno:
             items = [html.Li("Nome e turno são obrigatórios.")]
-            return no_update, no_update, True, items, no_update, no_update, no_update
+            return no_update, no_update, True, items, no_update, no_update, no_update, no_update
         if turno not in ("A", "B", "C"):
             items = [html.Li("Turno inválido.")]
-            return no_update, no_update, True, items, no_update, no_update, no_update
+            return no_update, no_update, True, items, no_update, no_update, no_update, no_update
         data = {"nome": nome.strip(), "turno_padrao": turno}
         if editing_id:
             old = gantt_db.get_employee_by_id(editing_id)
             gantt_db.update_employee(editing_id, data)
+            target_id = editing_id
             if old:
                 for field in ("nome", "turno_padrao"):
                     if old.get(field) != data[field]:
                         _log("edicao", "funcionario", editing_id, nome, field, old.get(field), data[field])
         else:
-            new_id = gantt_db.create_employee(data)
-            _log("criacao", "funcionario", new_id, nome)
-        return "tab-emp-list", (refresh or 0) + 1, False, [], "", "B", None
+            target_id = gantt_db.create_employee(data)
+            _log("criacao", "funcionario", target_id, nome)
+
+        # Aplica mudanças pendentes de foto staged no store
+        if photo_staged == "__clear__":
+            gantt_db.clear_employee_photo(target_id)
+            _log("edicao", "funcionario", target_id, nome, "foto", "presente", "removida")
+        elif isinstance(photo_staged, dict) and photo_staged.get("bytes_b64"):
+            import base64
+            photo_bytes = base64.b64decode(photo_staged["bytes_b64"])
+            gantt_db.set_employee_photo(target_id, photo_bytes, photo_staged.get("mime", "image/jpeg"))
+            _log("edicao", "funcionario", target_id, nome, "foto", "anterior", "atualizada")
+
+        return "tab-emp-list", (refresh or 0) + 1, False, [], "", "B", None, None
+
+    # ------------------------------------------------------------------
+    # CB-16b — Upload de foto: processa arquivo, faz resize e salva no store
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("store-employee-photo-staged", "data", allow_duplicate=True),
+        Output("div-employee-photo-preview", "children", allow_duplicate=True),
+        Output("btn-clear-employee-photo", "style", allow_duplicate=True),
+        Input("upload-employee-photo", "contents"),
+        State("upload-employee-photo", "filename"),
+        prevent_initial_call=True,
+    )
+    def stage_employee_photo(contents, filename):
+        if not contents:
+            raise PreventUpdate
+        try:
+            import base64, io
+            from PIL import Image
+            header, b64data = contents.split(",", 1)
+            mime = header.split(":")[1].split(";")[0] if ":" in header else "image/jpeg"
+            if mime not in ("image/jpeg", "image/png"):
+                raise ValueError("Formato inválido")
+            raw = base64.b64decode(b64data)
+            img = Image.open(io.BytesIO(raw)).convert("RGB")
+            img.thumbnail((128, 128))
+            buf = io.BytesIO()
+            img.save(buf, format="JPEG", quality=85)
+            out_bytes = buf.getvalue()
+            out_b64 = base64.b64encode(out_bytes).decode("ascii")
+            preview = html.Img(
+                src=f"data:image/jpeg;base64,{out_b64}",
+                style={"width": "64px", "height": "64px", "borderRadius": "50%",
+                       "objectFit": "cover", "border": "2px solid var(--bs-border-color)"},
+            )
+            btn_visible = {"display": "inline-block"}
+            return {"bytes_b64": out_b64, "mime": "image/jpeg"}, preview, btn_visible
+        except Exception as e:
+            msg = html.Small(f"Erro ao processar imagem: {e}", className="text-danger")
+            return no_update, msg, no_update
+
+    # ------------------------------------------------------------------
+    # CB-16c — Botão "Remover foto" no formulário: marca staged como __clear__
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("store-employee-photo-staged", "data", allow_duplicate=True),
+        Output("div-employee-photo-preview", "children", allow_duplicate=True),
+        Output("btn-clear-employee-photo", "style", allow_duplicate=True),
+        Input("btn-clear-employee-photo", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def clear_staged_photo(n_clicks):
+        if not n_clicks:
+            raise PreventUpdate
+        return "__clear__", "", {"display": "none"}
 
     # ------------------------------------------------------------------
     # CB-17 — Fechar modais de erros de validação e bloqueio
