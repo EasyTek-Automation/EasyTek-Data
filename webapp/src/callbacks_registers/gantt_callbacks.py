@@ -118,10 +118,12 @@ def register_gantt_callbacks(app):
         Input("store-gantt-hour-offset", "data"),
         Input("store-gantt-filter", "data"),
         Input("store-gantt-view-mode", "data"),
+        Input("store-gantt-employees-state", "data"),
         prevent_initial_call=False,
     )
     def render_gantt(refresh, granularity, projects_state, categories_state,
-                     activities_state, hour_offset, filter_query, view_mode):
+                     activities_state, hour_offset, filter_query, view_mode,
+                     employees_state):
         projects   = gantt_db.get_all_projects()  # exclui arquivados
         employees  = gantt_db.get_all_employees()
 
@@ -146,6 +148,7 @@ def register_gantt_callbacks(app):
                 granularity=granularity or "dias",
                 hour_offset=hour_offset or 0,
                 filter_query=filter_query or "",
+                employees_state=employees_state or {},
             )
         return build_gantt_chart(
             categories, activities, all_assignments,
@@ -186,6 +189,26 @@ def register_gantt_callbacks(app):
             "primary" if is_proj else "secondary", not is_proj,
             "primary" if not is_proj else "secondary", is_proj,
         )
+
+    # ------------------------------------------------------------------
+    # CB-01e — Toggle expand/collapse de funcionário na view de Recursos
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("store-gantt-employees-state", "data"),
+        Input({"type": "btn-toggle-employee-row", "index": ALL}, "n_clicks"),
+        State("store-gantt-employees-state", "data"),
+        prevent_initial_call=True,
+    )
+    def toggle_employee_row(n_clicks_list, current_state):
+        if not any(n_clicks_list):
+            raise PreventUpdate
+        triggered = ctx.triggered_id
+        if triggered is None:
+            raise PreventUpdate
+        emp_id = triggered["index"]
+        state = dict(current_state or {})
+        state[emp_id] = not state.get(emp_id, False)
+        return state
 
     # ------------------------------------------------------------------
     # CB-01c — Cards de KPI (resumo rápido do estado atual)
@@ -331,6 +354,7 @@ def register_gantt_callbacks(app):
         Output("store-gantt-projects-state",   "data", allow_duplicate=True),
         Output("store-gantt-categories-state", "data", allow_duplicate=True),
         Output("store-gantt-activities-state", "data", allow_duplicate=True),
+        Output("store-gantt-employees-state",  "data", allow_duplicate=True),
         Input("btn-expand-all",  "n_clicks"),
         Input("btn-collapse-all", "n_clicks"),
         prevent_initial_call=True,
@@ -343,10 +367,12 @@ def register_gantt_callbacks(app):
         projects   = gantt_db.get_all_projects()
         categories = gantt_db.get_all_categories()
         activities = gantt_db.get_all_activities()
+        employees  = gantt_db.get_all_employees()
         return (
             {p["_id"]: value for p in projects},
             {c["_id"]: value for c in categories},
             {a["_id"]: value for a in activities},
+            {e["_id"]: value for e in employees},
         )
 
     # ------------------------------------------------------------------
@@ -1407,9 +1433,9 @@ def register_gantt_callbacks(app):
         prevent_initial_call=False,
     )
     def toggle_hour_nav(granularity):
-        if granularity == "horas":
-            return {"display": "flex", "alignItems": "center", "gap": "0"}
-        return {"display": "none"}
+        # Navegação de tempo sempre visível — funciona em todas as granularidades
+        # (o offset é interpretado em horas, mas empurra a janela em qualquer modo).
+        return {"display": "flex", "alignItems": "center", "gap": "0"}
 
     # ------------------------------------------------------------------
     # CB-20 — Atualizar offset de horas (◀ / ▶ / Hoje)

@@ -291,6 +291,7 @@ def layout():
         dcc.Store(id="store-gantt-hour-offset",      storage_type="memory", data=0),
         dcc.Store(id="store-gantt-filter",           storage_type="memory", data=""),
         dcc.Store(id="store-gantt-view-mode",        storage_type="local",  data="projeto"),
+        dcc.Store(id="store-gantt-employees-state",  storage_type="local",  data={}),
 
         # Header
         dbc.Row([
@@ -391,7 +392,7 @@ def layout():
                         ], id="group-view-mode"),
                     ], width="auto"),
                     dbc.Col([
-                        html.Small("Navegação de horas",
+                        html.Small("Navegação no tempo",
                                    className="text-muted fw-semibold d-block mb-1"),
                         html.Div([
                             dbc.ButtonGroup([
@@ -402,14 +403,15 @@ def layout():
                             dcc.Dropdown(
                                 id="dropdown-hour-step",
                                 options=[
-                                    {"label": "± 4h",  "value": 4},
-                                    {"label": "± 6h",  "value": 6},
-                                    {"label": "± 12h", "value": 12},
-                                    {"label": "± 24h", "value": 24},
+                                    {"label": "± 4h",   "value": 4},
+                                    {"label": "± 12h",  "value": 12},
+                                    {"label": "± 1 dia", "value": 24},
+                                    {"label": "± 1 sem","value": 168},
+                                    {"label": "± 1 mês","value": 720},
                                 ],
-                                value=6,
+                                value=24,
                                 clearable=False,
-                                style={"minWidth": "90px"},
+                                style={"minWidth": "110px"},
                             ),
                         ], id="div-hour-nav",
                            style={"display": "none", "alignItems": "center", "gap": "0"}),

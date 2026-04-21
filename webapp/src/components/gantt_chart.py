@@ -325,23 +325,29 @@ def _build_activity_bar(activity, t_start, t_end, color=None):
     green_w   = width_pct * progress / 100.0
     bar_color = color or _activity_status_color(activity)
 
-    base_bar = html.Div(style={
+    tooltip_text = (
+        f"{activity.get('titulo','—')}\n"
+        f"Início:    {act_start.strftime('%d/%m/%Y %H:%M')}\n"
+        f"Fim:       {act_end.strftime('%d/%m/%Y %H:%M')}\n"
+        f"Progresso: {progress}%"
+    )
+    base_bar = html.Div(title=tooltip_text, style={
         "position": "absolute", "left": f"{left_pct:.4f}%", "top": "15%",
         "height": "70%", "width": f"{width_pct:.4f}%", "minWidth": "4px",
         "backgroundColor": bar_color, "opacity": "0.35",
-        "borderRadius": "999px", "zIndex": "1",
+        "borderRadius": "999px", "zIndex": "1", "cursor": "help",
     })
-    progress_bar = html.Div(style={
+    progress_bar = html.Div(title=tooltip_text, style={
         "position": "absolute", "left": f"{left_pct:.4f}%", "top": "15%",
         "height": "70%", "width": f"{green_w:.4f}%", "minWidth": "0px",
         "backgroundColor": bar_color, "opacity": "0.95",
-        "borderRadius": "999px", "zIndex": "2",
+        "borderRadius": "999px", "zIndex": "2", "cursor": "help",
     })
     children = [base_bar, progress_bar]
     return html.Div(children, style={"position": "relative", "height": "28px", "margin": "2px 0"})
 
 
-def _build_assignment_bar(assignment, t_start, t_end, activity=None):
+def _build_assignment_bar(assignment, t_start, t_end, activity=None, employee_name=""):
     """
     Barra opaca e bem visível da atribuição do funcionário.
     (Removida a faixa translúcida de referência da atividade pai — estava
@@ -355,12 +361,17 @@ def _build_assignment_bar(assignment, t_start, t_end, activity=None):
 
     asg_left  = _to_pct(s, t_start, t_end)
     asg_width = _to_pct(e, t_start, t_end) - asg_left
+    tooltip = (
+        f"{employee_name or 'Funcionário'}\n"
+        f"Entrada: {s.strftime('%d/%m/%Y %H:%M')}\n"
+        f"Saída:   {e.strftime('%d/%m/%Y %H:%M')}"
+    )
 
-    bar = html.Div(style={
-        "position": "absolute", "left": f"{asg_left:.4f}%", "top": "20%",
-        "height": "60%", "width": f"{asg_width:.4f}%", "minWidth": "12px",
+    bar = html.Div(title=tooltip, style={
+        "position": "absolute", "left": f"{asg_left:.4f}%", "top": "40%",
+        "height": "20%", "width": f"{asg_width:.4f}%", "minWidth": "12px",
         "backgroundColor": "#FBC02D", "opacity": "0.95",
-        "borderRadius": "999px",
+        "borderRadius": "999px", "cursor": "help",
     })
     return html.Div([bar], style={"position": "relative", "height": "100%"})
 
@@ -370,7 +381,8 @@ def _build_assignment_bar(assignment, t_start, t_end, activity=None):
 # ---------------------------------------------------------------------------
 
 def build_gantt_resource_view(employees, activities, assignments, categories, projects,
-                              granularity="dias", hour_offset=0, filter_query=""):
+                              granularity="dias", hour_offset=0, filter_query="",
+                              employees_state=None):
     """
     View invertida: agrupa por funcionário em vez de projeto.
     Cada funcionário vira uma 'swimlane' horizontal mostrando todas suas
@@ -387,24 +399,47 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
     act_map = {str(a["_id"]): a for a in (activities or [])}
 
     # Determinar janela temporal (mesma lógica do build_gantt_chart)
+    now_brt = datetime.utcnow() - timedelta(hours=3)
+    offset_td = timedelta(hours=hour_offset or 0)
+
     if granularity == "horas":
-        now_brt = datetime.utcnow() - timedelta(hours=3)
-        center  = now_brt + timedelta(hours=hour_offset or 0)
+        center  = now_brt + offset_td
         t_start = center - timedelta(hours=24)
         t_end   = center + timedelta(hours=24)
     else:
-        all_starts = [_parse_dt(a["data_hora_inicio"]) for a in activities]
-        all_ends   = [_parse_dt(a["data_hora_fim"])    for a in activities]
-        if not all_starts:
-            return html.Div("Nenhuma atividade cadastrada.", className="text-muted p-3")
-        PADDING = {"dias": timedelta(days=1), "semanas": timedelta(weeks=1),
-                   "meses": timedelta(days=30)}
-        pad = PADDING.get(granularity, timedelta(days=1))
-        t_start = min(all_starts) - pad
-        t_end   = max(all_ends)   + pad
+        PAST_WINDOW = {
+            "dias":    timedelta(days=3),
+            "semanas": timedelta(weeks=1),
+            "meses":   timedelta(days=30),
+        }
+        MIN_FUTURE = {
+            "dias":    timedelta(days=14),
+            "semanas": timedelta(weeks=6),
+            "meses":   timedelta(days=150),
+        }
+        past       = PAST_WINDOW.get(granularity, timedelta(days=3))
+        min_future = MIN_FUTURE.get(granularity, timedelta(days=14))
+        all_ends   = [_parse_dt(a["data_hora_fim"]) for a in activities]
+        data_end   = max(all_ends) if all_ends else now_brt
+        t_start    = (now_brt - past) + offset_td
+        t_end      = max(data_end, now_brt + min_future) + offset_td
 
     day_stripes = _build_day_stripes(t_start, t_end)
     now_line    = _build_now_line(t_start, t_end)
+
+    # Contar e filtrar atribuições totalmente fora da janela (saída antes de t_start)
+    hidden_past_count = 0
+    visible_assignments = []
+    for a in assignments:
+        try:
+            a_end = _parse_dt(a["data_hora_saida"])
+            if a_end < t_start:
+                hidden_past_count += 1
+                continue
+        except Exception:
+            pass
+        visible_assignments.append(a)
+    assignments = visible_assignments
 
     # Filtrar funcionários que têm atribuições (ativos)
     asgs_by_emp = {}
@@ -436,6 +471,23 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
 
     def _make_axis_row():
         axis_bg = "#e5e7eb"
+        right_content = _build_day_stripes(t_start, t_end) + build_time_axis(t_start, t_end, granularity) + now_line
+        if hidden_past_count > 0:
+            right_content.append(html.Div(
+                [html.I(className="bi bi-chevron-double-left me-1"),
+                 f"{hidden_past_count} anterior" + ("es" if hidden_past_count > 1 else "")],
+                title=f"{hidden_past_count} atribuição(ões) fora da janela visível",
+                style={
+                    "position": "absolute", "left": "4px", "top": "50%",
+                    "transform": "translateY(-50%)",
+                    "zIndex": "6",
+                    "backgroundColor": "#E96D38", "color": "#ffffff",
+                    "fontSize": "0.66rem", "fontWeight": "600",
+                    "padding": "2px 8px", "borderRadius": "999px",
+                    "whiteSpace": "nowrap", "pointerEvents": "auto",
+                    "boxShadow": "0 1px 3px rgba(0,0,0,0.2)",
+                },
+            ))
         return html.Div([
             html.Div(style={
                 "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
@@ -443,8 +495,8 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
                 "backgroundColor": axis_bg,
             }),
             html.Div(
-                _build_day_stripes(t_start, t_end) + build_time_axis(t_start, t_end, granularity) + now_line,
-                style={"position": "relative", "flex": "1",
+                right_content,
+                style={"position": "relative", "flex": "1", "marginLeft": "36px",
                        "height": f"{_axis_height_for(granularity)}px"},
             ),
         ], style={"display": "flex", "alignItems": "flex-end", "marginBottom": "2px",
@@ -468,30 +520,44 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
             except Exception:
                 pass
 
-        # Painel esquerdo: avatar + nome + turno + total de horas
+        # Painel esquerdo: avatar + nome + turno + total de horas + toggle expand/collapse
         turno = (emp.get("turno_padrao") or "?")
-        left_panel = html.Div([
-            _build_avatar(emp, size=28),
-            html.Div([
-                html.Div(emp["nome"], style={
-                    "fontWeight": "600", "fontSize": "0.85rem",
-                    "whiteSpace": "nowrap", "overflow": "hidden", "textOverflow": "ellipsis",
+        emp_expanded = (employees_state or {}).get(emp_id, False)
+        toggle_icon  = "▼" if emp_expanded else "▶"
+
+        left_panel = html.Div(
+            [
+                html.Span(toggle_icon, style={
+                    "fontSize": "0.7rem", "flexShrink": "0",
+                    "color": "var(--bs-secondary)", "paddingRight": "4px",
+                    "visibility": "visible" if emp_asgs else "hidden",
                 }),
+                _build_avatar(emp, size=28),
                 html.Div([
-                    html.Span(f"Turno {turno}", className="badge bg-secondary me-1",
-                              style={"fontSize": "0.62rem"}),
-                    html.Span(f"{total_hours:.1f}h atribuídas", style={
-                        "fontSize": "0.7rem", "color": "var(--bs-secondary)",
+                    html.Div(emp["nome"], style={
+                        "fontWeight": "600", "fontSize": "0.85rem",
+                        "whiteSpace": "nowrap", "overflow": "hidden", "textOverflow": "ellipsis",
                     }),
-                ]),
-            ], style={"flex": "1", "marginLeft": "10px", "minWidth": "0", "overflow": "hidden"}),
-        ], style={
-            "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
-            "display": "flex", "alignItems": "center", "paddingRight": "6px", "paddingLeft": "8px",
-            "overflow": "hidden",
-            "position": "sticky", "left": "0", "zIndex": "5",
-            "backgroundColor": "var(--bs-body-bg)",
-        })
+                    html.Div([
+                        html.Span(f"Turno {turno}", className="badge bg-secondary me-1",
+                                  style={"fontSize": "0.62rem"}),
+                        html.Span(f"{total_hours:.1f}h atribuídas", style={
+                            "fontSize": "0.7rem", "color": "var(--bs-secondary)",
+                        }),
+                    ]),
+                ], style={"flex": "1", "marginLeft": "10px", "minWidth": "0", "overflow": "hidden"}),
+            ],
+            id={"type": "btn-toggle-employee-row", "index": emp_id},
+            n_clicks=0,
+            style={
+                "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                "display": "flex", "alignItems": "center", "paddingRight": "6px", "paddingLeft": "8px",
+                "overflow": "hidden",
+                "position": "sticky", "left": "0", "zIndex": "5",
+                "backgroundColor": "var(--bs-body-bg)",
+                "cursor": "pointer" if emp_asgs else "default",
+            },
+        )
 
         # Painel direito: bars de todas as atribuições + avatar no início de cada uma
         right_items = list(day_stripes)
@@ -512,14 +578,19 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
             if proj:  title_parts.append(proj.get("nome", ""))
             if cat:   title_parts.append(cat.get("nome", ""))
             if act:   title_parts.append(act.get("titulo", ""))
-            tooltip = " → ".join(title_parts) if title_parts else ""
+            tooltip_parts = []
+            if title_parts:
+                tooltip_parts.append(" → ".join(title_parts))
+            tooltip_parts.append(f"Entrada: {s.strftime('%d/%m/%Y %H:%M')}")
+            tooltip_parts.append(f"Saída:   {e.strftime('%d/%m/%Y %H:%M')}")
+            tooltip = "\n".join(tooltip_parts)
 
             bar_color = _activity_status_color(act) if act else "#FBC02D"
             right_items.append(html.Div(title=tooltip, style={
                 "position": "absolute", "left": f"{asg_left_pct:.4f}%", "top": "20%",
                 "height": "60%", "width": f"{asg_width:.4f}%", "minWidth": "12px",
                 "backgroundColor": bar_color, "opacity": "0.85",
-                "borderRadius": "999px",
+                "borderRadius": "999px", "cursor": "help",
             }))
 
         right_items += now_line
@@ -527,7 +598,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
         row = html.Div([
             left_panel,
             html.Div(right_items, style={
-                "position": "relative", "flex": "1", "height": "36px",
+                "position": "relative", "flex": "1", "marginLeft": "36px", "height": "36px",
                 "overflow": "visible",
             }),
         ], style={
@@ -536,6 +607,78 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
             "overflow": "visible",
         })
         rows.append(row)
+
+        # Sub-linhas quando o funcionário está expandido:
+        # mostra apenas os pares únicos (projeto, categoria) onde ele tem atribuição.
+        # Se o funcionário tem 3 atribuições na mesma categoria do mesmo projeto,
+        # aparece UMA linha só. Se trabalha em projetos/categorias distintos, cada
+        # combinação única vira uma linha.
+        if emp_expanded and emp_asgs:
+            seen = set()
+            unique_contexts = []
+            for a in emp_asgs:
+                act = act_map.get(str(a.get("atividade_id", "")))
+                cat = cat_map.get(str(act.get("categoria_id", ""))) if act else None
+                proj = proj_map.get(str(cat.get("projeto_id", ""))) if cat else None
+                if not proj or not cat:
+                    continue
+                key = (str(proj["_id"]), str(cat["_id"]))
+                if key in seen:
+                    continue
+                seen.add(key)
+                unique_contexts.append((proj, cat))
+
+            for proj, cat in unique_contexts:
+                sub_left = html.Div(
+                    [
+                        html.Span("↳", style={"color": "var(--bs-secondary)",
+                                              "paddingLeft": "48px", "paddingRight": "6px",
+                                              "fontSize": "0.75rem", "flexShrink": "0"}),
+                        html.I(className="bi bi-folder-fill me-1",
+                               style={"color": "#E96D38", "fontSize": "0.78rem",
+                                      "flexShrink": "0"}),
+                        html.Span(proj.get("nome", "—"), style={
+                            "fontWeight": "600", "fontSize": "0.75rem",
+                            "whiteSpace": "nowrap", "overflow": "hidden",
+                            "textOverflow": "ellipsis", "flexShrink": "1",
+                            "minWidth": "0",
+                        }),
+                        html.I(className="bi bi-chevron-right mx-1",
+                               style={"fontSize": "0.6rem",
+                                      "color": "var(--bs-secondary)", "flexShrink": "0"}),
+                        html.I(className="bi bi-tag me-1",
+                               style={"color": "var(--bs-info)",
+                                      "fontSize": "0.72rem", "flexShrink": "0"}),
+                        html.Span(cat.get("nome", "—"), style={
+                            "fontWeight": "500", "fontSize": "0.72rem",
+                            "whiteSpace": "nowrap", "overflow": "hidden",
+                            "textOverflow": "ellipsis",
+                            "color": "var(--bs-body-color)",
+                            "flexShrink": "1", "minWidth": "0",
+                        }),
+                    ],
+                    style={
+                        "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px",
+                        "flexShrink": "0",
+                        "display": "flex", "alignItems": "center",
+                        "overflow": "hidden",
+                        "position": "sticky", "left": "0", "zIndex": "5",
+                        "backgroundColor": "var(--bs-light-bg-subtle, #f8f9fa)",
+                    },
+                )
+
+                sub_row = html.Div([
+                    sub_left,
+                    html.Div(list(day_stripes) + list(now_line), style={
+                        "position": "relative", "flex": "1", "marginLeft": "36px",
+                        "height": "22px", "overflow": "visible",
+                    }),
+                ], style={
+                    "display": "flex", "alignItems": "center", "height": "26px",
+                    "borderBottom": "1px dashed var(--bs-border-color-translucent)",
+                    "backgroundColor": "var(--bs-light-bg-subtle, #f8f9fa)",
+                })
+                rows.append(sub_row)
 
     return html.Div(rows, style={"overflowX": "auto", "width": "100%"})
 
@@ -596,33 +739,59 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 className="text-muted p-4 text-center",
             )
 
+    # Janela deslizante por granularidade; offset em horas permite navegação
+    # ◀ / Hoje / ▶ em qualquer modo (não só horas).
+    now_brt = datetime.utcnow() - timedelta(hours=3)
+    offset_td = timedelta(hours=hour_offset or 0)
+
     if granularity == "horas":
-        now_brt = datetime.utcnow() - timedelta(hours=3)
-        center  = now_brt + timedelta(hours=hour_offset or 0)
+        center  = now_brt + offset_td
         t_start = center - timedelta(hours=24)
         t_end   = center + timedelta(hours=24)
     else:
-        all_starts = [_parse_dt(c["data_hora_inicio"]) for c in categories]
-        all_ends   = [_parse_dt(c["data_hora_fim"])    for c in categories]
-        for p in (projects or []):
-            if p.get("data_hora_inicio"): all_starts.append(_parse_dt(p["data_hora_inicio"]))
-            if p.get("data_hora_fim"):    all_ends.append(_parse_dt(p["data_hora_fim"]))
-        if not all_starts or not all_ends:
-            return html.Div("Nenhuma data cadastrada.", className="text-muted p-3")
-        t_start_raw = min(all_starts)
-        t_end_raw   = max(all_ends)
-        PADDING = {
-            "dias":    timedelta(days=1),
+        PAST_WINDOW = {
+            "dias":    timedelta(days=3),
             "semanas": timedelta(weeks=1),
             "meses":   timedelta(days=30),
         }
-        pad     = PADDING.get(granularity, timedelta(days=1))
-        t_start = t_start_raw - pad
-        t_end   = t_end_raw   + pad
+        MIN_FUTURE = {
+            "dias":    timedelta(days=14),
+            "semanas": timedelta(weeks=6),
+            "meses":   timedelta(days=150),
+        }
+        past       = PAST_WINDOW.get(granularity, timedelta(days=3))
+        min_future = MIN_FUTURE.get(granularity, timedelta(days=14))
+
+        all_ends = [_parse_dt(c["data_hora_fim"]) for c in categories]
+        for p in (projects or []):
+            if p.get("data_hora_fim"):
+                all_ends.append(_parse_dt(p["data_hora_fim"]))
+
+        data_end = max(all_ends) if all_ends else now_brt
+        t_start  = (now_brt - past) + offset_td
+        t_end    = max(data_end, now_brt + min_future) + offset_td
+
+    # Contar atividades fora da janela visível (entirely before t_start)
+    # e filtrá-las — evita a compressão à esquerda conforme o tempo avança.
+    hidden_past_count = 0
+    visible_activities = []
+    for a in activities:
+        try:
+            a_end = _parse_dt(a["data_hora_fim"])
+            if a_end < t_start:
+                hidden_past_count += 1
+                continue
+        except Exception:
+            pass
+        visible_activities.append(a)
+    activities = visible_activities
 
     assignments_by_activity = {}
+    visible_act_ids = {str(a["_id"]) for a in activities}
     for a in assignments:
         aid = str(a.get("atividade_id", ""))
+        if aid not in visible_act_ids:
+            continue
         assignments_by_activity.setdefault(aid, []).append(a)
 
     activities_by_category = {}
@@ -636,6 +805,25 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
     def _make_time_axis_row():
         """Gera uma linha de eixo de tempo fresca (para uso dentro de cada projeto)."""
         axis_bg = "#e5e7eb"  # cinza claro — sinaliza faixa reservada ao período
+
+        right_content = _build_day_stripes(t_start, t_end) + build_time_axis(t_start, t_end, granularity) + now_line
+        if hidden_past_count > 0:
+            right_content.append(html.Div(
+                [html.I(className="bi bi-chevron-double-left me-1"),
+                 f"{hidden_past_count} anterior" + ("es" if hidden_past_count > 1 else "")],
+                title=f"{hidden_past_count} atividade(s) fora da janela visível (terminaram antes do período exibido)",
+                style={
+                    "position": "absolute", "left": "4px", "top": "50%",
+                    "transform": "translateY(-50%)",
+                    "zIndex": "6",
+                    "backgroundColor": "#E96D38", "color": "#ffffff",
+                    "fontSize": "0.66rem", "fontWeight": "600",
+                    "padding": "2px 8px", "borderRadius": "999px",
+                    "whiteSpace": "nowrap", "pointerEvents": "auto",
+                    "boxShadow": "0 1px 3px rgba(0,0,0,0.2)",
+                },
+            ))
+
         return html.Div([
             html.Div(style={
                 "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
@@ -643,9 +831,9 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 "backgroundColor": axis_bg,
             }),
             html.Div(
-                _build_day_stripes(t_start, t_end) + build_time_axis(t_start, t_end, granularity) + now_line,
+                right_content,
                 style={
-                    "position": "relative", "flex": "1",
+                    "position": "relative", "flex": "1", "marginLeft": "36px",
                     "height": f"{_axis_height_for(granularity)}px",
                 },
             ),
@@ -672,7 +860,16 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
         "Outro":               BRAND_COLOR,
     }
 
+    # Eixo global no topo: só aparece quando TODOS os projetos estão colapsados,
+    # oferecendo referência temporal sem repetir o eixo dentro dos containers.
+    # Se qualquer projeto estiver expandido, cada um exibe seu próprio eixo interno.
+    any_project_expanded = any(
+        (projects_state or {}).get(str(p["_id"]), True)
+        for p in (projects or [])
+    )
     rows = []
+    if projects and not any_project_expanded:
+        rows.append(_make_time_axis_row())
 
     for proj in (projects or []):
         proj_id       = str(proj["_id"])
@@ -686,11 +883,17 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
             p_end   = _parse_dt(proj["data_hora_fim"])
             p_left  = _to_pct(p_start, t_start, t_end)
             p_width = _to_pct(p_end,   t_start, t_end) - p_left
-            proj_bar_children.append(html.Div(style={
+            proj_tooltip = (
+                f"{proj.get('nome','—')} ({proj.get('tipo','—')})\n"
+                f"Início: {p_start.strftime('%d/%m/%Y %H:%M')}\n"
+                f"Fim:    {p_end.strftime('%d/%m/%Y %H:%M')}"
+            )
+            proj_bar_children.append(html.Div(title=proj_tooltip, style={
                 "position": "absolute", "left": f"{p_left:.4f}%", "top": "15%",
                 "height": "70%", "width": f"{p_width:.4f}%", "minWidth": "4px",
                 "backgroundColor": tipo_color, "opacity": "0.9",
                 "borderRadius": "999px", "border": f"1px solid {tipo_color}",
+                "cursor": "help",
             }))
         except Exception:
             pass
@@ -732,7 +935,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 "backgroundColor": "var(--bs-secondary-bg)",
                 "borderLeft": f"5px solid {tipo_color}",
             }),
-            html.Div(day_stripes + proj_bar_children + now_line, style={"position": "relative", "flex": "1", "height": "32px"}),
+            html.Div(day_stripes + proj_bar_children + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "height": "32px"}),
         ], style={
             "display": "flex", "alignItems": "center", "height": "42px",
             "borderBottom": f"2px solid {tipo_color}",
@@ -783,13 +986,17 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                     "borderLeft": "2px dashed var(--bs-border-color)",
                 }),
                 html.Div(day_stripes + [
-                    html.Div(style={
+                    html.Div(title=(
+                        f"{cat.get('nome','—')}\n"
+                        f"Início: {cat_start.strftime('%d/%m/%Y %H:%M')}\n"
+                        f"Fim:    {cat_end.strftime('%d/%m/%Y %H:%M')}"
+                    ), style={
                         "position": "absolute", "left": f"{left_pct:.4f}%", "top": "20%",
                         "height": "60%", "width": f"{width_pct:.4f}%", "minWidth": "4px",
                         "backgroundColor": "#7E57C2", "opacity": "0.75",
-                        "borderRadius": "999px",
+                        "borderRadius": "999px", "cursor": "help",
                     }),
-                ] + now_line, style={"position": "relative", "flex": "1", "height": "28px"}),
+                ] + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "height": "28px"}),
             ], style={
                 "display": "flex", "alignItems": "center", "height": "30px",
                 "borderBottom": "1px solid var(--bs-border-color-translucent)",
@@ -838,7 +1045,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         "position": "sticky", "left": "0", "zIndex": "5",
                         "backgroundColor": "var(--bs-body-bg)",
                     }),
-                    html.Div(day_stripes + [act_bar] + now_line, style={"position": "relative", "flex": "1", "height": "28px"}),
+                    html.Div(day_stripes + [act_bar] + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "height": "28px"}),
                 ], style={
                     "display": "flex", "alignItems": "center", "height": "32px",
                     "borderBottom": "1px solid var(--bs-border-color-translucent)",
@@ -855,7 +1062,8 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         time_range = f"{entrada.strftime('%H:%M')} – {saida.strftime('%H:%M')}"
                     except Exception:
                         time_range = ""
-                    asg_bar = _build_assignment_bar(asg, t_start, t_end, activity=act)
+                    asg_bar = _build_assignment_bar(asg, t_start, t_end, activity=act,
+                                                    employee_name=emp_nome)
                     emp_doc = emp_full_map.get(str(asg.get("funcionario_id", "")))
 
                     # Avatar grande posicionado no início da barra (pode sobrar da linha — intencional)
@@ -901,7 +1109,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         }),
                         html.Div(
                             day_stripes + ([asg_bar] if asg_bar else []) + bar_avatar_children + now_line,
-                            style={"position": "relative", "flex": "1", "height": "28px", "overflow": "visible"},
+                            style={"position": "relative", "flex": "1", "marginLeft": "36px", "height": "28px", "overflow": "visible"},
                         ),
                     ], style={
                         "display": "flex", "alignItems": "center", "height": "30px",
