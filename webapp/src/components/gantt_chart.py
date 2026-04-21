@@ -682,17 +682,17 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                     asg_bar = _build_assignment_bar(asg, t_start, t_end, activity=act)
                     emp_doc = emp_full_map.get(str(asg.get("funcionario_id", "")))
 
-                    # Avatar posicionado no início da barra (sobrepondo levemente)
+                    # Avatar grande posicionado no início da barra (pode sobrar da linha — intencional)
                     bar_avatar_children = []
                     try:
                         asg_s = _parse_dt(asg["data_hora_entrada"])
                         asg_left_pct = _to_pct(asg_s, t_start, t_end)
                         bar_avatar_children.append(html.Div(
-                            _build_avatar(emp_doc, size=20),
+                            _build_avatar(emp_doc, size=42),
                             style={
                                 "position": "absolute", "left": f"{asg_left_pct:.4f}%",
                                 "top": "50%",
-                                "transform": "translate(-6px, -50%)",
+                                "transform": "translate(-36px, -50%)",
                                 "zIndex": "3",
                             },
                         ))
@@ -704,7 +704,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                             html.Span("↳", style={"color": "var(--bs-secondary)",
                                                  "paddingLeft": "36px", "paddingRight": "4px",
                                                  "fontSize": "0.72rem", "flexShrink": "0"}),
-                            _build_avatar(emp_doc, size=16),
+                            _build_avatar(emp_doc, size=20),
                             html.Span(emp_nome, style={
                                 "flex": "1", "overflow": "hidden", "textOverflow": "ellipsis",
                                 "whiteSpace": "nowrap", "fontSize": "0.72rem",
@@ -725,12 +725,13 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         }),
                         html.Div(
                             day_stripes + ([asg_bar] if asg_bar else []) + bar_avatar_children + now_line,
-                            style={"position": "relative", "flex": "1", "height": "28px"},
+                            style={"position": "relative", "flex": "1", "height": "28px", "overflow": "visible"},
                         ),
                     ], style={
                         "display": "flex", "alignItems": "center", "height": "30px",
                         "borderBottom": "1px dashed var(--bs-border-color-translucent)",
                         "backgroundColor": "var(--bs-light-bg-subtle)",
+                        "overflow": "visible",
                     }))
 
                 if asg_rows:
