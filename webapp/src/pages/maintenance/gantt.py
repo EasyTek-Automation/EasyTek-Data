@@ -290,6 +290,7 @@ def layout():
         dcc.Store(id="store-block-info",             storage_type="memory"),
         dcc.Store(id="store-gantt-hour-offset",      storage_type="memory", data=0),
         dcc.Store(id="store-gantt-filter",           storage_type="memory", data=""),
+        dcc.Store(id="store-gantt-view-mode",        storage_type="local",  data="projeto"),
 
         # Header
         dbc.Row([
@@ -371,6 +372,16 @@ def layout():
                             dbc.Button([html.I(className="bi bi-arrows-collapse me-1"), "Recolher tudo"],
                                        id="btn-collapse-all", color="secondary", outline=True, size="sm"),
                         ]),
+                    ], width="auto"),
+                    dbc.Col([
+                        html.Small("Agrupar por",
+                                   className="text-muted fw-semibold d-block mb-1"),
+                        dbc.ButtonGroup([
+                            dbc.Button([html.I(className="bi bi-diagram-3 me-1"), "Projeto"],
+                                       id="btn-view-projeto", color="primary", size="sm"),
+                            dbc.Button([html.I(className="bi bi-people me-1"), "Funcionário"],
+                                       id="btn-view-funcionario", color="secondary", outline=True, size="sm"),
+                        ], id="group-view-mode"),
                     ], width="auto"),
                     dbc.Col([
                         html.Small("Navegação de horas",

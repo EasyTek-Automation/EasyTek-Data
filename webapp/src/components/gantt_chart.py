@@ -369,6 +369,177 @@ def _build_assignment_bar(assignment, t_start, t_end, activity=None):
 # Construtor principal
 # ---------------------------------------------------------------------------
 
+def build_gantt_resource_view(employees, activities, assignments, categories, projects,
+                              granularity="dias", hour_offset=0, filter_query=""):
+    """
+    View invertida: agrupa por funcionário em vez de projeto.
+    Cada funcionário vira uma 'swimlane' horizontal mostrando todas suas
+    atribuições no tempo — útil pra analisar carga de trabalho.
+    """
+    if not employees or not activities:
+        return html.Div(
+            "Nenhum funcionário ou atividade cadastrada.",
+            className="text-muted p-3",
+        )
+
+    cat_map = {str(c["_id"]): c for c in (categories or [])}
+    proj_map = {str(p["_id"]): p for p in (projects or [])}
+    act_map = {str(a["_id"]): a for a in (activities or [])}
+
+    # Determinar janela temporal (mesma lógica do build_gantt_chart)
+    if granularity == "horas":
+        now_brt = datetime.utcnow() - timedelta(hours=3)
+        center  = now_brt + timedelta(hours=hour_offset or 0)
+        t_start = center - timedelta(hours=24)
+        t_end   = center + timedelta(hours=24)
+    else:
+        all_starts = [_parse_dt(a["data_hora_inicio"]) for a in activities]
+        all_ends   = [_parse_dt(a["data_hora_fim"])    for a in activities]
+        if not all_starts:
+            return html.Div("Nenhuma atividade cadastrada.", className="text-muted p-3")
+        PADDING = {"dias": timedelta(days=1), "semanas": timedelta(weeks=1),
+                   "meses": timedelta(days=30)}
+        pad = PADDING.get(granularity, timedelta(days=1))
+        t_start = min(all_starts) - pad
+        t_end   = max(all_ends)   + pad
+
+    day_stripes = _build_day_stripes(t_start, t_end)
+    now_line    = _build_now_line(t_start, t_end)
+
+    # Filtrar funcionários que têm atribuições (ativos)
+    asgs_by_emp = {}
+    for a in assignments:
+        asgs_by_emp.setdefault(str(a.get("funcionario_id", "")), []).append(a)
+
+    # Aplicar filtro: se filter_query, só mostra funcionários cujas atribuições batam
+    q = (filter_query or "").strip().lower()
+    filtered_employees = []
+    for e in employees:
+        emp_id = str(e["_id"])
+        emp_asgs = asgs_by_emp.get(emp_id, [])
+        if not emp_asgs and not e.get("ativo", True):
+            continue  # pula inativos sem atribuições
+        if q:
+            name_match = q in e.get("nome", "").lower()
+            asg_match = False
+            for a in emp_asgs:
+                act = act_map.get(str(a.get("atividade_id", "")))
+                if act and q in act.get("titulo", "").lower():
+                    asg_match = True; break
+            if not (name_match or asg_match):
+                continue
+        filtered_employees.append(e)
+
+    if not filtered_employees:
+        return html.Div("Nenhum funcionário com atribuições no filtro atual.",
+                        className="text-muted p-4 text-center")
+
+    def _make_axis_row():
+        axis_bg = "#e5e7eb"
+        return html.Div([
+            html.Div(style={
+                "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                "position": "sticky", "left": "0", "zIndex": "5",
+                "backgroundColor": axis_bg,
+            }),
+            html.Div(
+                _build_day_stripes(t_start, t_end) + build_time_axis(t_start, t_end, granularity) + now_line,
+                style={"position": "relative", "flex": "1",
+                       "height": f"{_axis_height_for(granularity)}px"},
+            ),
+        ], style={"display": "flex", "alignItems": "flex-end", "marginBottom": "2px",
+                  "backgroundColor": axis_bg, "border": "1px solid #d1d5db",
+                  "borderRadius": "3px"})
+
+    rows = [_make_axis_row()]
+
+    for emp in filtered_employees:
+        emp_id = str(emp["_id"])
+        emp_asgs = sorted(asgs_by_emp.get(emp_id, []),
+                          key=lambda a: _parse_dt(a.get("data_hora_entrada") or t_start))
+
+        # Contador de horas totais no período visível
+        total_hours = 0.0
+        for a in emp_asgs:
+            try:
+                s = _parse_dt(a["data_hora_entrada"])
+                e = _parse_dt(a["data_hora_saida"])
+                total_hours += max(0, (e - s).total_seconds() / 3600.0)
+            except Exception:
+                pass
+
+        # Painel esquerdo: avatar + nome + turno + total de horas
+        turno = (emp.get("turno_padrao") or "?")
+        left_panel = html.Div([
+            _build_avatar(emp, size=28),
+            html.Div([
+                html.Div(emp["nome"], style={
+                    "fontWeight": "600", "fontSize": "0.85rem",
+                    "whiteSpace": "nowrap", "overflow": "hidden", "textOverflow": "ellipsis",
+                }),
+                html.Div([
+                    html.Span(f"Turno {turno}", className="badge bg-secondary me-1",
+                              style={"fontSize": "0.62rem"}),
+                    html.Span(f"{total_hours:.1f}h atribuídas", style={
+                        "fontSize": "0.7rem", "color": "var(--bs-secondary)",
+                    }),
+                ]),
+            ], style={"flex": "1", "marginLeft": "10px", "minWidth": "0", "overflow": "hidden"}),
+        ], style={
+            "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+            "display": "flex", "alignItems": "center", "paddingRight": "6px", "paddingLeft": "8px",
+            "overflow": "hidden",
+            "position": "sticky", "left": "0", "zIndex": "5",
+            "backgroundColor": "var(--bs-body-bg)",
+        })
+
+        # Painel direito: bars de todas as atribuições + avatar no início de cada uma
+        right_items = list(day_stripes)
+        for a in emp_asgs:
+            try:
+                s = _parse_dt(a["data_hora_entrada"])
+                e = _parse_dt(a["data_hora_saida"])
+            except Exception:
+                continue
+            asg_left_pct = _to_pct(s, t_start, t_end)
+            asg_width = _to_pct(e, t_start, t_end) - asg_left_pct
+
+            # Nome curto da atividade (para tooltip)
+            act = act_map.get(str(a.get("atividade_id", "")))
+            cat = cat_map.get(str(act.get("categoria_id", ""))) if act else None
+            proj = proj_map.get(str(cat.get("projeto_id", ""))) if cat else None
+            title_parts = []
+            if proj:  title_parts.append(proj.get("nome", ""))
+            if cat:   title_parts.append(cat.get("nome", ""))
+            if act:   title_parts.append(act.get("titulo", ""))
+            tooltip = " → ".join(title_parts) if title_parts else ""
+
+            bar_color = _activity_status_color(act) if act else "#FBC02D"
+            right_items.append(html.Div(title=tooltip, style={
+                "position": "absolute", "left": f"{asg_left_pct:.4f}%", "top": "20%",
+                "height": "60%", "width": f"{asg_width:.4f}%", "minWidth": "12px",
+                "backgroundColor": bar_color, "opacity": "0.85",
+                "borderRadius": "999px",
+            }))
+
+        right_items += now_line
+
+        row = html.Div([
+            left_panel,
+            html.Div(right_items, style={
+                "position": "relative", "flex": "1", "height": "36px",
+                "overflow": "visible",
+            }),
+        ], style={
+            "display": "flex", "alignItems": "center", "height": "44px",
+            "borderBottom": "1px solid var(--bs-border-color-translucent)",
+            "overflow": "visible",
+        })
+        rows.append(row)
+
+    return html.Div(rows, style={"overflowX": "auto", "width": "100%"})
+
+
 def build_gantt_chart(categories, activities, assignments, granularity="dias",
                       expanded_state=None, employees=None, hour_offset=0,
                       activities_state=None, projects=None, projects_state=None,

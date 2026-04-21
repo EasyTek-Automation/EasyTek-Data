@@ -13,7 +13,7 @@ from src.utils.gantt_validation import (
     CATEGORY_PIPELINE, ACTIVITY_PIPELINE, ASSIGNMENT_PIPELINE,
     ValidationContext,
 )
-from src.components.gantt_chart import build_gantt_chart
+from src.components.gantt_chart import build_gantt_chart, build_gantt_resource_view
 
 
 # ---------------------------------------------------------------------------
@@ -117,10 +117,11 @@ def register_gantt_callbacks(app):
         Input("store-gantt-activities-state", "data"),
         Input("store-gantt-hour-offset", "data"),
         Input("store-gantt-filter", "data"),
+        Input("store-gantt-view-mode", "data"),
         prevent_initial_call=False,
     )
     def render_gantt(refresh, granularity, projects_state, categories_state,
-                     activities_state, hour_offset, filter_query):
+                     activities_state, hour_offset, filter_query, view_mode):
         projects   = gantt_db.get_all_projects()  # exclui arquivados
         employees  = gantt_db.get_all_employees()
 
@@ -138,6 +139,14 @@ def register_gantt_callbacks(app):
         all_assignments = []
         for act in activities:
             all_assignments.extend(gantt_db.get_assignments_by_activity(act["_id"]))
+
+        if view_mode == "funcionario":
+            return build_gantt_resource_view(
+                employees, activities, all_assignments, categories, projects,
+                granularity=granularity or "dias",
+                hour_offset=hour_offset or 0,
+                filter_query=filter_query or "",
+            )
         return build_gantt_chart(
             categories, activities, all_assignments,
             granularity=granularity or "dias",
@@ -148,6 +157,34 @@ def register_gantt_callbacks(app):
             employees=employees,
             hour_offset=hour_offset or 0,
             filter_query=filter_query or "",
+        )
+
+    # ------------------------------------------------------------------
+    # CB-01d — Toggle entre view "Projeto" e view "Funcionário"
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("store-gantt-view-mode",   "data"),
+        Output("btn-view-projeto",        "color"),
+        Output("btn-view-projeto",        "outline"),
+        Output("btn-view-funcionario",    "color"),
+        Output("btn-view-funcionario",    "outline"),
+        Input("btn-view-projeto",         "n_clicks"),
+        Input("btn-view-funcionario",     "n_clicks"),
+        Input("store-gantt-view-mode",    "data"),
+    )
+    def toggle_view_mode(n_p, n_f, current):
+        triggered = ctx.triggered_id
+        if triggered == "btn-view-funcionario":
+            new_mode = "funcionario"
+        elif triggered == "btn-view-projeto":
+            new_mode = "projeto"
+        else:
+            new_mode = current or "projeto"
+        is_proj = new_mode == "projeto"
+        return (
+            new_mode,
+            "primary" if is_proj else "secondary", not is_proj,
+            "primary" if not is_proj else "secondary", is_proj,
         )
 
     # ------------------------------------------------------------------
