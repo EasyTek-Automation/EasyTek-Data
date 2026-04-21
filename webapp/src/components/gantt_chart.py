@@ -660,11 +660,16 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
         pid = str(c.get("projeto_id", ""))
         cats_by_project.setdefault(pid, []).append(c)
 
+    # Cor única da marca do cliente para TODOS os tipos de projeto —
+    # mantém identidade visual consistente e evita "salada de cores"
+    # quando combinada com as cores de status das atividades.
+    # O TIPO do projeto continua sinalizado pelo texto no badge.
+    BRAND_COLOR = "#E96D38"
     TIPO_COLOR = {
-        "Parada Preventiva":   "#E96D38",
-        "Parada Corretiva":    "var(--bs-danger)",
-        "Projeto de Melhoria": "var(--bs-success)",
-        "Outro":               "var(--bs-secondary)",
+        "Parada Preventiva":   BRAND_COLOR,
+        "Parada Corretiva":    BRAND_COLOR,
+        "Projeto de Melhoria": BRAND_COLOR,
+        "Outro":               BRAND_COLOR,
     }
 
     rows = []
@@ -673,7 +678,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
         proj_id       = str(proj["_id"])
         proj_expanded = (projects_state or {}).get(proj_id, True)
         proj_icon     = "▼" if proj_expanded else "▶"
-        tipo_color    = TIPO_COLOR.get(proj.get("tipo", ""), "var(--bs-secondary)")
+        tipo_color    = TIPO_COLOR.get(proj.get("tipo", ""), BRAND_COLOR)
 
         proj_bar_children = []
         try:
