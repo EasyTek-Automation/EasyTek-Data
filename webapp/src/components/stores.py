@@ -35,5 +35,6 @@ app_stores = [
 
     # Store para telemetria ao vivo da SE03
     dcc.Store(id='store-se03-telemetry', storage_type='memory'),
+    dcc.Store(id='store-se03-telemetry-latest', storage_type='memory'),
 
 ]
