@@ -2,6 +2,7 @@
 
 from datetime import datetime, timedelta
 from dash import html
+import dash_bootstrap_components as dbc
 
 LEFT_WIDTH = 360  # px — painel fixo esquerdo (nome + botões de ação)
 
@@ -36,6 +37,87 @@ def _parse_dt(value):
             except ValueError:
                 continue
     raise ValueError(f"Formato de data não reconhecido: {value!r}")
+
+
+def _render_multiline(text):
+    """
+    Converte texto multi-linha em lista de elementos Dash para uso dentro
+    de dbc.Tooltip. Cada linha vira string seguida de html.Br(); ao final
+    insere html.Hr() como separador visual antes das demais linhas do tooltip.
+    Retorna lista vazia se o texto for vazio/branco — o consumer omite a
+    linha do tooltip (SP-13 item 7: sem rótulo "Observação: (vazio)").
+    """
+    if not text or not text.strip():
+        return []
+    linhas = text.strip().split("\n")
+    out = []
+    for linha in linhas:
+        out.append(linha)
+        out.append(html.Br())
+    out.append(html.Hr(style={"margin": "4px 0"}))
+    return out
+
+
+def _progresso_esperado_pct(activity, now=None):
+    """Percentual esperado pelo tempo decorrido (BR-06). 0..100 ou None se datas inválidas.
+    Usa hora de Brasília (UTC-3) por consistência com _activity_status_color."""
+    try:
+        ini = _parse_dt(activity["data_hora_inicio"])
+        fim = _parse_dt(activity["data_hora_fim"])
+    except Exception:
+        return None
+    n = now if now is not None else (datetime.utcnow() - timedelta(hours=3))
+    total = (fim - ini).total_seconds()
+    if total <= 0:
+        return 100.0 if n >= fim else 0.0
+    elapsed = (n - ini).total_seconds()
+    return max(0.0, min(100.0, elapsed / total * 100.0))
+
+
+def _fmt_dt_label(value):
+    """Formata datetime como 'dd/mm/YYYY HH:MM' para exibição em tooltips."""
+    try:
+        return _parse_dt(value).strftime("%d/%m/%Y %H:%M")
+    except Exception:
+        return "—"
+
+
+def _build_project_tooltip_content(proj):
+    """Conteúdo do tooltip de Projeto (DS-09 §2)."""
+    out = [html.Strong(proj.get("nome", "—")), html.Br()]
+    tipo = proj.get("tipo", "")
+    if tipo:
+        out.extend([f"Tipo: {tipo}", html.Br()])
+    out.extend(_render_multiline(proj.get("observacoes", "")))
+    out.extend([
+        f"Início: {_fmt_dt_label(proj.get('data_hora_inicio'))}", html.Br(),
+        f"Fim: {_fmt_dt_label(proj.get('data_hora_fim'))}",
+    ])
+    return out
+
+
+def _build_category_tooltip_content(cat):
+    """Conteúdo do tooltip de Categoria (DS-09 §2 — sem campo descritivo nesta entrega)."""
+    return [
+        html.Strong(cat.get("nome", "—")), html.Br(),
+        f"Início: {_fmt_dt_label(cat.get('data_hora_inicio'))}", html.Br(),
+        f"Fim: {_fmt_dt_label(cat.get('data_hora_fim'))}",
+    ]
+
+
+def _build_activity_tooltip_content(act):
+    """Conteúdo do tooltip de Atividade (DS-09 §2)."""
+    out = [html.Strong(act.get("titulo", "—")), html.Br()]
+    out.extend(_render_multiline(act.get("observacao", "")))
+    out.extend([
+        f"Início: {_fmt_dt_label(act.get('data_hora_inicio'))}", html.Br(),
+        f"Fim: {_fmt_dt_label(act.get('data_hora_fim'))}", html.Br(),
+        f"Progresso real: {int(act.get('progresso_real', 0))}%", html.Br(),
+    ])
+    esperado = _progresso_esperado_pct(act)
+    if esperado is not None:
+        out.append(f"Progresso esperado: {int(round(esperado))}%")
+    return out
 
 
 def _btn(btn_type, index, icon, color="secondary", title=""):
@@ -193,20 +275,10 @@ def _activity_status_color(activity):
       ±10%    → azul    (no prazo)
       > +10%  → verde   (adiantada)
     """
-    try:
-        act_start = _parse_dt(activity["data_hora_inicio"])
-        act_end   = _parse_dt(activity["data_hora_fim"])
-    except Exception:
+    progresso_esperado = _progresso_esperado_pct(activity)
+    if progresso_esperado is None:
         return STATUS_COLOR_NO_PRAZO
-
-    now = datetime.utcnow() - timedelta(hours=3)
-    total_sec = (act_end - act_start).total_seconds()
-    if total_sec <= 0:
-        return STATUS_COLOR_NO_PRAZO
-
-    elapsed_sec = (now - act_start).total_seconds()
-    progresso_esperado = max(0.0, min(100.0, elapsed_sec / total_sec * 100.0))
-    progresso_real     = float(activity.get("progresso_real", 0) or 0)
+    progresso_real = float(activity.get("progresso_real", 0) or 0)
     delta = progresso_real - progresso_esperado
 
     if delta <= -STATUS_TOLERANCE_PCT:
@@ -325,12 +397,16 @@ def _build_activity_bar(activity, t_start, t_end, color=None):
     green_w   = width_pct * progress / 100.0
     bar_color = color or _activity_status_color(activity)
 
-    tooltip_text = (
-        f"{activity.get('titulo','—')}\n"
-        f"Início:    {act_start.strftime('%d/%m/%Y %H:%M')}\n"
-        f"Fim:       {act_end.strftime('%d/%m/%Y %H:%M')}\n"
-        f"Progresso: {progress}%"
-    )
+    linhas = [activity.get("titulo", "—")]
+    obs = (activity.get("observacao") or "").strip()
+    if obs:
+        linhas.append(obs)
+    linhas.extend([
+        f"Início:    {act_start.strftime('%d/%m/%Y %H:%M')}",
+        f"Fim:       {act_end.strftime('%d/%m/%Y %H:%M')}",
+        f"Progresso: {progress}%",
+    ])
+    tooltip_text = "\n".join(linhas)
     base_bar = html.Div(title=tooltip_text, style={
         "position": "absolute", "left": f"{left_pct:.4f}%", "top": "15%",
         "height": "70%", "width": f"{width_pct:.4f}%", "minWidth": "4px",
@@ -883,11 +959,15 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
             p_end   = _parse_dt(proj["data_hora_fim"])
             p_left  = _to_pct(p_start, t_start, t_end)
             p_width = _to_pct(p_end,   t_start, t_end) - p_left
-            proj_tooltip = (
-                f"{proj.get('nome','—')} ({proj.get('tipo','—')})\n"
-                f"Início: {p_start.strftime('%d/%m/%Y %H:%M')}\n"
-                f"Fim:    {p_end.strftime('%d/%m/%Y %H:%M')}"
-            )
+            linhas = [f"{proj.get('nome','—')} ({proj.get('tipo','—')})"]
+            obs = (proj.get("observacoes") or "").strip()
+            if obs:
+                linhas.append(obs)
+            linhas.extend([
+                f"Início: {p_start.strftime('%d/%m/%Y %H:%M')}",
+                f"Fim:    {p_end.strftime('%d/%m/%Y %H:%M')}",
+            ])
+            proj_tooltip = "\n".join(linhas)
             proj_bar_children.append(html.Div(title=proj_tooltip, style={
                 "position": "absolute", "left": f"{p_left:.4f}%", "top": "15%",
                 "height": "70%", "width": f"{p_width:.4f}%", "minWidth": "4px",
@@ -907,10 +987,20 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                             "fontSize": "0.82rem", "marginRight": "5px", "flexShrink": "0",
                             "color": tipo_color,
                         }),
-                        html.Span(proj["nome"], style={
-                            "fontWeight": "700", "fontSize": "0.9rem",
-                            "overflow": "hidden", "textOverflow": "ellipsis", "whiteSpace": "nowrap",
-                        }),
+                        html.Span(proj["nome"],
+                            id={"type": "gantt-label-project", "index": proj_id},
+                            tabIndex=0,
+                            style={
+                                "fontWeight": "700", "fontSize": "0.9rem",
+                                "overflow": "hidden", "textOverflow": "ellipsis", "whiteSpace": "nowrap",
+                            }),
+                        dbc.Tooltip(
+                            children=_build_project_tooltip_content(proj),
+                            target={"type": "gantt-label-project", "index": proj_id},
+                            delay={"show": 500, "hide": 100},
+                            className="gantt-tooltip",
+                            placement="right",
+                        ),
                         html.Span(proj.get("tipo", ""), style={
                             "fontSize": "0.65rem", "color": tipo_color, "fontWeight": "400",
                             "marginLeft": "8px", "flexShrink": "0", "whiteSpace": "nowrap",
@@ -962,11 +1052,21 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                                 "fontSize": "0.72rem", "marginRight": "5px",
                                 "flexShrink": "0", "color": "var(--bs-info)",
                             }),
-                            html.Span(cat["nome"], style={
-                                "fontSize": "0.8rem", "fontWeight": "500",
-                                "overflow": "hidden",
-                                "textOverflow": "ellipsis", "whiteSpace": "nowrap",
-                            }),
+                            html.Span(cat["nome"],
+                                id={"type": "gantt-label-category", "index": cat_id},
+                                tabIndex=0,
+                                style={
+                                    "fontSize": "0.8rem", "fontWeight": "500",
+                                    "overflow": "hidden",
+                                    "textOverflow": "ellipsis", "whiteSpace": "nowrap",
+                                }),
+                            dbc.Tooltip(
+                                children=_build_category_tooltip_content(cat),
+                                target={"type": "gantt-label-category", "index": cat_id},
+                                delay={"show": 500, "hide": 100},
+                                className="gantt-tooltip",
+                                placement="right",
+                            ),
                         ],
                         id={"type": "btn-toggle-category", "index": cat_id},
                         n_clicks=0,
@@ -1023,10 +1123,20 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                                     "color": "var(--bs-secondary)",
                                     "visibility": "visible" if act_asgs else "hidden",
                                 }),
-                                html.Span(act["titulo"], style={
-                                    "overflow": "hidden", "textOverflow": "ellipsis",
-                                    "whiteSpace": "nowrap", "fontSize": "0.78rem",
-                                }),
+                                html.Span(act["titulo"],
+                                    id={"type": "gantt-label-activity", "index": act_id},
+                                    tabIndex=0,
+                                    style={
+                                        "overflow": "hidden", "textOverflow": "ellipsis",
+                                        "whiteSpace": "nowrap", "fontSize": "0.78rem",
+                                    }),
+                                dbc.Tooltip(
+                                    children=_build_activity_tooltip_content(act),
+                                    target={"type": "gantt-label-activity", "index": act_id},
+                                    delay={"show": 500, "hide": 100},
+                                    className="gantt-tooltip",
+                                    placement="right",
+                                ),
                             ],
                             id={"type": "btn-toggle-activity", "index": act_id},
                             n_clicks=0,
