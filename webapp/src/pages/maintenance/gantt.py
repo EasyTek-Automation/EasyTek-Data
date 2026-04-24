@@ -106,6 +106,13 @@ def _modal_activity():
                 dbc.Input(id="input-activity-progresso", type="number",
                           min=0, max=100, step=1, placeholder="0"),
             ], id="div-activity-progresso", style={"display": "none"}),
+            dbc.Label("Observação / Justificativa"),
+            dbc.Textarea(
+                id="input-activity-observacao",
+                placeholder="Opcional — contexto, dependências, riscos, notas",
+                style={"minHeight": "90px"},
+                className="mb-3",
+            ),
         ]),
         dbc.ModalFooter([
             dbc.Button("Cancelar", id="btn-cancel-activity", color="secondary", outline=True),

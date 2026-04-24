@@ -569,6 +569,7 @@ def register_gantt_callbacks(app):
         Output("input-activity-fim", "value"),
         Output("input-activity-progresso", "value"),
         Output("div-activity-progresso", "style"),
+        Output("input-activity-observacao", "value"),
         Output("store-activity-editing-id", "data"),
         Input({"type": "btn-new-activity-in-cat", "index": ALL}, "n_clicks"),
         Input({"type": "btn-edit-activity",       "index": ALL}, "n_clicks"),
@@ -584,7 +585,7 @@ def register_gantt_callbacks(app):
         hidden  = {"display": "none"}
         visible = {"display": "block"}
         if triggered_id == "btn-cancel-activity":
-            return False, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
+            return False, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update, no_update
         if isinstance(triggered_id, dict) and triggered_id.get("type") == "btn-new-activity-in-cat":
             if not any(new_in_cat_clicks):
                 raise PreventUpdate
@@ -602,7 +603,7 @@ def register_gantt_callbacks(app):
                 True, "Nova Atividade", "",
                 proj_opts, proj_id,
                 cat_opts, cat_id,
-                "", "", 0, hidden, None,
+                "", "", 0, hidden, "", None,
             )
         if isinstance(triggered_id, dict) and triggered_id.get("type") == "btn-edit-activity":
             if not any(edit_clicks):
@@ -627,6 +628,7 @@ def register_gantt_callbacks(app):
                 _fmt_dt(act["data_hora_fim"]),
                 act.get("progresso_real", 0),
                 visible,
+                act.get("observacao", ""),
                 act_id,
             )
         raise PreventUpdate
@@ -668,11 +670,13 @@ def register_gantt_callbacks(app):
         State("input-activity-inicio", "value"),
         State("input-activity-fim", "value"),
         State("input-activity-progresso", "value"),
+        State("input-activity-observacao", "value"),
         State("store-activity-editing-id", "data"),
         State("store-gantt-refresh", "data"),
         prevent_initial_call=True,
     )
-    def save_activity(n_clicks, titulo, cat_id, inicio, fim, progresso, editing_id, refresh):
+    def save_activity(n_clicks, titulo, cat_id, inicio, fim, progresso, observacao,
+                      editing_id, refresh):
         if not n_clicks:
             raise PreventUpdate
         if current_user.level < 2:
@@ -692,6 +696,7 @@ def register_gantt_callbacks(app):
             "data_hora_inicio": inicio_dt,
             "data_hora_fim":    fim_dt,
             "progresso_real":   int(progresso or 0),
+            "observacao":       (observacao or "").strip(),
         }
         ctx_val = ValidationContext(category={
             "data_hora_inicio": _parse_dt(_fmt_dt(cat["data_hora_inicio"])) if isinstance(cat["data_hora_inicio"], str) else cat["data_hora_inicio"],
@@ -705,9 +710,13 @@ def register_gantt_callbacks(app):
             old = gantt_db.get_activity_by_id(editing_id)
             gantt_db.update_activity(editing_id, data)
             if old:
-                for field in ("titulo", "data_hora_inicio", "data_hora_fim", "progresso_real"):
-                    if str(old.get(field)) != str(data.get(field)):
-                        _log("edicao", "atividade", editing_id, titulo, field, old.get(field), data[field])
+                for field in ("titulo", "data_hora_inicio", "data_hora_fim",
+                              "progresso_real", "observacao"):
+                    old_val = old.get(field)
+                    if field == "observacao":
+                        old_val = old_val or ""
+                    if str(old_val) != str(data.get(field)):
+                        _log("edicao", "atividade", editing_id, titulo, field, old_val, data[field])
         else:
             new_id = gantt_db.create_activity(data)
             _log("criacao", "atividade", new_id, titulo)

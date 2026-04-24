@@ -337,7 +337,8 @@ def get_activity_by_id(activity_id):
 def create_activity(data):
     """
     Insere nova atividade. Retorna o ID gerado como string.
-    data: {"titulo", "categoria_id", "data_hora_inicio", "data_hora_fim", "progresso_real"(opt)}
+    data: {"titulo", "categoria_id", "data_hora_inicio", "data_hora_fim",
+           "progresso_real"(opt), "observacao"(opt)}
     """
     col = _col("gantt_activities")
     if col is None:
@@ -348,6 +349,7 @@ def create_activity(data):
         "data_hora_inicio": data["data_hora_inicio"],
         "data_hora_fim":    data["data_hora_fim"],
         "progresso_real":   int(data.get("progresso_real", 0)),
+        "observacao":       (data.get("observacao") or "").strip(),
         "criado_em":        _now(),
         "atualizado_em":    _now(),
     }
@@ -363,12 +365,15 @@ def update_activity(activity_id, data):
     col = _col("gantt_activities")
     if col is None:
         return False
-    allowed = ("titulo", "categoria_id", "data_hora_inicio", "data_hora_fim", "progresso_real")
+    allowed = ("titulo", "categoria_id", "data_hora_inicio", "data_hora_fim",
+               "progresso_real", "observacao")
     update_fields = {k: v for k, v in data.items() if k in allowed}
     if "categoria_id" in update_fields:
         update_fields["categoria_id"] = ObjectId(update_fields["categoria_id"])
     if "progresso_real" in update_fields:
         update_fields["progresso_real"] = int(update_fields["progresso_real"])
+    if "observacao" in update_fields:
+        update_fields["observacao"] = (update_fields["observacao"] or "").strip()
     update_fields["atualizado_em"] = _now()
     result = col.update_one({"_id": ObjectId(activity_id)}, {"$set": update_fields})
     return result.modified_count > 0
