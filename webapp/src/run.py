@@ -11,7 +11,8 @@ setup_logging()
 # PASSO 3: IMPORTAÇÕES PADRÃO
 import os
 from src.app import app, server
-from src import index # Esta importação dispara o registro dos callbacks
+from src import index  # Esta importação dispara o registro dos callbacks
+from src import api_internal  # Endpoints internos para serviços Docker
 
 # PASSO 3: LÓGICA DE EXECUÇÃO
 if __name__ == '__main__':

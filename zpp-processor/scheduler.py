@@ -1,228 +1,131 @@
 """
-Sistema de agendamento automático para processamento ZPP
-Thread em background que verifica periodicamente se deve processar arquivos
+Scheduler de processamento automático ZPP (canal padrão).
+Monitora /data/input e processa arquivos encontrados a cada intervalo configurado.
 """
+import logging
+import shutil
 import threading
 import time
-import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from zoneinfo import ZoneInfo
 
 from pymongo import MongoClient
+
 import config
-from processor import ZPPProcessor
-from models.processing_log import (
-    generate_job_id,
-    create_processing_log,
-    update_processing_log
-)
+from cleaner import find_excel_files
+from pipeline import process_file
 
 logger = logging.getLogger(__name__)
+
+_BRT = ZoneInfo("America/Sao_Paulo")
+
+
+def _clean_stem(stem: str) -> str:
+    """Remove sufixos de processamento anteriores (_YYYYMMDD_HHMMSS_Rejected/InternalError)."""
+    import re
+    return re.sub(r"(_\d{8}_\d{6}(_Rejected|_InternalError))+$", "", stem)
+
+
+def _move_file(src: Path, dest_dir: Path, suffix: str = "") -> Path:
+    """Move arquivo com timestamp BRT no nome, removendo sufixos anteriores."""
+    ts = datetime.now(tz=_BRT).strftime("%Y%m%d_%H%M%S")
+    clean = _clean_stem(src.stem)
+    dest = dest_dir / f"{clean}_{ts}{suffix}{src.suffix}"
+    shutil.move(str(src), str(dest))
+    return dest
 
 
 class ZPPScheduler:
     """
-    Agendador automático de processamento ZPP
-    Executa em thread separada, consultando configurações no MongoDB
+    Executa processamento automático em thread daemon.
+    Mantém contagem de tentativas por arquivo em memória.
+    Reinício do serviço zera contadores — comportamento intencional (SP-08).
     """
 
+    MAX_RETRIES = 3
+
     def __init__(self, mongo_uri: str, db_name: str):
-        """
-        Inicializa o agendador
-
-        Args:
-            mongo_uri: URI MongoDB
-            db_name: Nome do banco
-        """
-        self.mongo_uri = mongo_uri
-        self.db_name = db_name
+        self._client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
+        self._db_name = db_name
+        self._retry_counts: dict[str, int] = {}
         self.running = False
-        self.thread: Optional[threading.Thread] = None
-        self.last_run: Optional[datetime] = None
+        self._thread: threading.Thread | None = None
 
-        # Conectar ao MongoDB para consultar configurações
+    def _insert_log(self, result) -> None:
         try:
-            self.client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
-            self.db = self.client[db_name]
-            logger.info("[Scheduler] Conectado ao MongoDB")
+            self._client[self._db_name][config.LOGS_COLLECTION].insert_one(
+                result.to_log_doc()
+            )
         except Exception as e:
-            logger.error(f"[Scheduler] Erro ao conectar: {e}")
-            raise
+            logger.error(f"[scheduler] Falha ao inserir log no MongoDB: {e}")
 
-    def get_config(self) -> dict:
-        """
-        Busca configuração atual do MongoDB
-
-        Returns:
-            Dicionário de configuração
-        """
-        try:
-            config_doc = self.db[config.CONFIG_COLLECTION].find_one({"_id": "global"})
-
-            if not config_doc:
-                # Criar configuração padrão se não existir
-                from models.processing_log import create_default_config
-                default_config = create_default_config()
-                self.db[config.CONFIG_COLLECTION].insert_one(default_config)
-                config_doc = default_config
-
-            return config_doc
-
-        except Exception as e:
-            logger.error(f"[Scheduler] Erro ao buscar config: {e}")
-            # Retornar configuração padrão em caso de erro
-            return {
-                "auto_process": config.AUTO_PROCESS,
-                "interval_minutes": config.INTERVAL_MINUTES
-            }
-
-    def should_run(self) -> bool:
-        """
-        Verifica se deve executar processamento
-
-        Returns:
-            True se deve executar
-        """
-        cfg = self.get_config()
-
-        # Verificar se auto-process está ativado
-        if not cfg.get("auto_process", False):
-            return False
-
-        # Verificar intervalo desde última execução
-        interval_minutes = cfg.get("interval_minutes", 60)
-
-        if self.last_run is None:
-            return True
-
-        time_since_last = datetime.now() - self.last_run
-        if time_since_last >= timedelta(minutes=interval_minutes):
-            return True
-
-        return False
-
-    def run_processing(self):
-        """
-        Executa processamento automático
-        """
-        # Verificar se há arquivos antes de processar
-        from cleaner import find_excel_files
-        files_to_process = find_excel_files(config.INPUT_DIR)
-
-        if not files_to_process:
-            logger.info("[Scheduler] Nenhum arquivo para processar - pulando execução")
-            # Atualizar timestamp mesmo sem processar
-            self.last_run = datetime.now()
+    def _run_cycle(self) -> None:
+        files = find_excel_files(str(config.INPUT_DIR))
+        if not files:
             return
 
-        job_id = generate_job_id()
+        logger.info(f"[scheduler] {len(files)} arquivo(s) encontrado(s)")
 
-        logger.info(f"\n{'='*80}")
-        logger.info(f"[Scheduler] Processamento Automático Iniciado")
-        logger.info(f"Job ID: {job_id}")
-        logger.info(f"Arquivos encontrados: {len(files_to_process)}")
-        logger.info(f"{'='*80}\n")
+        for file_path in files:
+            nome = file_path.name
+            tentativas = self._retry_counts.get(nome, 0)
 
-        # Criar log inicial
-        log_doc = create_processing_log(
-            job_id=job_id,
-            trigger_type="automatic",
-            triggered_by="system"
-        )
-
-        try:
-            # Inserir log inicial
-            self.db[config.LOGS_COLLECTION].insert_one(log_doc)
-
-            # Inicializar processador
-            processor = ZPPProcessor(
-                mongo_uri=self.mongo_uri,
-                db_name=self.db_name,
-                archive_dir=config.OUTPUT_DIR
+            result = process_file(
+                file_path=file_path,
+                client=self._client,
+                canal="padrao",
+                operador="sistema",
             )
 
-            # Processar diretório
-            results = processor.process_directory(
-                directory=config.INPUT_DIR,
-                batch_size=config.BATCH_SIZE,
-                move_after_process=True
-            )
+            if result.status == "success":
+                dest = _move_file(file_path, config.OUTPUT_DIR)
+                logger.info(f"[scheduler] {nome} → output/{dest.name}")
+                self._retry_counts.pop(nome, None)
+                self._insert_log(result)
 
-            # Fechar processador
-            processor.close()
+            elif result.status == "rejected":
+                dest = _move_file(file_path, config.REJECTED_DIR, "_Rejected")
+                logger.error(f"[scheduler] {nome} rejeitado → rejected/{dest.name}")
+                self._retry_counts.pop(nome, None)
+                self._insert_log(result)
 
-            # Atualizar log
-            log_update = update_processing_log(
-                current_log=log_doc,
-                files_processed=results
-            )
+            else:  # failed
+                tentativas += 1
+                self._retry_counts[nome] = tentativas
+                logger.error(
+                    f"[scheduler] {nome} erro interno "
+                    f"(tentativa {tentativas}/{self.MAX_RETRIES})"
+                )
+                self._insert_log(result)
 
-            self.db[config.LOGS_COLLECTION].update_one(
-                {"job_id": job_id},
-                {"$set": log_update}
-            )
+                if tentativas >= self.MAX_RETRIES:
+                    dest = _move_file(file_path, config.REJECTED_DIR, "_InternalError")
+                    logger.error(f"[scheduler] {nome} → rejected/{dest.name} (3 tentativas)")
+                    self._retry_counts.pop(nome, None)
 
-            # Atualizar timestamp de última execução
-            self.last_run = datetime.now()
-
-            logger.info(f"\n[Scheduler] Processamento concluído: {len(results)} arquivo(s)")
-
-        except Exception as e:
-            logger.error(f"[Scheduler] Erro no processamento: {e}")
-
-            # Atualizar log com erro
-            self.db[config.LOGS_COLLECTION].update_one(
-                {"job_id": job_id},
-                {"$set": {
-                    "status": "failed",
-                    "completed_at": datetime.now(),
-                    "error_message": str(e)
-                }}
-            )
-
-    def scheduler_loop(self):
-        """
-        Loop principal do agendador
-        Executa a cada 1 minuto verificando se deve processar
-        """
-        logger.info("[Scheduler] Thread iniciada")
-
+    def _loop(self) -> None:
+        logger.info("[scheduler] Thread iniciada")
         while self.running:
             try:
-                if self.should_run():
-                    self.run_processing()
-
-                # Aguardar 1 minuto antes de próxima verificação
-                time.sleep(60)
-
+                self._run_cycle()
             except Exception as e:
-                logger.error(f"[Scheduler] Erro no loop: {e}")
-                time.sleep(60)  # Continuar após erro
+                logger.error(f"[scheduler] Erro no ciclo: {e}")
+            time.sleep(config.SCHEDULER_INTERVAL_SECONDS)
+        logger.info("[scheduler] Thread encerrada")
 
-        logger.info("[Scheduler] Thread encerrada")
-
-    def start(self):
-        """Inicia a thread do agendador"""
+    def start(self) -> None:
         if self.running:
-            logger.warning("[Scheduler] Já está rodando")
             return
-
         self.running = True
-        self.thread = threading.Thread(target=self.scheduler_loop, daemon=True)
-        self.thread.start()
-        logger.info("[Scheduler] Iniciado")
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._thread.start()
+        logger.info("[scheduler] Iniciado")
 
-    def stop(self):
-        """Para a thread do agendador"""
-        if not self.running:
-            return
-
+    def stop(self) -> None:
         self.running = False
-        if self.thread:
-            self.thread.join(timeout=5)
-        logger.info("[Scheduler] Parado")
+        if self._thread:
+            self._thread.join(timeout=5)
 
-    def close(self):
-        """Fecha conexão MongoDB"""
-        self.client.close()
+    def close(self) -> None:
+        self._client.close()

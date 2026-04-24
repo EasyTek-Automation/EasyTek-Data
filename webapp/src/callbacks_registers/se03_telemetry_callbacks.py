@@ -34,17 +34,6 @@ def _serialize_docs(docs):
     return result
 
 
-def _get_latest_by_machine(data: list) -> dict:
-    """Retorna o registro mais recente por IDMaq."""
-    latest = {}
-    for row in data:
-        maq = row.get("IDMaq", "")
-        ts = row.get("DateTime", "")
-        if maq not in latest or ts > latest[maq].get("DateTime", ""):
-            latest[maq] = row
-    return latest
-
-
 # ─────────────────────────────────────────
 # Funções de render dos KPI cards
 # ─────────────────────────────────────────
@@ -114,6 +103,16 @@ def register_se03_telemetry_callbacks(app, collection):
         collection: coleção MongoDB AMG_EnergyTelemetry
     """
 
+    if collection is not None:
+        try:
+            collection.create_index(
+                [("DateTime", -1), ("IDMaq", 1)],
+                name="idx_telemetry_datetime_idmaq",
+                background=True,
+            )
+        except Exception:
+            pass
+
     # ── Callback 1: Fetch de dados → Store ──────────────────────────────────
 
     @app.callback(
@@ -147,11 +146,52 @@ def register_se03_telemetry_callbacks(app, collection):
                         "IDMaq": 1,
                         "FatorPotenciaTotal": 1,
                         "PotenciaAtivaMaxPeriodo": 1,
-                        "PotenciaReativaMaxPeriodo": 1,
-                        "PotenciaAtivaAccImport": 1,
                     },
                 ).sort("DateTime", 1)
             )
+        except Exception:
+            return None
+
+        return _serialize_docs(docs)
+
+    # ── Callback 1b: Fetch do último valor por máquina (aggregation) → Store ─
+
+    @app.callback(
+        Output("store-se03-telemetry-latest", "data"),
+        Input("se03-tel-interval", "n_intervals"),
+        Input("se03-tel-machine-sel", "value"),
+        Input("se03-tel-window", "value"),
+        prevent_initial_call=True,
+    )
+    def fetch_se03_telemetry_latest(n_intervals, machines, window_min):
+        """Busca o documento mais recente por máquina via aggregation $group $first.
+
+        Custo é O(número de máquinas) com o índice (DateTime, IDMaq) — independe do tamanho da janela.
+        """
+        if collection is None:
+            return None
+
+        selected = machines or ["SE03_MM01"]
+        minutes = window_min or 15
+
+        now = datetime.now(timezone.utc)
+        start = now - timedelta(minutes=minutes)
+
+        pipeline = [
+            {"$match": {"DateTime": {"$gte": start}, "IDMaq": {"$in": selected}}},
+            {"$sort": {"DateTime": -1}},
+            {"$group": {
+                "_id": "$IDMaq",
+                "DateTime": {"$first": "$DateTime"},
+                "FatorPotenciaTotal": {"$first": "$FatorPotenciaTotal"},
+                "PotenciaAtivaMaxPeriodo": {"$first": "$PotenciaAtivaMaxPeriodo"},
+                "PotenciaReativaMaxPeriodo": {"$first": "$PotenciaReativaMaxPeriodo"},
+                "PotenciaAtivaAccImport": {"$first": "$PotenciaAtivaAccImport"},
+            }},
+        ]
+
+        try:
+            docs = list(collection.aggregate(pipeline))
         except Exception:
             return None
 
@@ -165,18 +205,16 @@ def register_se03_telemetry_callbacks(app, collection):
         Output("se03-tel-card-pot-reativa", "children"),
         Output("se03-tel-card-energia", "children"),
         Output("se03-telemetry-last-update", "children"),
-        Input("store-se03-telemetry", "data"),
+        Input("store-se03-telemetry-latest", "data"),
     )
     def update_kpi_cards(data):
-        """Atualiza cards com os valores mais recentes."""
+        """Atualiza cards com os valores mais recentes (1 doc por máquina vindo da aggregation)."""
         if not data:
             empty = [html.Span("—", className="fs-3 fw-bold text-muted")]
             return empty, empty, empty, empty, "—"
 
-        latest = _get_latest_by_machine(data)
-
-        # Agrega: usa MM01 se disponível, senão primeiro disponível
-        row = latest.get("SE03_MM01") or next(iter(latest.values()), {})
+        by_machine = {row.get("_id"): row for row in data}
+        row = by_machine.get("SE03_MM01") or next(iter(by_machine.values()), {})
 
         fp = row.get("FatorPotenciaTotal")
         pot_ativa_w = row.get("PotenciaAtivaMaxPeriodo")

@@ -34,7 +34,7 @@ from src.pages.energy import overview as energy_overview, config as energy_confi
 from src.pages.production import states
 
 # Manutenção
-from src.pages.maintenance import alarms, procedures, indicators, config as maintenance_config, zpp_processor, zpp_debug
+from src.pages.maintenance import alarms, procedures, indicators, config as maintenance_config, zpp_processor, zpp_debug, gantt
 
 # Workflow
 from src.pages.workflow import dashboard as workflow_dashboard
@@ -130,6 +130,8 @@ ROUTES = {
     "/maintenance/history": lambda: under_development.maintenance_development(),
     "/maintenance/indicators": indicators.layout,
     "/maintenance/config": maintenance_config.layout,
+    "/maintenance/gantt": gantt.layout,
+    "/maintenance/gantt/audit-log": gantt.audit_log_layout,
 
     # Configurações
     "/config/users": manage_users.layout_wrapper,

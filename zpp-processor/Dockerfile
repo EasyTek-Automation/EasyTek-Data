@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Criar diretórios de trabalho (serão sobrescritos por volumes)
-RUN mkdir -p /data/input /data/output /data/logs
+RUN mkdir -p /data/input /data/output /data/logs /data/rejected
 
 # Expor porta da API
 EXPOSE 5002
