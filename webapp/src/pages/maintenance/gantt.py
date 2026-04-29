@@ -170,6 +170,7 @@ def _modal_employee_management():
                                 {"label": "Turno A (00h–06h)", "value": "A"},
                                 {"label": "Turno B (06h–15h)", "value": "B"},
                                 {"label": "Turno C (15h–00h)", "value": "C"},
+                                {"label": "Administrativo (08h–17h)", "value": "ADM"},
                             ],
                             value="B",
                             className="mt-1 mb-3",

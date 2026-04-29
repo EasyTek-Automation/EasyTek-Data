@@ -66,6 +66,7 @@ TURNO_HORARIOS = {
     "A": ("00:00", "06:00"),
     "B": ("06:00", "15:00"),
     "C": ("15:00", "00:00"),
+    "ADM": ("08:00", "17:00"),
 }
 
 
@@ -936,7 +937,7 @@ def register_gantt_callbacks(app):
         if not employees:
             return html.P("Nenhum funcionário cadastrado. Use a aba 'Novo / Editar' para criar.",
                           className="text-muted")
-        TURNO_LABEL = {"A": "Turno A (00h–06h)", "B": "Turno B (06h–15h)", "C": "Turno C (15h–00h)"}
+        TURNO_LABEL = {"A": "Turno A (00h–06h)", "B": "Turno B (06h–15h)", "C": "Turno C (15h–00h)", "ADM": "Administrativo (08h–17h)"}
         rows = []
         for emp in employees:
             emp_id = str(emp["_id"])
@@ -1073,7 +1074,7 @@ def register_gantt_callbacks(app):
         if not nome or not turno:
             items = [html.Li("Nome e turno são obrigatórios.")]
             return no_update, no_update, True, items, no_update, no_update, no_update, no_update
-        if turno not in ("A", "B", "C"):
+        if turno not in ("A", "B", "C", "ADM"):
             items = [html.Li("Turno inválido.")]
             return no_update, no_update, True, items, no_update, no_update, no_update, no_update
         data = {"nome": nome.strip(), "turno_padrao": turno}
