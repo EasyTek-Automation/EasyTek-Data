@@ -1036,13 +1036,14 @@ def fetch_top_breakdowns_all(start_date: datetime, end_date: datetime,
 
         pipeline = [
             {"$match": match_stage},
-            {"$sort": {"duration_min": -1, "inicio_execucao": -1}},
+            {"$sort": {"duration_min": -1, "inicio_execucao": -1, "inicio_real_hora": -1}},
         ]
         if top_n is not None:
             pipeline.append({"$limit": top_n})
         pipeline.append({"$project": {
             "centro_de_trabalho": 1,
             "inicio_execucao": 1,
+            "inicio_real_hora": 1,           # hora real "HH:MM:SS" — combinada no return (IM-07 fix)
             "causa_do_desvio": 1,
             "duration_min": 1,
             "descricao": 1,
@@ -1059,6 +1060,22 @@ def fetch_top_breakdowns_all(start_date: datetime, end_date: datetime,
                 date = date_obj
             else:
                 continue
+
+            # `inicio_execucao` no Mongo é só a DATA (hora=00:00). Hora real fica
+            # em `inicio_real_hora` como string "HH:MM:SS". Combinar os dois para
+            # produzir datetime completo (IM-07 fix — paradas sempre apareciam 00:00).
+            hora_real = record.get("inicio_real_hora") or ""
+            if isinstance(hora_real, str) and len(hora_real) >= 5:
+                try:
+                    parts = hora_real.split(":")
+                    h = int(parts[0])
+                    m = int(parts[1]) if len(parts) > 1 else 0
+                    s = int(parts[2]) if len(parts) > 2 else 0
+                    # Sanitiza valores (defensivo contra dados sujos)
+                    if 0 <= h < 24 and 0 <= m < 60 and 0 <= s < 60:
+                        date = date.replace(hour=h, minute=m, second=s, microsecond=0)
+                except (ValueError, IndexError):
+                    pass  # mantém date sem hora
 
             motivo = record.get("causa_do_desvio", "")
             # Prioriza texto_de_confirmacao (alinha com fetch_top_breakdowns_by_equipment)
