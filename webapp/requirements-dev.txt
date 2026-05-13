@@ -1,0 +1,5 @@
+# Dependências apenas de desenvolvimento e testes.
+# NÃO incluídas na imagem de produção (Dockerfile só instala requirements.txt).
+# Instalar localmente com: pip install -r requirements-dev.txt
+
+freezegun>=1.5.0

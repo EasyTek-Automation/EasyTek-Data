@@ -684,3 +684,109 @@ def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
         traceback.print_exc()
 
     return result
+
+
+# ============================================================================
+# KPIReport — helper de agregação compartilhado (extraído de update_raw_data_tab)
+# ============================================================================
+# Reproduz a lógica da aba "Dados Brutos" da página Indicadores como função pura,
+# permitindo reuso pelo KPIReport (DS-08) e garantindo equivalência tela ↔ relatório
+# (invariante RR-01 / RV-07). Antes vivia inline em
+# `callbacks_registers/maintenance_kpi_callbacks.py::update_raw_data_tab` (linhas 991-1049
+# no commit de 2026-05-13). Movida para cá em IM-02 do projeto SDD KPIReport.
+
+
+def _build_raw_table_internal(
+    data: dict,
+    equipment_ids: list,
+    names: dict,
+    months: list,
+    year_months: list = None,
+) -> tuple:
+    """Agrega totais por equipamento + totais da planta para a aba Dados Brutos / KPIReport.
+
+    Função pura: aceita os mesmos insumos que o callback `update_raw_data_tab` recebe via
+    `stored_data` e devolve `(rows, totals)` sem efeitos colaterais. Reusada pelo
+    KPIReport (build_detalhamento_table) para garantir equivalência numérica com a tela.
+
+    Args:
+        data: dict no formato `{eq_id: [{"month": int, "year_month": str, ...}, ...]}`
+        equipment_ids: lista de equipamentos a incluir (já com escopo aplicado)
+        names: dict `{eq_id: nome_amigavel}` para resolução de nomes
+        months: lista de meses (int) a filtrar — usado quando year_months ausente
+        year_months: lista opcional de strings "YYYY-MM" — quando presente, sobrescreve months
+
+    Returns:
+        Tupla `(rows, totals)`:
+            rows: lista de dicts, um por equipamento com dados na janela
+            totals: dict da planta (soma + recálculo PRO017)
+        Se nenhum equipamento tem dados na janela, rows é lista vazia e totals tem zeros.
+    """
+    rows = []
+    for eq_id in equipment_ids:
+        if eq_id not in data:
+            continue
+        if year_months:
+            monthly_list = [m for m in data[eq_id] if m.get("year_month") in year_months]
+        else:
+            monthly_list = [m for m in data[eq_id] if m["month"] in months]
+        if not monthly_list:
+            continue
+
+        tot_fail = sum(m.get("num_failures", 0) for m in monthly_list)
+        tot_orders = sum(m.get("num_orders", 0) for m in monthly_list)
+        tot_act_h = sum(m.get("total_active_hours", 0.0) for m in monthly_list)
+        tot_bd_min = sum(m.get("total_breakdown_minutes", 0.0) for m in monthly_list)
+        tot_bd_h = tot_bd_min / 60.0
+        tot_up_h = max(tot_act_h - tot_bd_h, 0)
+
+        # KPIs recalculados dos totais (mais preciso que média de médias)
+        bd_rate = (tot_bd_h / tot_act_h * 100) if tot_act_h > 0 else None
+        if tot_fail > 0:
+            mtbf = (tot_act_h - tot_bd_h) / tot_fail
+            mttr_min = tot_bd_min / tot_fail
+        elif tot_act_h > 0:
+            mtbf = tot_act_h
+            mttr_min = 0.0
+        else:
+            mtbf = None
+            mttr_min = None
+
+        rows.append({
+            "eq_id": eq_id,
+            "equipamento": names.get(eq_id, eq_id),
+            "num_ordens": tot_orders,
+            "num_paradas": tot_fail,
+            "avaria_min": round(tot_bd_min, 3),
+            "avaria_h": round(tot_bd_h, 3),
+            "atividade_h": round(tot_act_h, 3),
+            "uptime_h": round(tot_up_h, 3),
+            "mtbf_h": round(mtbf, 3) if mtbf is not None else None,
+            "mttr_min": round(mttr_min, 3) if mttr_min is not None else None,
+            "taxa_avaria": round(bd_rate, 3) if bd_rate is not None else None,
+        })
+
+    # Totais da planta — soma dos valores brutos, KPIs recalculados sobre o agregado
+    p_orders = sum(r["num_ordens"] for r in rows)
+    p_fail = sum(r["num_paradas"] for r in rows)
+    p_act_h = sum(r["atividade_h"] for r in rows)
+    p_bd_min = sum(r["avaria_min"] for r in rows)
+    p_bd_h = p_bd_min / 60.0
+    p_up_h = sum(r["uptime_h"] for r in rows)
+    p_bd_rate = round(p_bd_h / p_act_h * 100, 3) if p_act_h > 0 else None
+    p_mtbf = round((p_act_h - p_bd_h) / p_fail, 3) if p_fail > 0 else (round(p_act_h, 3) if p_act_h > 0 else None)
+    p_mttr = round(p_bd_min / p_fail, 3) if p_fail > 0 else 0.0
+
+    totals = {
+        "num_ordens": p_orders,
+        "num_paradas": p_fail,
+        "avaria_min": round(p_bd_min, 3),
+        "avaria_h": round(p_bd_h, 3),
+        "atividade_h": round(p_act_h, 3),
+        "uptime_h": round(p_up_h, 3),
+        "mtbf_h": p_mtbf,
+        "mttr_min": p_mttr,
+        "taxa_avaria": p_bd_rate,
+    }
+
+    return rows, totals

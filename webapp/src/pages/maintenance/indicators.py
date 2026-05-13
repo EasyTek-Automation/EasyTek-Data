@@ -74,13 +74,33 @@ def layout():
                         size="sm",
                         outline=True
                     ),
-                    dbc.Button(
-                        [html.I(className="bi bi-download me-2"), "Exportar"],
-                        id="btn-export-indicators",
-                        color="secondary",
-                        size="sm",
-                        outline=True
-                    )
+                    # KPIReport (DS-06 / IM-05): botão Exportar trocado por DropdownMenu
+                    # com Excel (preservado) + DOCX (novo). dcc.Loading envolve para
+                    # spinner durante geração (RI-02 / RU-02 da RV-02).
+                    dcc.Loading(
+                        id="loading-kpi-report",
+                        type="circle",
+                        children=dbc.DropdownMenu(
+                            id="dropdown-export-indicators",
+                            label=[html.I(className="bi bi-download me-2"), "Exportar"],
+                            color="secondary",
+                            size="sm",
+                            toggle_style={"outline": "1px solid"},
+                            children=[
+                                dbc.DropdownMenuItem(
+                                    "Exportar Excel",
+                                    id="btn-export-indicators-xlsx",
+                                    n_clicks=0,
+                                ),
+                                dbc.DropdownMenuItem(
+                                    "Exportar DOCX",
+                                    id="btn-export-indicators-docx",
+                                    n_clicks=0,
+                                    disabled=True,  # estado E1 inicial (SP-16)
+                                ),
+                            ],
+                        ),
+                    ),
                 ])
             ], width=4, className="text-end d-flex align-items-center justify-content-end")
         ], className="mb-4"),
@@ -657,6 +677,7 @@ def layout():
         # ==================== STORES & DOWNLOADS ====================
         dcc.Store(id='store-indicator-filters', storage_type='memory'),
         dcc.Download(id="download-indicators-data"),
+        dcc.Download(id="download-kpi-report"),   # KPIReport (DS-06 / IM-05)
 
         # Interval para carregamento inicial de dados (executa apenas 1 vez)
         dcc.Interval(

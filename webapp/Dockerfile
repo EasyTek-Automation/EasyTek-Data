@@ -23,7 +23,11 @@ RUN apt-get update && apt-get install -y \
     libpangocairo-1.0-0 \
     libfontconfig1 \
     fonts-liberation \
+    chromium \
     && rm -rf /var/lib/apt/lists/*
+# chromium: dependência do kaleido>=1.0 para renderização Plotly→PNG dos sunbursts do KPIReport (RV-05).
+# Substituir por chromium-headless-shell em ciclo futuro — dívida registrada em
+# .dev-docs/technical-debt/kpi-report-chromium-headless-shell.md.
 
 # 4. Copiar o arquivo de dependências
 COPY requirements.txt .
@@ -46,4 +50,13 @@ EXPOSE 8050
 
 # 8. Comando para rodar a aplicação
 # Adiciona --chdir para mudar para o diretório 'src' antes de iniciar.
-CMD ["gunicorn", "--workers", "4", "--bind", "0.0.0.0:8050", "src.run:server"]
+# Flags KPIReport (RV-03):
+#  --max-requests / --jitter: reciclagem periódica de workers, mitiga hangs cumulativos do kaleido
+#  --timeout 90:               margem para o timeout duro de 60s da SP-12 (default gunicorn era 30s)
+CMD ["gunicorn", \
+     "--workers", "4", \
+     "--bind", "0.0.0.0:8050", \
+     "--max-requests", "200", \
+     "--max-requests-jitter", "50", \
+     "--timeout", "90", \
+     "src.run:server"]
