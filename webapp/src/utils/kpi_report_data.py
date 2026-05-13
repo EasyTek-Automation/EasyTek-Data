@@ -195,11 +195,15 @@ def _build_top5_paradas(
     inicio: datetime,
     fim: datetime,
     names: dict[str, str],
+    top_n: Optional[int] = 5,
 ) -> dict[str, Any]:
     """Helper compartilhado Blocos 2 e 5 — chama `fetch_top_breakdowns_all`,
     resolve nome via `names`, devolve `{"paradas": [...], "vazio": bool}` (SP-08).
+
+    `top_n=None` lista todas as paradas (Bloco 5 — BR-03 itens 5/7 revistos em 2026-05-13).
+    `top_n=5` mantém limite Top 5 (Bloco 2).
     """
-    paradas_raw = fetch_top_breakdowns_all(inicio, fim, top_n=5)
+    paradas_raw = fetch_top_breakdowns_all(inicio, fim, top_n=top_n)
     paradas = []
     for idx, p in enumerate(paradas_raw):
         eq_id = p.get("equipamento", "")
@@ -314,7 +318,8 @@ def coletar_dados_relatorio(stored_data: dict, agora: datetime) -> dict:
     months = sorted({int(ym.split("-")[1]) for ym in year_months})
     bloco4 = build_detalhamento_table(eq_ids, stored_data.get("data", {}), names, months, year_months, targets)
 
-    bloco5 = _build_top5_paradas(ini_24h, fim_24h, names)
+    # Bloco 5 lista TODAS as paradas das 24h, sem limite (BR-03 itens 5/7 revistos 2026-05-13)
+    bloco5 = _build_top5_paradas(ini_24h, fim_24h, names, top_n=None)
 
     # planta_vazia = ambos blocos planta sem dados
     def _kpis_vazio(b):

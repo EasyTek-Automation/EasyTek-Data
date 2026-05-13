@@ -989,7 +989,7 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str,
 # existente (CA-4.11 / RV-01).
 
 def fetch_top_breakdowns_all(start_date: datetime, end_date: datetime,
-                              top_n: int = 5,
+                              top_n: Optional[int] = 5,
                               breakdown_codes: Optional[List[str]] = None,
                               equipamentos_excluidos: Optional[List[str]] = None) -> List[Dict]:
     """Busca Top N paradas da planta (sem filtro de equipamento) na janela `[start, end]`.
@@ -1000,7 +1000,8 @@ def fetch_top_breakdowns_all(start_date: datetime, end_date: datetime,
     Args:
         start_date: datetime naïve — início da janela (inclusivo)
         end_date: datetime naïve — fim da janela (inclusivo)
-        top_n: quantidade de paradas a retornar (padrão 5 — BR-03)
+        top_n: quantidade de paradas a retornar; `None` retorna TODAS (sem `$limit`).
+            Bloco 5 do KPIReport usa `None` (BR-03 item 5 revisto em 2026-05-13).
         breakdown_codes: códigos de avaria (padrão: BREAKDOWN_CODES)
         equipamentos_excluidos: lista de equipamentos a excluir (padrão: lê de kpi_report_config)
 
@@ -1036,17 +1037,18 @@ def fetch_top_breakdowns_all(start_date: datetime, end_date: datetime,
         pipeline = [
             {"$match": match_stage},
             {"$sort": {"duration_min": -1, "inicio_execucao": -1}},
-            {"$limit": top_n},
-            {"$project": {
-                "centro_de_trabalho": 1,
-                "inicio_execucao": 1,
-                "causa_do_desvio": 1,
-                "duration_min": 1,
-                "descricao": 1,
-                "texto_de_confirmacao": 1,
-                "_id": 0,
-            }},
         ]
+        if top_n is not None:
+            pipeline.append({"$limit": top_n})
+        pipeline.append({"$project": {
+            "centro_de_trabalho": 1,
+            "inicio_execucao": 1,
+            "causa_do_desvio": 1,
+            "duration_min": 1,
+            "descricao": 1,
+            "texto_de_confirmacao": 1,
+            "_id": 0,
+        }})
 
         result = []
         for record in collection.aggregate(pipeline):
@@ -1073,7 +1075,7 @@ def fetch_top_breakdowns_all(start_date: datetime, end_date: datetime,
         return result
 
     except Exception:
-        logger.exception("Erro ao buscar Top %d paradas da planta", top_n)
+        logger.exception("Erro ao buscar paradas da planta (top_n=%s)", top_n)
         return []
 
 
