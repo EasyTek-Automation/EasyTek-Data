@@ -178,7 +178,7 @@ def _build_kpis_bloco_planta(
             )
             # Aumenta fonte das legendas só na figura usada no DOCX — não afeta tela
             # (perfumaria 2026-05-13: legendas eram pequenas demais quando renderizadas).
-            fig.update_layout(font=dict(size=18), margin=dict(t=8, b=8, l=8, r=8))
+            fig.update_layout(font=dict(size=22), margin=dict(t=8, b=8, l=8, r=8))
             sunburst_figures[kpi_key] = renderizar_sunburst_png(fig, cfg.KPI_LABELS[kpi_key])
         except Exception as exc:
             logger.warning("Falha ao construir sunburst %s: %s — usando placeholder", kpi_key, type(exc).__name__)
