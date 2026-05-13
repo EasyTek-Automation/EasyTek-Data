@@ -1027,7 +1027,7 @@ def fetch_top_breakdowns_all(start_date: datetime, end_date: datetime,
             "causa_do_desvio": {"$in": codes},
             "inicio_execucao": {
                 "$gte": start_date,
-                "$lte": end_date,
+                "$lt": end_date,           # janela SEMI-ABERTA `[ini, fim)` — alinha com compute_*_window (IM-07 fix)
                 "$exists": True,
             },
         }
