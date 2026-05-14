@@ -679,6 +679,39 @@ def layout():
         dcc.Download(id="download-indicators-data"),
         dcc.Download(id="download-kpi-report"),   # KPIReport (DS-06 / IM-05)
 
+        # Toast de progresso da geração DOCX (auto-dismiss em 10s)
+        dbc.Toast(
+            children=[
+                "As informações estão sendo compiladas e renderizadas para geração do seu relatório. "
+                "Esse processo pode durar de 15 a 30s.",
+                dbc.Progress(
+                    id="toast-kpi-report-progress",
+                    value=100,
+                    color="info",
+                    striped=True,
+                    animated=True,
+                    className="mt-2",
+                    style={"height": "5px"},
+                ),
+            ],
+            id="toast-kpi-report-generating",
+            header="Gerando relatório...",
+            is_open=False,
+            dismissable=True,
+            duration=10000,
+            icon="info",
+            style={
+                "position": "fixed",
+                "top": "155px",
+                "right": "20px",
+                "zIndex": 1999,
+                "minWidth": "320px",
+                "maxWidth": "420px",
+            },
+        ),
+        # Interval que alimenta a barra de progresso (tick a cada 100ms; 100 ticks = 10s)
+        dcc.Interval(id="interval-toast-kpi-report-tick", interval=100, disabled=True, n_intervals=0),
+
         # Interval para carregamento inicial de dados (executa apenas 1 vez)
         dcc.Interval(
             id='interval-initial-load',

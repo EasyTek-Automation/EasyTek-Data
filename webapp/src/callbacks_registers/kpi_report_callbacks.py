@@ -142,6 +142,40 @@ def register_kpi_report_callbacks(app: dash.Dash) -> None:
             return dash.no_update, "Exportar DOCX", False
 
     @app.callback(
+        Output("toast-kpi-report-generating", "is_open"),
+        Output("toast-kpi-report-progress", "value", allow_duplicate=True),
+        Output("interval-toast-kpi-report-tick", "disabled", allow_duplicate=True),
+        Output("interval-toast-kpi-report-tick", "n_intervals"),
+        Input("btn-export-indicators-docx", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def open_kpi_report_toast(n_clicks):
+        """Abre toast de progresso imediatamente ao clicar em Exportar DOCX.
+
+        Reseta barra (`value=100`) e Interval (`n_intervals=0`, `disabled=False`)
+        para reiniciar a contagem em cada clique. Roda em paralelo à geração; toast
+        fecha sozinho em 10s (`duration=10000`) ou via botão dismiss.
+        """
+        if not n_clicks:
+            raise dash.exceptions.PreventUpdate
+        return True, 100, False, 0
+
+    @app.callback(
+        Output("toast-kpi-report-progress", "value", allow_duplicate=True),
+        Output("interval-toast-kpi-report-tick", "disabled", allow_duplicate=True),
+        Input("interval-toast-kpi-report-tick", "n_intervals"),
+        prevent_initial_call=True,
+    )
+    def tick_kpi_report_progress(n_intervals):
+        """Decrementa barra 100→0 em 100 ticks de 100ms (= 10s); desabilita ao chegar a 0."""
+        if n_intervals is None:
+            raise dash.exceptions.PreventUpdate
+        remaining = max(0, 100 - n_intervals)
+        if remaining == 0:
+            return 0, True
+        return remaining, False
+
+    @app.callback(
         Output("btn-export-indicators-docx", "disabled", allow_duplicate=True),
         Input("store-indicator-filters", "data"),
         prevent_initial_call="initial_duplicate",  # Dash 3.x exige c/ allow_duplicate (adaptação IM-05)

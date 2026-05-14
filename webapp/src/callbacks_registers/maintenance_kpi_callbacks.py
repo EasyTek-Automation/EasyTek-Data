@@ -205,7 +205,7 @@ def register_maintenance_kpi_callbacks(app):
         if not ref_year:
             ref_year = 2026  # Ano padrão onde os dados ZPP estão disponíveis
 
-        from datetime import datetime as _datetime
+        from datetime import datetime as _datetime, timedelta as _timedelta
         from src.utils.zpp_kpi_calculator import _get_month_periods
 
         # ── Calcular start_date_dt / end_date_dt para todos os tipos de período ──
@@ -227,7 +227,12 @@ def register_maintenance_kpi_callbacks(app):
                 period_end = f"{year}-12-31"
             else:
                 start_date_dt = _datetime.fromisoformat(start_date) if isinstance(start_date, str) else start_date
-                end_date_dt = _datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
+                _end_raw = _datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
+                # Custom range UX: usuário escolhe "11/05 a 12/05" esperando AMBOS os dias.
+                # Date picker entrega 00:00 do dia escolhido — sem ajuste, janela `[start, end)`
+                # exclui o dia "end" inteiro. Somar 1 dia transforma em `[start, end+1d)`,
+                # cobrindo o dia "end" inteiro. Alinha com fix $lt em fetch_top_breakdowns_all.
+                end_date_dt = _end_raw + _timedelta(days=1)
                 period_start = start_date if isinstance(start_date, str) else start_date.isoformat()
                 period_end = end_date if isinstance(end_date, str) else end_date.isoformat()
                 year = start_date_dt.year  # Ano de início (para compatibilidade em display)

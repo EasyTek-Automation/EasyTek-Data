@@ -297,29 +297,35 @@ def coletar_dados_relatorio(stored_data: dict, agora: datetime) -> dict:
         "data_clique":   agora,
     }
 
-    # Datasets: Bloco 1 usa o mensal já presente no store; Bloco 3 (24h) precisa
-    # de fresh fetch com janela fina — `stored_data["data"]` é agregado mensal,
-    # sem granularidade diária. Sem este fetch, Bloco 3 ficaria idêntico ao Bloco 1
-    # (bug detectado durante validação manual IM-07).
-    data_mensal = stored_data.get("data", {})
+    # Datasets: cada bloco faz fresh fetch da sua própria janela. NÃO reusar
+    # `stored_data["data"]` — o store reflete o filtro custom da página, que pode
+    # divergir do mês corrente (bug reportado em 2026-05-13: filtro "11→11" da tela
+    # contaminava Bloco 1 do DOCX, violando BR-01). Custo: 2 queries Mongo extras
+    # por geração, sem cache do store.
+    try:
+        data_mensal = fetch_zpp_kpi_data(ini_mensal, fim_mensal)
+    except Exception as exc:
+        logger.warning("Falha ao buscar dados mensais para Bloco 1/4: %s — usando dict vazio", type(exc).__name__)
+        data_mensal = {}
     try:
         data_24h = fetch_zpp_kpi_data(ini_24h, fim_24h)
     except Exception as exc:
         logger.warning("Falha ao buscar dados 24h para Bloco 3: %s — usando dict vazio", type(exc).__name__)
         data_24h = {}
 
-    year = stored_data.get("year")
-    monthly_aggs = stored_data.get("monthly_aggregates")
+    # `year` e `monthly_aggregates` derivam da janela mensal própria do DOCX,
+    # não do store da página — força recomputação a partir de data_mensal.
+    year = ini_mensal.year
 
     bloco1 = _build_kpis_bloco_planta(eq_ids, ini_mensal, fim_mensal, targets, names, categories,
-                                       kpi_data=data_mensal, year=year, monthly_aggregates=monthly_aggs)
+                                       kpi_data=data_mensal, year=year, monthly_aggregates=None)
     bloco2 = _build_top5_paradas(ini_mensal, fim_mensal, names)
     bloco3 = _build_kpis_bloco_planta(eq_ids, ini_24h, fim_24h, targets, names, categories,
                                        kpi_data=data_24h, year=year, monthly_aggregates=None)
 
     year_months = _date_range_to_year_months(ini_mensal, fim_mensal)
     months = sorted({int(ym.split("-")[1]) for ym in year_months})
-    bloco4 = build_detalhamento_table(eq_ids, stored_data.get("data", {}), names, months, year_months, targets)
+    bloco4 = build_detalhamento_table(eq_ids, data_mensal, names, months, year_months, targets)
 
     # Bloco 5 lista TODAS as paradas das 24h, sem limite (BR-03 itens 5/7 revistos 2026-05-13)
     bloco5 = _build_top5_paradas(ini_24h, fim_24h, names, top_n=None)

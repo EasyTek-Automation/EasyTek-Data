@@ -992,14 +992,17 @@ def fetch_top_breakdowns_all(start_date: datetime, end_date: datetime,
                               top_n: Optional[int] = 5,
                               breakdown_codes: Optional[List[str]] = None,
                               equipamentos_excluidos: Optional[List[str]] = None) -> List[Dict]:
-    """Busca Top N paradas da planta (sem filtro de equipamento) na janela `[start, end]`.
+    """Busca Top N paradas da planta (sem filtro de equipamento) na janela `[start, end)`.
+
+    Janela SEMI-ABERTA — registros com `inicio_execucao == end_date` são excluídos.
+    Alinha com `compute_monthly_window` / `compute_last_24h_window` (IM-07 fix `$lt`).
 
     Ordenação `duration_min DESC, inicio_execucao DESC` (BR-03 tiebreak). Aplica
     `$nin` em `centro_de_trabalho` para excluir equipamentos da lista (BR-05 item 3).
 
     Args:
-        start_date: datetime naïve — início da janela (inclusivo)
-        end_date: datetime naïve — fim da janela (inclusivo)
+        start_date: datetime naïve — início da janela (inclusivo, `$gte`)
+        end_date: datetime naïve — fim da janela (exclusivo, `$lt`)
         top_n: quantidade de paradas a retornar; `None` retorna TODAS (sem `$limit`).
             Bloco 5 do KPIReport usa `None` (BR-03 item 5 revisto em 2026-05-13).
         breakdown_codes: códigos de avaria (padrão: BREAKDOWN_CODES)
