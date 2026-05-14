@@ -980,6 +980,125 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str,
         return []
 
 
+# ============================================================================
+# KPIReport — Top N paradas da planta (sem filtro de equipamento)
+# ============================================================================
+# Adicionada em 2026-05-13 (IM-04 do projeto SDD KPIReport). Vizinha de
+# `fetch_top_breakdowns_by_equipment` (acima), mas escopa a planta inteira
+# excluindo `EQUIPAMENTOS_EXCLUIDOS` (BR-05 item 3). Não modifica a função
+# existente (CA-4.11 / RV-01).
+
+def fetch_top_breakdowns_all(start_date: datetime, end_date: datetime,
+                              top_n: Optional[int] = 5,
+                              breakdown_codes: Optional[List[str]] = None,
+                              equipamentos_excluidos: Optional[List[str]] = None) -> List[Dict]:
+    """Busca Top N paradas da planta (sem filtro de equipamento) na janela `[start, end)`.
+
+    Janela SEMI-ABERTA — registros com `inicio_execucao == end_date` são excluídos.
+    Alinha com `compute_monthly_window` / `compute_last_24h_window` (IM-07 fix `$lt`).
+
+    Ordenação `duration_min DESC, inicio_execucao DESC` (BR-03 tiebreak). Aplica
+    `$nin` em `centro_de_trabalho` para excluir equipamentos da lista (BR-05 item 3).
+
+    Args:
+        start_date: datetime naïve — início da janela (inclusivo, `$gte`)
+        end_date: datetime naïve — fim da janela (exclusivo, `$lt`)
+        top_n: quantidade de paradas a retornar; `None` retorna TODAS (sem `$limit`).
+            Bloco 5 do KPIReport usa `None` (BR-03 item 5 revisto em 2026-05-13).
+        breakdown_codes: códigos de avaria (padrão: BREAKDOWN_CODES)
+        equipamentos_excluidos: lista de equipamentos a excluir (padrão: lê de kpi_report_config)
+
+    Returns:
+        Lista de dicts ordenados por duração desc:
+        [{"equipamento", "inicio_execucao", "duration_min", "causa_do_desvio", "descricao"}, ...]
+    """
+    codes = breakdown_codes if breakdown_codes else BREAKDOWN_CODES
+
+    if equipamentos_excluidos is None:
+        # Import lazy — evita circular import entre zpp_kpi_calculator ↔ kpi_report_config
+        try:
+            from src.utils.kpi_report_config import EQUIPAMENTOS_EXCLUIDOS
+            equipamentos_excluidos = EQUIPAMENTOS_EXCLUIDOS
+        except ImportError:
+            equipamentos_excluidos = []
+
+    try:
+        collection = get_mongo_connection(ZPP_PARADAS_COLLECTION)
+
+        match_stage = {
+            "_processed": True,
+            "causa_do_desvio": {"$in": codes},
+            "inicio_execucao": {
+                "$gte": start_date,
+                "$lt": end_date,           # janela SEMI-ABERTA `[ini, fim)` — alinha com compute_*_window (IM-07 fix)
+                "$exists": True,
+            },
+        }
+        if equipamentos_excluidos:
+            match_stage["centro_de_trabalho"] = {"$nin": equipamentos_excluidos}
+
+        pipeline = [
+            {"$match": match_stage},
+            {"$sort": {"duration_min": -1, "inicio_execucao": -1, "inicio_real_hora": -1}},
+        ]
+        if top_n is not None:
+            pipeline.append({"$limit": top_n})
+        pipeline.append({"$project": {
+            "centro_de_trabalho": 1,
+            "inicio_execucao": 1,
+            "inicio_real_hora": 1,           # hora real "HH:MM:SS" — combinada no return (IM-07 fix)
+            "causa_do_desvio": 1,
+            "duration_min": 1,
+            "descricao": 1,
+            "texto_de_confirmacao": 1,
+            "_id": 0,
+        }})
+
+        result = []
+        for record in collection.aggregate(pipeline):
+            date_obj = record.get("inicio_execucao")
+            if isinstance(date_obj, dict) and "$date" in date_obj:
+                date = datetime.fromisoformat(date_obj["$date"].replace('Z', '+00:00'))
+            elif isinstance(date_obj, datetime):
+                date = date_obj
+            else:
+                continue
+
+            # `inicio_execucao` no Mongo é só a DATA (hora=00:00). Hora real fica
+            # em `inicio_real_hora` como string "HH:MM:SS". Combinar os dois para
+            # produzir datetime completo (IM-07 fix — paradas sempre apareciam 00:00).
+            hora_real = record.get("inicio_real_hora") or ""
+            if isinstance(hora_real, str) and len(hora_real) >= 5:
+                try:
+                    parts = hora_real.split(":")
+                    h = int(parts[0])
+                    m = int(parts[1]) if len(parts) > 1 else 0
+                    s = int(parts[2]) if len(parts) > 2 else 0
+                    # Sanitiza valores (defensivo contra dados sujos)
+                    if 0 <= h < 24 and 0 <= m < 60 and 0 <= s < 60:
+                        date = date.replace(hour=h, minute=m, second=s, microsecond=0)
+                except (ValueError, IndexError):
+                    pass  # mantém date sem hora
+
+            motivo = record.get("causa_do_desvio", "")
+            # Prioriza texto_de_confirmacao (alinha com fetch_top_breakdowns_by_equipment)
+            descricao = record.get("texto_de_confirmacao") or record.get("descricao") or ""
+
+            result.append({
+                "equipamento": record.get("centro_de_trabalho", ""),
+                "inicio_execucao": date,
+                "duration_min": float(record.get("duration_min", 0)),
+                "causa_do_desvio": motivo,
+                "descricao": descricao,
+            })
+
+        return result
+
+    except Exception:
+        logger.exception("Erro ao buscar paradas da planta (top_n=%s)", top_n)
+        return []
+
+
 if __name__ == "__main__":
     """Script de teste para validar cálculos"""
 

@@ -21,7 +21,8 @@ from src.utils.maintenance_demo_data import (
     calculate_kpi_averages,
     calculate_general_avg_by_month,
     get_kpi_targets,
-    get_all_equipment_targets
+    get_all_equipment_targets,
+    _build_raw_table_internal,
 )
 
 # Importar funções de integração com ZPP
@@ -204,7 +205,7 @@ def register_maintenance_kpi_callbacks(app):
         if not ref_year:
             ref_year = 2026  # Ano padrão onde os dados ZPP estão disponíveis
 
-        from datetime import datetime as _datetime
+        from datetime import datetime as _datetime, timedelta as _timedelta
         from src.utils.zpp_kpi_calculator import _get_month_periods
 
         # ── Calcular start_date_dt / end_date_dt para todos os tipos de período ──
@@ -226,7 +227,12 @@ def register_maintenance_kpi_callbacks(app):
                 period_end = f"{year}-12-31"
             else:
                 start_date_dt = _datetime.fromisoformat(start_date) if isinstance(start_date, str) else start_date
-                end_date_dt = _datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
+                _end_raw = _datetime.fromisoformat(end_date) if isinstance(end_date, str) else end_date
+                # Custom range UX: usuário escolhe "11/05 a 12/05" esperando AMBOS os dias.
+                # Date picker entrega 00:00 do dia escolhido — sem ajuste, janela `[start, end)`
+                # exclui o dia "end" inteiro. Somar 1 dia transforma em `[start, end+1d)`,
+                # cobrindo o dia "end" inteiro. Alinha com fix $lt em fetch_top_breakdowns_all.
+                end_date_dt = _end_raw + _timedelta(days=1)
                 period_start = start_date if isinstance(start_date, str) else start_date.isoformat()
                 period_end = end_date if isinstance(end_date, str) else end_date.isoformat()
                 year = start_date_dt.year  # Ano de início (para compatibilidade em display)
@@ -988,65 +994,23 @@ def register_maintenance_kpi_callbacks(app):
             for eq in eq_list
         }
 
-        # Agregar totais do período por equipamento
-        rows = []
-        for eq_id in equipment_ids:
-            if eq_id not in data:
-                continue
-            if year_months:
-                monthly_list = [m for m in data[eq_id] if m.get("year_month") in year_months]
-            else:
-                monthly_list = [m for m in data[eq_id] if m["month"] in months]
-            if not monthly_list:
-                continue
-
-            tot_fail = sum(m.get("num_failures", 0) for m in monthly_list)
-            tot_orders = sum(m.get("num_orders", 0) for m in monthly_list)
-            tot_act_h = sum(m.get("total_active_hours", 0.0) for m in monthly_list)
-            tot_bd_min = sum(m.get("total_breakdown_minutes", 0.0) for m in monthly_list)
-            tot_bd_h = tot_bd_min / 60.0
-            tot_up_h = max(tot_act_h - tot_bd_h, 0)
-
-            # KPIs recalculados dos totais (mais preciso que média de médias)
-            bd_rate = (tot_bd_h / tot_act_h * 100) if tot_act_h > 0 else None
-            if tot_fail > 0:
-                mtbf = (tot_act_h - tot_bd_h) / tot_fail
-                mttr_min = tot_bd_min / tot_fail
-            elif tot_act_h > 0:
-                mtbf = tot_act_h
-                mttr_min = 0.0
-            else:
-                mtbf = None
-                mttr_min = None
-
-            rows.append({
-                "eq_id": eq_id,
-                "equipamento": names.get(eq_id, eq_id),
-                "num_ordens": tot_orders,
-                "num_paradas": tot_fail,
-                "avaria_min": round(tot_bd_min, 3),
-                "avaria_h": round(tot_bd_h, 3),
-                "atividade_h": round(tot_act_h, 3),
-                "uptime_h": round(tot_up_h, 3),
-                "mtbf_h": round(mtbf, 3) if mtbf is not None else None,
-                "mttr_min": round(mttr_min, 3) if mttr_min is not None else None,
-                "taxa_avaria": round(bd_rate, 3) if bd_rate is not None else None,
-            })
-
+        # Agregação extraída para utils/maintenance_demo_data.py em 2026-05-13 (IM-02 do projeto SDD KPIReport).
+        # Mantém comportamento idêntico; permite reuso pelo KPIReport (build_detalhamento_table)
+        # com gate de equivalência tela ↔ relatório (RR-01 / RV-07).
+        rows, totals = _build_raw_table_internal(data, equipment_ids, names, months, year_months)
         if not rows:
             return [_empty, _empty, _empty, _empty, _empty]
 
-        # ── Totais da planta ─────────────────────────────────────
-        # Somar os valores brutos (não os já arredondados) para máxima precisão
-        p_orders = sum(r["num_ordens"]   for r in rows)
-        p_fail   = sum(r["num_paradas"]  for r in rows)
-        p_act_h  = sum(r["atividade_h"]  for r in rows)
-        p_bd_min = sum(r["avaria_min"]   for r in rows)
-        p_bd_h   = p_bd_min / 60.0
-        p_up_h   = sum(r["uptime_h"]     for r in rows)
-        p_bd_rate = round(p_bd_h / p_act_h * 100, 3) if p_act_h > 0 else None
-        p_mtbf    = round((p_act_h - p_bd_h) / p_fail, 3) if p_fail > 0 else (round(p_act_h, 3) if p_act_h > 0 else None)
-        p_mttr    = round(p_bd_min / p_fail, 3) if p_fail > 0 else 0.0
+        # Desempacotar totais da planta (mantendo nomes locais por compatibilidade com o resto do callback)
+        p_orders  = totals["num_ordens"]
+        p_fail    = totals["num_paradas"]
+        p_act_h   = totals["atividade_h"]
+        p_bd_min  = totals["avaria_min"]
+        p_bd_h    = totals["avaria_h"]
+        p_up_h    = totals["uptime_h"]
+        p_bd_rate = totals["taxa_avaria"]
+        p_mtbf    = totals["mtbf_h"]
+        p_mttr    = totals["mttr_min"]
 
         def _fv(v, dec=1):
             """Formata float para string ou '—' se None."""
@@ -1402,7 +1366,7 @@ def register_maintenance_kpi_callbacks(app):
     # ============================================================
     @app.callback(
         Output("download-indicators-data", "data"),
-        Input("btn-export-indicators", "n_clicks"),
+        Input("btn-export-indicators-xlsx", "n_clicks"),   # ID alterado — DS-06 / IM-05 (KPIReport)
         State("store-indicator-filters", "data"),
         prevent_initial_call=True
     )

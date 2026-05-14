@@ -151,6 +151,7 @@ def create_maintenance_indicators_filters():
                         display_format="DD/MM/YYYY",
                         start_date_placeholder_text="Data Início",
                         end_date_placeholder_text="Data Fim",
+                        minimum_nights=0,
                         style={"fontSize": "0.85rem", "width": "100%"},
                         className="w-100"
                     )
