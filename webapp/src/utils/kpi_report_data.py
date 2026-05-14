@@ -93,6 +93,7 @@ def _build_kpis_bloco_planta(
     kpi_data: dict,
     year: int = None,
     monthly_aggregates: dict = None,
+    as_png: bool = True,
 ) -> dict[str, Any]:
     """Helper compartilhado por Blocos 1 e 3 — KPIs planta + 3 sunbursts.
 
@@ -100,6 +101,10 @@ def _build_kpis_bloco_planta(
     usar dataset mensal (`stored_data["data"]`); para Bloco 3 usar fresh fetch
     com `fetch_zpp_kpi_data(inicio_24h, fim_24h)` (a tabela mensal não tem
     granularidade diária — IM-07 fix).
+
+    `as_png`: True (DOCX) → `sunburst_figures` em bytes PNG via kaleido.
+    False (tela — IM-08) → `sunburst_figures` em objetos Plotly Figure nativos
+    para renderização interativa via `dcc.Graph`.
 
     Retorna dict com `kpis_planta`, `sunburst_figures`, `metas`, `cores_kpis`,
     `alert_range`.
@@ -176,14 +181,21 @@ def _build_kpis_bloco_planta(
                 show_average=True,
                 plant_average=plant_avg_raw,
             )
-            # Aumenta fonte das legendas só na figura usada no DOCX — não afeta tela
-            # (perfumaria 2026-05-13: legendas eram pequenas demais quando renderizadas).
-            fig.update_layout(font=dict(size=22), margin=dict(t=8, b=8, l=8, r=8))
-            sunburst_figures[kpi_key] = renderizar_sunburst_png(fig, cfg.KPI_LABELS[kpi_key])
+            if as_png:
+                # Aumenta fonte das legendas só na figura usada no DOCX — não afeta tela
+                # (perfumaria 2026-05-13: legendas eram pequenas demais quando renderizadas).
+                fig.update_layout(font=dict(size=22), margin=dict(t=8, b=8, l=8, r=8))
+                sunburst_figures[kpi_key] = renderizar_sunburst_png(fig, cfg.KPI_LABELS[kpi_key])
+            else:
+                # Tela (IM-08) — retorna Plotly Figure nativo (interativo via dcc.Graph)
+                sunburst_figures[kpi_key] = fig
         except Exception as exc:
             logger.warning("Falha ao construir sunburst %s: %s — usando placeholder", kpi_key, type(exc).__name__)
-            from src.utils.kpi_report_figures import _gerar_placeholder_png
-            sunburst_figures[kpi_key] = _gerar_placeholder_png(cfg.KPI_LABELS[kpi_key], 900, 700, 2)
+            if as_png:
+                from src.utils.kpi_report_figures import _gerar_placeholder_png
+                sunburst_figures[kpi_key] = _gerar_placeholder_png(cfg.KPI_LABELS[kpi_key], 900, 700, 2)
+            else:
+                sunburst_figures[kpi_key] = None  # tela trata None mostrando aviso
 
     return {
         "kpis_planta":      kpis_planta,
@@ -270,11 +282,14 @@ def build_detalhamento_table(
 # Orquestrador — coletar_dados_relatorio (SP-04 item 6)
 # =========================================================================
 
-def coletar_dados_relatorio(stored_data: dict, agora: datetime) -> dict:
+def coletar_dados_relatorio(stored_data: dict, agora: datetime, as_png: bool = True) -> dict:
     """Orquestra coleta completa — devolve dict consolidado para o template.
 
     Estrutura em SP-04 item 6 + DS-03 (chaves `periodo`, `bloco1..5`, `planta_vazia`).
     `agora` aware no fuso (`_now_in_report_timezone`). `stored_data` validado pelo callback.
+
+    `as_png`: True (default — DOCX) gera sunbursts em PNG via kaleido. False (tela,
+    IM-08) devolve `plotly.graph_objects.Figure` nativos para renderização interativa.
     """
     eq_ids = _aplicar_escopo(stored_data)
     names = stored_data.get("names", {}) or {}
@@ -318,10 +333,12 @@ def coletar_dados_relatorio(stored_data: dict, agora: datetime) -> dict:
     year = ini_mensal.year
 
     bloco1 = _build_kpis_bloco_planta(eq_ids, ini_mensal, fim_mensal, targets, names, categories,
-                                       kpi_data=data_mensal, year=year, monthly_aggregates=None)
+                                       kpi_data=data_mensal, year=year, monthly_aggregates=None,
+                                       as_png=as_png)
     bloco2 = _build_top5_paradas(ini_mensal, fim_mensal, names)
     bloco3 = _build_kpis_bloco_planta(eq_ids, ini_24h, fim_24h, targets, names, categories,
-                                       kpi_data=data_24h, year=year, monthly_aggregates=None)
+                                       kpi_data=data_24h, year=year, monthly_aggregates=None,
+                                       as_png=as_png)
 
     year_months = _date_range_to_year_months(ini_mensal, fim_mensal)
     months = sorted({int(ym.split("-")[1]) for ym in year_months})

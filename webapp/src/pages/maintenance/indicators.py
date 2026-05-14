@@ -74,32 +74,15 @@ def layout():
                         size="sm",
                         outline=True
                     ),
-                    # KPIReport (DS-06 / IM-05): botão Exportar trocado por DropdownMenu
-                    # com Excel (preservado) + DOCX (novo). dcc.Loading envolve para
-                    # spinner durante geração (RI-02 / RU-02 da RV-02).
-                    dcc.Loading(
-                        id="loading-kpi-report",
-                        type="circle",
-                        children=dbc.DropdownMenu(
-                            id="dropdown-export-indicators",
-                            label=[html.I(className="bi bi-download me-2"), "Exportar"],
-                            color="secondary",
-                            size="sm",
-                            toggle_style={"outline": "1px solid"},
-                            children=[
-                                dbc.DropdownMenuItem(
-                                    "Exportar Excel",
-                                    id="btn-export-indicators-xlsx",
-                                    n_clicks=0,
-                                ),
-                                dbc.DropdownMenuItem(
-                                    "Exportar DOCX",
-                                    id="btn-export-indicators-docx",
-                                    n_clicks=0,
-                                    disabled=True,  # estado E1 inicial (SP-16)
-                                ),
-                            ],
-                        ),
+                    # IM-08: Excel fica como botão simples no header da página;
+                    # DOCX migrou para dentro da Tab 4 "Relatório Diário".
+                    dbc.Button(
+                        [html.I(className="bi bi-file-earmark-excel me-2"), "Exportar"],
+                        id="btn-export-indicators-xlsx",
+                        color="secondary",
+                        size="sm",
+                        n_clicks=0,
+                        outline=True,
                     ),
                 ])
             ], width=4, className="text-end d-flex align-items-center justify-content-end")
@@ -380,7 +363,54 @@ def layout():
                 ]
             ),
 
-            # Tab 2: Individual (Equipamento Selecionado)
+            # Tab 2: Dados Brutos (Conferência)
+            dbc.Tab(
+                label="📋 Dados",
+                tab_id="tab-data",
+                children=[
+                    html.Div([
+
+                        # Cobertura de dados: último dia e nº de dias por collection
+                        html.Div(id="raw-data-coverage-info", className="mb-4"),
+
+                        # Tabela de diagnóstico — base de cálculo dos cards do topo
+                        html.H5([
+                            html.I(className="bi bi-eyeglasses me-2"),
+                            "Como os Cards do Topo São Calculados"
+                        ], className="mt-3 mb-1"),
+                        html.P(
+                            "Para cada mês: KPI calculado dos totais brutos daquele mês. "
+                            "O valor exibido nos cards do topo é a média aritmética desses valores mensais.",
+                            className="text-muted small mb-3"
+                        ),
+                        html.Div(id="raw-data-monthly-debug", className="mb-4"),
+
+                        # Card resumo geral da planta
+                        html.H5([
+                            html.I(className="bi bi-calculator me-2"),
+                            "Resumo da Planta"
+                        ], className="mt-3 mb-3"),
+                        html.Div(id="raw-data-summary-cards", className="mb-4"),
+
+                        # Tabela por motivo de parada
+                        html.H5([
+                            html.I(className="bi bi-list-ul me-2"),
+                            "Motivos de Parada"
+                        ], className="mt-3 mb-3"),
+                        html.Div(id="raw-data-motivos-table", className="mb-4"),
+
+                        # Tabela detalhada por equipamento
+                        html.H5([
+                            html.I(className="bi bi-table me-2"),
+                            "Detalhamento por Equipamento"
+                        ], className="mb-3"),
+                        html.Div(id="raw-data-table-container")
+
+                    ], className="p-3")
+                ]
+            ),
+
+            # Tab 3: Individual (Equipamento Selecionado)
             dbc.Tab(
                 label="🔧 Individual",
                 tab_id="tab-individual",
@@ -625,48 +655,41 @@ def layout():
                 ]
             ),
 
-            # Tab 3: Dados Brutos (Conferência)
+            # Tab 4: Relatório Diário (renderização do DOCX na tela — IM-08)
             dbc.Tab(
-                label="📋 Dados",
-                tab_id="tab-data",
+                label="📄 Relatório Diário",
+                tab_id="tab-relatorio-diario",
                 children=[
                     html.Div([
-
-                        # Cobertura de dados: último dia e nº de dias por collection
-                        html.Div(id="raw-data-coverage-info", className="mb-4"),
-
-                        # Tabela de diagnóstico — base de cálculo dos cards do topo
-                        html.H5([
-                            html.I(className="bi bi-eyeglasses me-2"),
-                            "Como os Cards do Topo São Calculados"
-                        ], className="mt-3 mb-1"),
-                        html.P(
-                            "Para cada mês: KPI calculado dos totais brutos daquele mês. "
-                            "O valor exibido nos cards do topo é a média aritmética desses valores mensais.",
-                            className="text-muted small mb-3"
-                        ),
-                        html.Div(id="raw-data-monthly-debug", className="mb-4"),
-
-                        # Card resumo geral da planta
-                        html.H5([
-                            html.I(className="bi bi-calculator me-2"),
-                            "Resumo da Planta"
-                        ], className="mt-3 mb-3"),
-                        html.Div(id="raw-data-summary-cards", className="mb-4"),
-
-                        # Tabela por motivo de parada
-                        html.H5([
-                            html.I(className="bi bi-list-ul me-2"),
-                            "Motivos de Parada"
-                        ], className="mt-3 mb-3"),
-                        html.Div(id="raw-data-motivos-table", className="mb-4"),
-
-                        # Tabela detalhada por equipamento
-                        html.H5([
-                            html.I(className="bi bi-table me-2"),
-                            "Detalhamento por Equipamento"
+                        # Header com botão Exportar DOCX
+                        dbc.Row([
+                            dbc.Col([
+                                html.H4("Relatório Diário de Manutenção", className="mb-1"),
+                                html.Small(id="rd-periodo-label", className="text-muted"),
+                            ], width=8),
+                            dbc.Col([
+                                dcc.Loading(
+                                    id="loading-kpi-report",
+                                    type="circle",
+                                    children=dbc.Button(
+                                        [html.I(className="bi bi-file-earmark-word me-2"), "Exportar DOCX"],
+                                        id="btn-export-indicators-docx",
+                                        color="primary",
+                                        size="sm",
+                                        n_clicks=0,
+                                        disabled=True,
+                                        className="float-end",
+                                    ),
+                                ),
+                            ], width=4),
                         ], className="mb-3"),
-                        html.Div(id="raw-data-table-container")
+
+                        # Container preenchido pelo callback render_relatorio_diario
+                        dcc.Loading(
+                            id="loading-relatorio-diario",
+                            type="default",
+                            children=html.Div(id="rd-content-container"),
+                        ),
 
                     ], className="p-3")
                 ]
