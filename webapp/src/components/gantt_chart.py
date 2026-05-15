@@ -1249,6 +1249,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 if asg_rows:
                     act_rows.append(html.Div(
                         asg_rows,
+                        id={"type": "gantt-activity-rows", "index": act_id},
                         style={"display": "block" if act_expanded else "none"},
                     ))
 
