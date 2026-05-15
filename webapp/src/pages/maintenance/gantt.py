@@ -301,6 +301,15 @@ def layout():
         dcc.Store(id="store-gantt-view-mode",        storage_type="local",  data="projeto"),
         dcc.Store(id="store-gantt-employees-state",  storage_type="local",  data={}),
 
+        # Stores de dados estruturais (Feature C — DS-10 / SP-14)
+        # Inicial None distingue "ainda não carregado" (None) de "sem dados" ([]).
+        dcc.Store(id="store-gantt-data-projects",    storage_type="memory", data=None),
+        dcc.Store(id="store-gantt-data-categories",  storage_type="memory", data=None),
+        dcc.Store(id="store-gantt-data-activities",  storage_type="memory", data=None),
+        dcc.Store(id="store-gantt-data-assignments", storage_type="memory", data=None),
+        dcc.Store(id="store-gantt-data-employees",   storage_type="memory", data=None),
+        dcc.Store(id="store-gantt-data-status",      storage_type="memory", data="idle"),
+
         # Header
         dbc.Row([
             dbc.Col([
@@ -314,6 +323,15 @@ def layout():
             ], width=8),
             dbc.Col([
                 dbc.ButtonGroup([
+                    dbc.Button(
+                        [html.I(className="bi bi-arrow-clockwise me-1"), "Atualizar"],
+                        id="btn-gantt-refresh",
+                        color="secondary",
+                        outline=True,
+                        size="sm",
+                        n_clicks=0,
+                        title="Recarregar dados do banco",
+                    ),
                     dbc.Button(
                         [html.I(className="bi bi-journal-text me-1"), "Auditoria"],
                         href="/maintenance/gantt/audit-log",
@@ -457,7 +475,14 @@ def layout():
                 style={"backgroundColor": "#66A593", "borderBottom": "none"},
             ),
             dbc.CardBody(
-                html.Div(id="gantt-chart-container", style={"minHeight": "200px"}),
+                dcc.Loading(
+                    id="loading-gantt",
+                    type="circle",
+                    color="#66A593",
+                    children=html.Div(id="gantt-chart-container",
+                                      style={"minHeight": "200px"}),
+                    parent_className="gantt-loading-wrapper",
+                ),
                 className="p-2",
             ),
         ], className="mb-3 shadow",

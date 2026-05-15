@@ -16,6 +16,10 @@ from src.utils.gantt_validation import (
 from src.components.gantt_chart import build_gantt_chart, build_gantt_resource_view
 
 
+# Rota da página do Gantt — usada como guard em callbacks globais (Feature C).
+ROUTE_GANTT = "/maintenance/gantt"
+
+
 # ---------------------------------------------------------------------------
 # Helpers internos
 # ---------------------------------------------------------------------------
@@ -62,6 +66,89 @@ def _validation_errors_output(errors):
     return True, items
 
 
+# ---------------------------------------------------------------------------
+# Empty states — Feature C / DS-14 (loading, erro de leitura, vazio)
+# ---------------------------------------------------------------------------
+
+def _gantt_loading_state():
+    """Placeholder enquanto os stores de dados estruturais ainda estão None.
+    Em uso normal o dcc.Loading do gantt-chart-container cobre a transição;
+    este helper é fallback defensivo."""
+    return html.Div(
+        [
+            dbc.Spinner(color="primary", size="md"),
+            html.Div("Carregando planejamento...", className="mt-3 text-muted small"),
+        ],
+        className="d-flex flex-column align-items-center justify-content-center py-5",
+        style={"minHeight": "300px"},
+    )
+
+
+def _gantt_error_state():
+    """Mensagem para falha de leitura do MongoDB. Diferenciada visualmente de
+    'sem dados' por ícone amarelo de alerta e texto de ação."""
+    return html.Div(
+        [
+            html.I(className="bi bi-exclamation-triangle-fill text-warning",
+                   style={"fontSize": "2.5rem"}),
+            html.H5("Sem conexão com o banco", className="mt-3 mb-1"),
+            html.P(
+                "Não foi possível ler os dados do planejamento. "
+                "Verifique a conexão e clique em Atualizar.",
+                className="text-muted small mb-0",
+            ),
+        ],
+        className="d-flex flex-column align-items-center justify-content-center text-center py-5",
+        style={"minHeight": "300px"},
+    )
+
+
+def _gantt_empty_state():
+    """Mensagem para banco respondendo OK mas sem projetos/categorias/atividades.
+    Diferenciada do estado de erro por ícone neutro e texto de orientação."""
+    return html.Div(
+        [
+            html.I(className="bi bi-calendar-x text-muted",
+                   style={"fontSize": "2.5rem"}),
+            html.H5("Sem planejamento cadastrado", className="mt-3 mb-1"),
+            html.P(
+                "Crie um Projeto e adicione Categorias e Atividades para começar.",
+                className="text-muted small mb-0",
+            ),
+        ],
+        className="d-flex flex-column align-items-center justify-content-center text-center py-5",
+        style={"minHeight": "300px"},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Invalidação seletiva de stores — Feature C / DS-12 / SP-14 item 3
+# ---------------------------------------------------------------------------
+
+def _reload_stores(entities):
+    """Recarrega entidades especificadas do banco e retorna tupla ordenada
+    (projects, categories, activities, assignments, employees) — a ordem casa
+    com os 5 Outputs de stores de dados dos callbacks de save.
+
+    Stores fora do `entities` recebem `dash.no_update` (preservam último valor).
+
+    `entities`: set de strings em {"projects","categories","activities",
+                                   "assignments","employees"}.
+    """
+    projects   = gantt_db.get_all_projects()    if "projects"   in entities else no_update
+    categories = gantt_db.get_all_categories()  if "categories" in entities else no_update
+    activities = gantt_db.get_all_activities()  if "activities" in entities else no_update
+    employees  = gantt_db.get_all_employees()   if "employees"  in entities else no_update
+    if "assignments" in entities:
+        # Reaproveita lista de atividades se já foi recarregada — evita 2ª query
+        act_source = activities if activities is not no_update else gantt_db.get_all_activities()
+        ids = [a["_id"] for a in act_source]
+        assignments = gantt_db.get_assignments_by_activities(ids)
+    else:
+        assignments = no_update
+    return projects, categories, activities, assignments, employees
+
+
 TURNO_HORARIOS = {
     "A": ("00:00", "06:00"),
     "B": ("06:00", "15:00"),
@@ -79,6 +166,8 @@ def register_gantt_callbacks(app):
 
     # Migração idempotente: garante que todas as categorias têm projeto_id
     gantt_db.migrate_to_default_project()
+    # Cria índices em FKs (idempotente, background) — SP-15 item 4
+    gantt_db.ensure_indexes()
 
     # ------------------------------------------------------------------
     # Rota Flask — servir foto do funcionário com cache de browser.
@@ -103,56 +192,113 @@ def register_gantt_callbacks(app):
         return Response(
             doc["foto_bytes"],
             mimetype=doc.get("foto_mime", "image/jpeg"),
-            headers={"Cache-Control": "public, max-age=3600"},
+            # Cache agressivo + cache-busting via ?v=atualizado_em na URL (Feature C / DS-15).
+            # Veracidade preservada — URL muda quando o funcionário é editado.
+            headers={"Cache-Control": "public, max-age=86400, immutable"},
         )
 
     # ------------------------------------------------------------------
+    # CB-00 — Carregar dados estruturais do banco para os stores de dados.
+    # Feature C (DS-10 / SP-14). Disparadores:
+    #   - Entrada na rota do Gantt (url.pathname).
+    #   - Clique em "Atualizar" (btn-gantt-refresh).
+    #   - Gatilho legado (store-gantt-refresh) — fallback até IM-75.
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("store-gantt-data-projects",    "data"),
+        Output("store-gantt-data-categories",  "data"),
+        Output("store-gantt-data-activities",  "data"),
+        Output("store-gantt-data-assignments", "data"),
+        Output("store-gantt-data-employees",   "data"),
+        Output("store-gantt-data-status",      "data"),
+        Input("url",                 "pathname"),
+        Input("btn-gantt-refresh",   "n_clicks"),
+        Input("store-gantt-refresh", "data"),
+        prevent_initial_call=False,
+    )
+    def load_gantt_data(pathname, refresh_clicks, internal_refresh):
+        """Lê todas as entidades estruturais do MongoDB e popula os stores."""
+        # Guard de rota — só atua na página do Gantt
+        if pathname != ROUTE_GANTT:
+            raise PreventUpdate
+
+        # Sinaliza erro explícito se alguma coleção do Gantt estiver inacessível
+        # (sem depender de exceção que pymongo raramente levanta).
+        for col_name in ("gantt_projects", "gantt_categories", "gantt_activities",
+                         "gantt_assignments", "gantt_employees"):
+            if gantt_db._col(col_name) is None:
+                return None, None, None, None, None, "error"
+
+        try:
+            projects   = gantt_db.get_all_projects()
+            employees  = gantt_db.get_all_employees()
+            categories = gantt_db.get_all_categories()
+            activities = gantt_db.get_all_activities()
+            ids = [a["_id"] for a in activities]
+            assignments = gantt_db.get_assignments_by_activities(ids)
+            return projects, categories, activities, assignments, employees, "ready"
+        except Exception:
+            return None, None, None, None, None, "error"
+
+    # ------------------------------------------------------------------
     # CB-01 — Renderizar Gantt
+    # Consome stores de dados (CB-00) e stores de UI; zero queries MongoDB
+    # em re-renders visuais (SP-15 item 1).
     # ------------------------------------------------------------------
     @app.callback(
         Output("gantt-chart-container", "children"),
-        Input("store-gantt-refresh", "data"),
-        Input("store-gantt-granularity", "data"),
-        Input("store-gantt-projects-state", "data"),
+        Input("store-gantt-data-projects",    "data"),
+        Input("store-gantt-data-categories",  "data"),
+        Input("store-gantt-data-activities",  "data"),
+        Input("store-gantt-data-assignments", "data"),
+        Input("store-gantt-data-employees",   "data"),
+        Input("store-gantt-data-status",      "data"),
+        Input("store-gantt-granularity",      "data"),
+        Input("store-gantt-projects-state",   "data"),
         Input("store-gantt-categories-state", "data"),
         Input("store-gantt-activities-state", "data"),
-        Input("store-gantt-hour-offset", "data"),
-        Input("store-gantt-filter", "data"),
-        Input("store-gantt-view-mode", "data"),
-        Input("store-gantt-employees-state", "data"),
+        Input("store-gantt-hour-offset",      "data"),
+        Input("store-gantt-filter",           "data"),
+        Input("store-gantt-view-mode",        "data"),
+        Input("store-gantt-employees-state",  "data"),
         prevent_initial_call=False,
     )
-    def render_gantt(refresh, granularity, projects_state, categories_state,
-                     activities_state, hour_offset, filter_query, view_mode,
-                     employees_state):
-        projects   = gantt_db.get_all_projects()  # exclui arquivados
-        employees  = gantt_db.get_all_employees()
+    def render_gantt(projects, categories, activities, assignments, employees, status,
+                     granularity, projects_state, categories_state, activities_state,
+                     hour_offset, filter_query, view_mode, employees_state):
+        # Empty states (DS-14) — prioridade: erro > loading > vazio
+        if status == "error":
+            return _gantt_error_state()
+        if any(s is None for s in (projects, categories, activities,
+                                   assignments, employees)):
+            return _gantt_loading_state()
+        if not projects and not categories and not activities:
+            return _gantt_empty_state()
 
         # Cascata: só renderizar categorias/atividades de projetos ativos
+        # (filtragem em memória, zero queries — SP-15 item 6)
         active_proj_ids = {str(p["_id"]) for p in projects}
-        categories = [
-            c for c in gantt_db.get_all_categories()
+        categories_active = [
+            c for c in categories
             if str(c.get("projeto_id", "")) in active_proj_ids
         ]
-        active_cat_ids = {str(c["_id"]) for c in categories}
-        activities = [
-            a for a in gantt_db.get_all_activities()
+        active_cat_ids = {str(c["_id"]) for c in categories_active}
+        activities_active = [
+            a for a in activities
             if str(a.get("categoria_id", "")) in active_cat_ids
         ]
-        all_assignments = []
-        for act in activities:
-            all_assignments.extend(gantt_db.get_assignments_by_activity(act["_id"]))
 
         if view_mode == "funcionario":
             return build_gantt_resource_view(
-                employees, activities, all_assignments, categories, projects,
+                employees, activities_active, assignments,
+                categories_active, projects,
                 granularity=granularity or "dias",
                 hour_offset=hour_offset or 0,
                 filter_query=filter_query or "",
                 employees_state=employees_state or {},
             )
         return build_gantt_chart(
-            categories, activities, all_assignments,
+            categories_active, activities_active, assignments,
             granularity=granularity or "dias",
             projects=projects,
             projects_state=projects_state or {},

@@ -313,6 +313,23 @@ def _avatar_color_for(nome):
     return AVATAR_FALLBACK_PALETTE[idx]
 
 
+def _photo_version(employee):
+    """Token de cache-busting para a URL da foto do funcionário (Feature C / DS-15).
+
+    Usa `atualizado_em` — qualquer write em update_employee_* atualiza o campo,
+    então a URL muda e o browser re-baixa a foto. Em conjunto com Cache-Control
+    `immutable` no endpoint, garante BR-17 (foto editada reflete imediatamente
+    para o editor) sem desperdiçar banda em renders sucessivos do mesmo estado.
+    """
+    raw = employee.get("atualizado_em")
+    if not raw:
+        return "0"
+    if hasattr(raw, "timestamp"):
+        return str(int(raw.timestamp()))
+    # ISO string (vinda do dcc.Store após serialização) — comprime para token.
+    return str(raw).replace(":", "").replace("-", "").replace(".", "")[:14]
+
+
 def _build_avatar(employee, size=20):
     """
     Avatar circular do funcionário. Usa foto servida via rota Flask se existir;
@@ -331,8 +348,9 @@ def _build_avatar(employee, size=20):
         "flexShrink": "0",
     }
     if has_photo and emp_id:
+        v = _photo_version(employee)
         style = {**common,
-                 "backgroundImage": f"url(/api/gantt/employee-photo/{emp_id})",
+                 "backgroundImage": f"url(/api/gantt/employee-photo/{emp_id}?v={v})",
                  "backgroundSize": "cover", "backgroundPosition": "center"}
         return html.Div(title=nome, style=style)
     style = {**common,
