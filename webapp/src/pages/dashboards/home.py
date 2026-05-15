@@ -240,6 +240,133 @@ def layout():
         ], className="mb-4"),
         
         # ========================================
+        # GRÁFICO TIME-SERIES OEE (PADRÃO LEGADO — MOCK)
+        # ========================================
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader(
+                        add_demo_badge_to_card_header([
+                            dbc.Row([
+                                dbc.Col(
+                                    html.Span([
+                                        html.I(className="bi bi-activity me-2"),
+                                        "Monitoramento de OEE — Decapado Mecânico (Mock)"
+                                    ]),
+                                    width="auto"
+                                ),
+                                dbc.Col(
+                                    dbc.Button(
+                                        "Exportar para Excel",
+                                        id="btn-export-home-oee-mock",
+                                        className="ms-auto",
+                                        size="sm",
+                                        color="primary"
+                                    ),
+                                    width="auto"
+                                )
+                            ], justify="between", align="center")
+                        ], page_path="/")
+                    ),
+                    dbc.CardBody([
+                        dcc.Download(id="download-home-oee-mock-excel"),
+                        dcc.Loading(
+                            id="loading-home-oee-mock",
+                            type="circle",
+                            children=[
+                                dcc.Graph(
+                                    id="graph-home-oee-mock",
+                                    config={"responsive": True, "displayModeBar": False, "showTips": False},
+                                    style={"visibility": "hidden", "height": "450px"}
+                                )
+                            ]
+                        )
+                    ])
+                ], className="shadow-sm")
+            ])
+        ], className="mb-4"),
+
+        # ========================================
+        # TIMELINE EVOCON-STYLE (MOCK)
+        # ========================================
+        dcc.Store(id="store-evocon-granularity", storage_type="local", data="horas"),
+        dcc.Store(id="store-evocon-offset",      storage_type="memory", data=0),
+        dcc.Store(id="evocon-anim-dummy",        storage_type="memory"),
+        dcc.Interval(id="interval-evocon-now",   interval=30_000, n_intervals=0),
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader(
+                        add_demo_badge_to_card_header([
+                            html.I(className="bi bi-bar-chart-steps me-2", style={"color": "#0d6efd"}),
+                            "Linha do Tempo de Estados — Visão Operacional (Mock)"
+                        ], page_path="/")
+                    ),
+                    dbc.CardBody([
+                        # Toolbar — granularidade + navegação
+                        dbc.Row([
+                            dbc.Col([
+                                html.Small("Escala do eixo", className="text-muted fw-semibold d-block mb-1"),
+                                dcc.Dropdown(
+                                    id="dropdown-evocon-granularity",
+                                    options=[
+                                        {"label": "Horas", "value": "horas"},
+                                        {"label": "Dias",  "value": "dias"},
+                                    ],
+                                    value="horas",
+                                    clearable=False,
+                                    style={"minWidth": "140px"},
+                                ),
+                            ], width="auto"),
+                            dbc.Col([
+                                html.Small("Navegação no tempo", className="text-muted fw-semibold d-block mb-1"),
+                                dbc.ButtonGroup([
+                                    dbc.Button("◀",    id="btn-evocon-prev",  color="secondary", outline=True, size="sm"),
+                                    dbc.Button("Hoje", id="btn-evocon-today", color="info",      outline=True, size="sm"),
+                                    dbc.Button("▶",    id="btn-evocon-next",  color="secondary", outline=True, size="sm"),
+                                ]),
+                            ], width="auto"),
+                            dbc.Col([
+                                html.Small("Período exibido", className="text-muted fw-semibold d-block mb-1"),
+                                html.Div(
+                                    id="label-evocon-period",
+                                    className="fw-bold",
+                                    style={"fontSize": "1rem", "color": "#212529", "lineHeight": "32px"},
+                                ),
+                            ]),
+                        ], className="g-3 mb-2 align-items-end"),
+                        html.Div([
+                            html.Small("Legenda: ", className="text-muted me-2"),
+                            dbc.Badge("Produção", color="success", className="me-1"),
+                            dbc.Badge("Avaria", color="danger", className="me-1"),
+                            dbc.Badge("Setup", color="warning", className="me-1"),
+                            dbc.Badge("Logística", style={"backgroundColor": "#fd7e14"}, className="me-1"),
+                            dbc.Badge("Refeição", color="secondary", className="me-1"),
+                            dbc.Badge("MTTO Aut.", color="dark", className="me-1"),
+                            dbc.Badge("Processo", style={"backgroundColor": "#e85d04"}, className="me-1"),
+                        ], className="mb-2"),
+                        dcc.Loading(
+                            id="loading-home-evocon",
+                            type="circle",
+                            children=[
+                                html.Div(
+                                    id="evocon-anim-wrap",
+                                    children=[
+                                        dcc.Graph(
+                                            id="graph-home-evocon-timeline",
+                                            config={"responsive": True, "displayModeBar": False, "showTips": False},
+                                            style={"visibility": "hidden", "height": "560px"}
+                                        )
+                                    ],
+                                )
+                            ]
+                        )
+                    ])
+                ], className="shadow-sm")
+            ])
+        ], className="mb-4"),
+
+        # ========================================
         # TABELA DE ALARMES RECENTES
         # ========================================
         dbc.Row([
