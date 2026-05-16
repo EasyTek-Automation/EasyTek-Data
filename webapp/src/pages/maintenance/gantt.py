@@ -322,16 +322,21 @@ def layout():
                        className="text-muted mb-0"),
             ], width=8),
             dbc.Col([
+                # Botão "Atualizar" SEPARADO do ButtonGroup original — adição
+                # de funcionalidade (Feature C) sem alterar aparência do grupo
+                # já validado em entregas anteriores. Ver .dev-docs/projects/
+                # GantManagement/regra-preservar-ui.md.
+                dbc.Button(
+                    html.I(className="bi bi-arrow-clockwise"),
+                    id="btn-gantt-refresh",
+                    color="secondary",
+                    outline=True,
+                    size="sm",
+                    n_clicks=0,
+                    title="Atualizar — recarregar dados do banco",
+                    className="me-2",
+                ),
                 dbc.ButtonGroup([
-                    dbc.Button(
-                        [html.I(className="bi bi-arrow-clockwise me-1"), "Atualizar"],
-                        id="btn-gantt-refresh",
-                        color="secondary",
-                        outline=True,
-                        size="sm",
-                        n_clicks=0,
-                        title="Recarregar dados do banco",
-                    ),
                     dbc.Button(
                         [html.I(className="bi bi-journal-text me-1"), "Auditoria"],
                         href="/maintenance/gantt/audit-log",
