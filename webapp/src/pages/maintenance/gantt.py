@@ -320,25 +320,24 @@ def layout():
                 ], className="mb-1"),
                 html.P("Visualização e gerenciamento de projetos, categorias e atividades",
                        className="text-muted mb-0"),
-            ], width=7),
+            ], width=6),
             dbc.Col([
-                # Botão "Atualizar" SEPARADO do ButtonGroup original — adição
-                # de funcionalidade (Feature C) sem alterar aparência do grupo
-                # já validado em entregas anteriores. width da coluna ajustado
-                # de 4 → 5 para acomodar o botão extra sem que os 5 botões
-                # originais quebrem texto em 2 linhas. Ver .dev-docs/projects/
+                # ButtonGroup do header — pré-15/05 tinha 5 botões em uma linha
+                # com width=4. Atualizar (Feature C) entra GRUDADO como 1º item;
+                # width da coluna passa para 5 para acomodar 6 botões sem quebra
+                # de linha em viewport >=1366 px. Ver .dev-docs/projects/
                 # GantManagement/regra-preservar-ui.md.
-                dbc.Button(
-                    [html.I(className="bi bi-arrow-clockwise me-1"), "Atualizar"],
-                    id="btn-gantt-refresh",
-                    color="secondary",
-                    outline=True,
-                    size="sm",
-                    n_clicks=0,
-                    title="Recarregar dados do banco",
-                    className="me-2",
-                ),
                 dbc.ButtonGroup([
+                    dbc.Button(
+                        [html.I(className="bi bi-arrow-clockwise me-1"), "Atualizar"],
+                        id="btn-gantt-refresh",
+                        color="secondary",
+                        outline=True,
+                        size="sm",
+                        n_clicks=0,
+                        title="Recarregar dados do banco",
+                        style={"whiteSpace": "nowrap"},
+                    ),
                     dbc.Button(
                         [html.I(className="bi bi-journal-text me-1"), "Auditoria"],
                         href="/maintenance/gantt/audit-log",
@@ -346,6 +345,7 @@ def layout():
                         outline=True,
                         size="sm",
                         external_link=False,
+                        style={"whiteSpace": "nowrap"},
                     ),
                     dbc.Button(
                         [html.I(className="bi bi-person-plus me-1"), "Funcionários"],
@@ -353,6 +353,7 @@ def layout():
                         color="secondary",
                         outline=True,
                         size="sm",
+                        style={"whiteSpace": "nowrap"},
                     ),
                     dbc.Button(
                         [html.I(className="bi bi-archive me-1"), "Arquivados"],
@@ -360,6 +361,7 @@ def layout():
                         color="secondary",
                         outline=True,
                         size="sm",
+                        style={"whiteSpace": "nowrap"},
                     ),
                     dbc.Button(
                         [html.I(className="bi bi-file-earmark-pdf me-1"), "Exportar PDF"],
@@ -367,15 +369,17 @@ def layout():
                         color="secondary",
                         outline=True,
                         size="sm",
+                        style={"whiteSpace": "nowrap"},
                     ),
                     dbc.Button(
                         [html.I(className="bi bi-folder-plus me-1"), "Novo Projeto"],
                         id="btn-new-project",
                         color="primary",
                         size="sm",
+                        style={"whiteSpace": "nowrap"},
                     ),
                 ])
-            ], width=5, className="text-end d-flex align-items-center justify-content-end"),
+            ], width=6, className="text-end d-flex align-items-center justify-content-end"),
         ], className="mb-3"),
 
         # Toolbar — controles com rótulos
