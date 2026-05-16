@@ -225,6 +225,24 @@ def _axis_height_for(granularity):
     return {"horas": 64, "dias": 56, "semanas": 56, "meses": 88}.get(granularity, 64)
 
 
+def _min_width_for(granularity, t_start, t_end):
+    """Largura mínima em px do painel de timeline para garantir que rótulos do
+    eixo não se sobreponham mesmo com muitas atividades. Cada unidade de granularidade
+    recebe um piso de pixels; total = unidades * piso. Quando ultrapassa o viewport,
+    o container raiz já tem overflow-x: auto para gerar scroll horizontal."""
+    delta_days = max((t_end - t_start).total_seconds() / 86400.0, 1.0)
+    if granularity == "horas":
+        # Cada hora gera 1 marker + 1 meia-hora pontilhada — piso 26 px/hora
+        return int(delta_days * 24 * 26)
+    if granularity == "dias":
+        return int(delta_days * 38)
+    if granularity == "semanas":
+        return int((delta_days / 7.0) * 56)
+    if granularity == "meses":
+        return int((delta_days / 30.0) * 90)
+    return 0
+
+
 # ---------------------------------------------------------------------------
 # Paleta viva para atividades
 # ---------------------------------------------------------------------------
@@ -583,7 +601,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
             }),
             html.Div(
                 right_content,
-                style={"position": "relative", "flex": "1", "marginLeft": "36px",
+                style={"position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)",
                        "height": f"{_axis_height_for(granularity)}px"},
             ),
         ], style={"display": "flex", "alignItems": "flex-end", "marginBottom": "2px",
@@ -685,7 +703,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
         row = html.Div([
             left_panel,
             html.Div(right_items, style={
-                "position": "relative", "flex": "1", "marginLeft": "36px", "height": "36px",
+                "position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)", "height": "36px",
                 "overflow": "visible",
             }),
         ], style={
@@ -757,7 +775,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
                 sub_row = html.Div([
                     sub_left,
                     html.Div(list(day_stripes) + list(now_line), style={
-                        "position": "relative", "flex": "1", "marginLeft": "36px",
+                        "position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)",
                         "height": "22px", "overflow": "visible",
                     }),
                 ], style={
@@ -767,6 +785,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
                 })
                 rows.append(sub_row)
 
+    min_w = _min_width_for(granularity, t_start, t_end)
     return html.Div(
         rows,
         className="gantt-zebra-root",
@@ -774,6 +793,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
             "overflowX": "auto", "width": "100%",
             "--gantt-days-in-view": str(total_days),
             "--gantt-day-offset": f"-{day_offset_frac * 100 / total_days:.4f}%",
+            "--gantt-timeline-min-w": f"{min_w}px",
         },
     )
 
@@ -910,10 +930,12 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
 
         right_content = build_time_axis(t_start, t_end, granularity) + now_line
         if hidden_past_count > 0:
-            right_content.append(html.Div(
+            right_content.append(html.Button(
                 [html.I(className="bi bi-chevron-double-left me-1"),
                  f"{hidden_past_count} anterior" + ("es" if hidden_past_count > 1 else "")],
-                title=f"{hidden_past_count} atividade(s) fora da janela visível (terminaram antes do período exibido)",
+                id={"type": "btn-hidden-past", "index": "axis"},
+                n_clicks=0,
+                title=f"{hidden_past_count} atividade(s) fora da janela visível — clique para voltar no tempo",
                 style={
                     "position": "absolute", "left": "4px", "top": "50%",
                     "transform": "translateY(-50%)",
@@ -923,6 +945,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                     "padding": "2px 8px", "borderRadius": "999px",
                     "whiteSpace": "nowrap", "pointerEvents": "auto",
                     "boxShadow": "0 1px 3px rgba(0,0,0,0.2)",
+                    "border": "none", "cursor": "pointer",
                 },
             ))
 
@@ -935,7 +958,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
             html.Div(
                 right_content,
                 style={
-                    "position": "relative", "flex": "1", "marginLeft": "36px",
+                    "position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)",
                     "height": f"{_axis_height_for(granularity)}px",
                 },
             ),
@@ -1051,7 +1074,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 "backgroundColor": "var(--bs-secondary-bg)",
                 "borderLeft": f"5px solid {tipo_color}",
             }),
-            html.Div(day_stripes + proj_bar_children + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "height": "32px"}),
+            html.Div(day_stripes + proj_bar_children + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)", "height": "32px"}),
         ], style={
             "display": "flex", "alignItems": "center", "height": "42px",
             "borderBottom": f"2px solid {tipo_color}",
@@ -1122,7 +1145,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         "backgroundColor": "#7E57C2", "opacity": "0.75",
                         "borderRadius": "999px", "cursor": "help",
                     }),
-                ] + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "height": "28px"}),
+                ] + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)", "height": "28px"}),
             ], style={
                 "display": "flex", "alignItems": "center", "height": "30px",
                 "borderBottom": "1px solid var(--bs-border-color-translucent)",
@@ -1181,7 +1204,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         "position": "sticky", "left": "0", "zIndex": "5",
                         "backgroundColor": "var(--bs-body-bg)",
                     }),
-                    html.Div(day_stripes + [act_bar] + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "height": "28px"}),
+                    html.Div(day_stripes + [act_bar] + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)", "height": "28px"}),
                 ], style={
                     "display": "flex", "alignItems": "center", "height": "32px",
                     "borderBottom": "1px solid var(--bs-border-color-translucent)",
@@ -1245,7 +1268,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         }),
                         html.Div(
                             day_stripes + ([asg_bar] if asg_bar else []) + bar_avatar_children + now_line,
-                            style={"position": "relative", "flex": "1", "marginLeft": "36px", "height": "28px", "overflow": "visible"},
+                            style={"position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)", "height": "28px", "overflow": "visible"},
                         ),
                     ], style={
                         "display": "flex", "alignItems": "center", "height": "30px",
@@ -1273,6 +1296,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
             style={"display": "block" if proj_expanded else "none"},
         ))
 
+    min_w = _min_width_for(granularity, t_start, t_end)
     return html.Div(
         rows,
         className="gantt-zebra-root",
@@ -1280,5 +1304,6 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
             "overflowX": "auto", "width": "100%",
             "--gantt-days-in-view": str(total_days),
             "--gantt-day-offset": f"-{day_offset_frac * 100 / total_days:.4f}%",
+            "--gantt-timeline-min-w": f"{min_w}px",
         },
     )

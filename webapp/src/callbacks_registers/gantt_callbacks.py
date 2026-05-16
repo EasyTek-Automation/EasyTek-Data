@@ -1619,6 +1619,32 @@ def register_gantt_callbacks(app):
         raise PreventUpdate
 
     # ------------------------------------------------------------------
+    # CB-20b — Clique no badge "N anteriores" — empurra a janela para trás
+    # em saltos maiores que o step de prev/next (24h ou 7 dias por granularidade)
+    # para alcançar atividades já encerradas que foram filtradas.
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("store-gantt-hour-offset", "data", allow_duplicate=True),
+        Input({"type": "btn-hidden-past", "index": ALL}, "n_clicks"),
+        State("store-gantt-hour-offset", "data"),
+        State("store-gantt-granularity", "data"),
+        prevent_initial_call=True,
+    )
+    def jump_to_hidden_past(n_clicks_list, current_offset, granularity):
+        if not any(n_clicks_list or []):
+            raise PreventUpdate
+        offset = current_offset or 0
+        # Pulo proporcional à granularidade — recua o suficiente para "abrir
+        # espaço" para os itens anteriores aparecerem na próxima janela.
+        jump = {
+            "horas":   24,    # 1 dia em horas
+            "dias":    24 * 7,    # 1 semana
+            "semanas": 24 * 30,   # ~1 mês
+            "meses":   24 * 90,   # ~1 trimestre
+        }.get(granularity, 24 * 7)
+        return offset - jump
+
+    # ------------------------------------------------------------------
     # CB-25 — Carregar log de auditoria
     # ------------------------------------------------------------------
     @app.callback(
