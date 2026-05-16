@@ -320,20 +320,22 @@ def layout():
                 ], className="mb-1"),
                 html.P("Visualização e gerenciamento de projetos, categorias e atividades",
                        className="text-muted mb-0"),
-            ], width=8),
+            ], width=7),
             dbc.Col([
                 # Botão "Atualizar" SEPARADO do ButtonGroup original — adição
                 # de funcionalidade (Feature C) sem alterar aparência do grupo
-                # já validado em entregas anteriores. Ver .dev-docs/projects/
+                # já validado em entregas anteriores. width da coluna ajustado
+                # de 4 → 5 para acomodar o botão extra sem que os 5 botões
+                # originais quebrem texto em 2 linhas. Ver .dev-docs/projects/
                 # GantManagement/regra-preservar-ui.md.
                 dbc.Button(
-                    html.I(className="bi bi-arrow-clockwise"),
+                    [html.I(className="bi bi-arrow-clockwise me-1"), "Atualizar"],
                     id="btn-gantt-refresh",
                     color="secondary",
                     outline=True,
                     size="sm",
                     n_clicks=0,
-                    title="Atualizar — recarregar dados do banco",
+                    title="Recarregar dados do banco",
                     className="me-2",
                 ),
                 dbc.ButtonGroup([
@@ -373,7 +375,7 @@ def layout():
                         size="sm",
                     ),
                 ])
-            ], width=4, className="text-end d-flex align-items-center justify-content-end"),
+            ], width=5, className="text-end d-flex align-items-center justify-content-end"),
         ], className="mb-3"),
 
         # Toolbar — controles com rótulos
