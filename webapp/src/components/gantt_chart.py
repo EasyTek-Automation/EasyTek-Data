@@ -388,12 +388,10 @@ def _build_day_stripes(t_start, t_end):
         right = _to_pct(min(next_day, t_end),  t_start, t_end)
         width = right - left
         if width > 0 and day_idx % 2 == 1:
-            stripes.append(html.Div(style={
-                "position": "absolute", "left": f"{left:.4f}%",
-                "width": f"{width:.4f}%", "top": "0", "bottom": "0",
-                "backgroundColor": "var(--bs-body-color)", "opacity": "0.04",
-                "pointerEvents": "none", "zIndex": "0",
-            }))
+            stripes.append(html.Div(
+                className="gantt-day-stripe",
+                style={"left": f"{left:.4f}%", "width": f"{width:.4f}%"},
+            ))
         cursor = next_day
         day_idx += 1
     return stripes
@@ -584,7 +582,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
             ))
         return html.Div([
             html.Div(style={
-                "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                 "position": "sticky", "left": "0", "zIndex": "5",
                 "backgroundColor": axis_bg,
             }),
@@ -644,7 +642,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
             id={"type": "btn-toggle-employee-row", "index": emp_id},
             n_clicks=0,
             style={
-                "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                 "display": "flex", "alignItems": "center", "paddingRight": "6px", "paddingLeft": "8px",
                 "overflow": "hidden",
                 "position": "sticky", "left": "0", "zIndex": "5",
@@ -752,7 +750,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
                         }),
                     ],
                     style={
-                        "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px",
+                        "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)",
                         "flexShrink": "0",
                         "display": "flex", "alignItems": "center",
                         "overflow": "hidden",
@@ -920,7 +918,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
 
         return html.Div([
             html.Div(style={
-                "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                 "position": "sticky", "left": "0", "zIndex": "5",
                 "backgroundColor": axis_bg,
             }),
@@ -1036,7 +1034,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 _btn("btn-archive-project",      proj_id, "archive", "secondary", "Arquivar projeto"),
                 _btn("btn-delete-project",       proj_id, "trash",   "danger",    "Excluir projeto"),
             ], style={
-                "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                 "display": "flex", "alignItems": "center", "paddingRight": "6px",
                 "overflow": "hidden",
                 "position": "sticky", "left": "0", "zIndex": "5",
@@ -1096,7 +1094,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                     _btn("btn-edit-category",        cat_id, "pencil",  "primary", "Editar categoria"),
                     _btn("btn-delete-category",      cat_id, "trash",   "danger",  "Excluir categoria"),
                 ], style={
-                    "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                    "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                     "display": "flex", "alignItems": "center", "paddingRight": "6px",
                     "overflow": "hidden",
                     "position": "sticky", "left": "0", "zIndex": "5",
@@ -1167,7 +1165,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         _btn("btn-delete-activity", act_id, "trash",       "danger",  "Excluir atividade"),
                         _btn("btn-new-assignment",  act_id, "person-plus", "success", "Atribuir funcionário"),
                     ], style={
-                        "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                        "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                         "display": "flex", "alignItems": "center", "paddingRight": "6px",
                         "overflow": "hidden",
                         "position": "sticky", "left": "0", "zIndex": "5",
@@ -1229,7 +1227,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                             _btn("btn-edit-assignment",   asg_id, "pencil", "primary", "Editar atribuição"),
                             _btn("btn-delete-assignment", asg_id, "trash",  "danger",  "Excluir atribuição"),
                         ], style={
-                            "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                            "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                             "display": "flex", "alignItems": "center", "paddingRight": "6px",
                             "overflow": "hidden",
                             "position": "sticky", "left": "0", "zIndex": "5",

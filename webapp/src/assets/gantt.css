@@ -6,3 +6,41 @@
   text-align: left;
   white-space: pre-line;
 }
+
+/* Day stripes (faixas zebra do timeline) — props comuns extraídos do inline
+   style para reduzir o tamanho do payload serializado pelo Dash em ~9 KB por
+   render (Feature G / DS-16). Apenas left e width permanecem inline porque
+   variam por stripe. */
+.gantt-day-stripe {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background-color: var(--bs-body-color);
+  opacity: 0.04;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Sticky column container (lado esquerdo de cada row do Gantt) — common
+   props extraídos. Apenas backgroundColor e borderLeft podem variar por tipo
+   de row e ficam inline quando necessário. */
+.gantt-sticky-col {
+  width: var(--gantt-left-width, 360px);
+  min-width: var(--gantt-left-width, 360px);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  padding-right: 6px;
+  overflow: hidden;
+  position: sticky;
+  left: 0;
+  z-index: 5;
+}
+
+/* Timeline cell (lado direito) — common props extraídos. Altura varia por
+   tipo de row e fica inline. */
+.gantt-timeline-cell {
+  position: relative;
+  flex: 1;
+  margin-left: 36px;
+}

@@ -1,0 +1,29 @@
+/* Gantt — indicador discreto de seleção da última linha clicada (Feature F).
+   Aplicado pelo JS em gantt-toggle.js no row ancestor do toggle clicado.
+   Sobrevive reload via localStorage. */
+
+.gantt-selected {
+    background-color: rgba(102, 165, 147, 0.10) !important;
+    box-shadow: inset 4px 0 0 #66A593;
+    transition: background-color 150ms ease;
+    position: relative;
+}
+
+/* Overlay garantido — paint color uniforme mesmo quando o row tem children
+   absolutos/sticky que cobririam o backgroundcolor do row. */
+.gantt-selected::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-color: rgba(102, 165, 147, 0.10);
+    pointer-events: none;
+    z-index: 0;
+}
+
+/* Mantém o fundo dos filhos diretos (sticky col + timeline) coerente
+   com o overlay — eles ficam por cima do ::before. */
+.gantt-selected > div {
+    background-color: rgba(102, 165, 147, 0.10) !important;
+    position: relative;
+    z-index: 1;
+}

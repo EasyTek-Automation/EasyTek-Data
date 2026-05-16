@@ -475,14 +475,21 @@ def layout():
                 style={"backgroundColor": "#66A593", "borderBottom": "none"},
             ),
             dbc.CardBody(
-                dcc.Loading(
-                    id="loading-gantt",
-                    type="circle",
-                    color="#66A593",
-                    children=html.Div(id="gantt-chart-container",
-                                      style={"minHeight": "200px"}),
-                    parent_className="gantt-loading-wrapper",
-                ),
+                html.Div([
+                    dcc.Loading(
+                        id="loading-gantt",
+                        type="circle",
+                        color="#66A593",
+                        children=html.Div(id="gantt-chart-container",
+                                          style={"minHeight": "200px"}),
+                        parent_className="gantt-loading-wrapper",
+                    ),
+                    # Handle de resize da coluna esquerda (Feature E) — JS em
+                    # assets/gantt-resize.js controla drag e persiste em localStorage.
+                    html.Div(id="gantt-resize-handle",
+                             className="gantt-resize-handle",
+                             title="Arraste para ajustar a largura da coluna"),
+                ], className="gantt-resize-wrapper"),
                 className="p-2",
             ),
         ], className="mb-3 shadow",
