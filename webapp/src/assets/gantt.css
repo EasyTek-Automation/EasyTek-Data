@@ -7,18 +7,52 @@
   white-space: pre-line;
 }
 
-/* Day stripes (faixas zebra do timeline) — props comuns extraídos do inline
-   style para reduzir o tamanho do payload serializado pelo Dash em ~9 KB por
-   render (Feature G / DS-16). Apenas left e width permanecem inline porque
-   variam por stripe. */
-.gantt-day-stripe {
+/* Day stripes — primeiro versão eliminou prop redundantes inline (.gantt-day-stripe),
+   Pass 2 elimina os ~8500 divs por completo: zebra agora é pintada via
+   repeating-linear-gradient. CSS vars --gantt-days-in-view e --gantt-day-offset
+   ficam no container raiz do Gantt para escalar com a janela ativa. */
+.gantt-day-stripe { /* fallback retrocompat — nenhum elemento usa atualmente */
+  position: absolute; top: 0; bottom: 0;
+  background-color: var(--bs-body-color); opacity: 0.04;
+  pointer-events: none; z-index: 0;
+}
+
+/* Zebra das células de timeline — aplicada via attribute selector ao
+   descendant pattern comum (marginLeft: 36px existe apenas nas timeline cells).
+   Não usa class explícita para evitar refactor em 6+ pontos de chamada. */
+.gantt-zebra-root div[style*="margin-left: 36px"] {
+  background-image: repeating-linear-gradient(
+    to right,
+    transparent 0,
+    transparent calc(100% / var(--gantt-days-in-view, 30)),
+    rgba(0, 0, 0, 0.04) calc(100% / var(--gantt-days-in-view, 30)),
+    rgba(0, 0, 0, 0.04) calc(200% / var(--gantt-days-in-view, 30))
+  );
+  background-position: calc(var(--gantt-day-offset, 0%) ) 0;
+  background-repeat: repeat-x;
+}
+
+/* Marcadores do eixo de tempo (Pass 3) — common props extraídos.
+   Cada marker gera linha vertical + label. Em granularidade Dias com
+   janela de 240 dias × 9 axis rows = 4320 elementos absolute. Mover
+   3-6 props para CSS reduz ~250 → ~70 bytes/marker. */
+.gax-line, .gax-half-hour-line {
   position: absolute;
   top: 0;
   bottom: 0;
-  background-color: var(--bs-body-color);
-  opacity: 0.04;
-  pointer-events: none;
-  z-index: 0;
+  width: 0;
+}
+.gax-half-hour-line {
+  border-left: 1px dashed var(--bs-border-color);
+}
+.gax-label {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%) rotate(180deg);
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+  font-size: 0.83rem;
+  padding-left: 3px;
 }
 
 /* Sticky column container (lado esquerdo de cada row do Gantt) — common

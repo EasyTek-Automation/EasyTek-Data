@@ -190,14 +190,10 @@ def build_time_axis(t_start, t_end, granularity):
         cursor_h = t_start.replace(minute=0, second=0, microsecond=0) + timedelta(minutes=30)
         while cursor_h <= t_end:
             if cursor_h >= t_start:
-                result.append(html.Div(style={
-                    "position":   "absolute",
-                    "left":       f"{_to_pct(cursor_h, t_start, t_end):.4f}%",
-                    "top":        "0",
-                    "bottom":     "0",
-                    "width":      "0",
-                    "borderLeft": "1px dashed var(--bs-border-color)",
-                }))
+                result.append(html.Div(
+                    className="gax-half-hour-line",
+                    style={"left": f"{_to_pct(cursor_h, t_start, t_end):.4f}%"},
+                ))
             cursor_h += timedelta(hours=1)
 
     for item in markers:
@@ -207,28 +203,20 @@ def build_time_axis(t_start, t_end, granularity):
         weight      = "600" if is_midnight else "400"
 
         # 1. Linha vertical divisória (altura total do eixo)
-        result.append(html.Div(style={
-            "position":   "absolute",
-            "left":       f"{left:.4f}%",
-            "top":        "0",
-            "bottom":     "0",
-            "width":      "0",
-            "borderLeft": "2px solid var(--bs-body-color)" if is_midnight else "1px solid var(--bs-border-color)",
-        }))
+        result.append(html.Div(
+            className="gax-line",
+            style={
+                "left":       f"{left:.4f}%",
+                "borderLeft": "2px solid var(--bs-body-color)" if is_midnight else "1px solid var(--bs-border-color)",
+            },
+        ))
 
         # 2. Rótulo centralizado verticalmente
-        result.append(html.Div(label, style={
-            "position":    "absolute",
-            "left":        f"{left:.4f}%",
-            "top":         "50%",
-            "transform":   "translate(-50%, -50%) rotate(180deg)",
-            "whiteSpace":  "nowrap",
-            "writingMode": "vertical-rl",
-            "color":       color_main,
-            "fontWeight":  weight,
-            "fontSize":    "0.83rem",
-            "paddingLeft": "3px",
-        }))
+        result.append(html.Div(
+            label,
+            className="gax-label",
+            style={"left": f"{left:.4f}%", "color": color_main, "fontWeight": weight},
+        ))
     return result
 
 
@@ -516,7 +504,14 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
         t_start    = (now_brt - past) + offset_td
         t_end      = max(data_end, now_brt + min_future) + offset_td
 
-    day_stripes = _build_day_stripes(t_start, t_end)
+    # Day stripes substituídos por gradient CSS para eliminar ~8500 divs/render
+    # (Feature G Pass 2). Padrão zebra é pintado por .gantt-zebra usando as CSS
+    # vars --gantt-days-in-view e --gantt-day-offset expostas no container raiz.
+    day_stripes = []
+    _t0_day = t_start.replace(hour=0, minute=0, second=0, microsecond=0)
+    _t1_day = t_end.replace(hour=0, minute=0, second=0, microsecond=0)
+    total_days = max(int((_t1_day - _t0_day).total_seconds() / 86400) + 1, 1)
+    day_offset_frac = (t_start - _t0_day).total_seconds() / 86400.0
     now_line    = _build_now_line(t_start, t_end)
 
     # Contar e filtrar atribuições totalmente fora da janela (saída antes de t_start)
@@ -563,7 +558,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
 
     def _make_axis_row():
         axis_bg = "#e5e7eb"
-        right_content = _build_day_stripes(t_start, t_end) + build_time_axis(t_start, t_end, granularity) + now_line
+        right_content = build_time_axis(t_start, t_end, granularity) + now_line
         if hidden_past_count > 0:
             right_content.append(html.Div(
                 [html.I(className="bi bi-chevron-double-left me-1"),
@@ -772,7 +767,15 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
                 })
                 rows.append(sub_row)
 
-    return html.Div(rows, style={"overflowX": "auto", "width": "100%"})
+    return html.Div(
+        rows,
+        className="gantt-zebra-root",
+        style={
+            "overflowX": "auto", "width": "100%",
+            "--gantt-days-in-view": str(total_days),
+            "--gantt-day-offset": f"-{day_offset_frac * 100 / total_days:.4f}%",
+        },
+    )
 
 
 def build_gantt_chart(categories, activities, assignments, granularity="dias",
@@ -891,14 +894,21 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
         cid = str(act.get("categoria_id", ""))
         activities_by_category.setdefault(cid, []).append(act)
 
-    day_stripes = _build_day_stripes(t_start, t_end)
+    # Day stripes substituídos por gradient CSS para eliminar ~8500 divs/render
+    # (Feature G Pass 2). Padrão zebra é pintado por .gantt-zebra usando as CSS
+    # vars --gantt-days-in-view e --gantt-day-offset expostas no container raiz.
+    day_stripes = []
+    _t0_day = t_start.replace(hour=0, minute=0, second=0, microsecond=0)
+    _t1_day = t_end.replace(hour=0, minute=0, second=0, microsecond=0)
+    total_days = max(int((_t1_day - _t0_day).total_seconds() / 86400) + 1, 1)
+    day_offset_frac = (t_start - _t0_day).total_seconds() / 86400.0
     now_line    = _build_now_line(t_start, t_end)
 
     def _make_time_axis_row():
         """Gera uma linha de eixo de tempo fresca (para uso dentro de cada projeto)."""
         axis_bg = "#e5e7eb"  # cinza claro — sinaliza faixa reservada ao período
 
-        right_content = _build_day_stripes(t_start, t_end) + build_time_axis(t_start, t_end, granularity) + now_line
+        right_content = build_time_axis(t_start, t_end, granularity) + now_line
         if hidden_past_count > 0:
             right_content.append(html.Div(
                 [html.I(className="bi bi-chevron-double-left me-1"),
@@ -1263,4 +1273,12 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
             style={"display": "block" if proj_expanded else "none"},
         ))
 
-    return html.Div(rows, style={"overflowX": "auto", "width": "100%"})
+    return html.Div(
+        rows,
+        className="gantt-zebra-root",
+        style={
+            "overflowX": "auto", "width": "100%",
+            "--gantt-days-in-view": str(total_days),
+            "--gantt-day-offset": f"-{day_offset_frac * 100 / total_days:.4f}%",
+        },
+    )
