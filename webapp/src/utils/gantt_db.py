@@ -10,12 +10,20 @@ from src.database.connection import get_mongo_connection
 # ---------------------------------------------------------------------------
 
 def _serialize(doc):
-    """Converte ObjectId para string e retorna cópia do documento."""
+    """Converte qualquer valor ObjectId em str e retorna cópia do documento.
+
+    Cobre _id e chaves estrangeiras (projeto_id, categoria_id, atividade_id,
+    funcionario_id) para que o documento seja JSON-serializável em dcc.Store.
+    """
     if doc is None:
         return None
-    d = dict(doc)
-    d["_id"] = str(d["_id"])
-    return d
+    out = {}
+    for k, v in doc.items():
+        if isinstance(v, ObjectId):
+            out[k] = str(v)
+        else:
+            out[k] = v
+    return out
 
 
 def _col(name):
@@ -221,6 +229,27 @@ def migrate_to_default_project():
     return str(proj_id)
 
 
+def ensure_indexes():
+    """Cria índices em FKs do módulo Gantt. Idempotente — MongoDB ignora chamada
+    repetida em índice já existente. Background=True para não bloquear escrita
+    durante o build inicial. SP-15 item 4."""
+    pairs = [
+        ("gantt_activities",  "categoria_id"),
+        ("gantt_assignments", "atividade_id"),
+        ("gantt_assignments", "funcionario_id"),
+        ("gantt_categories",  "projeto_id"),
+    ]
+    for col_name, field in pairs:
+        col = _col(col_name)
+        if col is None:
+            continue
+        try:
+            col.create_index(field, background=True)
+        except Exception:
+            # Conservador: índice conflitante pré-existente não derruba o boot.
+            pass
+
+
 # ---------------------------------------------------------------------------
 # gantt_categories
 # ---------------------------------------------------------------------------
@@ -404,6 +433,21 @@ def get_assignments_by_activity(activity_id):
     return [
         _serialize(d)
         for d in col.find({"atividade_id": ObjectId(activity_id)}).sort("data_hora_entrada", 1)
+    ]
+
+
+def get_assignments_by_activities(activity_ids):
+    """Retorna em UMA query MongoDB todas as atribuições do conjunto de atividades.
+    Substitui o loop N+1 em render_gantt (SP-15 item 3). Aceita IDs str ou
+    ObjectId; lista vazia → retorna [].
+    """
+    col = _col("gantt_assignments")
+    if col is None or not activity_ids:
+        return []
+    oids = [a if isinstance(a, ObjectId) else ObjectId(a) for a in activity_ids]
+    return [
+        _serialize(d)
+        for d in col.find({"atividade_id": {"$in": oids}}).sort("data_hora_entrada", 1)
     ]
 
 

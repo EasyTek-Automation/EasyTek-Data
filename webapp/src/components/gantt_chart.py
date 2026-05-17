@@ -190,14 +190,10 @@ def build_time_axis(t_start, t_end, granularity):
         cursor_h = t_start.replace(minute=0, second=0, microsecond=0) + timedelta(minutes=30)
         while cursor_h <= t_end:
             if cursor_h >= t_start:
-                result.append(html.Div(style={
-                    "position":   "absolute",
-                    "left":       f"{_to_pct(cursor_h, t_start, t_end):.4f}%",
-                    "top":        "0",
-                    "bottom":     "0",
-                    "width":      "0",
-                    "borderLeft": "1px dashed var(--bs-border-color)",
-                }))
+                result.append(html.Div(
+                    className="gax-half-hour-line",
+                    style={"left": f"{_to_pct(cursor_h, t_start, t_end):.4f}%"},
+                ))
             cursor_h += timedelta(hours=1)
 
     for item in markers:
@@ -207,34 +203,44 @@ def build_time_axis(t_start, t_end, granularity):
         weight      = "600" if is_midnight else "400"
 
         # 1. Linha vertical divisória (altura total do eixo)
-        result.append(html.Div(style={
-            "position":   "absolute",
-            "left":       f"{left:.4f}%",
-            "top":        "0",
-            "bottom":     "0",
-            "width":      "0",
-            "borderLeft": "2px solid var(--bs-body-color)" if is_midnight else "1px solid var(--bs-border-color)",
-        }))
+        result.append(html.Div(
+            className="gax-line",
+            style={
+                "left":       f"{left:.4f}%",
+                "borderLeft": "2px solid var(--bs-body-color)" if is_midnight else "1px solid var(--bs-border-color)",
+            },
+        ))
 
         # 2. Rótulo centralizado verticalmente
-        result.append(html.Div(label, style={
-            "position":    "absolute",
-            "left":        f"{left:.4f}%",
-            "top":         "50%",
-            "transform":   "translate(-50%, -50%) rotate(180deg)",
-            "whiteSpace":  "nowrap",
-            "writingMode": "vertical-rl",
-            "color":       color_main,
-            "fontWeight":  weight,
-            "fontSize":    "0.83rem",
-            "paddingLeft": "3px",
-        }))
+        result.append(html.Div(
+            label,
+            className="gax-label",
+            style={"left": f"{left:.4f}%", "color": color_main, "fontWeight": weight},
+        ))
     return result
 
 
 def _axis_height_for(granularity):
     """Altura da faixa do eixo em pixels — rótulos verticais precisam de mais."""
     return {"horas": 64, "dias": 56, "semanas": 56, "meses": 88}.get(granularity, 64)
+
+
+def _min_width_for(granularity, t_start, t_end):
+    """Largura mínima em px do painel de timeline para garantir que rótulos do
+    eixo não se sobreponham mesmo com muitas atividades. Cada unidade de granularidade
+    recebe um piso de pixels; total = unidades * piso. Quando ultrapassa o viewport,
+    o container raiz já tem overflow-x: auto para gerar scroll horizontal."""
+    delta_days = max((t_end - t_start).total_seconds() / 86400.0, 1.0)
+    if granularity == "horas":
+        # Cada hora gera 1 marker + 1 meia-hora pontilhada — piso 26 px/hora
+        return int(delta_days * 24 * 26)
+    if granularity == "dias":
+        return int(delta_days * 38)
+    if granularity == "semanas":
+        return int((delta_days / 7.0) * 56)
+    if granularity == "meses":
+        return int((delta_days / 30.0) * 90)
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +319,23 @@ def _avatar_color_for(nome):
     return AVATAR_FALLBACK_PALETTE[idx]
 
 
+def _photo_version(employee):
+    """Token de cache-busting para a URL da foto do funcionário (Feature C / DS-15).
+
+    Usa `atualizado_em` — qualquer write em update_employee_* atualiza o campo,
+    então a URL muda e o browser re-baixa a foto. Em conjunto com Cache-Control
+    `immutable` no endpoint, garante BR-17 (foto editada reflete imediatamente
+    para o editor) sem desperdiçar banda em renders sucessivos do mesmo estado.
+    """
+    raw = employee.get("atualizado_em")
+    if not raw:
+        return "0"
+    if hasattr(raw, "timestamp"):
+        return str(int(raw.timestamp()))
+    # ISO string (vinda do dcc.Store após serialização) — comprime para token.
+    return str(raw).replace(":", "").replace("-", "").replace(".", "")[:14]
+
+
 def _build_avatar(employee, size=20):
     """
     Avatar circular do funcionário. Usa foto servida via rota Flask se existir;
@@ -331,8 +354,9 @@ def _build_avatar(employee, size=20):
         "flexShrink": "0",
     }
     if has_photo and emp_id:
+        v = _photo_version(employee)
         style = {**common,
-                 "backgroundImage": f"url(/api/gantt/employee-photo/{emp_id})",
+                 "backgroundImage": f"url(/api/gantt/employee-photo/{emp_id}?v={v})",
                  "backgroundSize": "cover", "backgroundPosition": "center"}
         return html.Div(title=nome, style=style)
     style = {**common,
@@ -370,12 +394,10 @@ def _build_day_stripes(t_start, t_end):
         right = _to_pct(min(next_day, t_end),  t_start, t_end)
         width = right - left
         if width > 0 and day_idx % 2 == 1:
-            stripes.append(html.Div(style={
-                "position": "absolute", "left": f"{left:.4f}%",
-                "width": f"{width:.4f}%", "top": "0", "bottom": "0",
-                "backgroundColor": "var(--bs-body-color)", "opacity": "0.04",
-                "pointerEvents": "none", "zIndex": "0",
-            }))
+            stripes.append(html.Div(
+                className="gantt-day-stripe",
+                style={"left": f"{left:.4f}%", "width": f"{width:.4f}%"},
+            ))
         cursor = next_day
         day_idx += 1
     return stripes
@@ -500,7 +522,14 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
         t_start    = (now_brt - past) + offset_td
         t_end      = max(data_end, now_brt + min_future) + offset_td
 
-    day_stripes = _build_day_stripes(t_start, t_end)
+    # Day stripes substituídos por gradient CSS para eliminar ~8500 divs/render
+    # (Feature G Pass 2). Padrão zebra é pintado por .gantt-zebra usando as CSS
+    # vars --gantt-days-in-view e --gantt-day-offset expostas no container raiz.
+    day_stripes = []
+    _t0_day = t_start.replace(hour=0, minute=0, second=0, microsecond=0)
+    _t1_day = t_end.replace(hour=0, minute=0, second=0, microsecond=0)
+    total_days = max(int((_t1_day - _t0_day).total_seconds() / 86400) + 1, 1)
+    day_offset_frac = (t_start - _t0_day).total_seconds() / 86400.0
     now_line    = _build_now_line(t_start, t_end)
 
     # Contar e filtrar atribuições totalmente fora da janela (saída antes de t_start)
@@ -547,7 +576,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
 
     def _make_axis_row():
         axis_bg = "#e5e7eb"
-        right_content = _build_day_stripes(t_start, t_end) + build_time_axis(t_start, t_end, granularity) + now_line
+        right_content = build_time_axis(t_start, t_end, granularity) + now_line
         if hidden_past_count > 0:
             right_content.append(html.Div(
                 [html.I(className="bi bi-chevron-double-left me-1"),
@@ -566,13 +595,13 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
             ))
         return html.Div([
             html.Div(style={
-                "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                 "position": "sticky", "left": "0", "zIndex": "5",
                 "backgroundColor": axis_bg,
             }),
             html.Div(
                 right_content,
-                style={"position": "relative", "flex": "1", "marginLeft": "36px",
+                style={"position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)",
                        "height": f"{_axis_height_for(granularity)}px"},
             ),
         ], style={"display": "flex", "alignItems": "flex-end", "marginBottom": "2px",
@@ -626,7 +655,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
             id={"type": "btn-toggle-employee-row", "index": emp_id},
             n_clicks=0,
             style={
-                "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                 "display": "flex", "alignItems": "center", "paddingRight": "6px", "paddingLeft": "8px",
                 "overflow": "hidden",
                 "position": "sticky", "left": "0", "zIndex": "5",
@@ -674,7 +703,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
         row = html.Div([
             left_panel,
             html.Div(right_items, style={
-                "position": "relative", "flex": "1", "marginLeft": "36px", "height": "36px",
+                "position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)", "height": "36px",
                 "overflow": "visible",
             }),
         ], style={
@@ -734,7 +763,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
                         }),
                     ],
                     style={
-                        "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px",
+                        "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)",
                         "flexShrink": "0",
                         "display": "flex", "alignItems": "center",
                         "overflow": "hidden",
@@ -746,7 +775,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
                 sub_row = html.Div([
                     sub_left,
                     html.Div(list(day_stripes) + list(now_line), style={
-                        "position": "relative", "flex": "1", "marginLeft": "36px",
+                        "position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)",
                         "height": "22px", "overflow": "visible",
                     }),
                 ], style={
@@ -756,7 +785,17 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
                 })
                 rows.append(sub_row)
 
-    return html.Div(rows, style={"overflowX": "auto", "width": "100%"})
+    min_w = _min_width_for(granularity, t_start, t_end)
+    return html.Div(
+        rows,
+        className="gantt-zebra-root",
+        style={
+            "overflowX": "auto", "width": "100%",
+            "--gantt-days-in-view": str(total_days),
+            "--gantt-day-offset": f"-{day_offset_frac * 100 / total_days:.4f}%",
+            "--gantt-timeline-min-w": f"{min_w}px",
+        },
+    )
 
 
 def build_gantt_chart(categories, activities, assignments, granularity="dias",
@@ -875,19 +914,28 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
         cid = str(act.get("categoria_id", ""))
         activities_by_category.setdefault(cid, []).append(act)
 
-    day_stripes = _build_day_stripes(t_start, t_end)
+    # Day stripes substituídos por gradient CSS para eliminar ~8500 divs/render
+    # (Feature G Pass 2). Padrão zebra é pintado por .gantt-zebra usando as CSS
+    # vars --gantt-days-in-view e --gantt-day-offset expostas no container raiz.
+    day_stripes = []
+    _t0_day = t_start.replace(hour=0, minute=0, second=0, microsecond=0)
+    _t1_day = t_end.replace(hour=0, minute=0, second=0, microsecond=0)
+    total_days = max(int((_t1_day - _t0_day).total_seconds() / 86400) + 1, 1)
+    day_offset_frac = (t_start - _t0_day).total_seconds() / 86400.0
     now_line    = _build_now_line(t_start, t_end)
 
     def _make_time_axis_row():
         """Gera uma linha de eixo de tempo fresca (para uso dentro de cada projeto)."""
         axis_bg = "#e5e7eb"  # cinza claro — sinaliza faixa reservada ao período
 
-        right_content = _build_day_stripes(t_start, t_end) + build_time_axis(t_start, t_end, granularity) + now_line
+        right_content = build_time_axis(t_start, t_end, granularity) + now_line
         if hidden_past_count > 0:
-            right_content.append(html.Div(
+            right_content.append(html.Button(
                 [html.I(className="bi bi-chevron-double-left me-1"),
                  f"{hidden_past_count} anterior" + ("es" if hidden_past_count > 1 else "")],
-                title=f"{hidden_past_count} atividade(s) fora da janela visível (terminaram antes do período exibido)",
+                id={"type": "btn-hidden-past", "index": "axis"},
+                n_clicks=0,
+                title=f"{hidden_past_count} atividade(s) fora da janela visível — clique para voltar no tempo",
                 style={
                     "position": "absolute", "left": "4px", "top": "50%",
                     "transform": "translateY(-50%)",
@@ -897,19 +945,20 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                     "padding": "2px 8px", "borderRadius": "999px",
                     "whiteSpace": "nowrap", "pointerEvents": "auto",
                     "boxShadow": "0 1px 3px rgba(0,0,0,0.2)",
+                    "border": "none", "cursor": "pointer",
                 },
             ))
 
         return html.Div([
             html.Div(style={
-                "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                 "position": "sticky", "left": "0", "zIndex": "5",
                 "backgroundColor": axis_bg,
             }),
             html.Div(
                 right_content,
                 style={
-                    "position": "relative", "flex": "1", "marginLeft": "36px",
+                    "position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)",
                     "height": f"{_axis_height_for(granularity)}px",
                 },
             ),
@@ -1018,14 +1067,14 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 _btn("btn-archive-project",      proj_id, "archive", "secondary", "Arquivar projeto"),
                 _btn("btn-delete-project",       proj_id, "trash",   "danger",    "Excluir projeto"),
             ], style={
-                "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                 "display": "flex", "alignItems": "center", "paddingRight": "6px",
                 "overflow": "hidden",
                 "position": "sticky", "left": "0", "zIndex": "5",
                 "backgroundColor": "var(--bs-secondary-bg)",
                 "borderLeft": f"5px solid {tipo_color}",
             }),
-            html.Div(day_stripes + proj_bar_children + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "height": "32px"}),
+            html.Div(day_stripes + proj_bar_children + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)", "height": "32px"}),
         ], style={
             "display": "flex", "alignItems": "center", "height": "42px",
             "borderBottom": f"2px solid {tipo_color}",
@@ -1078,7 +1127,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                     _btn("btn-edit-category",        cat_id, "pencil",  "primary", "Editar categoria"),
                     _btn("btn-delete-category",      cat_id, "trash",   "danger",  "Excluir categoria"),
                 ], style={
-                    "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                    "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                     "display": "flex", "alignItems": "center", "paddingRight": "6px",
                     "overflow": "hidden",
                     "position": "sticky", "left": "0", "zIndex": "5",
@@ -1096,7 +1145,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         "backgroundColor": "#7E57C2", "opacity": "0.75",
                         "borderRadius": "999px", "cursor": "help",
                     }),
-                ] + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "height": "28px"}),
+                ] + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)", "height": "28px"}),
             ], style={
                 "display": "flex", "alignItems": "center", "height": "30px",
                 "borderBottom": "1px solid var(--bs-border-color-translucent)",
@@ -1149,13 +1198,13 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         _btn("btn-delete-activity", act_id, "trash",       "danger",  "Excluir atividade"),
                         _btn("btn-new-assignment",  act_id, "person-plus", "success", "Atribuir funcionário"),
                     ], style={
-                        "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                        "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                         "display": "flex", "alignItems": "center", "paddingRight": "6px",
                         "overflow": "hidden",
                         "position": "sticky", "left": "0", "zIndex": "5",
                         "backgroundColor": "var(--bs-body-bg)",
                     }),
-                    html.Div(day_stripes + [act_bar] + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "height": "28px"}),
+                    html.Div(day_stripes + [act_bar] + now_line, style={"position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)", "height": "28px"}),
                 ], style={
                     "display": "flex", "alignItems": "center", "height": "32px",
                     "borderBottom": "1px solid var(--bs-border-color-translucent)",
@@ -1211,7 +1260,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                             _btn("btn-edit-assignment",   asg_id, "pencil", "primary", "Editar atribuição"),
                             _btn("btn-delete-assignment", asg_id, "trash",  "danger",  "Excluir atribuição"),
                         ], style={
-                            "width": f"{LEFT_WIDTH}px", "minWidth": f"{LEFT_WIDTH}px", "flexShrink": "0",
+                            "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                             "display": "flex", "alignItems": "center", "paddingRight": "6px",
                             "overflow": "hidden",
                             "position": "sticky", "left": "0", "zIndex": "5",
@@ -1219,7 +1268,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         }),
                         html.Div(
                             day_stripes + ([asg_bar] if asg_bar else []) + bar_avatar_children + now_line,
-                            style={"position": "relative", "flex": "1", "marginLeft": "36px", "height": "28px", "overflow": "visible"},
+                            style={"position": "relative", "flex": "1", "marginLeft": "36px", "minWidth": "var(--gantt-timeline-min-w, 0)", "height": "28px", "overflow": "visible"},
                         ),
                     ], style={
                         "display": "flex", "alignItems": "center", "height": "30px",
@@ -1231,6 +1280,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 if asg_rows:
                     act_rows.append(html.Div(
                         asg_rows,
+                        id={"type": "gantt-activity-rows", "index": act_id},
                         style={"display": "block" if act_expanded else "none"},
                     ))
 
@@ -1246,4 +1296,14 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
             style={"display": "block" if proj_expanded else "none"},
         ))
 
-    return html.Div(rows, style={"overflowX": "auto", "width": "100%"})
+    min_w = _min_width_for(granularity, t_start, t_end)
+    return html.Div(
+        rows,
+        className="gantt-zebra-root",
+        style={
+            "overflowX": "auto", "width": "100%",
+            "--gantt-days-in-view": str(total_days),
+            "--gantt-day-offset": f"-{day_offset_frac * 100 / total_days:.4f}%",
+            "--gantt-timeline-min-w": f"{min_w}px",
+        },
+    )

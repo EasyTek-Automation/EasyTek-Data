@@ -301,6 +301,15 @@ def layout():
         dcc.Store(id="store-gantt-view-mode",        storage_type="local",  data="projeto"),
         dcc.Store(id="store-gantt-employees-state",  storage_type="local",  data={}),
 
+        # Stores de dados estruturais (Feature C — DS-10 / SP-14)
+        # Inicial None distingue "ainda não carregado" (None) de "sem dados" ([]).
+        dcc.Store(id="store-gantt-data-projects",    storage_type="memory", data=None),
+        dcc.Store(id="store-gantt-data-categories",  storage_type="memory", data=None),
+        dcc.Store(id="store-gantt-data-activities",  storage_type="memory", data=None),
+        dcc.Store(id="store-gantt-data-assignments", storage_type="memory", data=None),
+        dcc.Store(id="store-gantt-data-employees",   storage_type="memory", data=None),
+        dcc.Store(id="store-gantt-data-status",      storage_type="memory", data="idle"),
+
         # Header
         dbc.Row([
             dbc.Col([
@@ -311,9 +320,24 @@ def layout():
                 ], className="mb-1"),
                 html.P("Visualização e gerenciamento de projetos, categorias e atividades",
                        className="text-muted mb-0"),
-            ], width=8),
+            ], width=6),
             dbc.Col([
+                # ButtonGroup do header — pré-15/05 tinha 5 botões em uma linha
+                # com width=4. Atualizar (Feature C) entra GRUDADO como 1º item;
+                # width da coluna passa para 5 para acomodar 6 botões sem quebra
+                # de linha em viewport >=1366 px. Ver .dev-docs/projects/
+                # GantManagement/regra-preservar-ui.md.
                 dbc.ButtonGroup([
+                    dbc.Button(
+                        [html.I(className="bi bi-arrow-clockwise me-1"), "Atualizar"],
+                        id="btn-gantt-refresh",
+                        color="secondary",
+                        outline=True,
+                        size="sm",
+                        n_clicks=0,
+                        title="Recarregar dados do banco",
+                        style={"whiteSpace": "nowrap"},
+                    ),
                     dbc.Button(
                         [html.I(className="bi bi-journal-text me-1"), "Auditoria"],
                         href="/maintenance/gantt/audit-log",
@@ -321,6 +345,7 @@ def layout():
                         outline=True,
                         size="sm",
                         external_link=False,
+                        style={"whiteSpace": "nowrap"},
                     ),
                     dbc.Button(
                         [html.I(className="bi bi-person-plus me-1"), "Funcionários"],
@@ -328,6 +353,7 @@ def layout():
                         color="secondary",
                         outline=True,
                         size="sm",
+                        style={"whiteSpace": "nowrap"},
                     ),
                     dbc.Button(
                         [html.I(className="bi bi-archive me-1"), "Arquivados"],
@@ -335,6 +361,7 @@ def layout():
                         color="secondary",
                         outline=True,
                         size="sm",
+                        style={"whiteSpace": "nowrap"},
                     ),
                     dbc.Button(
                         [html.I(className="bi bi-file-earmark-pdf me-1"), "Exportar PDF"],
@@ -342,15 +369,17 @@ def layout():
                         color="secondary",
                         outline=True,
                         size="sm",
+                        style={"whiteSpace": "nowrap"},
                     ),
                     dbc.Button(
                         [html.I(className="bi bi-folder-plus me-1"), "Novo Projeto"],
                         id="btn-new-project",
                         color="primary",
                         size="sm",
+                        style={"whiteSpace": "nowrap"},
                     ),
                 ])
-            ], width=4, className="text-end d-flex align-items-center justify-content-end"),
+            ], width=6, className="text-end d-flex align-items-center justify-content-end"),
         ], className="mb-3"),
 
         # Toolbar — controles com rótulos
@@ -447,17 +476,36 @@ def layout():
         # Cards de KPI — resumo rápido do estado atual
         dbc.Row(id="row-gantt-kpis", className="mb-3 g-3"),
 
-        # Card dos projetos
+        # Card dos projetos — CardHeader em sticky para que o título
+        # "Projetos & Manutenções" trave no topo do viewport ao rolar a página,
+        # permitindo que o conteúdo do Gantt continue rolando abaixo dele.
         dbc.Card([
             dbc.CardHeader(
                 html.H5([
                     html.I(className="bi bi-kanban-fill me-2"),
                     "Projetos & Manutenções",
                 ], className="mb-0 text-white fw-semibold"),
-                style={"backgroundColor": "#66A593", "borderBottom": "none"},
+                style={
+                    "backgroundColor": "#66A593", "borderBottom": "none",
+                    "position": "sticky", "top": "0", "zIndex": "100",
+                },
             ),
             dbc.CardBody(
-                html.Div(id="gantt-chart-container", style={"minHeight": "200px"}),
+                html.Div([
+                    dcc.Loading(
+                        id="loading-gantt",
+                        type="circle",
+                        color="#66A593",
+                        children=html.Div(id="gantt-chart-container",
+                                          style={"minHeight": "200px"}),
+                        parent_className="gantt-loading-wrapper",
+                    ),
+                    # Handle de resize da coluna esquerda (Feature E) — JS em
+                    # assets/gantt-resize.js controla drag e persiste em localStorage.
+                    html.Div(id="gantt-resize-handle",
+                             className="gantt-resize-handle",
+                             title="Arraste para ajustar a largura da coluna"),
+                ], className="gantt-resize-wrapper"),
                 className="p-2",
             ),
         ], className="mb-3 shadow",
