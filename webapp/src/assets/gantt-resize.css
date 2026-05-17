@@ -1,0 +1,52 @@
+/* Gantt — coluna esquerda redimensionável (Feature E).
+   Largura controlada via CSS var --gantt-left-width (fallback 360px).
+   O handle vertical fica sobreposto na fronteira entre sticky column e timeline. */
+
+.gantt-resize-wrapper {
+    position: relative;
+}
+
+.gantt-resize-handle {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: var(--gantt-left-width, 360px);
+    width: 6px;
+    margin-left: -3px;       /* centraliza o handle exatamente na borda */
+    cursor: col-resize;
+    background: transparent;
+    z-index: 50;
+    transition: background-color 120ms ease;
+    user-select: none;
+}
+
+.gantt-resize-handle:hover,
+.gantt-resize-handle.is-dragging {
+    background: rgba(102, 165, 147, 0.45); /* tom do brand #66A593 */
+}
+
+/* Linha visual no centro do handle para sinalizar área clicável */
+.gantt-resize-handle::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 1px;
+    margin-left: -0.5px;
+    background: rgba(102, 165, 147, 0.25);
+    pointer-events: none;
+}
+
+.gantt-resize-handle:hover::before,
+.gantt-resize-handle.is-dragging::before {
+    background: rgba(102, 165, 147, 0.9);
+    width: 2px;
+    margin-left: -1px;
+}
+
+/* Quando o handle está sendo arrastado, todo o body cursor vira col-resize */
+body.gantt-resizing {
+    cursor: col-resize !important;
+    user-select: none !important;
+}
