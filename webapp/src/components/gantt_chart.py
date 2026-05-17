@@ -496,31 +496,31 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
     proj_map = {str(p["_id"]): p for p in (projects or [])}
     act_map = {str(a["_id"]): a for a in (activities or [])}
 
-    # Determinar janela temporal LARGA (mesma lógica do build_gantt_chart) —
-    # Feature H: hour_offset descontinuado para deslocar janela; agora navegação
-    # é puro scrollLeft client-side. Sem re-render server.
+    # Determinar janela temporal (mesma lógica do build_gantt_chart)
     now_brt = datetime.utcnow() - timedelta(hours=3)
+    offset_td = timedelta(hours=hour_offset or 0)
 
     if granularity == "horas":
-        t_start = now_brt - timedelta(days=7)
-        t_end   = now_brt + timedelta(days=7)
+        center  = now_brt + offset_td
+        t_start = center - timedelta(hours=24)
+        t_end   = center + timedelta(hours=24)
     else:
         PAST_WINDOW = {
-            "dias":    timedelta(days=60),
-            "semanas": timedelta(days=120),
-            "meses":   timedelta(days=365),
+            "dias":    timedelta(days=3),
+            "semanas": timedelta(weeks=1),
+            "meses":   timedelta(days=30),
         }
         MIN_FUTURE = {
-            "dias":    timedelta(days=120),
-            "semanas": timedelta(days=240),
-            "meses":   timedelta(days=730),
+            "dias":    timedelta(days=14),
+            "semanas": timedelta(weeks=6),
+            "meses":   timedelta(days=150),
         }
-        past       = PAST_WINDOW.get(granularity, timedelta(days=60))
-        min_future = MIN_FUTURE.get(granularity, timedelta(days=120))
+        past       = PAST_WINDOW.get(granularity, timedelta(days=3))
+        min_future = MIN_FUTURE.get(granularity, timedelta(days=14))
         all_ends   = [_parse_dt(a["data_hora_fim"]) for a in activities]
         data_end   = max(all_ends) if all_ends else now_brt
-        t_start    = now_brt - past
-        t_end      = max(data_end, now_brt + min_future)
+        t_start    = (now_brt - past) + offset_td
+        t_end      = max(data_end, now_brt + min_future) + offset_td
 
     # Day stripes substituídos por gradient CSS para eliminar ~8500 divs/render
     # (Feature G Pass 2). Padrão zebra é pintado por .gantt-zebra usando as CSS
@@ -854,28 +854,28 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 className="text-muted p-4 text-center",
             )
 
-    # Janela LARGA fixa por granularidade (Feature H). hour_offset não é mais
-    # usado para mover a janela — agora navegação ◀ Hoje ▶ é puro scrollLeft
-    # client-side via assets/gantt-nav-scroll.js. Sem re-render server-side.
+    # Janela deslizante por granularidade; offset em horas permite navegação
+    # ◀ / Hoje / ▶ em qualquer modo (não só horas).
     now_brt = datetime.utcnow() - timedelta(hours=3)
+    offset_td = timedelta(hours=hour_offset or 0)
 
     if granularity == "horas":
-        # Janela curta — 7 dias antes + 7 dias depois (336 h). Render viável.
-        t_start = now_brt - timedelta(days=7)
-        t_end   = now_brt + timedelta(days=7)
+        center  = now_brt + offset_td
+        t_start = center - timedelta(hours=24)
+        t_end   = center + timedelta(hours=24)
     else:
         PAST_WINDOW = {
-            "dias":    timedelta(days=60),    # 2 meses para trás
-            "semanas": timedelta(days=120),   # 4 meses para trás
-            "meses":   timedelta(days=365),   # 1 ano para trás
+            "dias":    timedelta(days=3),
+            "semanas": timedelta(weeks=1),
+            "meses":   timedelta(days=30),
         }
         MIN_FUTURE = {
-            "dias":    timedelta(days=120),   # 4 meses adiante
-            "semanas": timedelta(days=240),   # 8 meses adiante
-            "meses":   timedelta(days=730),   # 2 anos adiante
+            "dias":    timedelta(days=14),
+            "semanas": timedelta(weeks=6),
+            "meses":   timedelta(days=150),
         }
-        past       = PAST_WINDOW.get(granularity, timedelta(days=60))
-        min_future = MIN_FUTURE.get(granularity, timedelta(days=120))
+        past       = PAST_WINDOW.get(granularity, timedelta(days=3))
+        min_future = MIN_FUTURE.get(granularity, timedelta(days=14))
 
         all_ends = [_parse_dt(c["data_hora_fim"]) for c in categories]
         for p in (projects or []):
@@ -883,8 +883,8 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 all_ends.append(_parse_dt(p["data_hora_fim"]))
 
         data_end = max(all_ends) if all_ends else now_brt
-        t_start  = now_brt - past
-        t_end    = max(data_end, now_brt + min_future)
+        t_start  = (now_brt - past) + offset_td
+        t_end    = max(data_end, now_brt + min_future) + offset_td
 
     # Contar atividades fora da janela visível (entirely before t_start)
     # e filtrá-las — evita a compressão à esquerda conforme o tempo avança.

@@ -257,7 +257,7 @@ def register_gantt_callbacks(app):
         State("store-gantt-projects-state",   "data"),
         State("store-gantt-categories-state", "data"),
         State("store-gantt-activities-state", "data"),
-        State("store-gantt-hour-offset",      "data"),
+        Input("store-gantt-hour-offset",      "data"),
         Input("store-gantt-filter",           "data"),
         Input("store-gantt-view-mode",        "data"),
         State("store-gantt-employees-state",  "data"),
