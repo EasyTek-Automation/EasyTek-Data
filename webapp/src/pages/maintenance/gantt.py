@@ -476,14 +476,19 @@ def layout():
         # Cards de KPI — resumo rápido do estado atual
         dbc.Row(id="row-gantt-kpis", className="mb-3 g-3"),
 
-        # Card dos projetos
+        # Card dos projetos — CardHeader em sticky para que o título
+        # "Projetos & Manutenções" trave no topo do viewport ao rolar a página,
+        # permitindo que o conteúdo do Gantt continue rolando abaixo dele.
         dbc.Card([
             dbc.CardHeader(
                 html.H5([
                     html.I(className="bi bi-kanban-fill me-2"),
                     "Projetos & Manutenções",
                 ], className="mb-0 text-white fw-semibold"),
-                style={"backgroundColor": "#66A593", "borderBottom": "none"},
+                style={
+                    "backgroundColor": "#66A593", "borderBottom": "none",
+                    "position": "sticky", "top": "0", "zIndex": "100",
+                },
             ),
             dbc.CardBody(
                 html.Div([
