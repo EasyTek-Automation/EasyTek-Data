@@ -66,10 +66,28 @@ def _get_month_periods(start_date: datetime, end_date: datetime) -> List[tuple]:
     """
     Gera lista de (year, month) cobrindo todos os meses entre start_date e end_date.
     Suporta ranges que cruzam virada de ano (ex: Out/2025 → Fev/2026).
+
+    Janela semi-aberta [start_date, end_date): quando end_date é exatamente o
+    primeiro instante de um mês (ex: datetime(y, m+1, 1)), esse mês NÃO é incluído
+    — apenas os meses anteriores. Evita classificar registros no mês de fronteira.
     """
     periods = []
     y, m = start_date.year, start_date.month
     end_y, end_m = end_date.year, end_date.month
+
+    is_first_instant_of_month = (
+        end_date.day == 1
+        and end_date.hour == 0
+        and end_date.minute == 0
+        and end_date.second == 0
+        and end_date.microsecond == 0
+    )
+    if is_first_instant_of_month:
+        end_m -= 1
+        if end_m == 0:
+            end_m = 12
+            end_y -= 1
+
     while (y, m) <= (end_y, end_m):
         periods.append((y, m))
         m += 1
@@ -161,16 +179,17 @@ def fetch_zpp_production_data(start_date: datetime, end_date: datetime) -> pd.Da
         # IMPORTANTE: Usar constante fixa, não nome dinâmico
         collection = get_mongo_connection(ZPP_PRODUCAO_COLLECTION)
 
-        # Buscar registros cujo INÍCIO ou FIM intersecta o período solicitado.
-        # Registros boundary (ex: início 30/01, fim 02/02) têm fininotif fora do mês
-        # mas ffinnotif dentro — precisam ser incluídos para o MONTH_BOUNDARY_RULE="fim".
-        # Estratégia: ampliar janela de busca 31 dias para trás em fininotif,
-        # mas exigir que ffinnotif >= start_date para não trazer dados de meses anteriores.
+        # Janela semi-aberta [start_date, end_date) — caller passa end_date como
+        # primeiro instante do mês seguinte (ex: datetime(y, m+1, 1)). Usar $lt
+        # impede que registros datados em 01/<mês+1> vazem para o fetch atual.
+        # fininotif recua 31 dias para capturar boundary cross-month (fim no mês,
+        # início no mês anterior). ffinnotif tem teto $lt end_date para não trazer
+        # registros que finalizam em meses posteriores.
         one_month_before = start_date - timedelta(days=31)
         query = {
             "_processed": True,
-            "fininotif": {"$gte": one_month_before, "$lte": end_date},
-            "ffinnotif": {"$gte": start_date},
+            "fininotif": {"$gte": one_month_before, "$lt": end_date},
+            "ffinnotif": {"$gte": start_date, "$lt": end_date},
         }
 
         # Buscar documentos com AMBAS as datas
@@ -333,14 +352,17 @@ def fetch_zpp_breakdown_data(start_date: datetime, end_date: datetime,
         # IMPORTANTE: Usar constante fixa, não nome dinâmico
         collection = get_mongo_connection(ZPP_PARADAS_COLLECTION)
 
-        # Buscar TODOS os registros processados no range de datas solicitado
+        # Janela semi-aberta [start_date, end_date). Filtra por fim_execucao (BR-01:
+        # campo de referência de ZPP_Paradas; BR-03: MONTH_BOUNDARY_RULE='fim').
+        # inicio_execucao tem janela ampliada 31 dias retroativos para capturar
+        # paradas boundary (início no mês anterior, fim no atual). $lt em ambos
+        # impede vazamento de registros em 01/<mês+1> (Bug #1).
+        one_month_before = start_date - timedelta(days=31)
         query = {
             "_processed": True,
             "causa_do_desvio": {"$in": codes},
-            "inicio_execucao": {
-                "$gte": start_date,
-                "$lte": end_date
-            }
+            "inicio_execucao": {"$gte": one_month_before, "$lt": end_date},
+            "fim_execucao": {"$gte": start_date, "$lt": end_date},
         }
 
         # Buscar documentos com AMBAS as datas
