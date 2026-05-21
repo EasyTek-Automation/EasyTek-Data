@@ -921,6 +921,7 @@ def register_indicators_v2_callbacks(app):
         ("v2-i18n-lg-refeicao",    "lg_refeicao"),
         ("v2-i18n-lg-mtto",        "lg_mtto"),
         ("v2-i18n-lg-processo",    "lg_processo"),
+        ("v2-i18n-beta-badge",     "beta_badge"),
     ]
 
     @app.callback(
@@ -931,6 +932,7 @@ def register_indicators_v2_callbacks(app):
             Output("tab-v2-report-component", "label"),
             Output("filter-v2-period-type", "options"),
             Output("filter-v2-equipment", "placeholder"),
+            Output("v2-beta-tooltip", "children"),
         ],
         Input("store-v2-lang", "data"),
     )
@@ -948,6 +950,7 @@ def register_indicators_v2_callbacks(app):
             {"label": d.get("period_custom", "Personalizado"), "value": "custom"},
         ])
         results.append(f"({'all' if lang == 'en' else ('todos' if lang == 'pt' else 'todos')})")
+        results.append(d.get("beta_tooltip", "Página em validação. Dados sintéticos."))
         return results
 
     # IM-11 — Toggle do collapse de filtros + condicional visibilidade ano/range

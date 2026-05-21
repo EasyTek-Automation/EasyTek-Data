@@ -65,28 +65,53 @@ def layout():
                     className="text-muted"
                 )
             ], width=8),
-            dbc.Col([
-                dbc.ButtonGroup([
-                    dbc.Button(
-                        [html.I(className="bi bi-arrow-clockwise me-2"), "Atualizar"],
-                        id="btn-refresh-indicators",
-                        color="primary",
-                        size="sm",
-                        outline=True
-                    ),
-                    # IM-08: Excel fica como botão simples no header da página;
-                    # DOCX migrou para dentro da Tab 4 "Relatório Diário".
-                    dbc.Button(
-                        [html.I(className="bi bi-file-earmark-excel me-2"), "Exportar"],
-                        id="btn-export-indicators-xlsx",
-                        color="secondary",
-                        size="sm",
-                        n_clicks=0,
-                        outline=True,
-                    ),
-                ])
-            ], width=4, className="text-end d-flex align-items-center justify-content-end")
-        ], className="mb-4"),
+            dbc.Col(
+                html.Div(
+                    [
+                        dbc.ButtonGroup([
+                            dbc.Button(
+                                [html.I(className="bi bi-arrow-clockwise me-2"), "Atualizar"],
+                                id="btn-refresh-indicators",
+                                color="primary",
+                                size="sm",
+                                outline=True
+                            ),
+                            # IM-08: Excel fica como botão simples no header da página;
+                            # DOCX migrou para dentro da Tab 4 "Relatório Diário".
+                            dbc.Button(
+                                [html.I(className="bi bi-file-earmark-excel me-2"), "Exportar"],
+                                id="btn-export-indicators-xlsx",
+                                color="secondary",
+                                size="sm",
+                                n_clicks=0,
+                                outline=True,
+                            ),
+                        ]),
+                        # Toggle de visualização v1.0 / v2.0
+                        dbc.ButtonGroup([
+                            dbc.Button(
+                                "v1.0",
+                                id="btn-view-v1",
+                                color="primary",
+                                size="sm",
+                                outline=False,
+                            ),
+                            dbc.Button(
+                                "v2.0",
+                                id="btn-view-v2",
+                                color="primary",
+                                size="sm",
+                                outline=True,
+                                href="/maintenance/indicators-v2",
+                            ),
+                        ]),
+                    ],
+                    className="d-flex flex-column align-items-md-end align-items-start gap-2",
+                ),
+                xs=12, md=4,
+                className="d-flex align-items-end justify-content-md-end justify-content-start mt-3 mt-md-0",
+            ),
+        ], className="mb-4 align-items-start"),
 
         # ==================== PERÍODO ANALISADO ====================
         dbc.Row([

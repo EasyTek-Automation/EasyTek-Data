@@ -92,6 +92,8 @@ TRANS = {
         "kpi_mtbf_title": "M01 - MTBF",
         "kpi_mttr_title": "M02 - MTTR",
         "kpi_br_title":   "M03 - Taxa de Avaria",
+        "beta_badge":    "BETA · Dados demo",
+        "beta_tooltip":  "Página em validação. Dados sintéticos — não refletem a operação real.",
         # Chart traces / titles
         "chart_trend":   "Tendência",
         "chart_target":  "Meta",
@@ -173,6 +175,8 @@ TRANS = {
         "kpi_mtbf_title": "M01 - MTBF",
         "kpi_mttr_title": "M02 - MTTR",
         "kpi_br_title":   "M03 - Tasa de Avería",
+        "beta_badge":    "BETA · Datos demo",
+        "beta_tooltip":  "Página en validación. Datos sintéticos — no reflejan la operación real.",
         "chart_trend":   "Tendencia",
         "chart_target":  "Meta",
         "chart_value":   "Valor",
@@ -250,6 +254,8 @@ TRANS = {
         "kpi_mtbf_title": "M01 - MTBF",
         "kpi_mttr_title": "M02 - MTTR",
         "kpi_br_title":   "M03 - Breakdown Rate",
+        "beta_badge":    "BETA · Demo data",
+        "beta_tooltip":  "Page under validation. Synthetic data — does not reflect real operation.",
         "chart_trend":   "Trend",
         "chart_target":  "Target",
         "chart_value":   "Value",
@@ -505,8 +511,28 @@ def layout():
                                             "Indicadores de Manutenção V2",
                                             id="v2-i18n-page-title",
                                         ),
+                                        dbc.Badge(
+                                            [
+                                                html.I(className="bi bi-exclamation-triangle-fill me-2"),
+                                                html.Span(
+                                                    "BETA · Dados demo",
+                                                    id="v2-i18n-beta-badge",
+                                                ),
+                                            ],
+                                            id="v2-beta-badge",
+                                            color="warning",
+                                            text_color="dark",
+                                            className="v2-beta-badge ms-3 align-middle",
+                                            pill=True,
+                                        ),
+                                        dbc.Tooltip(
+                                            "Página em validação. Dados sintéticos — não refletem a operação real.",
+                                            id="v2-beta-tooltip",
+                                            target="v2-beta-badge",
+                                            placement="bottom",
+                                        ),
                                     ],
-                                    className="mb-1",
+                                    className="mb-1 d-flex align-items-center flex-wrap",
                                 ),
                                 html.P(
                                     "POC drilldown — Clique em qualquer card pra explorar Avaria / MTBF / MTTR.",
@@ -545,6 +571,26 @@ def layout():
                                         ),
                                     ]
                                 ),
+                                # Toggle de visualização v1.0 / v2.0
+                                dbc.ButtonGroup(
+                                    [
+                                        dbc.Button(
+                                            "v1.0",
+                                            id="btn-view-v1-from-v2",
+                                            color="primary",
+                                            size="sm",
+                                            outline=True,
+                                            href="/maintenance/indicators",
+                                        ),
+                                        dbc.Button(
+                                            "v2.0",
+                                            id="btn-view-v2-from-v2",
+                                            color="primary",
+                                            size="sm",
+                                            outline=False,
+                                        ),
+                                    ]
+                                ),
                             ],
                             className="d-flex flex-column align-items-md-end align-items-start gap-2",
                         ),
@@ -552,7 +598,7 @@ def layout():
                         className="d-flex align-items-end justify-content-md-end justify-content-start mt-3 mt-md-0",
                     ),
                 ],
-                className="mb-4 align-items-end",
+                className="mb-4 align-items-start",
             ),
 
             # IM-11 — Filtros V2 (collapse, paridade V1)
