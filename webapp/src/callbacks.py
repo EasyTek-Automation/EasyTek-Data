@@ -40,6 +40,7 @@ from src.callbacks_registers.kpi_report_callbacks import register_kpi_report_cal
 from src.callbacks_registers.kpi_report_screen_callbacks import register_kpi_report_screen_callbacks
 from src.callbacks_registers.kpi_report_v2_callbacks import register_kpi_report_v2_callbacks
 from src.callbacks_registers.kpi_report_v2_tab_callback import register_kpi_report_v2_tab_callback
+from src.callbacks_registers.kpi_report_v2_data_tab_callback import register_kpi_report_v2_data_tab_callback
 from src.callbacks_registers.zpp_processor_callbacks import register_zpp_processor_callbacks
 from src.callbacks_registers.zpp_debug_callbacks import register_zpp_debug_callbacks
 from src.callbacks_registers.zpp_redesign_callbacks import register_zpp_redesign_callbacks
@@ -134,6 +135,8 @@ def register_callbacks(app):
     register_kpi_report_v2_callbacks(app)
     # KPIReport-v2 aba 'Relatório' dentro de /maintenance/indicators-v2 (reusa layout V1)
     register_kpi_report_v2_tab_callback(app)
+    # KPIReport-v2 aba 'Dados' dentro de /maintenance/indicators-v2 (reusa layout V1 Dados Brutos)
+    register_kpi_report_v2_data_tab_callback(app)
 
     # ZPP Processor callbacks
     register_zpp_processor_callbacks(app)

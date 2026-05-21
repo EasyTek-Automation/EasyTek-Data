@@ -937,10 +937,49 @@ def layout():
                         id="tab-v2-data-component",
                         tab_id="tab-v2-data",
                         children=html.Div(
-                            html.P(
-                                "Aba placeholder — replicar conteúdo de indicators.py se necessário.",
-                                className="text-muted text-center py-5",
-                            )
+                            [
+                                dcc.Loading(
+                                    id="rd-v2-data-loading",
+                                    type="circle",
+                                    color="#0d6efd",
+                                    children=html.Div(
+                                        [
+                                            html.Div(id="rd-v2-data-coverage",
+                                                      className="mb-4"),
+                                            html.H5(
+                                                [html.I(className="bi bi-eyeglasses me-2"),
+                                                 "Como os Cards do Topo São Calculados"],
+                                                className="mt-3 mb-1",
+                                            ),
+                                            html.P(
+                                                "Para cada mês: KPI calculado dos totais brutos. "
+                                                "O valor exibido nos cards é a média aritmética desses valores mensais.",
+                                                className="text-muted small mb-3",
+                                            ),
+                                            html.Div(id="rd-v2-data-monthly", className="mb-4"),
+                                            html.H5(
+                                                [html.I(className="bi bi-calculator me-2"),
+                                                 "Resumo da Planta"],
+                                                className="mt-3 mb-3",
+                                            ),
+                                            html.Div(id="rd-v2-data-summary", className="mb-4"),
+                                            html.H5(
+                                                [html.I(className="bi bi-list-ul me-2"),
+                                                 "Motivos de Parada"],
+                                                className="mt-3 mb-3",
+                                            ),
+                                            html.Div(id="rd-v2-data-motivos", className="mb-4"),
+                                            html.H5(
+                                                [html.I(className="bi bi-table me-2"),
+                                                 "Detalhamento por Equipamento"],
+                                                className="mb-3",
+                                            ),
+                                            html.Div(id="rd-v2-data-table"),
+                                        ],
+                                        className="p-3",
+                                    ),
+                                ),
+                            ],
                         ),
                     ),
                     dbc.Tab(
