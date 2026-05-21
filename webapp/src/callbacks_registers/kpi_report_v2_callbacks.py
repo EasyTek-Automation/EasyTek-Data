@@ -267,8 +267,14 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
                     "mttr":           (avg.get("mttr") * 60) if isinstance(avg.get("mttr"), (int, float)) else avg.get("mttr"),
                     "breakdown_rate": avg.get("breakdown_rate"),
                 }
-            except Exception:
-                logger.exception("KPI v2 compute_compare: falha ao buscar janela anterior")
+            except Exception as exc:
+                # Janela anterior sem dados (típico em local / fim-de-semana) —
+                # tratado como ∆=na no UI; downgrade log de error pra warning.
+                logger.warning(
+                    "KPI v2 compute_compare: sem dados em janela anterior "
+                    "[%s, %s): %s — ∆ exibido como 'n/d'.",
+                    win_start, win_end, type(exc).__name__,
+                )
                 return {"mtbf": None, "mttr": None, "breakdown_rate": None}
 
         ant_mes = fetch_anterior_monthly_window(win_mes)
