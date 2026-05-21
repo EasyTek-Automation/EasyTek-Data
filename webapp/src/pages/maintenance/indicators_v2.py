@@ -948,10 +948,87 @@ def layout():
                         id="tab-v2-report-component",
                         tab_id="tab-v2-report",
                         children=html.Div(
-                            html.P(
-                                "Aba placeholder.",
-                                className="text-muted text-center py-5",
-                            )
+                            [
+                                # Header: período + botões de export
+                                html.Div(
+                                    [
+                                        html.Div(
+                                            html.Small(
+                                                id="rd-v2-periodo-label",
+                                                className="text-muted",
+                                            ),
+                                        ),
+                                        html.Div(
+                                            [
+                                                dbc.Button(
+                                                    [html.I(className="bi bi-filetype-pdf me-2"),
+                                                     "Exportar PDF"],
+                                                    id="btn-kpi-v2-export-pdf",
+                                                    color="primary",
+                                                    size="sm",
+                                                    disabled=True,
+                                                    className="me-2",
+                                                ),
+                                                dbc.Button(
+                                                    [html.I(className="bi bi-file-earmark-word me-2"),
+                                                     "Exportar DOCX"],
+                                                    id="btn-kpi-v2-export-docx",
+                                                    color="secondary",
+                                                    size="sm",
+                                                    disabled=True,
+                                                    className="me-2",
+                                                ),
+                                                dbc.Button(
+                                                    [html.I(className="bi bi-link-45deg me-2"),
+                                                     "Copiar Link"],
+                                                    id="btn-kpi-v2-share",
+                                                    color="info",
+                                                    outline=True,
+                                                    size="sm",
+                                                ),
+                                            ],
+                                        ),
+                                    ],
+                                    className="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 mb-3",
+                                ),
+                                # Container preenchido pelo callback ao ativar a aba
+                                dcc.Loading(
+                                    id="rd-v2-loading",
+                                    type="circle",
+                                    color="#0d6efd",
+                                    children=html.Div(
+                                        id="rd-v2-content-container",
+                                        children=html.Div(
+                                            "Carregue a aba para gerar o relatório…",
+                                            className="text-muted text-center py-5",
+                                        ),
+                                    ),
+                                ),
+                                # Downloads + clipboard helpers
+                                dcc.Download(id="download-kpi-v2-pdf"),
+                                dcc.Download(id="download-kpi-v2-docx"),
+                                dcc.Clipboard(id="kpi-v2-share-clipboard",
+                                              target_id=None,
+                                              style={"display": "none"}),
+                                # Toast feedback (share/erro)
+                                dbc.Toast(
+                                    id="kpi-v2-share-toast",
+                                    header="KPI Report v2",
+                                    is_open=False,
+                                    dismissable=True,
+                                    duration=4000,
+                                    icon="info",
+                                    style={"position": "fixed", "top": 66, "right": 10,
+                                           "width": 350, "zIndex": 9999},
+                                ),
+                                # Stores compartilhados com a rota standalone
+                                dcc.Store(id="store-kpi-v2-data", storage_type="memory"),
+                                dcc.Store(id="store-kpi-v2-lang",
+                                          storage_type="local", data="pt"),
+                                dcc.Store(id="store-kpi-v2-blocks-toggle",
+                                          storage_type="local",
+                                          data={str(i): True for i in range(1, 6)}),
+                            ],
                         ),
                     ),
                 ],

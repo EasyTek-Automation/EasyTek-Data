@@ -263,10 +263,10 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
     # C1 — init_data
     # ------------------------------------------------------------------
     @app.callback(
-        Output("store-kpi-v2-data", "data"),
+        Output("store-kpi-v2-data", "data", allow_duplicate=True),
         Input("kpi-v2-load-once", "n_intervals"),
         Input("btn-kpi-v2-refresh", "n_clicks"),
-        prevent_initial_call=False,
+        prevent_initial_call="initial_duplicate",
     )
     def init_data(n_intervals, n_refresh):
         """Carga inicial e refresh manual — chama coletar_dados_relatorio (as_png=False)."""
