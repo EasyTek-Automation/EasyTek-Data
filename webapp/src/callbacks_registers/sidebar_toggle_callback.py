@@ -19,7 +19,7 @@ _SIDEBAR_W = "280px"
 
 def _estilos_expandido():
     sidebar_col = {
-        "position": "fixed", "top": "60px", "left": "0", "bottom": "0",
+        "position": "fixed", "top": "80px", "left": "0", "bottom": "0",
         "width": _SIDEBAR_W, "zIndex": 901,
         "transform": "translateX(0)",
         "transition": "transform 0.3s ease",
@@ -29,7 +29,7 @@ def _estilos_expandido():
         "height": "100%", "visibility": "visible", "opacity": 1, "overflowY": "auto",
     }
     overlay = {
-        "position": "fixed", "top": "60px", "left": "0", "right": "0", "bottom": "0",
+        "position": "fixed", "top": "80px", "left": "0", "right": "0", "bottom": "0",
         "backgroundColor": "rgba(255,255,255,0.55)",
         "backdropFilter": "blur(2px)", "WebkitBackdropFilter": "blur(2px)",
         "zIndex": 900, "cursor": "pointer",
@@ -41,7 +41,7 @@ def _estilos_expandido():
 
 def _estilos_colapsado():
     sidebar_col = {
-        "position": "fixed", "top": "60px", "left": "0", "bottom": "0",
+        "position": "fixed", "top": "80px", "left": "0", "bottom": "0",
         "width": _SIDEBAR_W, "zIndex": 901,
         "transform": f"translateX(-{_SIDEBAR_W})",
         "transition": "transform 0.3s ease",
@@ -51,7 +51,7 @@ def _estilos_colapsado():
         "height": "100%", "visibility": "visible", "opacity": 1, "overflowY": "auto",
     }
     overlay = {
-        "position": "fixed", "top": "60px", "left": "0", "right": "0", "bottom": "0",
+        "position": "fixed", "top": "80px", "left": "0", "right": "0", "bottom": "0",
         "backgroundColor": "rgba(255,255,255,0.55)",
         "backdropFilter": "blur(2px)", "WebkitBackdropFilter": "blur(2px)",
         "zIndex": 900, "cursor": "pointer",

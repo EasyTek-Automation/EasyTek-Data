@@ -102,22 +102,8 @@ def create_sidebar_layout(app_instance, pathname="/", sidebar_content_style=None
     
     return dbc.Card([
         dbc.CardBody([
-            # Logo (sempre presente)
-            html.Div([
-                html.Img(
-                    src="/assets/LogoAMG.png",
-                    style={
-                        "width": "100%",
-                        "max-height": "120px",
-                        "object-fit": "contain",
-                        "margin": "0 auto 20px",
-                        "display": "block"
-                    }
-                ),
-                html.Hr(),
-            ], style={"width": "100%"}),
-
-            # Container para conteúdo dinâmico (será atualizado via callback)
+            # Logo do cliente migrou para o header (header-brand-mark) porque a
+            # sidebar fica colapsada quase sempre, escondendo a marca.
             html.Div(
                 children=initial_content,
                 id="sidebar-dynamic-content"

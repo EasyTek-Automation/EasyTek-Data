@@ -450,7 +450,8 @@ def create_header(pathname, user):
     if can_see_menu(user, "configuracoes"):
         nav_items.append(config_dropdown)
     
-    navigation_menu = dbc.Nav(nav_items, navbar=True, className="ms-3")
+    # className="" — sem margin-start; nav começa imediatamente após o brand mark.
+    navigation_menu = dbc.Nav(nav_items, navbar=True, className="")
 
     # ========================================
     # DROPDOWN DE FILTROS
@@ -539,10 +540,36 @@ def create_header(pathname, user):
     # ========================================
     # LAYOUT FINAL DO HEADER
     # ========================================
+    # ========================================
+    # BRAND MARK — logo cliente (frosted + gradient border bottom)
+    # Antes vivia na sidebar; movido porque sidebar fica colapsada quase sempre.
+    # Clicável → navega pra /.
+    # ========================================
+    brand_mark = dcc.Link(
+        html.Div(
+            html.Img(
+                src="/assets/LogoAMG.png",
+                style={
+                    "height": "78px",
+                    "width": "auto",
+                    "maxWidth": "290px",
+                    "objectFit": "contain",
+                    "display": "block",
+                },
+                alt="AMG",
+            ),
+            className="header-brand-mark",
+            title="Início",
+        ),
+        href="/",
+        style={"textDecoration": "none"},
+    )
+
     header_layout = html.Div([
         # LADO ESQUERDO
         html.Div([
             dbc.Button(hamburger_icon(), id="collapse-sidebar-btn", color="primary", size="sm", className="me-2"),
+            brand_mark,
             navigation_menu,
         ], className="d-flex align-items-center"),
 
@@ -557,7 +584,7 @@ def create_header(pathname, user):
     id="header",
     style={
         "position": "fixed", "top": 0, "left": 0, "right": 0,
-        "height": "60px", "padding": "0 1rem", "zIndex": 1020,
+        "height": "80px", "padding": "0 1rem", "zIndex": 1020,
         "display": "flex", "alignItems": "center", "justifyContent": "space-between",
         "background": "var(--bs-body-bg, #fff)",
         "borderBottom": "1px solid var(--bs-border-color, #dee2e6)",

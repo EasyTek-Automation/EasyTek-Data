@@ -262,14 +262,14 @@ def _build_main_layout(pathname, page_content, sidebar_state):
 
     if sidebar_state == "expanded":
         sidebar_col_style = {
-            "position": "fixed", "top": "60px", "left": "0", "bottom": "0",
+            "position": "fixed", "top": "80px", "left": "0", "bottom": "0",
             "width": _SIDEBAR_W, "zIndex": 901,
             "transform": "translateX(0)",
             "transition": "transform 0.3s ease",
             "overflowY": "auto",
         }
         overlay_style = {
-            "position": "fixed", "top": "60px", "left": "0",
+            "position": "fixed", "top": "80px", "left": "0",
             "right": "0", "bottom": "0",
             "backgroundColor": "rgba(255,255,255,0.55)",
             "backdropFilter": "blur(2px)",
@@ -280,14 +280,14 @@ def _build_main_layout(pathname, page_content, sidebar_state):
         }
     else:
         sidebar_col_style = {
-            "position": "fixed", "top": "60px", "left": "0", "bottom": "0",
+            "position": "fixed", "top": "80px", "left": "0", "bottom": "0",
             "width": _SIDEBAR_W, "zIndex": 901,
             "transform": f"translateX(-{_SIDEBAR_W})",
             "transition": "transform 0.3s ease",
             "overflowY": "auto",
         }
         overlay_style = {
-            "position": "fixed", "top": "60px", "left": "0",
+            "position": "fixed", "top": "80px", "left": "0",
             "right": "0", "bottom": "0",
             "backgroundColor": "rgba(255,255,255,0.55)",
             "backdropFilter": "blur(2px)",
@@ -321,7 +321,7 @@ def _build_main_layout(pathname, page_content, sidebar_state):
             html.Div(page_content),
             id="content-column",
             style={
-                "position": "fixed", "top": "60px", "left": "0",
+                "position": "fixed", "top": "80px", "left": "0",
                 "right": "0", "bottom": "0",
                 "overflowY": "auto", "zIndex": 1,
             }
