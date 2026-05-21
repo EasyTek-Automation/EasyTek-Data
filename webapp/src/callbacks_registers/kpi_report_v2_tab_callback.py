@@ -1,14 +1,15 @@
 """Callback de renderização da aba 'Relatório' do indicators-v2.
 
-Reusa **layout V1** (helpers em `kpi_report_screen_callbacks`) — entrega o mesmo
-visual do Tab 4 "Relatório Diário" da página /maintenance/indicators.
+Reusa **estrutura V1** (helpers em `kpi_report_screen_callbacks` — cards KPI,
+tabelas, seções) MAS substitui os sunbursts por **bar charts** alinhados ao
+paradigma visual do Indicators-V2 (refactor sessão 03).
 
 Trigger: `tabs-indicators-v2.active_tab == 'tab-v2-report'`.
 Saída: `rd-v2-content-container.children` + `rd-v2-periodo-label.children`
        + `store-kpi-v2-data` (alimenta C8/C9 export).
 
 Anti-pattern proibido: NÃO recalcula KPI. Delega a `coletar_dados_relatorio` v1
-e renderiza via helpers V1 (`_row_3_kpis`, `_row_3_sunbursts`, `_tabela_*`).
+e renderiza via helpers V1 (`_row_3_kpis`, `_tabela_*`).
 """
 from __future__ import annotations
 
@@ -16,19 +17,67 @@ import logging
 
 import dash
 import dash_bootstrap_components as dbc
-from dash import Input, Output, State, html, no_update
+from dash import Input, Output, dcc, html
 
 from src.callbacks_registers.kpi_report_screen_callbacks import (
     _row_3_kpis,
-    _row_3_sunbursts,
     _section,
     _tabela_detalhamento,
     _tabela_top_paradas,
 )
 from src.utils import kpi_report_config as cfg
 from src.utils.kpi_report_data import coletar_dados_relatorio
+from src.utils.kpi_report_v2_bars import build_bar_figure
+from src.utils.kpi_report_v2_series import (
+    build_daily_series_last_n,
+    build_monthly_series_for_year,
+)
 
 logger = logging.getLogger(__name__)
+
+
+_KPI_KEYS: tuple[tuple[str, str], ...] = (
+    ("mtbf",        "MTBF"),
+    ("mttr",        "MTTR"),
+    ("taxa_avaria", "Taxa de Avaria"),
+)
+
+
+def _row_3_bars(series: dict | None, metas: dict | None) -> dbc.Row:
+    """3 cards lado a lado — bar chart por KPI (substitui `_row_3_sunbursts`).
+
+    `series`: dict com `labels`, `mtbf`, `mttr`, `taxa_avaria`, `current_idx`.
+    `metas`: dict com `mtbf`, `mttr`, `taxa_avaria` (em h, min, %).
+    """
+    metas = metas or {}
+    cols = []
+    for kpi_key, _ in _KPI_KEYS:
+        if not isinstance(series, dict) or not series.get("labels"):
+            content = dbc.Alert("Sem dados.", color="warning",
+                                 className="text-center mb-0")
+        else:
+            fig = build_bar_figure(
+                labels=series.get("labels") or [],
+                values=series.get(kpi_key) or [],
+                kpi=kpi_key,
+                target=metas.get(kpi_key),
+                title="",
+                highlight_idx=series.get("current_idx"),
+                height=300,
+            )
+            content = dcc.Graph(
+                figure=fig,
+                config={"displayModeBar": False, "responsive": True},
+                style={"height": "300px"},
+            )
+        cols.append(
+            dbc.Col(
+                dbc.Card(dbc.CardBody(content, className="p-2"),
+                          className="shadow-sm h-100"),
+                md=4, className="mb-3",
+            )
+        )
+    return dbc.Row(cols)
 
 
 def register_kpi_report_v2_tab_callback(app: dash.Dash) -> None:
@@ -101,14 +150,34 @@ def register_kpi_report_v2_tab_callback(app: dash.Dash) -> None:
                 {"empty": True, "reason": "planta_vazia"},
             )
 
+        # Séries de barras — paradigma Indicators-V2. Reusa funções canônicas v1
+        # via build_monthly_series_for_year + build_daily_series_last_n.
+        eq_ids = stored_data.get("equipment_ids") if isinstance(stored_data, dict) else []
+        try:
+            monthly_series = build_monthly_series_for_year(
+                year=agora.year, equipment_ids=eq_ids or [],
+                current_month=agora.month,
+            )
+        except Exception:
+            logger.exception("KPI v2 tab: monthly_series falhou")
+            monthly_series = None
+        try:
+            daily_series = build_daily_series_last_n(
+                now=agora, n_days=7, equipment_ids=eq_ids or [],
+            )
+        except Exception:
+            logger.exception("KPI v2 tab: daily_series falhou")
+            daily_series = None
+
         # Mesma ordem do Tab 4 v1 — alinhada ao template DOCX (2026-05-13).
+        # Diferença: bar charts (paradigma Indicators-V2) no lugar de sunbursts.
         content = html.Div([
             _section(
                 "KPIs da Planta (Mês Corrente)",
                 _row_3_kpis(b1.get("kpis_planta", {}),
                             b1.get("metas", {}),
                             b1.get("cores_kpis", {})),
-                _row_3_sunbursts(b1.get("sunburst_figures", {})),
+                _row_3_bars(monthly_series, b1.get("metas", {})),
             ),
             _section(
                 "Top 5 Paradas do Mês",
@@ -126,7 +195,7 @@ def register_kpi_report_v2_tab_callback(app: dash.Dash) -> None:
                 _row_3_kpis(b3.get("kpis_planta", {}),
                             b3.get("metas", {}),
                             b3.get("cores_kpis", {})),
-                _row_3_sunbursts(b3.get("sunburst_figures", {})),
+                _row_3_bars(daily_series, b3.get("metas", {})),
             ),
             _section(
                 "Todas as Paradas das Últimas 24h",
