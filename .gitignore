@@ -114,3 +114,9 @@ _pw_*.mjs
 # Notas/briefings pessoais (não publicar)
 briefing-*.md
 prompt-investigacao-*.md
+
+# Cobertura / cache pytest (não versionar)
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/

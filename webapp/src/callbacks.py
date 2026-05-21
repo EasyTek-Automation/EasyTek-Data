@@ -38,6 +38,7 @@ from src.callbacks_registers.maintenance_kpi_callbacks import register_maintenan
 from src.callbacks_registers.maintenance_config_callbacks import register_maintenance_config_callbacks
 from src.callbacks_registers.kpi_report_callbacks import register_kpi_report_callbacks
 from src.callbacks_registers.kpi_report_screen_callbacks import register_kpi_report_screen_callbacks
+from src.callbacks_registers.kpi_report_v2_callbacks import register_kpi_report_v2_callbacks
 from src.callbacks_registers.zpp_processor_callbacks import register_zpp_processor_callbacks
 from src.callbacks_registers.zpp_debug_callbacks import register_zpp_debug_callbacks
 from src.callbacks_registers.zpp_redesign_callbacks import register_zpp_redesign_callbacks
@@ -128,6 +129,8 @@ def register_callbacks(app):
     register_kpi_report_callbacks(app)
     # KPIReport screen rendering (Tab 4 Relatório Diário — IM-08)
     register_kpi_report_screen_callbacks(app)
+    # KPIReport-v2 — rota /maintenance/kpi-report-v2 (SDD KPIReport-v2, IM-06..IM-11)
+    register_kpi_report_v2_callbacks(app)
 
     # ZPP Processor callbacks
     register_zpp_processor_callbacks(app)

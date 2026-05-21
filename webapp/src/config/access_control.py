@@ -120,6 +120,12 @@ ROUTE_ACCESS = {
         "min_level": 1,
         "description": "Indicadores de Manutenção V2 (POC drilldown)"
     },
+    "/maintenance/kpi-report-v2": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 1,
+        "description": "Relatório de KPIs v2 (HTML + PDF + drilldown)"
+    },
     "/maintenance/config": {
         "shared": False,
         "perfis": ["manutencao"],

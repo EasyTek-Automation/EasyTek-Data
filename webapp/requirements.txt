@@ -47,3 +47,7 @@ docxtpl>=0.16.7,<1.0
 kaleido>=1.0,<2.0
 Pillow>=10.0
 
+# KPIReport-v2 (DS-04) — geração PDF nativa via reportlab (puro Python, ~3MB).
+# Escolha justificada vs WeasyPrint: evita engine HTML→PDF duplicado (Chromium do kaleido já presente).
+reportlab>=4.0,<5.0
+
