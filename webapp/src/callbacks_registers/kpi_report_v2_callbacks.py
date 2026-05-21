@@ -98,6 +98,55 @@ def _serialize_dados_for_store(dados: dict) -> dict:
     return out
 
 
+def _replace_sunbursts_with_bars(dados: dict) -> dict:
+    """Substitui `bloco{1,3}.sunburst_figures` PNG bytes por bar chart PNG bytes.
+
+    Reusa `monthly_series` / `daily_series` já injetadas + `kpi_report_v2_bars` +
+    kaleido. Mantém compat com template DOCX v1 que renderiza
+    `{{ bloco1.sunburst_figures.mtbf }}` — bytes continuam bytes; só muda o que
+    o usuário vê (sunburst → bar). Não toca V1 (refactor RF-08).
+    """
+    if not dados:
+        return dados
+    try:
+        from src.utils.kpi_report_figures import renderizar_sunburst_png
+        from src.utils.kpi_report_v2_bars import build_bar_figure
+    except Exception:
+        logger.exception("KPI v2 docx: imports bars/figures falharam")
+        return dados
+
+    for bloco_key, series_key in (("bloco1", "monthly_series"),
+                                    ("bloco3", "daily_series")):
+        bloco = dados.get(bloco_key)
+        if not isinstance(bloco, dict):
+            continue
+        series = bloco.get(series_key)
+        if not isinstance(series, dict):
+            continue
+        labels = series.get("labels") or []
+        if not labels:
+            continue
+        metas = bloco.get("metas") or {}
+        new_figs: dict[str, bytes] = {}
+        for kpi_key in ("mtbf", "mttr", "taxa_avaria"):
+            values = series.get(kpi_key) or []
+            try:
+                fig = build_bar_figure(
+                    labels=labels, values=values, kpi=kpi_key,
+                    target=metas.get(kpi_key), title="",
+                    highlight_idx=series.get("current_idx"), height=300,
+                )
+                png = renderizar_sunburst_png(fig, kpi_key.upper())
+                if isinstance(png, (bytes, bytearray)):
+                    new_figs[kpi_key] = bytes(png)
+            except Exception:
+                logger.warning("KPI v2 docx: falha bar PNG %s/%s",
+                                bloco_key, kpi_key)
+        if new_figs:
+            bloco["sunburst_figures"] = new_figs
+    return dados
+
+
 def _inject_series(dados: dict, stored: dict, agora: datetime) -> dict:
     """Injeta `monthly_series` (bloco 1) e `daily_series` (bloco 3) — refactor RF.
 
@@ -550,6 +599,10 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
         agora = cfg._now_in_report_timezone()
         try:
             dados_png = coletar_dados_relatorio(stored, agora, as_png=True)
+            # RF-08: injeta séries + substitui sunburst PNG por bar chart PNG
+            # antes do template DOCX renderizar (template v1 fica intocado).
+            dados_png = _inject_series(dados_png, stored, agora)
+            dados_png = _replace_sunbursts_with_bars(dados_png)
             docx_bytes = montar_docx(dados_png)
         except (TemplateLoadError, Exception):
             logger.exception("KPI v2 export_docx: falha")
