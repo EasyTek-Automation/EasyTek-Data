@@ -22,7 +22,7 @@ TRANS: dict[str, dict[str, str]] = {
     "pt": {
         "page_title":             "Relatório de KPIs v2",
         "page_subtitle":          "Drilldown progressivo — clique em qualquer bloco para detalhar.",
-        "beta_badge":             "BETA · Dados ao vivo",
+        "beta_badge":             "BETA · Dados em Auditoria",
         "beta_tooltip":           "Página em validação. Use a v1 (/maintenance/indicators) como referência canônica.",
         "block_1_title":          "Bloco 1 — KPIs do Mês (Planta)",
         "block_2_title":          "Bloco 2 — Top 5 Paradas do Mês",
@@ -65,7 +65,7 @@ TRANS: dict[str, dict[str, str]] = {
     "es": {
         "page_title":             "Informe de KPIs v2",
         "page_subtitle":          "Drilldown progresivo — haga clic en cualquier bloque para detallar.",
-        "beta_badge":             "BETA · Datos en vivo",
+        "beta_badge":             "BETA · Datos en Auditoría",
         "beta_tooltip":           "Página en validación. Use la v1 (/maintenance/indicators) como referencia canónica.",
         "block_1_title":          "Bloque 1 — KPIs del Mes (Planta)",
         "block_2_title":          "Bloque 2 — Top 5 Paradas del Mes",
@@ -108,7 +108,7 @@ TRANS: dict[str, dict[str, str]] = {
     "en": {
         "page_title":             "KPI Report v2",
         "page_subtitle":          "Progressive drilldown — click any block to expand.",
-        "beta_badge":             "BETA · Live data",
+        "beta_badge":             "BETA · Data in Audit",
         "beta_tooltip":           "Page under validation. Use v1 (/maintenance/indicators) as the canonical reference.",
         "block_1_title":          "Block 1 — Monthly KPIs (Plant)",
         "block_2_title":          "Block 2 — Top 5 Monthly Breakdowns",
@@ -211,7 +211,7 @@ def _beta_badge() -> html.Span:
     return html.Span(
         [
             html.I(className="bi bi-exclamation-triangle-fill me-2"),
-            html.Span("BETA · Dados ao vivo", id="kpi-v2-i18n-beta-badge"),
+            html.Span("BETA · Dados em Auditoria", id="kpi-v2-i18n-beta-badge"),
         ],
         id="kpi-v2-beta-badge",
         className="v2-beta-badge ms-3 align-middle",

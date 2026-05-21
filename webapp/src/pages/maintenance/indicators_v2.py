@@ -92,7 +92,7 @@ TRANS = {
         "kpi_mtbf_title": "M01 - MTBF",
         "kpi_mttr_title": "M02 - MTTR",
         "kpi_br_title":   "M03 - Taxa de Avaria",
-        "beta_badge":    "BETA · Dados demo",
+        "beta_badge":    "BETA · Dados em Auditoria",
         "beta_tooltip":  "Página em validação. Dados sintéticos — não refletem a operação real.",
         # Chart traces / titles
         "chart_trend":   "Tendência",
@@ -175,7 +175,7 @@ TRANS = {
         "kpi_mtbf_title": "M01 - MTBF",
         "kpi_mttr_title": "M02 - MTTR",
         "kpi_br_title":   "M03 - Tasa de Avería",
-        "beta_badge":    "BETA · Datos demo",
+        "beta_badge":    "BETA · Datos en Auditoría",
         "beta_tooltip":  "Página en validación. Datos sintéticos — no reflejan la operación real.",
         "chart_trend":   "Tendencia",
         "chart_target":  "Meta",
@@ -254,7 +254,7 @@ TRANS = {
         "kpi_mtbf_title": "M01 - MTBF",
         "kpi_mttr_title": "M02 - MTTR",
         "kpi_br_title":   "M03 - Breakdown Rate",
-        "beta_badge":    "BETA · Demo data",
+        "beta_badge":    "BETA · Data in Audit",
         "beta_tooltip":  "Page under validation. Synthetic data — does not reflect real operation.",
         "chart_trend":   "Trend",
         "chart_target":  "Target",
@@ -515,7 +515,7 @@ def layout():
                                             [
                                                 html.I(className="bi bi-exclamation-triangle-fill me-2"),
                                                 html.Span(
-                                                    "BETA · Dados demo",
+                                                    "BETA · Dados em Auditoria",
                                                     id="v2-i18n-beta-badge",
                                                 ),
                                             ],
