@@ -132,39 +132,70 @@ def _bloco_planta_flowables(block_id: int, dados: Optional[dict], lang: str,
     ]))
     out.append(tbl)
 
-    # Sunbursts (PNG bytes) — 3 em linha
-    sunbursts = dados.get("sunburst_figures") or {}
-    sb_cells = []
-    for kpi_key, label_key in [("mtbf", "kpi_mtbf"),
-                                 ("mttr", "kpi_mttr"),
-                                 ("taxa_avaria", "kpi_breakdown_rate")]:
-        png = sunbursts.get(kpi_key)
-        if isinstance(png, (bytes, bytearray)):
+    # Bar charts (PNG via kaleido) — paradigma Indicators-V2 (refactor RF-03).
+    # Aceita 2 caminhos:
+    #   (a) `*_series` dict pronto (preferido) → gera Figure aqui via build_bar_figure
+    #       e renderiza PNG via renderizar_sunburst_png (kaleido).
+    #   (b) `sunburst_figures` legado (retrocompat) → embed direto se PNG bytes.
+    series_key = "monthly_series" if block_id == 1 else "daily_series" if block_id == 3 else None
+    series = dados.get(series_key) if series_key else None
+    legacy_imgs = dados.get("sunburst_figures") or {}
+
+    chart_cells = []
+    for kpi_key in ("mtbf", "mttr", "taxa_avaria"):
+        png_bytes: Optional[bytes] = None
+        if series and isinstance(series, dict):
+            labels = series.get("labels") or []
+            values = series.get(kpi_key) or []
+            highlight = series.get("current_idx")
+            target = (metas or {}).get(kpi_key)
+            if labels and values:
+                try:
+                    from src.utils.kpi_report_v2_bars import build_bar_figure
+                    from src.utils.kpi_report_figures import renderizar_sunburst_png
+                    fig = build_bar_figure(
+                        labels=labels, values=values, kpi=kpi_key,
+                        target=target, title="",
+                        highlight_idx=highlight, height=260,
+                    )
+                    # renderizar_sunburst_png aceita qualquer Plotly Figure (kaleido)
+                    png_bytes = renderizar_sunburst_png(fig, kpi_key.upper())
+                except Exception:
+                    logger.exception(
+                        "kpi-v2 pdf bloco %s: falha bar PNG %s", block_id, kpi_key,
+                    )
+        if png_bytes is None:
+            # Fallback retrocompat: tenta legacy PNG
+            cand = legacy_imgs.get(kpi_key)
+            if isinstance(cand, (bytes, bytearray)):
+                png_bytes = bytes(cand)
+
+        if isinstance(png_bytes, (bytes, bytearray)):
             try:
-                img = Image(io.BytesIO(bytes(png)), width=5 * cm, height=4 * cm,
-                             kind="proportional")
-                sb_cells.append(img)
+                img = Image(io.BytesIO(bytes(png_bytes)), width=5.5 * cm,
+                             height=4.4 * cm, kind="proportional")
+                chart_cells.append(img)
             except Exception:
-                logger.exception("kpi-v2 pdf bloco %s: falha ao embutir sunburst %s",
+                logger.exception("kpi-v2 pdf bloco %s: falha embed PNG %s",
                                   block_id, kpi_key)
-                sb_cells.append(Paragraph("—", styles["small"]))
+                chart_cells.append(Paragraph("—", styles["small"]))
         else:
-            sb_cells.append(Paragraph("—", styles["small"]))
+            chart_cells.append(Paragraph("—", styles["small"]))
 
     out.append(Spacer(1, 4 * mm))
-    sb_tbl = Table(
+    chart_tbl = Table(
         [
             [Paragraph(_t(lang, k), styles["small"]) for k in
              ("kpi_mtbf", "kpi_mttr", "kpi_breakdown_rate")],
-            sb_cells,
+            chart_cells,
         ],
         colWidths=[5.5 * cm, 5.5 * cm, 5.5 * cm],
     )
-    sb_tbl.setStyle(TableStyle([
+    chart_tbl.setStyle(TableStyle([
         ("ALIGN", (0, 0), (-1, -1), "CENTER"),
         ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
     ]))
-    out.append(sb_tbl)
+    out.append(chart_tbl)
     out.append(Spacer(1, 6 * mm))
     return out
 

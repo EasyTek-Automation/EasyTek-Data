@@ -41,6 +41,10 @@ from src.utils.kpi_report_v2_layout import (
     build_drilldown_modal_body,
     render_all_blocks,
 )
+from src.utils.kpi_report_v2_series import (
+    build_daily_series_last_n,
+    build_monthly_series_for_year,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +78,12 @@ def _serialize_figures(bloco_dict: dict | None) -> dict | None:
 
 
 def _serialize_dados_for_store(dados: dict) -> dict:
-    """Aplica `_serialize_figures` nos blocos 1 e 3 + serializa datetimes em metadata."""
+    """Aplica `_serialize_figures` nos blocos 1 e 3 + serializa datetimes em metadata.
+
+    Mantém `sunburst_figures` por retrocompat (legado): bytes viram None pra
+    transitar via JSON. O refactor RF-* prefere `monthly_series` / `daily_series`
+    em vez de sunburst — esses ficam JSON-friendly nativamente.
+    """
     if not dados:
         return {}
     out = dict(dados)
@@ -87,6 +96,40 @@ def _serialize_dados_for_store(dados: dict) -> dict:
         for k, v in periodo.items()
     }
     return out
+
+
+def _inject_series(dados: dict, stored: dict, agora: datetime) -> dict:
+    """Injeta `monthly_series` (bloco 1) e `daily_series` (bloco 3) — refactor RF.
+
+    Reusa `build_monthly_series_for_year` / `build_daily_series_last_n` que delegam
+    a fórmulas canônicas v1. Mantém BR-01/02/05/06/08 (janelas, escopo, fuso, metas).
+    """
+    if not dados:
+        return dados
+
+    eq_ids = stored.get("equipment_ids") or []
+    bloco1 = dados.get("bloco1") or {}
+    bloco3 = dados.get("bloco3") or {}
+
+    try:
+        bloco1["monthly_series"] = build_monthly_series_for_year(
+            year=agora.year, equipment_ids=eq_ids, current_month=agora.month,
+        )
+    except Exception:
+        logger.exception("KPI v2 inject_series: monthly falhou")
+        bloco1["monthly_series"] = None
+
+    try:
+        bloco3["daily_series"] = build_daily_series_last_n(
+            now=agora, n_days=7, equipment_ids=eq_ids,
+        )
+    except Exception:
+        logger.exception("KPI v2 inject_series: daily falhou")
+        bloco3["daily_series"] = None
+
+    dados["bloco1"] = bloco1
+    dados["bloco3"] = bloco3
+    return dados
 
 
 def _build_default_stored_data() -> dict:
@@ -203,6 +246,9 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
         delta_t = time.perf_counter() - t_inicio
         if delta_t > cfg.LATENCIA_GUIDELINE_S:
             logger.warning("KPI v2 init_data ultrapassou guideline: %.2fs", delta_t)
+
+        # RF-04: injeta séries mensais/diárias pros bar charts blocos 1/3
+        dados = _inject_series(dados, stored, agora)
 
         return _serialize_dados_for_store(dados)
 
@@ -469,11 +515,14 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
         if not active:
             active = {1, 2, 3, 4, 5}
 
-        # Para PDF precisamos das figures PNG (kaleido) — chamamos coletar novamente com as_png=True
+        # Para PDF: coleta com as_png=True (kaleido bytes sunburst legado) E injeta
+        # monthly_series/daily_series — gerar_pdf prefere series (bar chart refactor RF-03)
+        # com fallback automático pra sunburst PNG caso série esteja vazia.
         stored = _build_default_stored_data()
         agora = cfg._now_in_report_timezone()
         try:
             dados_png = coletar_dados_relatorio(stored, agora, as_png=True)
+            dados_png = _inject_series(dados_png, stored, agora)
             pdf_bytes = gerar_pdf(dados_png, active, lang)
         except Exception:
             logger.exception("KPI v2 export_pdf: falha")

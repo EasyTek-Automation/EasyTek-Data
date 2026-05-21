@@ -240,35 +240,73 @@ class TestBloco1:
         assert "Bloque 1" in flat
         assert "Tasa de Avería" in flat
 
-    def test_sunburst_bytes_png_renderiza_img(self, dados_bloco_planta):
-        # PNG mínimo válido (1x1 transparente)
-        png_bytes = bytes.fromhex(
-            "89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4"
-            "890000000d49444154789c6300010000000500010d0a2db40000000049454e44"
-            "ae426082"
-        )
+    def test_bloco1_monthly_series_renderiza_bar_charts(self, dados_bloco_planta):
+        """RF-01: bloco 1 com monthly_series → 3 dcc.Graph (bar charts)."""
         dados = dict(dados_bloco_planta)
-        dados["sunburst_figures"] = {"mtbf": png_bytes, "mttr": None,
-                                       "taxa_avaria": None}
+        dados["monthly_series"] = {
+            "labels":      ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+                             "Jul", "Ago", "Set", "Out", "Nov", "Dez"],
+            "mtbf":        [10.0, 12.0, 15.0, 11.0, 13.0, 14.0,
+                             12.5, 11.8, 13.2, 14.5, 12.1, 10.9],
+            "mttr":        [8.0, 7.5, 9.0, 8.2, 7.8, 8.5,
+                             8.1, 7.9, 8.3, 8.7, 8.0, 7.6],
+            "taxa_avaria": [2.1, 2.3, 2.0, 2.5, 2.4, 2.2,
+                             2.1, 2.3, 2.0, 2.5, 2.4, 2.2],
+            "current_idx": 4,  # destacando "Mai"
+        }
         card = ly.build_bloco1_html(dados, None, "pt")
-        # Procura tag html.Img na árvore (sunburst bytes vira <img src=data:image/png;base64,...>)
-        import re
-        flat = _walk_str(card)
-        # walk_str não traz src, então procura via repr da árvore
-        assert any("data:image/png;base64" in str(c) for c in
-                    [card] + [getattr(card, "children", [])])
+        # Confere existência de Graph na árvore (bar chart Plotly)
+        from dash import dcc
+        found = []
 
-    def test_sunburst_dict_renderiza_graph(self, dados_bloco_planta):
-        # dict (Figure.to_dict()) ou Figure → dcc.Graph
-        import plotly.graph_objects as go
-        fig = go.Figure(data=[go.Bar(x=[1, 2], y=[3, 4])])
+        def collect(c):
+            if isinstance(c, dcc.Graph):
+                found.append(c)
+                return
+            ch = getattr(c, "children", None)
+            if isinstance(ch, list):
+                for x in ch:
+                    collect(x)
+            elif ch is not None:
+                collect(ch)
+        collect(card)
+        assert len(found) == 3, f"esperado 3 Graphs, achou {len(found)}"
+        # Confere que fig tem trace go.Bar
+        from plotly.graph_objects import Figure
+        for g in found:
+            assert g.figure is not None
+            # figure pode ser Figure ou dict — converte
+            f = g.figure if isinstance(g.figure, Figure) else Figure(g.figure)
+            traces = [t for t in f.data if t.type == "bar"]
+            assert traces, "esperado go.Bar trace no chart"
+
+    def test_bloco3_daily_series_renderiza_bar_charts(self, dados_bloco_planta):
+        """RF-02: bloco 3 com daily_series → 3 dcc.Graph."""
         dados = dict(dados_bloco_planta)
-        dados["sunburst_figures"] = {"mtbf": fig, "mttr": None,
-                                       "taxa_avaria": None}
-        card = ly.build_bloco1_html(dados, None, "pt")
-        # garante que não lança e que MTBF foi processado
-        flat = _walk_str(card)
-        assert "MTBF" in flat
+        dados["daily_series"] = {
+            "labels":      ["15/05", "16/05", "17/05", "18/05",
+                             "19/05", "20/05", "21/05"],
+            "mtbf":        [10.0, 12.0, 11.5, 10.8, 11.2, 12.3, 11.9],
+            "mttr":        [8.0, 7.8, 8.2, 7.9, 8.1, 8.0, 7.7],
+            "taxa_avaria": [2.1, 2.2, 2.0, 2.3, 2.1, 2.2, 2.0],
+            "current_idx": 6,
+        }
+        card = ly.build_bloco3_html(dados, None, "pt")
+        from dash import dcc
+        found = []
+
+        def collect(c):
+            if isinstance(c, dcc.Graph):
+                found.append(c)
+                return
+            ch = getattr(c, "children", None)
+            if isinstance(ch, list):
+                for x in ch:
+                    collect(x)
+            elif ch is not None:
+                collect(ch)
+        collect(card)
+        assert len(found) == 3
 
 
 class TestBloco3:

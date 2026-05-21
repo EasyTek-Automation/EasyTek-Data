@@ -16,6 +16,7 @@ from dash import dash_table, dcc, html
 
 from src.pages.maintenance.kpi_report_v2 import TRANS
 from src.utils.kpi_report_config import fmt_numero
+from src.utils.kpi_report_v2_bars import build_bar_figure
 
 
 # ============================================================================
@@ -177,9 +178,12 @@ def _build_kpi_planta_card(block_id: int, title_key: str,
     kpis = dados.get("kpis_planta") or {}
     metas = dados.get("metas") or {}
     cores = dados.get("cores_kpis") or {}
-    sunburst_figs = dados.get("sunburst_figures") or {}
+    # Refactor RF: prefere `monthly_series` (bloco 1) / `daily_series` (bloco 3).
+    # Fallback pra `sunburst_figures` legado caso esteja presente (retrocompat).
+    series_key = "monthly_series" if block_id == 1 else "daily_series" if block_id == 3 else None
+    series = dados.get(series_key) if series_key else None
 
-    # 3 KPIs (MTBF / MTTR / Taxa Avaria)
+    # 3 KPIs (MTBF / MTTR / Taxa Avaria) — header inalterado, badge ∆ continua
     kpi_rows = []
     for kpi_key, label_key in [("mtbf", "kpi_mtbf"),
                                 ("mttr", "kpi_mttr"),
@@ -214,33 +218,40 @@ def _build_kpi_planta_card(block_id: int, title_key: str,
             )
         )
 
-    # Sunbursts (3 colunas, lado a lado em md+)
-    sunburst_cols = []
+    # Bar charts (3 colunas) — paradigma Indicators-V2 (RF-01/RF-02).
+    chart_cols = []
     for kpi_key, label_key in [("mtbf", "kpi_mtbf"),
                                 ("mttr", "kpi_mttr"),
                                 ("taxa_avaria", "kpi_breakdown_rate")]:
-        fig = sunburst_figs.get(kpi_key)
-        if fig is None or (isinstance(fig, dict) and not fig):
+        if series and isinstance(series, dict):
+            labels = series.get("labels") or []
+            values = series.get(kpi_key) or []
+            highlight = series.get("current_idx")
+            target = metas.get(kpi_key)
+            if labels and values:
+                fig = build_bar_figure(
+                    labels=labels, values=values, kpi=kpi_key,
+                    target=target, title="",
+                    highlight_idx=highlight, height=220,
+                )
+                content = dcc.Graph(
+                    figure=fig,
+                    config={"displayModeBar": False, "staticPlot": False,
+                            "responsive": True},
+                    style={"height": "220px", "width": "100%"},
+                )
+            else:
+                content = html.Div(
+                    _t(lang, "no_data"),
+                    className="text-muted text-center small py-3",
+                )
+        else:
             content = html.Div(
                 _t(lang, "no_data"),
                 className="text-muted text-center small py-3",
             )
-        elif isinstance(fig, (bytes, bytearray)):
-            # PNG bytes (caso passe `as_png=True`)
-            import base64 as _b64
-            b64 = _b64.b64encode(bytes(fig)).decode("ascii")
-            content = html.Img(
-                src=f"data:image/png;base64,{b64}",
-                style={"width": "100%", "height": "auto"},
-            )
-        else:
-            # plotly Figure ou dict serializado → dcc.Graph
-            content = dcc.Graph(
-                figure=fig,
-                config={"displayModeBar": False},
-                style={"height": "260px"},
-            )
-        sunburst_cols.append(
+
+        chart_cols.append(
             dbc.Col(
                 [
                     html.Div(_t(lang, label_key),
@@ -267,7 +278,7 @@ def _build_kpi_planta_card(block_id: int, title_key: str,
                 [
                     *kpi_rows,
                     html.Hr(),
-                    dbc.Row(sunburst_cols, className="g-2"),
+                    dbc.Row(chart_cols, className="g-2"),
                 ],
             ),
         ],
