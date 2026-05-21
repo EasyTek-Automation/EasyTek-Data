@@ -23,7 +23,7 @@ import json
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import dash
@@ -43,6 +43,7 @@ from src.utils.kpi_report_v2_layout import (
 )
 from src.utils.kpi_report_v2_series import (
     build_daily_series_last_n,
+    build_daily_series_last_n_ending,
     build_monthly_series_for_year,
 )
 
@@ -98,6 +99,61 @@ def _serialize_dados_for_store(dados: dict) -> dict:
     return out
 
 
+def _resolve_data_24h(value: Any, agora: datetime) -> datetime:
+    """Resolve DatePicker value (ISO 'YYYY-MM-DD') → datetime do dia escolhido.
+
+    None/inválido → ontem (BR-02 padrão). Mesmo helper usado no tab_callback —
+    duplicado aqui pra evitar import circular.
+    """
+    if value:
+        try:
+            return datetime.fromisoformat(str(value)[:10])
+        except (ValueError, TypeError):
+            pass
+    return (agora.replace(hour=0, minute=0, second=0, microsecond=0,
+                            tzinfo=None) - timedelta(days=1))
+
+
+def _override_blocos_24h(dados: dict, stored: dict, data_dia: datetime) -> dict:
+    """Sobrescreve blocos 3/5 com janela `[data_dia 00:00, data_dia+1 00:00)`.
+
+    Reusa helpers V1 canônicos (`_build_kpis_bloco_planta`, `_build_top5_paradas`).
+    BR-02b — V1 intocada.
+    """
+    if not dados:
+        return dados
+    from src.utils.kpi_report_data import (
+        _build_kpis_bloco_planta,
+        _build_top5_paradas,
+    )
+    from src.utils.zpp_kpi_calculator import fetch_zpp_kpi_data
+
+    d_start = data_dia.replace(hour=0, minute=0, second=0, microsecond=0,
+                                 tzinfo=None)
+    d_end = d_start + timedelta(days=1)
+    eq_ids = stored.get("equipment_ids") or []
+    names = stored.get("names") or {}
+    categories = stored.get("categories") or {}
+    targets = stored.get("equipment_targets") or {}
+
+    try:
+        data_dia_kpi = fetch_zpp_kpi_data(d_start, d_end)
+    except Exception:
+        logger.warning("KPI v2 export BR-02b: sem dados [%s, %s)", d_start, d_end)
+        data_dia_kpi = {}
+
+    try:
+        dados["bloco3"] = _build_kpis_bloco_planta(
+            eq_ids, d_start, d_end, targets, names, categories,
+            kpi_data=data_dia_kpi, year=d_start.year,
+            monthly_aggregates=None, as_png=True,
+        )
+        dados["bloco5"] = _build_top5_paradas(d_start, d_end, names, top_n=None)
+    except Exception:
+        logger.exception("KPI v2 export BR-02b: falha override blocos 3/5")
+    return dados
+
+
 def _replace_sunbursts_with_bars(dados: dict) -> dict:
     """Substitui `bloco{1,3}.sunburst_figures` PNG bytes por bar chart PNG bytes.
 
@@ -147,11 +203,17 @@ def _replace_sunbursts_with_bars(dados: dict) -> dict:
     return dados
 
 
-def _inject_series(dados: dict, stored: dict, agora: datetime) -> dict:
+def _inject_series(
+    dados: dict, stored: dict, agora: datetime,
+    end_day_24h: datetime | None = None,
+) -> dict:
     """Injeta `monthly_series` (bloco 1) e `daily_series` (bloco 3) — refactor RF.
 
-    Reusa `build_monthly_series_for_year` / `build_daily_series_last_n` que delegam
+    Reusa `build_monthly_series_for_year` / `build_daily_series_last_n*` que delegam
     a fórmulas canônicas v1. Mantém BR-01/02/05/06/08 (janelas, escopo, fuso, metas).
+
+    `end_day_24h` (BR-02b): se fornecido, série diária encerra no dia escolhido em
+    vez de ontem (default V1).
     """
     if not dados:
         return dados
@@ -169,9 +231,14 @@ def _inject_series(dados: dict, stored: dict, agora: datetime) -> dict:
         bloco1["monthly_series"] = None
 
     try:
-        bloco3["daily_series"] = build_daily_series_last_n(
-            now=agora, n_days=7, equipment_ids=eq_ids,
-        )
+        if end_day_24h is not None:
+            bloco3["daily_series"] = build_daily_series_last_n_ending(
+                end_day=end_day_24h, n_days=7, equipment_ids=eq_ids,
+            )
+        else:
+            bloco3["daily_series"] = build_daily_series_last_n(
+                now=agora, n_days=7, equipment_ids=eq_ids,
+            )
     except Exception:
         logger.exception("KPI v2 inject_series: daily falhou")
         bloco3["daily_series"] = None
@@ -550,10 +617,11 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
         State("store-kpi-v2-data", "data"),
         State("store-kpi-v2-blocks-toggle", "data"),
         State("store-kpi-v2-lang", "data"),
+        State("kpi-v2-date-24h", "date"),
         prevent_initial_call=True,
     )
-    def export_pdf(n, dados, toggle, lang):
-        """Gera PDF via reportlab respeitando toggle de blocos (DS-04)."""
+    def export_pdf(n, dados, toggle, lang, date_24h):
+        """Gera PDF via reportlab respeitando toggle de blocos + DatePicker (BR-02b)."""
         if not n or not dados or dados.get("empty"):
             raise dash.exceptions.PreventUpdate
 
@@ -569,15 +637,31 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
         # com fallback automático pra sunburst PNG caso série esteja vazia.
         stored = _build_default_stored_data()
         agora = cfg._now_in_report_timezone()
+        data_dia = _resolve_data_24h(date_24h, agora)
+        ontem = (agora.replace(hour=0, minute=0, second=0, microsecond=0,
+                                 tzinfo=None) - timedelta(days=1))
         try:
             dados_png = coletar_dados_relatorio(stored, agora, as_png=True)
-            dados_png = _inject_series(dados_png, stored, agora)
-            pdf_bytes = gerar_pdf(dados_png, active, lang)
+            # BR-02b: se DatePicker ≠ ontem, sobrescreve blocos 3/5 com janela custom
+            if data_dia.date() != ontem.date():
+                dados_png = _override_blocos_24h(dados_png, stored, data_dia)
+                end_day_override = data_dia
+                dia_label = data_dia.strftime("%d/%m/%Y")
+            else:
+                end_day_override = None
+                dia_label = ""
+            dados_png = _inject_series(dados_png, stored, agora,
+                                         end_day_24h=end_day_override)
+            pdf_bytes = gerar_pdf(dados_png, active, lang,
+                                    dia_24h_label=dia_label)
         except Exception:
             logger.exception("KPI v2 export_pdf: falha")
             raise dash.exceptions.PreventUpdate
 
         nome = cfg.gerar_nome_arquivo(agora).replace(".docx", ".pdf")
+        # Embute dia no filename se diferente de ontem
+        if data_dia.date() != ontem.date():
+            nome = nome.replace(".pdf", f"_24h-{data_dia.strftime('%Y-%m-%d')}.pdf")
         return dcc.send_bytes(lambda buf: buf.write(pdf_bytes), nome,
                                type="application/pdf")
 
@@ -585,10 +669,11 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
         Output("download-kpi-v2-docx", "data"),
         Input("btn-kpi-v2-export-docx", "n_clicks"),
         State("store-kpi-v2-data", "data"),
+        State("kpi-v2-date-24h", "date"),
         prevent_initial_call=True,
     )
-    def export_docx(n, dados):
-        """Delega 100% para `montar_docx` v1 — mantém compatibilidade total."""
+    def export_docx(n, dados, date_24h):
+        """Delega ao `montar_docx` v1 + respeita DatePicker BR-02b."""
         if not n or not dados or dados.get("empty"):
             raise dash.exceptions.PreventUpdate
 
@@ -597,11 +682,21 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
 
         stored = _build_default_stored_data()
         agora = cfg._now_in_report_timezone()
+        data_dia = _resolve_data_24h(date_24h, agora)
+        ontem = (agora.replace(hour=0, minute=0, second=0, microsecond=0,
+                                 tzinfo=None) - timedelta(days=1))
         try:
             dados_png = coletar_dados_relatorio(stored, agora, as_png=True)
+            # BR-02b override blocos 3/5
+            if data_dia.date() != ontem.date():
+                dados_png = _override_blocos_24h(dados_png, stored, data_dia)
+                end_day_override = data_dia
+            else:
+                end_day_override = None
             # RF-08: injeta séries + substitui sunburst PNG por bar chart PNG
             # antes do template DOCX renderizar (template v1 fica intocado).
-            dados_png = _inject_series(dados_png, stored, agora)
+            dados_png = _inject_series(dados_png, stored, agora,
+                                         end_day_24h=end_day_override)
             dados_png = _replace_sunbursts_with_bars(dados_png)
             docx_bytes = montar_docx(dados_png)
         except (TemplateLoadError, Exception):
@@ -609,6 +704,9 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
             raise dash.exceptions.PreventUpdate
 
         nome = cfg.gerar_nome_arquivo(agora)
+        if data_dia.date() != ontem.date():
+            nome = nome.replace(".docx",
+                                  f"_24h-{data_dia.strftime('%Y-%m-%d')}.docx")
         return dcc.send_bytes(
             lambda buf: buf.write(docx_bytes), nome,
             type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",

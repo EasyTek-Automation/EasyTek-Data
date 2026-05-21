@@ -91,9 +91,11 @@ def _fmt(v: Optional[float], casas: int = 1) -> str:
 # ============================================================================
 
 def _bloco_planta_flowables(block_id: int, dados: Optional[dict], lang: str,
-                              titulo_key: str, styles: dict) -> list:
-    """Bloco 1 ou 3 — KPIs planta + sunbursts."""
-    out: list = [Paragraph(_t(lang, titulo_key), styles["block_title"])]
+                              titulo_key: str, styles: dict,
+                              title_suffix: str = "") -> list:
+    """Bloco 1 ou 3 — KPIs planta + bar charts. `title_suffix` BR-02b: ' — DD/MM/YYYY'."""
+    full_title = _t(lang, titulo_key) + (title_suffix or "")
+    out: list = [Paragraph(full_title, styles["block_title"])]
     if not dados:
         out.append(Paragraph(_t(lang, "no_data"), styles["kpi_line"]))
         return out
@@ -201,9 +203,11 @@ def _bloco_planta_flowables(block_id: int, dados: Optional[dict], lang: str,
 
 
 def _bloco_paradas_flowables(block_id: int, dados: Optional[dict], lang: str,
-                               titulo_key: str, styles: dict, top_n: Optional[int]) -> list:
-    """Bloco 2 ou 5 — Top paradas."""
-    out: list = [Paragraph(_t(lang, titulo_key), styles["block_title"])]
+                               titulo_key: str, styles: dict, top_n: Optional[int],
+                               title_suffix: str = "") -> list:
+    """Bloco 2 ou 5 — Top paradas. `title_suffix` BR-02b: ' — DD/MM/YYYY'."""
+    full_title = _t(lang, titulo_key) + (title_suffix or "")
+    out: list = [Paragraph(full_title, styles["block_title"])]
     if not dados or dados.get("vazio") or not dados.get("paradas"):
         out.append(Paragraph(_t(lang, "no_data"), styles["kpi_line"]))
         return out
@@ -329,13 +333,16 @@ def _on_page(canvas: rl_canvas.Canvas, doc: SimpleDocTemplate) -> None:
 # ============================================================================
 
 def gerar_pdf(dados: dict, blocos_ativos: set[int] | list[int],
-                lang: str = "pt") -> bytes:
+                lang: str = "pt",
+                dia_24h_label: str = "") -> bytes:
     """Renderiza PDF A4 retrato — devolve bytes.
 
     Args:
         dados: dict retornado por `coletar_dados_relatorio(..., as_png=True)`.
         blocos_ativos: subset de {1, 2, 3, 4, 5}.
         lang: 'pt' | 'es' | 'en'.
+        dia_24h_label: BR-02b — quando ≠ '' (ex: '15/05/2026'), anexa ao título
+            dos blocos 3 e 5 indicando o dia escolhido pelo usuário.
 
     Raises:
         ValueError: se `dados` for inválido (nenhum bloco renderizável).
@@ -346,6 +353,8 @@ def gerar_pdf(dados: dict, blocos_ativos: set[int] | list[int],
     active = {int(b) for b in (blocos_ativos or [])}
     if not active:
         active = {1, 2, 3, 4, 5}
+
+    suffix_24h = f" — {dia_24h_label}" if dia_24h_label else ""
 
     styles = _styles()
     buf = io.BytesIO()
@@ -380,6 +389,7 @@ def gerar_pdf(dados: dict, blocos_ativos: set[int] | list[int],
     if 3 in active:
         story.extend(_bloco_planta_flowables(
             3, dados.get("bloco3"), lang, "block_3_title", styles,
+            title_suffix=suffix_24h,
         ))
     if 4 in active:
         story.append(PageBreak())
@@ -387,6 +397,7 @@ def gerar_pdf(dados: dict, blocos_ativos: set[int] | list[int],
     if 5 in active:
         story.extend(_bloco_paradas_flowables(
             5, dados.get("bloco5"), lang, "block_5_title", styles, top_n=None,
+            title_suffix=suffix_24h,
         ))
 
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
