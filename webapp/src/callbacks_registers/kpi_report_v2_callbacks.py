@@ -191,6 +191,8 @@ def _replace_sunbursts_with_bars(dados: dict) -> dict:
                     labels=labels, values=values, kpi=kpi_key,
                     target=metas.get(kpi_key), title="",
                     highlight_idx=series.get("current_idx"), height=300,
+                    bar_text_size=36, meta_text_size=30,
+                    axis_tick_size=33,
                 )
                 png = renderizar_sunburst_png(fig, kpi_key.upper())
                 if isinstance(png, (bytes, bytearray)):

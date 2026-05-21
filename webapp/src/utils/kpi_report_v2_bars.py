@@ -51,6 +51,9 @@ def build_bar_figure(
     height: int = 240,
     show_trend: bool = True,
     show_meta_line: bool = True,
+    bar_text_size: int = 12,
+    meta_text_size: int = 10,
+    axis_tick_size: int = 11,
 ) -> go.Figure:
     """Bar chart canônico do KPIReport-v2.
 
@@ -64,6 +67,9 @@ def build_bar_figure(
         height: Altura px.
         show_trend: Desenha curva polinomial tracejada se len(values) ≥ 3.
         show_meta_line: Desenha hline em `target`.
+        bar_text_size: Tamanho fonte rótulos das barras (default 12 — UI).
+        meta_text_size: Tamanho fonte rótulo da meta (default 10 — UI).
+        axis_tick_size: Tamanho fonte ticks dos eixos (default 11 — UI).
     """
     safe_vals = [float(v) if isinstance(v, (int, float)) else 0.0 for v in values]
     unit = _UNIT.get(kpi, "")
@@ -89,6 +95,7 @@ def build_bar_figure(
         marker=dict(color=bar_colors, line=dict(color="rgba(0,0,0,0.3)", width=1)),
         text=[f"{v:.1f}{unit}" if v else "" for v in safe_vals],
         textposition="outside",
+        textfont=dict(size=bar_text_size),
         cliponaxis=False,
         hovertemplate=f"<b>%{{x}}</b><br>%{{y:.2f}}{unit}<extra></extra>",
         name="Valor",
@@ -120,7 +127,7 @@ def build_bar_figure(
             line=dict(color="#6c757d", width=2, dash="dash"),
             annotation_text=f"Meta {target:.1f}{unit}",
             annotation_position="top right",
-            annotation_font=dict(size=10, color="#6c757d"),
+            annotation_font=dict(size=meta_text_size, color="#6c757d"),
         )
 
     # Range Y com headroom pra rótulos outside
@@ -136,8 +143,9 @@ def build_bar_figure(
         plot_bgcolor="white",
         paper_bgcolor="rgba(0,0,0,0)",
         height=height,
-        yaxis=dict(gridcolor="#eee", range=[y_bottom, y_top]),
-        xaxis=dict(type="category"),
+        yaxis=dict(gridcolor="#eee", range=[y_bottom, y_top],
+                    tickfont=dict(size=axis_tick_size)),
+        xaxis=dict(type="category", tickfont=dict(size=axis_tick_size)),
         showlegend=False,
         bargap=0.25,
     )

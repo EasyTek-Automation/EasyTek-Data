@@ -155,10 +155,14 @@ def _bloco_planta_flowables(block_id: int, dados: Optional[dict], lang: str,
                 try:
                     from src.utils.kpi_report_v2_bars import build_bar_figure
                     from src.utils.kpi_report_figures import renderizar_sunburst_png
+                    # Fontes 3x maiores no PDF (rótulos pequenos demais no HTML
+                    # ao serem rasterizados via kaleido em alta resolução).
                     fig = build_bar_figure(
                         labels=labels, values=values, kpi=kpi_key,
                         target=target, title="",
                         highlight_idx=highlight, height=260,
+                        bar_text_size=36, meta_text_size=30,
+                        axis_tick_size=33,
                     )
                     # renderizar_sunburst_png aceita qualquer Plotly Figure (kaleido)
                     png_bytes = renderizar_sunburst_png(fig, kpi_key.upper())
