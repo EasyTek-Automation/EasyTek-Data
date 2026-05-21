@@ -949,14 +949,34 @@ def layout():
                         tab_id="tab-v2-report",
                         children=html.Div(
                             [
-                                # Header: período + botões de export
+                                # Header: período + DatePicker BR-02b + botões export
                                 html.Div(
                                     [
                                         html.Div(
-                                            html.Small(
-                                                id="rd-v2-periodo-label",
-                                                className="text-muted",
-                                            ),
+                                            [
+                                                html.Small(
+                                                    id="rd-v2-periodo-label",
+                                                    className="text-muted d-block",
+                                                ),
+                                                html.Div(
+                                                    [
+                                                        html.Label(
+                                                            "Dia das 24h:",
+                                                            htmlFor="kpi-v2-date-24h",
+                                                            className="me-2 small text-muted",
+                                                        ),
+                                                        dcc.DatePickerSingle(
+                                                            id="kpi-v2-date-24h",
+                                                            display_format="DD/MM/YYYY",
+                                                            first_day_of_week=1,
+                                                            placeholder="Escolha o dia",
+                                                            persistence=False,
+                                                            clearable=True,
+                                                        ),
+                                                    ],
+                                                    className="d-flex align-items-center mt-2",
+                                                ),
+                                            ],
                                         ),
                                         html.Div(
                                             [
@@ -989,7 +1009,7 @@ def layout():
                                             ],
                                         ),
                                     ],
-                                    className="d-flex justify-content-between align-items-center flex-wrap gap-2 mt-3 mb-3",
+                                    className="d-flex justify-content-between align-items-start flex-wrap gap-2 mt-3 mb-3",
                                 ),
                                 # Container preenchido pelo callback ao ativar a aba
                                 dcc.Loading(

@@ -94,43 +94,28 @@ def build_monthly_series_for_year(
     return base
 
 
-def build_daily_series_last_n(
-    now: datetime,
+def build_daily_series_last_n_ending(
+    end_day: datetime,
     n_days: int,
     equipment_ids: list[str],
 ) -> dict:
-    """Retorna séries de N valores diários encerrando em ontem 00:00 (último dia completo).
+    """Variante de `build_daily_series_last_n` com `end_day` custom (BR-02b).
 
-    O último item da série coincide com a janela BR-02 (`compute_last_24h_window`).
-
-    Args:
-        now: datetime aware no fuso.
-        n_days: Número de dias na série (típico 7).
-        equipment_ids: IDs dos equipamentos no escopo (BR-05).
-
-    Returns:
-        ```
-        {
-            "labels":   ["DD/MM", ...],
-            "mtbf":     [v1..vN],
-            "mttr":     [v1..vN],  # em minutos
-            "taxa_avaria": [v1..vN],
-            "current_idx": N-1,  # último item = janela BR-02
-        }
-        ```
+    `end_day` = dia destacado (naïve no fuso). Série cobre `[end_day - (N-1), end_day]`.
+    Último item = janela `[end_day 00:00, end_day+1 00:00)`.
     """
     if n_days <= 0:
         n_days = 1
-
-    end_today_midnight = now.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
-    # último item: [ontem 00:00, hoje 00:00). Primeiro item: ontem-(N-1).
+    end_day_midnight = end_day.replace(hour=0, minute=0, second=0,
+                                        microsecond=0, tzinfo=None)
+    # Cada item: janela [dia 00:00, dia+1 00:00)
     days: list[tuple[datetime, datetime]] = []
     labels: list[str] = []
     for offset in range(n_days - 1, -1, -1):
-        day_end = end_today_midnight - timedelta(days=offset)
-        day_start = day_end - timedelta(days=1)
-        days.append((day_start, day_end))
-        labels.append(day_start.strftime("%d/%m"))
+        d_start = end_day_midnight - timedelta(days=offset)
+        d_end = d_start + timedelta(days=1)
+        days.append((d_start, d_end))
+        labels.append(d_start.strftime("%d/%m"))
 
     series = {
         "labels":      labels,
@@ -139,7 +124,6 @@ def build_daily_series_last_n(
         "taxa_avaria": [0.0] * n_days,
         "current_idx": n_days - 1,
     }
-
     for i, (d_start, d_end) in enumerate(days):
         try:
             mtbf, mttr_min, br = _compute_plant_kpis_for_window(d_start, d_end)
@@ -150,8 +134,21 @@ def build_daily_series_last_n(
         series["mtbf"][i]        = mtbf
         series["mttr"][i]        = mttr_min
         series["taxa_avaria"][i] = br
-
     return series
+
+
+def build_daily_series_last_n(
+    now: datetime,
+    n_days: int,
+    equipment_ids: list[str],
+) -> dict:
+    """Retorna séries de N valores diários encerrando em ontem (BR-02 padrão).
+
+    Wrapper sobre `build_daily_series_last_n_ending` com `end_day = ontem`.
+    """
+    yesterday = now.replace(hour=0, minute=0, second=0, microsecond=0,
+                              tzinfo=None) - timedelta(days=1)
+    return build_daily_series_last_n_ending(yesterday, n_days, equipment_ids)
 
 
 def _compute_plant_kpis_for_window(

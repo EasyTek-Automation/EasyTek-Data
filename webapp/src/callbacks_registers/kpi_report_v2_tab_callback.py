@@ -14,10 +14,12 @@ e renderiza via helpers V1 (`_row_3_kpis`, `_tabela_*`).
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta
+from typing import Optional
 
 import dash
 import dash_bootstrap_components as dbc
-from dash import Input, Output, dcc, html
+from dash import Input, Output, State, dcc, html, no_update
 
 from src.callbacks_registers.kpi_report_screen_callbacks import (
     _row_3_kpis,
@@ -26,12 +28,18 @@ from src.callbacks_registers.kpi_report_screen_callbacks import (
     _tabela_top_paradas,
 )
 from src.utils import kpi_report_config as cfg
-from src.utils.kpi_report_data import coletar_dados_relatorio
+from src.utils.kpi_report_data import (
+    _build_kpis_bloco_planta,
+    _build_top5_paradas,
+    coletar_dados_relatorio,
+)
 from src.utils.kpi_report_v2_bars import build_bar_figure
 from src.utils.kpi_report_v2_series import (
     build_daily_series_last_n,
+    build_daily_series_last_n_ending,
     build_monthly_series_for_year,
 )
+from src.utils.zpp_kpi_calculator import fetch_zpp_kpi_data
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +88,54 @@ def _row_3_bars(series: dict | None, metas: dict | None) -> dbc.Row:
     return dbc.Row(cols)
 
 
+def _recompute_blocos_24h(
+    stored_data: dict,
+    data_dia: datetime,
+) -> tuple[dict, dict]:
+    """Recalcula bloco3 + bloco5 com janela `[data_dia 00:00, data_dia+1 00:00)`.
+
+    BR-02b: override do dia "últimas 24h". Reusa V1 `_build_kpis_bloco_planta`
+    + `_build_top5_paradas` — fórmulas canônicas, não recalcula nada.
+    """
+    d_start = data_dia.replace(hour=0, minute=0, second=0, microsecond=0,
+                                 tzinfo=None)
+    d_end = d_start + timedelta(days=1)
+
+    eq_ids = stored_data.get("equipment_ids") or []
+    names = stored_data.get("names") or {}
+    categories = stored_data.get("categories") or {}
+    targets = stored_data.get("equipment_targets") or {}
+
+    try:
+        data_dia_kpi = fetch_zpp_kpi_data(d_start, d_end)
+    except Exception:
+        logger.warning("KPI v2 BR-02b: sem dados ZPP em [%s, %s)", d_start, d_end)
+        data_dia_kpi = {}
+
+    bloco3 = _build_kpis_bloco_planta(
+        eq_ids, d_start, d_end, targets, names, categories,
+        kpi_data=data_dia_kpi, year=d_start.year, monthly_aggregates=None,
+        as_png=False,
+    )
+    bloco5 = _build_top5_paradas(d_start, d_end, names, top_n=None)
+    return bloco3, bloco5
+
+
+def _resolve_data_24h(value: Optional[str], agora: datetime) -> datetime:
+    """Resolve DatePicker value (ISO 'YYYY-MM-DD') → datetime do dia escolhido.
+
+    Default (None ou inválido): ontem (BR-02 padrão).
+    """
+    if value:
+        try:
+            return datetime.fromisoformat(str(value)[:10])
+        except ValueError:
+            pass
+    # Default = ontem
+    return (agora.replace(hour=0, minute=0, second=0, microsecond=0,
+                            tzinfo=None) - timedelta(days=1))
+
+
 def register_kpi_report_v2_tab_callback(app: dash.Dash) -> None:
     """Popula aba 'Relatório' do indicators-v2 com layout V1 quando ativada."""
 
@@ -88,9 +144,10 @@ def register_kpi_report_v2_tab_callback(app: dash.Dash) -> None:
         Output("rd-v2-periodo-label", "children"),
         Output("store-kpi-v2-data", "data", allow_duplicate=True),
         Input("tabs-indicators-v2", "active_tab"),
+        Input("kpi-v2-date-24h", "date"),
         prevent_initial_call=True,
     )
-    def render_relatorio_v2(active_tab):
+    def render_relatorio_v2(active_tab, date_24h):
         """Renderiza relatório quando aba 'Relatório' fica ativa.
 
         Reusa estrutura e helpers do Tab 4 "Relatório Diário" v1 (DS-08 SDD v1).
@@ -150,8 +207,18 @@ def register_kpi_report_v2_tab_callback(app: dash.Dash) -> None:
                 {"empty": True, "reason": "planta_vazia"},
             )
 
-        # Séries de barras — paradigma Indicators-V2. Reusa funções canônicas v1
-        # via build_monthly_series_for_year + build_daily_series_last_n.
+        # BR-02b: se DatePicker forneceu data ≠ ontem, sobrescreve blocos 3/5
+        # com janela [data 00:00, data+1 00:00) — fórmulas canônicas v1.
+        data_dia = _resolve_data_24h(date_24h, agora)
+        ontem = (agora.replace(hour=0, minute=0, second=0, microsecond=0,
+                                 tzinfo=None) - timedelta(days=1))
+        if data_dia.date() != ontem.date():
+            try:
+                b3, b5 = _recompute_blocos_24h(stored_data, data_dia)
+            except Exception:
+                logger.exception("KPI v2 BR-02b: falha recompute blocos 3/5")
+
+        # Séries de barras — paradigma Indicators-V2. Reusa funções canônicas v1.
         eq_ids = stored_data.get("equipment_ids") if isinstance(stored_data, dict) else []
         try:
             monthly_series = build_monthly_series_for_year(
@@ -162,12 +229,18 @@ def register_kpi_report_v2_tab_callback(app: dash.Dash) -> None:
             logger.exception("KPI v2 tab: monthly_series falhou")
             monthly_series = None
         try:
-            daily_series = build_daily_series_last_n(
-                now=agora, n_days=7, equipment_ids=eq_ids or [],
+            # BR-02b: série diária encerra no dia escolhido (= último item destacado)
+            daily_series = build_daily_series_last_n_ending(
+                end_day=data_dia, n_days=7, equipment_ids=eq_ids or [],
             )
         except Exception:
             logger.exception("KPI v2 tab: daily_series falhou")
             daily_series = None
+
+        # Label do dia escolhido (substitui texto "Últimas 24h" quando custom)
+        label_24h = "Últimas 24h"
+        if data_dia.date() != ontem.date():
+            label_24h = f"24h de {data_dia.strftime('%d/%m/%Y')}"
 
         # Mesma ordem do Tab 4 v1 — alinhada ao template DOCX (2026-05-13).
         # Diferença: bar charts (paradigma Indicators-V2) no lugar de sunbursts.
@@ -191,18 +264,18 @@ def register_kpi_report_v2_tab_callback(app: dash.Dash) -> None:
                 _tabela_detalhamento(b4),
             ),
             _section(
-                "KPIs Últimas 24h",
+                f"KPIs {label_24h}",
                 _row_3_kpis(b3.get("kpis_planta", {}),
                             b3.get("metas", {}),
                             b3.get("cores_kpis", {})),
                 _row_3_bars(daily_series, b3.get("metas", {})),
             ),
             _section(
-                "Todas as Paradas das Últimas 24h",
+                f"Todas as Paradas — {label_24h}",
                 html.Div(
                     _tabela_top_paradas(
                         b5.get("paradas", []), b5.get("vazio", True),
-                        "Sem paradas nas últimas 24 horas.",
+                        "Sem paradas no dia selecionado.",
                     ),
                     style={"maxHeight": "500px", "overflowY": "auto"},
                 ),
