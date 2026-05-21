@@ -32,66 +32,56 @@ Não é necessário criar testes para código que não será alterado.
 
 ## Common Commands
 
-### Development
+### Subir Stack Local (única forma suportada)
 
+Todo desenvolvimento e teste local roda via **stack Docker completo** orquestrado por `AMG_Infra/scripts/up.sh`. Não existe mais modo `run_local` standalone — o webapp depende de MongoDB, ZPP-Processor e event-gateway estarem de pé.
+
+**Pré-requisitos:**
+- Docker Desktop rodando no Windows (WSL2 integration habilitada)
+- Comandos `docker` precisam ser executados **fora do ai-jail** (jail bloqueia o socket)
+- Arquivo `AMG_Infra/environments/local/.env` existente (criar a partir de `.env.common` se ausente)
+
+**Comando:**
 ```bash
-# Run the webapp locally (development mode)
-cd webapp
-python run_local.py
-
-# Alternative: Run from src directory
-cd webapp/src
-python run.py
+# Sair do ai-jail se estiver dentro (digite "exit" no terminal)
+cd ~/projects/AMG/AMG_Infra
+./scripts/up.sh local
+# Webapp → http://localhost:8050
+# Mongo  → localhost:27017
+# ZPP    → localhost:5002
+# NodeRed→ localhost:1880
 ```
 
-### Event Gateway Service
+`up.sh local` faz `docker compose build` automaticamente — qualquer alteração em `AMG_Data/webapp/src/` recompila a imagem. O override do ambiente local também monta `../AMG_Data/webapp/src:/app/src:ro` para hot reload de Python sem rebuild.
 
+**Parar:**
 ```bash
-# Run the MQTT gateway service
-cd event-gateway
-python api.py
-# Default runs on http://localhost:5001
+cd ~/projects/AMG/AMG_Infra
+./scripts/down.sh local
 ```
 
-### Python Environment
+**Rodar a partir de um worktree do AMG_Data:**
 
-```bash
-# Activate virtual environment
-source venv/bin/activate  # Linux/Mac
-venv\Scripts\activate     # Windows
-
-# Install dependencies for webapp
-cd webapp
-pip install -r requirements.txt
-
-# Install dependencies for event-gateway
-cd event-gateway
-pip install -r requirements.txt
-```
+`docker-compose.override.yml` usa `build: ../AMG_Data/webapp` (relativo a AMG_Infra). Para construir a partir de um worktree em `.claude/worktrees/<name>/webapp`, ou (a) faça merge do worktree no main do AMG_Data antes de subir, ou (b) edite o `context:` do override apontando para o caminho do worktree.
 
 ### Environment Setup
 
-Both `webapp` and the project root require `.env` files. Required environment variables:
+Variáveis vivem em **`AMG_Infra/environments/local/.env`** (consumido por `up.sh local`). Template de referência em `AMG_Infra/.env.common`.
 
+Variáveis-chave (lidas pelos containers via `env_file`):
 ```
-# MongoDB connection
-MONGO_URI=mongodb://...
-DB_NAME=your_database_name
-
-# Flask security
-SECRET_KEY=your_secret_key
-
-# MQTT broker (for event-gateway)
-MQTT_BROKER_ADDRESS=broker_address
+MONGO_URI=mongodb+srv://...        # ou mongodb://database:27017 para Mongo do override local
+DB_NAME=Cluster-EasyTek
+SECRET_KEY=<token_hex_32>
+MQTT_BROKER_ADDRESS=...
 MQTT_BROKER_PORT=8883
-MQTT_USERNAME=username
-MQTT_PASSWORD=password
-
-# Optional
-GATEWAY_URL=http://localhost:5001
-PORT=8050
-LOG_LEVEL=DEBUG  # Options: DEBUG, INFO, WARNING, ERROR
-DOCS_PROCEDURES_PATH=/path/to/procedures  # External volume for procedure documentation
+MQTT_USERNAME=...
+MQTT_PASSWORD=...
+GATEWAY_URL=http://event-gateway:5001
+ZPP_PROCESSOR_URL=http://zpp-processor:5002
+ZPP_INTERNAL_SECRET=<token>
+LOG_LEVEL=INFO
+TZ=America/Sao_Paulo
 ```
 
 ### Offline Mode
@@ -273,7 +263,8 @@ ROUTE_ALIASES = {
 
 **Maintenance Routes Structure**:
 - `/maintenance/alarms`: Alarm monitoring and history
-- `/maintenance/indicators`: KPI dashboard (MTBF, MTTR, Breakdown Rate)
+- `/maintenance/indicators`: KPI dashboard (MTBF, MTTR, Breakdown Rate) — V1, canônico
+- `/maintenance/indicators-v2`: KPI dashboard V2 — layout drilldown + timeline reusada + switch foco manutenção (mesma BR/cálculo da V1; SDD em `.dev-docs/projects/indicators-v2/`)
 - `/maintenance/config`: KPI target configuration (admin only, level 3)
 - `/maintenance/procedures`: Markdown-based documentation system
 - `/workflow/dashboard`: Workflow management - Pending tasks dashboard (integrated in Maintenance menu)
@@ -533,6 +524,36 @@ if should_show_demo_badge(page_path="/production/oee"):
 - Set targets per equipment or use general plant target
 - Alert range configuration (tolerance percentage)
 - Real-time preview of color coding impact
+
+#### 10b. Indicators V2 (`/maintenance/indicators-v2`)
+
+Página alternativa de Indicadores de Manutenção com layout drilldown progressivo. **Mesma BR/cálculo da V1** (`zpp_kpi_calculator`); diferença é UX.
+
+**Componentes-chave:**
+- 3 cards KPI clicáveis no topo (MTBF, MTTR, Avaria) — barras mensais agregadas da planta
+- Modal drilldown 4 níveis: equipamentos → meses → (mes-top OU dias) → tabela
+- Click no card de mês → "mes-top" (top paradas barras horizontais + tabela top 10)
+- Click numa barra do gráfico de meses → "dias" (KPI diário do equipamento)
+- Click numa barra de dia → "tabela" (eventos paradas do dia)
+- Timeline evocon reusada da home com switch "Só avaria" (BR-15: filtra na query ZPP)
+- Spotlight CSS no hover dos cards (`:has()` — Chromium ≥105)
+- Filtros V2 collapse-able (period type, year, range, equipment, codes — paridade V1)
+- Excel export V2
+
+**Rota/permissão:** `/maintenance/indicators-v2` — perfil `manutencao` level 1+ (idêntico V1).
+
+**Módulos novos:**
+- `webapp/src/pages/maintenance/indicators_v2.py` — layout
+- `webapp/src/callbacks_registers/indicators_v2_callbacks.py` — callbacks drilldown + fetch real
+- `webapp/src/utils/zpp_timeline_loader.py` — `fetch_timeline_events()` + `_classify_status()`
+
+**Stores compartilhados com home:** `store-evocon-{granularity,offset,mtto-only}`, `interval-evocon-now`. Switch `switch-v2-mtto-only` só existe na V2 (sync via `sync_mtto_only` + `hydrate_switch`).
+
+**Testes:** `webapp/tests/maintenance/test_zpp_status_classifier.py` (29 casos) + `test_indicators_v2_parity.py` (7 casos contrato V1↔V2). Total 36/36 verde.
+
+**Documentação SDD:** `.dev-docs/projects/indicators-v2/` (8 docs, fases 01..06 completas).
+
+**Convenção crítica BR-12:** caller passa `end_date = datetime(y, m+1, 1)` (primeiro instante mês seguinte). Janela `[start, end)` estrita pós-fix `f102f3f`.
 
 #### 11. Workflow Module Architecture (`/workflow/dashboard`)
 
@@ -886,7 +907,7 @@ def layout():
 
 ### Development Mode Features
 
-- Hot reload enabled when running via `run_local.py`
+- Hot reload via volume mount `../AMG_Data/webapp/src:/app/src:ro` no override do ambiente local
 - Debug mode provides detailed error messages
 - Loading overlay with spinner during initial page load
 - Environment validation on startup (checks required env vars)

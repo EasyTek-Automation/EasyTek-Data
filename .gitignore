@@ -109,3 +109,8 @@ NUL
 REFATORACAO_ARQUIVOS.md
 # Configuração local do Claude Code (específica por máquina)
 settings.local.json
+_pw_*.mjs
+
+# Notas/briefings pessoais (não publicar)
+briefing-*.md
+prompt-investigacao-*.md

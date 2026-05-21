@@ -114,6 +114,12 @@ ROUTE_ACCESS = {
         "min_level": 1,
         "description": "Indicadores de Manutenção"
     },
+    "/maintenance/indicators-v2": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 1,
+        "description": "Indicadores de Manutenção V2 (POC drilldown)"
+    },
     "/maintenance/config": {
         "shared": False,
         "perfis": ["manutencao"],

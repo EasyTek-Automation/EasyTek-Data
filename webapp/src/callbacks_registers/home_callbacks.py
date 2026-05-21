@@ -150,8 +150,50 @@ def _generate_day_events(day: date, eq_id: str, eq_idx: int) -> list:
     return events
 
 
+def _fetch_timeline_df_real(t_start: datetime, t_end: datetime,
+                            window_min: float, mtto_only: bool = False):
+    """IM-09: integra zpp_timeline_loader.fetch_timeline_events e adapta pro schema
+    esperado pelo renderizador atual (colunas: y, start, duration, status, color, pattern, ...).
+
+    Retorna None se módulo indisponível ou erro — chamador faz fallback mock.
+    """
+    try:
+        from src.utils.zpp_timeline_loader import (
+            fetch_timeline_events, BREAKDOWN_CODES as _BR_CODES,
+        )
+    except Exception:
+        return None
+
+    try:
+        codes_filter = list(_BR_CODES) if mtto_only else None
+        raw = fetch_timeline_events(t_start, t_end, breakdown_codes=codes_filter)
+        if raw is None or raw.empty:
+            return None
+
+        # Adapta schema: start_dt/end_dt → start (min desde t_start) + duration
+        adapted = raw.copy()
+        adapted["start"] = adapted["start_dt"].apply(
+            lambda dt: max(0.0, (dt - t_start).total_seconds() / 60)
+        )
+        adapted["duration"] = adapted["duration_min"]
+        # Clamp a window
+        adapted.loc[adapted["start"] < 0, "start"] = 0
+        adapted.loc[adapted["start"] > window_min, :] = None  # remove eventos fora
+        adapted = adapted.dropna(subset=["start"])
+
+        adapted.attrs["source"] = "real"
+        return adapted
+    except Exception as e:
+        logger.warning("V2 timeline real falhou (%s) — fallback mock", e)
+        return None
+
+
 def _gather_events_window(t_start: datetime, t_end: datetime) -> pd.DataFrame:
-    """Coleta eventos de todos equipamentos dentro [t_start, t_end), clampa às bordas."""
+    """Coleta eventos de todos equipamentos dentro [t_start, t_end), clampa às bordas.
+
+    MOCK (determinístico). Usado como fallback quando Mongo offline ou sem dados.
+    `df.attrs["source"] = "mock"` marca origem pra UI condicional (BR-15 gray-out).
+    """
     rows = []
     day = t_start.date()
     while day <= t_end.date():
@@ -177,7 +219,9 @@ def _gather_events_window(t_start: datetime, t_end: datetime) -> pd.DataFrame:
                     "desc":     ev["desc"],
                 })
         day += timedelta(days=1)
-    return pd.DataFrame(rows)
+    df_mock = pd.DataFrame(rows)
+    df_mock.attrs["source"] = "mock"
+    return df_mock
 
 
 def _evocon_xaxis_ticks(granularity: str, t_start: datetime, window_min: float):
@@ -398,18 +442,26 @@ def register_home_callbacks(app):
             Input("store-evocon-granularity", "data"),
             Input("store-evocon-offset", "data"),
             Input("interval-evocon-now", "n_intervals"),
+            Input("store-evocon-mtto-only", "data"),
         ],
     )
-    def update_home_evocon_timeline(granularity, offset, n_intervals):
+    def update_home_evocon_timeline(granularity, offset, n_intervals, mtto_only):
         granularity = granularity or "horas"
         offset = int(offset or 0)
+        mtto_only = bool(mtto_only)  # default False — switch ausente no DOM da home
         visible_style = {"visibility": "visible", "height": "560px"}
 
         try:
             t_start, t_end, period_label = _evocon_compute_window(granularity, offset)
             window_min = (t_end - t_start).total_seconds() / 60
 
-            df = _gather_events_window(t_start, t_end)
+            # IM-09 + IM-10: tenta fetch real (zpp_timeline_loader). Switch ON aplica
+            # filtro de breakdown codes na QUERY (não só visual). Fallback mock se vazio.
+            df = _fetch_timeline_df_real(t_start, t_end, window_min, mtto_only=mtto_only)
+            if df is None or df.empty:
+                # Fallback mock — preserva UX quando Mongo offline ou sem dados
+                df = _gather_events_window(t_start, t_end)
+
             if df.empty:
                 fig = go.Figure()
                 fig.update_layout(
@@ -424,6 +476,17 @@ def register_home_callbacks(app):
                 axis=1,
             )
 
+            # Switch MTTO-only (V2 / BR-15): gray-out só aplicado se DF veio do MOCK
+            # (real já filtra na query). Mock sempre carrega todos os status pra
+            # paridade UX quando offline.
+            df_is_mock = bool(df.attrs.get("source") == "mock")
+            if mtto_only and df_is_mock:
+                gray = "#d0d0d0"
+                mask = ~df["status"].isin(["avaria", "producao"])
+                df.loc[mask, "color"] = gray
+                df.loc[mask, "text"] = ""
+                df.loc[mask, "pattern"] = ""
+
             fig = go.Figure()
 
             fig.add_trace(go.Bar(
@@ -433,10 +496,11 @@ def register_home_callbacks(app):
                 orientation="h",
                 marker=dict(
                     color=df["color"].tolist(),
-                    line=dict(width=0),
+                    line=dict(color="rgba(255,255,255,0.85)", width=1),  # separação sutil entre segmentos
+                    cornerradius=3,  # cantos arredondados — visual moderno
                     pattern=dict(
                         shape=df["pattern"].tolist(),
-                        fgcolor="#6c757d",
+                        fgcolor="rgba(108,117,125,0.7)",
                         size=6,
                         solidity=0.4,
                     ),
@@ -444,13 +508,16 @@ def register_home_callbacks(app):
                 text=df["text"],
                 textposition="inside",
                 insidetextanchor="middle",
-                textfont=dict(color="white", size=11, family="Arial Black"),
+                textfont=dict(color="white", size=11, family="Inter, system-ui, sans-serif", weight="bold"),
                 width=0.62,
                 customdata=df[["label_eq", "cod", "desc", "duration"]].values,
                 hovertemplate=(
                     "<b>%{customdata[0]}</b><br>"
-                    "<b>Cód %{customdata[1]}</b> — %{customdata[2]}<br>"
-                    "Duração: %{customdata[3]:.0f} min<extra></extra>"
+                    "━━━━━━━━━━━━━<br>"
+                    "Cód: <b>%{customdata[1]}</b><br>"
+                    "Tipo: %{customdata[2]}<br>"
+                    "Duração: <b>%{customdata[3]:.0f}</b> min"
+                    "<extra></extra>"
                 ),
                 showlegend=False,
             ))
@@ -481,7 +548,9 @@ def register_home_callbacks(app):
             fig.update_layout(
                 template=TEMPLATE_THEME_MINTY,
                 height=540,
-                bargap=0.32,
+                bargap=0.36,
+                plot_bgcolor="rgba(248,250,252,0.4)",  # bg sutil pra dar profundidade
+                paper_bgcolor="rgba(0,0,0,0)",
                 xaxis=dict(
                     range=[-window_min * 0.005, window_min * 1.005],
                     tickmode="array",
@@ -490,7 +559,9 @@ def register_home_callbacks(app):
                     side="top",
                     showgrid=False,
                     zeroline=False,
-                    tickfont=dict(size=11, color="#6c757d"),
+                    tickfont=dict(size=11, color="#6c757d", family="Inter, system-ui, sans-serif"),
+                    showline=True,
+                    linecolor="rgba(0,0,0,0.08)",
                 ),
                 yaxis=dict(
                     tickmode="array",
@@ -499,10 +570,16 @@ def register_home_callbacks(app):
                     autorange="reversed",
                     showgrid=False,
                     zeroline=False,
-                    tickfont=dict(size=14, color="#212529", family="Arial Black"),
+                    tickfont=dict(size=12, color="#343a40", family="Inter, system-ui, sans-serif"),
+                    showline=False,
                 ),
-                margin=dict(l=80, r=30, t=50, b=30),
+                margin=dict(l=85, r=20, t=40, b=20),
                 showlegend=False,
+                hoverlabel=dict(
+                    bgcolor="white",
+                    bordercolor="rgba(0,0,0,0.15)",
+                    font=dict(size=12, color="#212529", family="Inter, system-ui, sans-serif"),
+                ),
             )
 
             logger.debug(f"[EVOCON_TIMELINE] gran={granularity} offset={offset} eventos={len(df)} janela={t_start}→{t_end}")
@@ -538,14 +615,29 @@ def register_home_callbacks(app):
             return current + 1
         raise dash.exceptions.PreventUpdate
 
-    # Granularity dropdown
+    # Granularity buttons (substituem dropdown — animação visual via Bootstrap transitions)
     @app.callback(
         Output("store-evocon-granularity", "data"),
-        Input("dropdown-evocon-granularity", "value"),
-        prevent_initial_call=False,
+        Input("btn-evocon-gran-horas", "n_clicks"),
+        Input("btn-evocon-gran-dias", "n_clicks"),
+        prevent_initial_call=True,
     )
-    def update_evocon_granularity(value):
-        return value or "horas"
+    def update_evocon_granularity(h_clicks, d_clicks):
+        trig = ctx.triggered_id
+        if trig == "btn-evocon-gran-dias":
+            return "dias"
+        return "horas"
+
+    # Toggle visual: outline reflete store (botão ativo solid, inativo outline)
+    @app.callback(
+        Output("btn-evocon-gran-horas", "outline"),
+        Output("btn-evocon-gran-dias", "outline"),
+        Input("store-evocon-granularity", "data"),
+    )
+    def toggle_gran_buttons(gran):
+        if gran == "dias":
+            return True, False  # horas outline, dias solid
+        return False, True      # horas solid, dias outline
 
     # ========================================
     # CLIENTSIDE: Animação fodástica do timeline
@@ -729,3 +821,24 @@ def register_home_callbacks(app):
         temp = "72.5°C"
         
         return oee, power, alarms, temp
+
+    # Sync: switch V2 → store global (store presente tanto na home quanto na V2)
+    @app.callback(
+        Output("store-evocon-mtto-only", "data"),
+        Input("switch-v2-mtto-only", "value"),
+        prevent_initial_call=True,
+    )
+    def sync_mtto_only(value):
+        return bool(value)
+
+    # Hydrate: store → switch ao entrar na V2 (sem loop com sync_mtto_only)
+    @app.callback(
+        Output("switch-v2-mtto-only", "value"),
+        Input("url", "pathname"),
+        State("store-evocon-mtto-only", "data"),
+    )
+    def hydrate_switch(pathname, stored):
+        if pathname != "/maintenance/indicators-v2":
+            from dash.exceptions import PreventUpdate
+            raise PreventUpdate
+        return bool(stored)

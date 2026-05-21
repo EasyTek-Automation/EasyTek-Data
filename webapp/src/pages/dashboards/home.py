@@ -287,11 +287,58 @@ def layout():
         ], className="mb-4"),
 
         # ========================================
+        # POC — DRILLDOWN PARADAS (Anos → Meses → Dias → Tabela)
+        # ========================================
+        dcc.Store(id="store-drill-level", data="anos"),
+        dcc.Store(id="store-drill-year", data=None),
+        dcc.Store(id="store-drill-month", data=None),
+        dcc.Store(id="store-drill-day", data=None),
+        dbc.Row([
+            dbc.Col([
+                dbc.Card([
+                    dbc.CardHeader(
+                        add_demo_badge_to_card_header([
+                            html.I(className="bi bi-bar-chart me-2"),
+                            "Paradas por Ano (POC drilldown) — clique numa barra"
+                        ], page_path="/")
+                    ),
+                    dbc.CardBody([
+                        dcc.Graph(
+                            id="graph-drill-years",
+                            config={"displayModeBar": False},
+                            style={"height": "320px"}
+                        )
+                    ])
+                ], className="shadow-sm")
+            ])
+        ], className="mb-4"),
+        dbc.Modal([
+            dbc.ModalHeader(dbc.ModalTitle(id="drill-modal-title")),
+            dbc.ModalBody([
+                html.Div([
+                    dbc.Button(
+                        [html.I(className="bi bi-arrow-left me-1"), "Voltar"],
+                        id="btn-drill-back",
+                        size="sm",
+                        color="secondary",
+                        outline=True,
+                        className="mb-2"
+                    ),
+                ]),
+                html.Div(id="drill-modal-content")
+            ]),
+            dbc.ModalFooter(
+                dbc.Button("Fechar", id="btn-drill-close", className="ms-auto")
+            ),
+        ], id="modal-drill", size="xl", is_open=False, scrollable=True),
+
+        # ========================================
         # TIMELINE EVOCON-STYLE (MOCK)
         # ========================================
         dcc.Store(id="store-evocon-granularity", storage_type="local", data="horas"),
         dcc.Store(id="store-evocon-offset",      storage_type="memory", data=0),
         dcc.Store(id="evocon-anim-dummy",        storage_type="memory"),
+        dcc.Store(id="store-evocon-mtto-only",   storage_type="local", data=False),
         dcc.Interval(id="interval-evocon-now",   interval=30_000, n_intervals=0),
         dbc.Row([
             dbc.Col([
@@ -307,16 +354,18 @@ def layout():
                         dbc.Row([
                             dbc.Col([
                                 html.Small("Escala do eixo", className="text-muted fw-semibold d-block mb-1"),
-                                dcc.Dropdown(
-                                    id="dropdown-evocon-granularity",
-                                    options=[
-                                        {"label": "Horas", "value": "horas"},
-                                        {"label": "Dias",  "value": "dias"},
-                                    ],
-                                    value="horas",
-                                    clearable=False,
-                                    style={"minWidth": "140px"},
-                                ),
+                                dbc.ButtonGroup([
+                                    dbc.Button(
+                                        [html.I(className="bi bi-clock me-1"), "Horas"],
+                                        id="btn-evocon-gran-horas", color="primary", size="sm",
+                                        outline=False, n_clicks=0, className="evocon-gran-btn",
+                                    ),
+                                    dbc.Button(
+                                        [html.I(className="bi bi-calendar-day me-1"), "Dias"],
+                                        id="btn-evocon-gran-dias", color="primary", size="sm",
+                                        outline=True, n_clicks=0, className="evocon-gran-btn",
+                                    ),
+                                ], className="shadow-sm"),
                             ], width="auto"),
                             dbc.Col([
                                 html.Small("Navegação no tempo", className="text-muted fw-semibold d-block mb-1"),

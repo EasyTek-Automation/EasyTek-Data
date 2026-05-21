@@ -25,6 +25,8 @@ from src.callbacks_registers.hourlyconsumption_callback import register_hourlyco
 from src.callbacks_registers.sidebar_content_callback import register_sidebar_content_callback
 from src.callbacks_registers.sidebar_toggle_callback import register_sidebar_toggle_callback
 from src.callbacks_registers.home_callbacks import register_home_callbacks
+from src.callbacks_registers.home_drilldown_callbacks import register_home_drilldown_callbacks
+from src.callbacks_registers.indicators_v2_callbacks import register_indicators_v2_callbacks
 from src.callbacks_registers.alarms_callbacks import register_alarms_callbacks
 from src.callbacks_registers.create_user_callbacks import register_create_user_callbacks
 from src.callbacks_registers.change_password_callbacks import register_change_password_callbacks
@@ -99,6 +101,8 @@ def register_callbacks(app):
     register_sidebar_content_callback(app)
     register_sidebar_toggle_callback(app)
     register_home_callbacks(app)
+    register_home_drilldown_callbacks(app)
+    register_indicators_v2_callbacks(app)
     register_alarms_callbacks(app)
     register_create_user_callbacks(app)
     register_change_password_callbacks(app)
