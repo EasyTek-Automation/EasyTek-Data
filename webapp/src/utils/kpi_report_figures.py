@@ -46,6 +46,67 @@ def renderizar_sunburst_png(
         return _gerar_placeholder_png(kpi_label, width, height, scale)
 
 
+def renderizar_em_paralelo(
+    specs: list,
+    width: int = 900,
+    height: int = 700,
+    scale: int = 2,
+    n_workers: int = 1,
+) -> dict:
+    """Renderiza múltiplas Plotly Figures via Kaleido async (asyncio.gather).
+
+    Args:
+        specs: lista de tuplas `(key, fig, label)` — key identifica resultado, fig é
+            Plotly Figure, label usado em logs/placeholder de falha.
+        width/height/scale: dimensões da imagem (idênticas a `renderizar_sunburst_png`).
+        n_workers: workers paralelos do Kaleido (1 já é ótimo — overhead spawn > ganho).
+
+    Returns:
+        dict `{key: png_bytes}`. Em falha individual, retorna placeholder. Em falha
+        do Kaleido em si, faz fallback serial chamando `renderizar_sunburst_png`.
+
+    Performance: 12s serial → ~3s via persistent Kaleido(n=1) async (perf #1).
+    """
+    if not specs:
+        return {}
+
+    import asyncio
+    try:
+        from kaleido import Kaleido
+    except ImportError:
+        logger.warning("Kaleido class indisponível — fallback serial")
+        return {key: renderizar_sunburst_png(fig, label, width, height, scale)
+                for key, fig, label in specs}
+
+    opts = {"format": "png", "width": width, "height": height, "scale": scale}
+    n = max(1, min(n_workers, len(specs)))
+
+    async def _gather():
+        k = Kaleido(n=n)
+        await k.open()
+        try:
+            tasks = [k.calc_fig(fig, opts=opts) for _, fig, _ in specs]
+            return await asyncio.gather(*tasks, return_exceptions=True)
+        finally:
+            await k.close()
+
+    try:
+        raw = asyncio.run(_gather())
+    except Exception:
+        logger.exception("Falha kaleido async — fallback serial")
+        return {key: renderizar_sunburst_png(fig, label, width, height, scale)
+                for key, fig, label in specs}
+
+    results: dict = {}
+    for (key, _fig, label), png in zip(specs, raw):
+        if isinstance(png, Exception):
+            logger.warning("Falha kaleido %s: %s", label, type(png).__name__)
+            results[key] = _gerar_placeholder_png(label, width, height, scale)
+        else:
+            results[key] = png
+    return results
+
+
 def _gerar_placeholder_png(
     kpi_label: str,
     width: int,

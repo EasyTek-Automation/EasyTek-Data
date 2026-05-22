@@ -143,9 +143,10 @@ def _bloco_planta_flowables(block_id: int, dados: Optional[dict], lang: str,
     series = dados.get(series_key) if series_key else None
     legacy_imgs = dados.get("sunburst_figures") or {}
 
-    chart_cells = []
+    # Fase 1 — build sequencial dos 3 Plotly Figures (rápido); coleta para render paralelo.
+    pending = []  # [(kpi_key, fig, label)]
+    legacy_fallback: dict = {}  # kpi_key → bytes (retrocompat)
     for kpi_key in ("mtbf", "mttr", "taxa_avaria"):
-        png_bytes: Optional[bytes] = None
         if series and isinstance(series, dict):
             labels = series.get("labels") or []
             values = series.get(kpi_key) or []
@@ -154,9 +155,6 @@ def _bloco_planta_flowables(block_id: int, dados: Optional[dict], lang: str,
             if labels and values:
                 try:
                     from src.utils.kpi_report_v2_bars import build_bar_figure
-                    from src.utils.kpi_report_figures import renderizar_sunburst_png
-                    # Fontes 3x maiores no PDF (rótulos pequenos demais no HTML
-                    # ao serem rasterizados via kaleido em alta resolução).
                     fig = build_bar_figure(
                         labels=labels, values=values, kpi=kpi_key,
                         target=target, title="",
@@ -164,18 +162,26 @@ def _bloco_planta_flowables(block_id: int, dados: Optional[dict], lang: str,
                         bar_text_size=36, meta_text_size=30,
                         axis_tick_size=33,
                     )
-                    # renderizar_sunburst_png aceita qualquer Plotly Figure (kaleido)
-                    png_bytes = renderizar_sunburst_png(fig, kpi_key.upper())
+                    pending.append((kpi_key, fig, kpi_key.upper()))
+                    continue
                 except Exception:
                     logger.exception(
-                        "kpi-v2 pdf bloco %s: falha bar PNG %s", block_id, kpi_key,
+                        "kpi-v2 pdf bloco %s: falha build bar fig %s", block_id, kpi_key,
                     )
-        if png_bytes is None:
-            # Fallback retrocompat: tenta legacy PNG
-            cand = legacy_imgs.get(kpi_key)
-            if isinstance(cand, (bytes, bytearray)):
-                png_bytes = bytes(cand)
+        cand = legacy_imgs.get(kpi_key)
+        if isinstance(cand, (bytes, bytearray)):
+            legacy_fallback[kpi_key] = bytes(cand)
 
+    # Fase 2 — render PNG em paralelo via Kaleido(n=3) (perf #1).
+    rendered_png: dict = {}
+    if pending:
+        from src.utils.kpi_report_figures import renderizar_em_paralelo
+        rendered_png = renderizar_em_paralelo(pending, width=900, height=700, scale=2)
+
+    # Fase 3 — embed células na ordem original.
+    chart_cells = []
+    for kpi_key in ("mtbf", "mttr", "taxa_avaria"):
+        png_bytes = rendered_png.get(kpi_key) or legacy_fallback.get(kpi_key)
         if isinstance(png_bytes, (bytes, bytearray)):
             try:
                 img = Image(io.BytesIO(bytes(png_bytes)), width=5.5 * cm,

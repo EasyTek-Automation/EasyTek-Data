@@ -162,7 +162,9 @@ def _build_kpis_bloco_planta(
         ("mttr",        "MTTR",            "mttr",           "mttr",           "mttr"),
         ("taxa_avaria", "breakdown_rate",  "breakdown_rate", "breakdown_rate", "breakdown_rate"),
     ]
-    sunburst_figures = {}
+    sunburst_figures: dict = {}
+    # Fase 1 — build sequencial dos Plotly Figures (rápido, ~0.1s cada).
+    pending_renders = []  # [(kpi_key, fig, label)] — render PNG kaleido em paralelo abaixo.
     for kpi_key, kpi_name_plotly, by_eq_key, target_key, avg_key in sunburst_specs:
         data_by_eq = {eq: by_equipment.get(eq, {}).get(by_eq_key) for eq in eq_ids}
         target_individual = {eq: (targets or {}).get(eq, {}).get(target_key) for eq in eq_ids}
@@ -185,7 +187,7 @@ def _build_kpis_bloco_planta(
                 # Aumenta fonte das legendas só na figura usada no DOCX — não afeta tela
                 # (perfumaria 2026-05-13: legendas eram pequenas demais quando renderizadas).
                 fig.update_layout(font=dict(size=22), margin=dict(t=8, b=8, l=8, r=8))
-                sunburst_figures[kpi_key] = renderizar_sunburst_png(fig, cfg.KPI_LABELS[kpi_key])
+                pending_renders.append((kpi_key, fig, cfg.KPI_LABELS[kpi_key]))
             else:
                 # Tela (IM-08) — retorna Plotly Figure nativo (interativo via dcc.Graph)
                 sunburst_figures[kpi_key] = fig
@@ -196,6 +198,13 @@ def _build_kpis_bloco_planta(
                 sunburst_figures[kpi_key] = _gerar_placeholder_png(cfg.KPI_LABELS[kpi_key], 900, 700, 2)
             else:
                 sunburst_figures[kpi_key] = None  # tela trata None mostrando aviso
+
+    # Fase 2 — render PNG em paralelo via Kaleido(n=4) (perf #1).
+    if pending_renders:
+        from src.utils.kpi_report_figures import renderizar_em_paralelo
+        sunburst_figures.update(
+            renderizar_em_paralelo(pending_renders, width=900, height=700, scale=2)
+        )
 
     return {
         "kpis_planta":      kpis_planta,
