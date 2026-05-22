@@ -326,16 +326,37 @@ def coletar_dados_relatorio(stored_data: dict, agora: datetime, as_png: bool = T
     # divergir do mês corrente (bug reportado em 2026-05-13: filtro "11→11" da tela
     # contaminava Bloco 1 do DOCX, violando BR-01). Custo: 2 queries Mongo extras
     # por geração, sem cache do store.
-    try:
-        data_mensal = fetch_zpp_kpi_data(ini_mensal, fim_mensal)
-    except Exception as exc:
-        logger.warning("Falha ao buscar dados mensais para Bloco 1/4: %s — usando dict vazio", type(exc).__name__)
-        data_mensal = {}
-    try:
-        data_24h = fetch_zpp_kpi_data(ini_24h, fim_24h)
-    except Exception as exc:
-        logger.warning("Falha ao buscar dados 24h para Bloco 3: %s — usando dict vazio", type(exc).__name__)
-        data_24h = {}
+    #
+    # Perf #4: 4 queries Mongo independentes (data_mensal, data_24h, top5 mensal,
+    # top5 24h) executam em paralelo via ThreadPool. PyMongo libera GIL no I/O.
+    from concurrent.futures import ThreadPoolExecutor as _TPE
+
+    def _safe_fetch_kpi(ini, fim, label):
+        try:
+            return fetch_zpp_kpi_data(ini, fim)
+        except Exception as exc:
+            logger.warning("Falha ao buscar dados %s: %s — usando dict vazio",
+                            label, type(exc).__name__)
+            return {}
+
+    def _safe_top5(ini, fim, names_arg, top_n=5):
+        try:
+            return _build_top5_paradas(ini, fim, names_arg, top_n=top_n)
+        except Exception as exc:
+            logger.warning("Falha ao buscar top5 paradas (%s, %s): %s",
+                            ini, fim, type(exc).__name__)
+            return {"paradas": [], "total": 0, "vazio": True}
+
+    with _TPE(max_workers=4, thread_name_prefix="kpi-mongo") as _pool:
+        _f_mensal = _pool.submit(_safe_fetch_kpi, ini_mensal, fim_mensal, "mensais para Bloco 1/4")
+        _f_24h    = _pool.submit(_safe_fetch_kpi, ini_24h, fim_24h, "24h para Bloco 3")
+        _f_b2     = _pool.submit(_safe_top5, ini_mensal, fim_mensal, names, 5)
+        # Bloco 5 lista TODAS as paradas das 24h, sem limite (BR-03 itens 5/7 revistos 2026-05-13)
+        _f_b5     = _pool.submit(_safe_top5, ini_24h, fim_24h, names, None)
+        data_mensal = _f_mensal.result()
+        data_24h    = _f_24h.result()
+        bloco2      = _f_b2.result()
+        bloco5      = _f_b5.result()
 
     # `year` e `monthly_aggregates` derivam da janela mensal própria do DOCX,
     # não do store da página — força recomputação a partir de data_mensal.
@@ -344,7 +365,6 @@ def coletar_dados_relatorio(stored_data: dict, agora: datetime, as_png: bool = T
     bloco1 = _build_kpis_bloco_planta(eq_ids, ini_mensal, fim_mensal, targets, names, categories,
                                        kpi_data=data_mensal, year=year, monthly_aggregates=None,
                                        as_png=as_png)
-    bloco2 = _build_top5_paradas(ini_mensal, fim_mensal, names)
     bloco3 = _build_kpis_bloco_planta(eq_ids, ini_24h, fim_24h, targets, names, categories,
                                        kpi_data=data_24h, year=year, monthly_aggregates=None,
                                        as_png=as_png)
@@ -352,9 +372,6 @@ def coletar_dados_relatorio(stored_data: dict, agora: datetime, as_png: bool = T
     year_months = _date_range_to_year_months(ini_mensal, fim_mensal)
     months = sorted({int(ym.split("-")[1]) for ym in year_months})
     bloco4 = build_detalhamento_table(eq_ids, data_mensal, names, months, year_months, targets)
-
-    # Bloco 5 lista TODAS as paradas das 24h, sem limite (BR-03 itens 5/7 revistos 2026-05-13)
-    bloco5 = _build_top5_paradas(ini_24h, fim_24h, names, top_n=None)
 
     # planta_vazia = ambos blocos planta sem dados
     def _kpis_vazio(b):
