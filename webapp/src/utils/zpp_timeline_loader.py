@@ -224,6 +224,8 @@ def fetch_timeline_events(
                 brk_intervals.append((start_dt, end_dt))
                 cod = str(row.get("motivo", "") or "")
                 status = _classify_status(cod)
+                desc_raw = row.get("descricao")
+                desc = str(desc_raw).strip() if desc_raw and not (isinstance(desc_raw, float) and pd.isna(desc_raw)) else "—"
                 rows.append({
                     "equipment_id": eq_id,
                     "label_eq":     label,
@@ -233,7 +235,7 @@ def fetch_timeline_events(
                     "duration_min": dur_min,
                     "status":       status,
                     "cod":          cod,
-                    "desc":         "—",  # ZPP_Paradas tem descricao mas fetch V1 não retorna
+                    "desc":         desc or "—",
                     "color":        EVOCON_PALETTE_TIMELINE.get(status, "#9aa0a6"),
                     "pattern":      "/" if status == "setup" else "",
                 })
@@ -309,6 +311,7 @@ def _fetch_all_paradas(t_start: datetime, t_end: datetime) -> pd.DataFrame:
                 "fim_execucao": 1,
                 "inicio_real_hora": 1,
                 "causa_do_desvio": 1,
+                "descricao": 1,
                 "duration_min": 1,
             },
         )
@@ -326,6 +329,7 @@ def _fetch_all_paradas(t_start: datetime, t_end: datetime) -> pd.DataFrame:
                 "month":        start.month,
                 "year_month":   f"{start.year}-{start.month:02d}",
                 "motivo":       str(doc.get("causa_do_desvio", "") or ""),
+                "descricao":    str(doc.get("descricao", "") or ""),
                 "duracao_min":  dur,
                 "boundary_case": False,
             })
@@ -362,6 +366,7 @@ def _fetch_avaria_paradas(t_start: datetime, t_end: datetime,
                 "inicio_execucao": 1,
                 "inicio_real_hora": 1,
                 "causa_do_desvio": 1,
+                "descricao": 1,
                 "duration_min": 1,
             },
         )
@@ -375,6 +380,7 @@ def _fetch_avaria_paradas(t_start: datetime, t_end: datetime,
                 "linea":        doc.get("centro_de_trabalho", ""),
                 "date":         start,
                 "motivo":       str(doc.get("causa_do_desvio", "") or ""),
+                "descricao":    str(doc.get("descricao", "") or ""),
                 "duracao_min":  float(doc.get("duration_min", 0) or 0),
             })
         return pd.DataFrame(rows)
