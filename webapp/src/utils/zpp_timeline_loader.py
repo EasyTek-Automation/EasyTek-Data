@@ -6,7 +6,7 @@ unificado pronto pra renderização Plotly do timeline evocon-style na V2 e home
 DS-07 / IM-08: `_classify_status(code)` mapeia código SAP → categoria visual.
 """
 
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 import logging
 from typing import Optional, List
 
@@ -178,9 +178,19 @@ def fetch_timeline_events(
             for _, prod_row in eq_prod.iterrows():
                 # Cada doc de ZPP_Producao é uma janela de operação contígua
                 # Aproximação: janela inteira é "producao" (refinar com gaps de paradas é TODO)
-                p_start = prod_row.get("date")
+                p_start_raw = prod_row.get("date")
                 horas = float(prod_row.get("horasact", 0) or 0)
-                if not isinstance(p_start, datetime) or horas <= 0:
+                if horas <= 0:
+                    continue
+                # `fetch_zpp_production_data` retorna `date` como `datetime.date`
+                # (linha 306: `fim.date()`). `isinstance(date_obj, datetime)` é
+                # False — date NÃO é subclasse de datetime. Aceitar ambos e
+                # promover date → datetime na meia-noite local.
+                if isinstance(p_start_raw, datetime):
+                    p_start = p_start_raw
+                elif isinstance(p_start_raw, date):
+                    p_start = datetime(p_start_raw.year, p_start_raw.month, p_start_raw.day)
+                else:
                     continue
                 p_end = p_start + timedelta(hours=horas)
                 # Clampar à janela
