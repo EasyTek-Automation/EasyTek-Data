@@ -500,6 +500,11 @@ def register_home_callbacks(app):
                     cornerradius=3,  # cantos arredondados — visual moderno
                     pattern=dict(
                         shape=df["pattern"].tolist(),
+                        # bgcolor = cor da própria barra. Sem isso, Plotly
+                        # renderiza fundo branco onde shape != "" — barras de
+                        # setup viram brancas hachuradas em vez de amarelas
+                        # com listras (~16% das barras afetadas).
+                        bgcolor=df["color"].tolist(),
                         fgcolor="rgba(108,117,125,0.7)",
                         size=6,
                         solidity=0.4,
