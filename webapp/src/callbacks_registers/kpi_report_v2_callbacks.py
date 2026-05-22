@@ -746,3 +746,35 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
 
         msg = page.TRANS.get(lang, page.TRANS["pt"])["share_toast_success"]
         return True, msg, "success", url
+
+    # C13 — abre toast "Gerando relatório..." + reseta barra/Interval no click PDF/DOCX.
+    @app.callback(
+        Output("toast-kpi-v2-generating", "is_open"),
+        Output("toast-kpi-v2-generating-progress", "value", allow_duplicate=True),
+        Output("interval-toast-kpi-v2-tick", "disabled", allow_duplicate=True),
+        Output("interval-toast-kpi-v2-tick", "n_intervals"),
+        Input("btn-kpi-v2-export-pdf", "n_clicks"),
+        Input("btn-kpi-v2-export-docx", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def open_kpi_v2_generating_toast(n_pdf, n_docx):
+        """Abre toast progresso ao clicar PDF/DOCX. Reseta barra 100 + Interval ticks=0."""
+        if not (n_pdf or n_docx):
+            raise dash.exceptions.PreventUpdate
+        return True, 100, False, 0
+
+    # C14 — decrementa barra 100→0 em 100 ticks de 100ms (= 10s, casa com duration toast).
+    @app.callback(
+        Output("toast-kpi-v2-generating-progress", "value", allow_duplicate=True),
+        Output("interval-toast-kpi-v2-tick", "disabled", allow_duplicate=True),
+        Input("interval-toast-kpi-v2-tick", "n_intervals"),
+        prevent_initial_call=True,
+    )
+    def tick_kpi_v2_generating_progress(n_intervals):
+        """Tick progresso barra; desabilita Interval ao chegar a 0."""
+        if n_intervals is None:
+            raise dash.exceptions.PreventUpdate
+        remaining = max(0, 100 - n_intervals)
+        if remaining == 0:
+            return 0, True
+        return remaining, False

@@ -433,6 +433,44 @@ def layout() -> dbc.Container:
         style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999},
     )
 
+    # Toast de progresso da geração PDF/DOCX (auto-dismiss em 10s — portado da V1).
+    generating_toast = dbc.Toast(
+        children=[
+            "As informações estão sendo compiladas e renderizadas para geração do seu relatório. "
+            "Esse processo pode durar de 15 a 30s.",
+            dbc.Progress(
+                id="toast-kpi-v2-generating-progress",
+                value=100,
+                color="info",
+                striped=True,
+                animated=True,
+                className="mt-2",
+                style={"height": "5px"},
+            ),
+        ],
+        id="toast-kpi-v2-generating",
+        header="Gerando relatório...",
+        is_open=False,
+        dismissable=True,
+        duration=10000,
+        icon="info",
+        style={
+            "position": "fixed",
+            "top": "155px",
+            "right": "20px",
+            "zIndex": 1999,
+            "minWidth": "320px",
+            "maxWidth": "420px",
+        },
+    )
+
+    generating_tick = dcc.Interval(
+        id="interval-toast-kpi-v2-tick",
+        interval=100,
+        disabled=True,
+        n_intervals=0,
+    )
+
     return dbc.Container(
         [
             header_row,
@@ -442,6 +480,8 @@ def layout() -> dbc.Container:
             _footer_buttons(),
             downloads,
             share_toast,
+            generating_toast,
+            generating_tick,
             _drilldown_modal(),
             *_stores(),
         ],

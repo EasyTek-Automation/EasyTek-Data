@@ -1080,6 +1080,43 @@ def layout():
                                     style={"position": "fixed", "top": 66, "right": 10,
                                            "width": 350, "zIndex": 9999},
                                 ),
+                                # Toast progresso geração PDF/DOCX (auto-dismiss 10s, portado V1).
+                                dbc.Toast(
+                                    children=[
+                                        "As informações estão sendo compiladas e renderizadas "
+                                        "para geração do seu relatório. "
+                                        "Esse processo pode durar de 15 a 30s.",
+                                        dbc.Progress(
+                                            id="toast-kpi-v2-generating-progress",
+                                            value=100,
+                                            color="info",
+                                            striped=True,
+                                            animated=True,
+                                            className="mt-2",
+                                            style={"height": "5px"},
+                                        ),
+                                    ],
+                                    id="toast-kpi-v2-generating",
+                                    header="Gerando relatório...",
+                                    is_open=False,
+                                    dismissable=True,
+                                    duration=10000,
+                                    icon="info",
+                                    style={
+                                        "position": "fixed",
+                                        "top": "155px",
+                                        "right": "20px",
+                                        "zIndex": 1999,
+                                        "minWidth": "320px",
+                                        "maxWidth": "420px",
+                                    },
+                                ),
+                                dcc.Interval(
+                                    id="interval-toast-kpi-v2-tick",
+                                    interval=100,
+                                    disabled=True,
+                                    n_intervals=0,
+                                ),
                                 # Stores compartilhados com a rota standalone
                                 dcc.Store(id="store-kpi-v2-data", storage_type="memory"),
                                 dcc.Store(id="store-kpi-v2-lang",
