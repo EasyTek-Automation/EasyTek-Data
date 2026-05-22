@@ -96,6 +96,64 @@ def _classify_status(code: Optional[str]) -> str:
     return "outros"
 
 
+def _combine_date_hour(base: datetime, hora) -> datetime:
+    """Combina data (sem hora) + string "HH:MM:SS" do SAP → datetime preciso.
+
+    SAP ZPP exporta `inicio_execucao`/`fim_execucao` como meia-noite UTC e
+    grava a hora em campo separado (`inicio_real_hora`, `hininotif`, etc) no
+    formato "HH:MM:SS". Sem esta combinação, todas as paradas e produção do
+    dia aparecem colapsadas em 00:00 no timeline.
+    """
+    if not isinstance(base, datetime):
+        return base
+    if not isinstance(hora, str) or not hora:
+        return base
+    try:
+        parts = hora.split(":")
+        h = int(parts[0])
+        m = int(parts[1]) if len(parts) > 1 else 0
+        s = int(parts[2]) if len(parts) > 2 else 0
+        return base.replace(hour=h, minute=m, second=s, microsecond=0)
+    except (ValueError, IndexError, TypeError):
+        return base
+
+
+def _subtract_intervals(big_start: datetime, big_end: datetime,
+                        blockers: list) -> list:
+    """Subtrai intervalos `blockers` de `[big_start, big_end)` → lista de gaps.
+
+    Resolve overlap visual entre janela ZPP_Producao (cobre ~24h) e paradas que
+    caem dentro dela: sem subtração, barra verde da produção é renderizada por
+    cima e oculta as paradas. Algoritmo: clampa cada blocker à janela, faz merge
+    dos sobrepostos, retorna os trechos livres entre cuts.
+    """
+    if big_end <= big_start:
+        return []
+    cuts = []
+    for s, e in blockers:
+        s2, e2 = max(s, big_start), min(e, big_end)
+        if e2 > s2:
+            cuts.append((s2, e2))
+    if not cuts:
+        return [(big_start, big_end)]
+    cuts.sort()
+    merged = [list(cuts[0])]
+    for s, e in cuts[1:]:
+        if s <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], e)
+        else:
+            merged.append([s, e])
+    gaps = []
+    cursor = big_start
+    for s, e in merged:
+        if s > cursor:
+            gaps.append((cursor, s))
+        cursor = max(cursor, e)
+    if cursor < big_end:
+        gaps.append((cursor, big_end))
+    return gaps
+
+
 def fetch_timeline_events(
     t_start: datetime,
     t_end: datetime,
@@ -141,14 +199,18 @@ def fetch_timeline_events(
             # Switch OFF: precisa todos os códigos — query direta sem filtro $in
             brk_df = _fetch_all_paradas(t_start, t_end)
 
-        # 3. Buscar produção
-        prod_df = fetch_zpp_production_data(t_start, t_end)
+        # 3. Buscar produção — query local pra preservar hora real (`hininotif`).
+        # `fetch_zpp_production_data` da V1 descarta hora e devolve date sem
+        # timestamp, o que colapsa todas as barras verdes em 00:00 do dia.
+        prod_df = _fetch_all_producao(t_start, t_end)
 
         # 4. Construir DataFrame por equipamento
         rows = []
         for y_idx, (eq_id, label) in enumerate(sorted(names.items())):
-            # Eventos de parada do equipamento
+            # Eventos de parada do equipamento — acumula intervalos pra subtrair
+            # do janelão de produção (evita overlay visual da barra verde).
             eq_brk = brk_df[brk_df.get("linea") == eq_id] if not brk_df.empty else pd.DataFrame()
+            brk_intervals = []
             for _, row in eq_brk.iterrows():
                 start_dt = row.get("date")  # já vem como datetime no fetch V1
                 if not isinstance(start_dt, datetime):
@@ -157,6 +219,7 @@ def fetch_timeline_events(
                 if dur_min <= 0:
                     continue
                 end_dt = start_dt + timedelta(minutes=dur_min)
+                brk_intervals.append((start_dt, end_dt))
                 cod = str(row.get("motivo", "") or "")
                 status = _classify_status(cod)
                 rows.append({
@@ -173,11 +236,9 @@ def fetch_timeline_events(
                     "pattern":      "/" if status == "setup" else "",
                 })
 
-            # 5. Gaps de produção (verde) — derivados de ZPP_Producao
+            # 5. Gaps de produção (verde) — janelas ZPP_Producao menos paradas
             eq_prod = prod_df[prod_df.get("linea") == eq_id] if not prod_df.empty else pd.DataFrame()
             for _, prod_row in eq_prod.iterrows():
-                # Cada doc de ZPP_Producao é uma janela de operação contígua
-                # Aproximação: janela inteira é "producao" (refinar com gaps de paradas é TODO)
                 p_start_raw = prod_row.get("date")
                 horas = float(prod_row.get("horasact", 0) or 0)
                 if horas <= 0:
@@ -193,24 +254,27 @@ def fetch_timeline_events(
                 else:
                     continue
                 p_end = p_start + timedelta(hours=horas)
-                # Clampar à janela
                 p_start = max(p_start, t_start)
                 p_end = min(p_end, t_end)
                 if p_end <= p_start:
                     continue
-                rows.append({
-                    "equipment_id": eq_id,
-                    "label_eq":     label,
-                    "y":            y_idx,
-                    "start_dt":     p_start,
-                    "end_dt":       p_end,
-                    "duration_min": (p_end - p_start).total_seconds() / 60,
-                    "status":       "producao",
-                    "cod":          "—",
-                    "desc":         "Produção",
-                    "color":        EVOCON_PALETTE_TIMELINE["producao"],
-                    "pattern":      "",
-                })
+                # Subtrai paradas do equipamento que caem dentro da janela —
+                # uma barra verde por gap entre paradas, em vez de uma única
+                # barra cobrindo o dia todo (que escondia as paradas).
+                for g_start, g_end in _subtract_intervals(p_start, p_end, brk_intervals):
+                    rows.append({
+                        "equipment_id": eq_id,
+                        "label_eq":     label,
+                        "y":            y_idx,
+                        "start_dt":     g_start,
+                        "end_dt":       g_end,
+                        "duration_min": (g_end - g_start).total_seconds() / 60,
+                        "status":       "producao",
+                        "cod":          "—",
+                        "desc":         "Produção",
+                        "color":        EVOCON_PALETTE_TIMELINE["producao"],
+                        "pattern":      "",
+                    })
 
         df = pd.DataFrame(rows)
         return df if not df.empty else _empty_df()
@@ -222,7 +286,9 @@ def fetch_timeline_events(
 
 def _fetch_all_paradas(t_start: datetime, t_end: datetime) -> pd.DataFrame:
     """Query direta em ZPP_Paradas SEM filtro de breakdown codes (switch OFF).
-    Retorna DataFrame com schema compatível com fetch_zpp_breakdown_data da V1.
+    Retorna DataFrame com schema compatível com fetch_zpp_breakdown_data da V1
+    + combina `inicio_real_hora` (HH:MM:SS) com `inicio_execucao` (data) pra
+    posicionar a barra no horário real do dia.
     """
     if not _HAS_MONGO:
         return pd.DataFrame()
@@ -239,15 +305,17 @@ def _fetch_all_paradas(t_start: datetime, t_end: datetime) -> pd.DataFrame:
                 "centro_de_trabalho": 1,
                 "inicio_execucao": 1,
                 "fim_execucao": 1,
+                "inicio_real_hora": 1,
                 "causa_do_desvio": 1,
                 "duration_min": 1,
             },
         )
         rows = []
         for doc in cursor:
-            start = doc.get("inicio_execucao")
-            if not isinstance(start, datetime):
+            start_date = doc.get("inicio_execucao")
+            if not isinstance(start_date, datetime):
                 continue
+            start = _combine_date_hour(start_date, doc.get("inicio_real_hora"))
             dur = float(doc.get("duration_min", 0) or 0)
             rows.append({
                 "linea":        doc.get("centro_de_trabalho", ""),
@@ -262,6 +330,51 @@ def _fetch_all_paradas(t_start: datetime, t_end: datetime) -> pd.DataFrame:
         return pd.DataFrame(rows)
     except Exception as e:
         logger.warning("_fetch_all_paradas falhou (%s)", e)
+        return pd.DataFrame()
+
+
+def _fetch_all_producao(t_start: datetime, t_end: datetime) -> pd.DataFrame:
+    """Query direta em ZPP_Producao para o timeline state — mantém hora real.
+
+    `fetch_zpp_production_data` (zpp_kpi_calculator) descarta `hininotif` e
+    retorna `date` como `datetime.date` (sem hora) porque KPI mensais não
+    precisam de hora. Pro timeline state precisamos da hora real do dia
+    (`hininotif` = "HH:MM:SS" combinado com `fininotif`).
+    """
+    if not _HAS_MONGO:
+        return pd.DataFrame()
+    try:
+        col = get_mongo_connection("ZPP_Producao")
+        if col is None:
+            return pd.DataFrame()
+        cursor = col.find(
+            {
+                "_processed": True,
+                "ffinnotif": {"$gte": t_start, "$lt": t_end},
+            },
+            {
+                "_id": 0,
+                "pto_trab": 1,
+                "fininotif": 1,
+                "hininotif": 1,
+                "horasact": 1,
+            },
+        )
+        rows = []
+        for doc in cursor:
+            base = doc.get("fininotif")
+            if not isinstance(base, datetime):
+                continue
+            start = _combine_date_hour(base, doc.get("hininotif"))
+            horas = float(doc.get("horasact", 0) or 0)
+            rows.append({
+                "linea":        doc.get("pto_trab", ""),
+                "date":         start,
+                "horasact":     horas,
+            })
+        return pd.DataFrame(rows)
+    except Exception as e:
+        logger.warning("_fetch_all_producao falhou (%s)", e)
         return pd.DataFrame()
 
 

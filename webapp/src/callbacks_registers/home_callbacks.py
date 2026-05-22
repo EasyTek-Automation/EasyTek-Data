@@ -536,12 +536,22 @@ def register_home_callbacks(app):
                     ))
 
             tickvals, ticktext = _evocon_xaxis_ticks(granularity, t_start, window_min)
+            # Eixo Y dinâmico — deriva do próprio df pra não desalinhar quando
+            # Mongo retorna conjunto diferente de EVOCON_EQUIPMENTS hardcoded
+            # (ex: DECAP001/SOLDA001 extras, ou ordem alfabética != ordem fixa).
+            y_to_label = {}
+            for _y, _lbl in zip(df["y"].tolist(), df.get("label_eq", df["y"]).tolist()):
+                yi = int(_y)
+                if yi not in y_to_label and _lbl:
+                    y_to_label[yi] = str(_lbl)
+            ys_sorted = sorted(y_to_label.keys()) or [0]
+            y_min, y_max = min(ys_sorted), max(ys_sorted)
             for tv in tickvals:
                 if 0 < tv < window_min:
                     fig.add_shape(
                         type="line",
                         x0=tv, x1=tv,
-                        y0=-0.5, y1=len(EVOCON_EQUIPMENTS) - 0.5,
+                        y0=y_min - 0.5, y1=y_max + 0.5,
                         line=dict(color="rgba(0,0,0,0.08)", width=1),
                     )
 
@@ -565,8 +575,8 @@ def register_home_callbacks(app):
                 ),
                 yaxis=dict(
                     tickmode="array",
-                    tickvals=list(range(len(EVOCON_EQUIPMENTS))),
-                    ticktext=[eq["label"] for eq in EVOCON_EQUIPMENTS],
+                    tickvals=ys_sorted,
+                    ticktext=[y_to_label[y] for y in ys_sorted],
                     autorange="reversed",
                     showgrid=False,
                     zeroline=False,
