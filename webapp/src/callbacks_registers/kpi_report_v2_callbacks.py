@@ -397,6 +397,43 @@ def _build_export_dados(stored: dict, agora: datetime, data_dia: datetime) -> tu
 
 
 # ============================================================================
+# Background prewarm — perf #5 (KPIReport-v2).
+# Quando page load completa (C1 init_data), spawn daemon thread que pré-popula
+# caches #2 (PNG) e #3 (export dados) pra ontem (data_dia default). Se user
+# clicar Exportar PDF/DOCX dentro de 60s, cache_hit → ~1s.
+# Lock simples evita kickoff duplicado se C1 dispara duas vezes próximas.
+# ============================================================================
+_PREWARM_LOCK = RLock()
+_PREWARM_ACTIVE: set[str] = set()
+
+
+def _kickoff_export_prewarm(stored: dict, agora: datetime) -> None:
+    """Spawn daemon thread que popula export cache para a janela default (ontem)."""
+    import threading
+    ontem = (agora.replace(hour=0, minute=0, second=0, microsecond=0,
+                             tzinfo=None) - timedelta(days=1))
+    key = _export_cache_key(stored, agora, ontem)
+    with _PREWARM_LOCK:
+        if key in _PREWARM_ACTIVE:
+            return
+        if _export_cache_get(key) is not None:
+            return  # já em cache, não precisa prewarm
+        _PREWARM_ACTIVE.add(key)
+
+    def _worker():
+        try:
+            _build_export_dados(stored, agora, ontem)
+        except Exception:
+            logger.warning("KPI v2 prewarm falhou (silent — export terá cache miss)",
+                            exc_info=False)
+        finally:
+            with _PREWARM_LOCK:
+                _PREWARM_ACTIVE.discard(key)
+
+    threading.Thread(target=_worker, name="kpi-v2-prewarm", daemon=True).start()
+
+
+# ============================================================================
 # Registro
 # ============================================================================
 
@@ -442,6 +479,10 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
 
         # RF-04: injeta séries mensais/diárias pros bar charts blocos 1/3
         dados = _inject_series(dados, stored, agora)
+
+        # Perf #5 — pré-aquece caches #2 (PNG) e #3 (export dados) em background.
+        # Quando user clicar Exportar PDF/DOCX (segundos depois), tudo já em cache.
+        _kickoff_export_prewarm(stored, agora)
 
         return _serialize_dados_for_store(dados)
 

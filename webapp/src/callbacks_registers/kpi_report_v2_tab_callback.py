@@ -286,4 +286,15 @@ def register_kpi_report_v2_tab_callback(app: dash.Dash) -> None:
         # botões enquanto for None/empty). Não precisa serializar dados pesados —
         # callbacks de export coletam novamente com as_png=True.
         ready_marker = {"ready": True, "rotulo": rotulo}
+
+        # Perf #5 — pré-aquece export cache em background. User clicar Exportar
+        # PDF/DOCX dentro de 60s = cache hit ~1s.
+        try:
+            from src.callbacks_registers.kpi_report_v2_callbacks import (
+                _kickoff_export_prewarm,
+            )
+            _kickoff_export_prewarm(stored_data, agora)
+        except Exception:
+            logger.warning("KPI v2 tab: falha ao spawnar prewarm (silent)")
+
         return content, rotulo, ready_marker
