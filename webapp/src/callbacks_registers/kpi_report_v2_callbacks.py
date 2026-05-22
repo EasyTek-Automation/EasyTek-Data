@@ -19,11 +19,13 @@ Callbacks registrados (12 total):
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import time
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeoutError
 from datetime import datetime, timedelta
+from threading import RLock
 from typing import Any
 
 import dash
@@ -319,6 +321,79 @@ def _coletar_with_timeout(stored_data: dict, agora: datetime) -> dict:
             raise TimeoutError(
                 f"Coleta KPIReport v2 excedeu {cfg.TIMEOUT_GERACAO_S}s"
             ) from exc
+
+
+# ============================================================================
+# Export-level cache — perf #3 (KPIReport-v2).
+# Compartilha resultado de `coletar_dados_relatorio + _override + _inject_series`
+# entre export PDF e export DOCX consecutivos. Chave: hash de (equipment_ids,
+# agora.minute, data_dia). TTL 60s — janela típica entre PDF e DOCX.
+# ============================================================================
+_EXPORT_CACHE: dict[str, tuple[float, dict]] = {}
+_EXPORT_CACHE_LOCK = RLock()
+_EXPORT_CACHE_TTL_S = 60.0
+_EXPORT_CACHE_MAX = 16
+
+
+def _export_cache_key(stored: dict, agora: datetime, data_dia: datetime) -> str:
+    """Hash determinístico do contexto de export (mesma janela = mesma chave)."""
+    payload = json.dumps(
+        [
+            sorted(stored.get("equipment_ids") or []),
+            agora.replace(second=0, microsecond=0).isoformat(),
+            data_dia.date().isoformat(),
+        ],
+        default=str,
+    )
+    return hashlib.sha1(payload.encode("utf-8")).hexdigest()
+
+
+def _export_cache_get(key: str) -> dict | None:
+    with _EXPORT_CACHE_LOCK:
+        entry = _EXPORT_CACHE.get(key)
+        if not entry:
+            return None
+        ts, dados = entry
+        if time.monotonic() - ts > _EXPORT_CACHE_TTL_S:
+            _EXPORT_CACHE.pop(key, None)
+            return None
+        return dados
+
+
+def _export_cache_put(key: str, dados: dict) -> None:
+    with _EXPORT_CACHE_LOCK:
+        if len(_EXPORT_CACHE) >= _EXPORT_CACHE_MAX:
+            oldest = min(_EXPORT_CACHE.items(), key=lambda kv: kv[1][0])[0]
+            _EXPORT_CACHE.pop(oldest, None)
+        _EXPORT_CACHE[key] = (time.monotonic(), dados)
+
+
+def _build_export_dados(stored: dict, agora: datetime, data_dia: datetime) -> tuple[dict, datetime | None]:
+    """Constrói `dados_png` para export (PDF/DOCX) com cache TTL 60s (perf #3).
+
+    Pipeline: `coletar_dados_relatorio(as_png=True)` + `_override_blocos_24h`
+    (se DatePicker ≠ ontem) + `_inject_series`. Resultado cacheado por contexto
+    — PDF então DOCX dentro de 60s reaproveita.
+
+    Returns: tupla (dados_png, end_day_override) — segundo elemento é `data_dia`
+    se janela custom, senão None.
+    """
+    ontem = (agora.replace(hour=0, minute=0, second=0, microsecond=0,
+                             tzinfo=None) - timedelta(days=1))
+    end_day_override = data_dia if data_dia.date() != ontem.date() else None
+
+    key = _export_cache_key(stored, agora, data_dia)
+    cached = _export_cache_get(key)
+    if cached is not None:
+        return cached, end_day_override
+
+    dados_png = coletar_dados_relatorio(stored, agora, as_png=True)
+    if end_day_override is not None:
+        dados_png = _override_blocos_24h(dados_png, stored, data_dia)
+    dados_png = _inject_series(dados_png, stored, agora,
+                                end_day_24h=end_day_override)
+    _export_cache_put(key, dados_png)
+    return dados_png, end_day_override
 
 
 # ============================================================================
@@ -640,20 +715,10 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
         stored = _build_default_stored_data()
         agora = cfg._now_in_report_timezone()
         data_dia = _resolve_data_24h(date_24h, agora)
-        ontem = (agora.replace(hour=0, minute=0, second=0, microsecond=0,
-                                 tzinfo=None) - timedelta(days=1))
         try:
-            dados_png = coletar_dados_relatorio(stored, agora, as_png=True)
-            # BR-02b: se DatePicker ≠ ontem, sobrescreve blocos 3/5 com janela custom
-            if data_dia.date() != ontem.date():
-                dados_png = _override_blocos_24h(dados_png, stored, data_dia)
-                end_day_override = data_dia
-                dia_label = data_dia.strftime("%d/%m/%Y")
-            else:
-                end_day_override = None
-                dia_label = ""
-            dados_png = _inject_series(dados_png, stored, agora,
-                                         end_day_24h=end_day_override)
+            dados_png, end_day_override = _build_export_dados(stored, agora, data_dia)
+            dia_label = (data_dia.strftime("%d/%m/%Y")
+                          if end_day_override is not None else "")
             pdf_bytes = gerar_pdf(dados_png, active, lang,
                                     dia_24h_label=dia_label)
         except Exception:
@@ -661,8 +726,7 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
             raise dash.exceptions.PreventUpdate
 
         nome = cfg.gerar_nome_arquivo(agora).replace(".docx", ".pdf")
-        # Embute dia no filename se diferente de ontem
-        if data_dia.date() != ontem.date():
+        if end_day_override is not None:
             nome = nome.replace(".pdf", f"_24h-{data_dia.strftime('%Y-%m-%d')}.pdf")
         return dcc.send_bytes(lambda buf: buf.write(pdf_bytes), nome,
                                type="application/pdf")
@@ -685,28 +749,19 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
         stored = _build_default_stored_data()
         agora = cfg._now_in_report_timezone()
         data_dia = _resolve_data_24h(date_24h, agora)
-        ontem = (agora.replace(hour=0, minute=0, second=0, microsecond=0,
-                                 tzinfo=None) - timedelta(days=1))
         try:
-            dados_png = coletar_dados_relatorio(stored, agora, as_png=True)
-            # BR-02b override blocos 3/5
-            if data_dia.date() != ontem.date():
-                dados_png = _override_blocos_24h(dados_png, stored, data_dia)
-                end_day_override = data_dia
-            else:
-                end_day_override = None
-            # RF-08: injeta séries + substitui sunburst PNG por bar chart PNG
-            # antes do template DOCX renderizar (template v1 fica intocado).
-            dados_png = _inject_series(dados_png, stored, agora,
-                                         end_day_24h=end_day_override)
-            dados_png = _replace_sunbursts_with_bars(dados_png)
+            dados_png, end_day_override = _build_export_dados(stored, agora, data_dia)
+            # RF-08: substitui sunburst PNG por bar chart PNG antes do template DOCX
+            # renderizar (template v1 fica intocado). Aplica em cópia para não
+            # mutar o dict cacheado (next export usa state intacto).
+            dados_png = _replace_sunbursts_with_bars(dict(dados_png))
             docx_bytes = montar_docx(dados_png)
         except (TemplateLoadError, Exception):
             logger.exception("KPI v2 export_docx: falha")
             raise dash.exceptions.PreventUpdate
 
         nome = cfg.gerar_nome_arquivo(agora)
-        if data_dia.date() != ontem.date():
+        if end_day_override is not None:
             nome = nome.replace(".docx",
                                   f"_24h-{data_dia.strftime('%Y-%m-%d')}.docx")
         return dcc.send_bytes(
