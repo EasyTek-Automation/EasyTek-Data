@@ -193,8 +193,10 @@ def fetch_timeline_events(
 
         # 2. Buscar paradas
         if breakdown_codes is not None:
-            # Caminho otimizado quando switch ON: usa fetch V1 com filtro
-            brk_df = fetch_zpp_breakdown_data(t_start, t_end, breakdown_codes=breakdown_codes)
+            # Switch ON: query local com filtro $in que preserva hora real.
+            # NÃO usar fetch_zpp_breakdown_data — descarta hora e retorna
+            # `date` como datetime.date, que isinstance(_, datetime) rejeita.
+            brk_df = _fetch_avaria_paradas(t_start, t_end, breakdown_codes)
         else:
             # Switch OFF: precisa todos os códigos — query direta sem filtro $in
             brk_df = _fetch_all_paradas(t_start, t_end)
@@ -330,6 +332,54 @@ def _fetch_all_paradas(t_start: datetime, t_end: datetime) -> pd.DataFrame:
         return pd.DataFrame(rows)
     except Exception as e:
         logger.warning("_fetch_all_paradas falhou (%s)", e)
+        return pd.DataFrame()
+
+
+def _fetch_avaria_paradas(t_start: datetime, t_end: datetime,
+                          codes: list) -> pd.DataFrame:
+    """Query direta em ZPP_Paradas com filtro $in de breakdown codes.
+
+    Substitui `fetch_zpp_breakdown_data` (V1) no path do timeline state porque
+    V1 retorna `date` como `datetime.date` (linha 463: `inicio.date()`), o que
+    faz o isinstance(start_dt, datetime) descartar TODAS as paradas — sintoma
+    "switch Só avaria + dia antigo = só verde, paradas sumiram".
+    """
+    if not _HAS_MONGO:
+        return pd.DataFrame()
+    try:
+        col = get_mongo_connection("ZPP_Paradas")
+        if col is None:
+            return pd.DataFrame()
+        cursor = col.find(
+            {
+                "_processed": True,
+                "causa_do_desvio": {"$in": codes},
+                "fim_execucao": {"$gte": t_start, "$lt": t_end},
+            },
+            {
+                "_id": 0,
+                "centro_de_trabalho": 1,
+                "inicio_execucao": 1,
+                "inicio_real_hora": 1,
+                "causa_do_desvio": 1,
+                "duration_min": 1,
+            },
+        )
+        rows = []
+        for doc in cursor:
+            base = doc.get("inicio_execucao")
+            if not isinstance(base, datetime):
+                continue
+            start = _combine_date_hour(base, doc.get("inicio_real_hora"))
+            rows.append({
+                "linea":        doc.get("centro_de_trabalho", ""),
+                "date":         start,
+                "motivo":       str(doc.get("causa_do_desvio", "") or ""),
+                "duracao_min":  float(doc.get("duration_min", 0) or 0),
+            })
+        return pd.DataFrame(rows)
+    except Exception as e:
+        logger.warning("_fetch_avaria_paradas falhou (%s)", e)
         return pd.DataFrame()
 
 

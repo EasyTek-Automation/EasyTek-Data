@@ -688,7 +688,7 @@ def register_home_callbacks(app):
             } else if (trig === 'btn-evocon-today') {
                 animClass = 'evocon-bounce';
                 btnId = 'btn-evocon-today';
-            } else if (trig === 'dropdown-evocon-granularity') {
+            } else if (trig === 'store-evocon-granularity') {
                 animClass = 'evocon-glitch';
             }
             if (animClass) wrap.classList.add(animClass);
@@ -721,7 +721,7 @@ def register_home_callbacks(app):
             Input("btn-evocon-prev", "n_clicks"),
             Input("btn-evocon-next", "n_clicks"),
             Input("btn-evocon-today", "n_clicks"),
-            Input("dropdown-evocon-granularity", "value"),
+            Input("store-evocon-granularity", "data"),
         ],
         prevent_initial_call=True,
     )
