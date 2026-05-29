@@ -564,6 +564,12 @@ def layout():
                                             color="secondary", size="sm", outline=True,
                                         ),
                                         dbc.Button(
+                                            [html.I(className="bi bi-sliders me-2"),
+                                             html.Span("Gatilhos", id="v2-i18n-btn-thresholds")],
+                                            id="btn-thresholds-v2",
+                                            color="warning", size="sm", outline=True,
+                                        ),
+                                        dbc.Button(
                                             [html.I(className="bi bi-file-earmark-excel me-2"),
                                              html.Span("Exportar", id="v2-i18n-btn-export")],
                                             id="btn-export-v2-xlsx",
@@ -1137,7 +1143,11 @@ def layout():
             dcc.Store(id="store-v2-kpi", data=None),
             dcc.Store(id="store-v2-equipment", data=None),
             dcc.Store(id="store-v2-month", data=None),
+            dcc.Store(id="store-v2-year", data=None),
             dcc.Store(id="store-v2-day", data=None),
+            # Toggle "Sem ferramentaria": OFF=mostra tudo (default); ON=filtra 202/S202.
+            # Persiste localmente — preferência sobrevive a reload/navegação.
+            dcc.Store(id="store-v2-hide-tooling", storage_type="local", data=False),
 
             # Modal drilldown (XL, scrollable)
             dbc.Modal(
@@ -1151,6 +1161,19 @@ def layout():
                     dbc.ModalBody(
                         [
                             html.Div(id="modal-v2-breadcrumb", className="mb-3"),
+                            # Switch "Sem ferramentaria" — só aparece nos níveis que
+                            # listam paradas individuais (mes-top, tabela). Quando ON,
+                            # filtra códigos 202/S202 (Quebra matriz/facas).
+                            html.Div(
+                                dbc.Switch(
+                                    id="switch-v2-hide-tooling",
+                                    label="Sem ferramentaria (202 / S202)",
+                                    value=False,
+                                    className="mb-2",
+                                ),
+                                id="wrap-v2-hide-tooling",
+                                style={"display": "none"},
+                            ),
                             dcc.Loading(
                                 id="loading-modal-v2",
                                 type="circle",
@@ -1190,6 +1213,67 @@ def layout():
                 # Custom dialog class pra controlar largura
                 content_class_name="modal-v2-content",
                 dialog_class_name="modal-v2-dialog",
+            ),
+
+            # Modal de cadastro de gatilhos por equipamento
+            dbc.Modal(
+                [
+                    dbc.ModalHeader(
+                        dbc.ModalTitle("Gatilhos de duração de parada por equipamento"),
+                        close_button=True,
+                    ),
+                    dbc.ModalBody(
+                        [
+                            html.P(
+                                [
+                                    "Cada equipamento tem seu próprio ",
+                                    html.B("gatilho_1"),
+                                    " (em minutos). O ",
+                                    html.B("gatilho_2"),
+                                    " é calculado automaticamente como ",
+                                    html.B("gatilho_1 × 1,20"),
+                                    " e não pode ser editado.",
+                                ],
+                                className="text-muted small mb-2",
+                            ),
+                            html.P(
+                                [
+                                    html.Span("Paradas ≥ gatilho_1 ficam ", className="small"),
+                                    html.Span("amarelas", style={"backgroundColor": "#fff3cd",
+                                                                 "padding": "0 6px"},
+                                              className="small"),
+                                    html.Span("; paradas ≥ gatilho_2 ficam ", className="small"),
+                                    html.Span("rosadas", style={"backgroundColor": "#f8d7da",
+                                                                 "padding": "0 6px"},
+                                              className="small"),
+                                    html.Span(" — em mes-top + tabela do dia.", className="small"),
+                                ],
+                                className="text-muted mb-3",
+                            ),
+                            html.Div(id="modal-thresholds-status", className="mb-2"),
+                            html.Div(id="modal-thresholds-table"),
+                        ]
+                    ),
+                    dbc.ModalFooter(
+                        [
+                            dbc.Button(
+                                [html.I(className="bi bi-x-lg me-1"), "Cancelar"],
+                                id="btn-thresholds-cancel",
+                                color="secondary", outline=True,
+                            ),
+                            dbc.Button(
+                                [html.I(className="bi bi-check2 me-1"), "Salvar"],
+                                id="btn-thresholds-save",
+                                color="primary",
+                                className="ms-auto",
+                            ),
+                        ]
+                    ),
+                ],
+                id="modal-v2-thresholds",
+                size="lg",
+                is_open=False,
+                scrollable=True,
             ),
         ],
         fluid=True,

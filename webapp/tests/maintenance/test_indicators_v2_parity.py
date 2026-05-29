@@ -1,20 +1,30 @@
 """Testes IM-13 — paridade numérica V1 vs V2.
 
 Garante que os helpers de fetch da V2 (`indicators_v2_callbacks._fetch_*`) usam as
-mesmas funções V1 (`zpp_kpi_calculator.*`) e produzem resultados idênticos.
+mesmas funções V1 (`zpp_kpi_calculator.*`) e propagam os filtros do store correto
+(`period_type`, `start_iso`/`end_iso`, `equipment`, `codes`).
+
+API pós-fix `fix/indicators-v2-filters`: as funções de fetch aceitam
+`(start, end, codes, equipment_filter)` em vez de `year`. `_unpack_filters`
+extrai isso do `store-v2-filters` produzido por `apply_v2_filters`.
 
 Mock pattern alinhado com `test_fetch_zpp_window.py`: patch.object em
 `get_mongo_connection` retornando coleção fake com `find().sort()` controlado.
-
-Limitação: estes testes validam contrato (mesmas funções V1 são chamadas com
-mesmos args), não comparação numeric end-to-end com dados reais — esses ficam
-pra suite de integração futura.
 """
 
 from datetime import datetime
 from unittest.mock import patch, MagicMock
 
 import pytest
+
+
+@pytest.fixture(autouse=True)
+def _clear_v2_caches():
+    """Caches process-level vazam estado entre testes. Limpa antes de cada um."""
+    from src.callbacks_registers.indicators_v2_callbacks import cache_invalidate_all
+    cache_invalidate_all()
+    yield
+    cache_invalidate_all()
 
 
 # ==================== TESTE 1 — Cards top usam V1 ====================
@@ -25,23 +35,27 @@ def test_planta_cards_use_v1_calc(mock_fetch, mock_avg):
     """V2._fetch_planta_monthly deve chamar fetch_zpp_kpi_data + calculate_general_avg_by_month."""
     from src.callbacks_registers.indicators_v2_callbacks import _fetch_planta_monthly
 
-    mock_fetch.return_value = {"EQ1": [{"month": m, "breakdown_rate": 1.0 + m * 0.1} for m in range(1, 13)]}
+    mock_fetch.return_value = {
+        "EQ1": [{"month": m, "year": 2026, "breakdown_rate": 1.0 + m * 0.1} for m in range(1, 13)]
+    }
     mock_avg.return_value = {
         f"2026-{m:02d}": {"mtbf": 10.0, "mttr": 0.5, "breakdown_rate": 1.0 + m * 0.1}
         for m in range(1, 13)
     }
 
-    result = _fetch_planta_monthly("breakdown", year=2026)
+    start = datetime(2026, 1, 1)
+    end = datetime(2027, 1, 1)
+    labels, values = _fetch_planta_monthly("breakdown", start, end)
 
-    # Confirma chamada V1
     mock_fetch.assert_called_once()
     args_fetch = mock_fetch.call_args[0]
-    assert args_fetch[0] == datetime(2026, 1, 1), "start_date deve ser primeiro instante do ano"
-    assert args_fetch[1] == datetime(2027, 1, 1), "end_date deve ser primeiro instante do ano seguinte (BR-12)"
+    assert args_fetch[0] == start, "start_date deve ser propagado direto"
+    assert args_fetch[1] == end, "end_date deve ser propagado direto (BR-12)"
 
     mock_avg.assert_called_once()
-    # Confirma resultado numérico
-    assert result == [round(1.0 + m * 0.1, 2) for m in range(1, 13)]
+    assert labels == ["Jan/26", "Fev/26", "Mar/26", "Abr/26", "Mai/26", "Jun/26",
+                      "Jul/26", "Ago/26", "Set/26", "Out/26", "Nov/26", "Dez/26"]
+    assert values == [round(1.0 + m * 0.1, 2) for m in range(1, 13)]
 
 
 # ==================== TESTE 2 — Equipment monthly usa V1 ====================
@@ -53,15 +67,18 @@ def test_equipment_monthly_uses_v1(mock_names, mock_fetch):
     from src.callbacks_registers.indicators_v2_callbacks import _fetch_equipment_monthly
 
     mock_fetch.return_value = {
-        "LONGI001": [{"month": m, "mtbf": 8.0 + m, "mttr": 0.5, "breakdown_rate": 2.0}
+        "LONGI001": [{"month": m, "year": 2026, "mtbf": 8.0 + m, "mttr": 0.5, "breakdown_rate": 2.0}
                      for m in range(1, 13)]
     }
 
-    # Passando nome amigável — V2 resolve via reverse lookup
-    result = _fetch_equipment_monthly("mtbf", "LCL-08", year=2026)
+    start = datetime(2026, 1, 1)
+    end = datetime(2027, 1, 1)
+    labels, values = _fetch_equipment_monthly("mtbf", "LCL-08", start, end)
 
-    mock_fetch.assert_called_once_with(datetime(2026, 1, 1), datetime(2027, 1, 1), pytest.importorskip("src.utils.zpp_kpi_calculator").BREAKDOWN_CODES)
-    assert result == [round(8.0 + m, 2) for m in range(1, 13)]
+    from src.utils.zpp_kpi_calculator import BREAKDOWN_CODES
+    mock_fetch.assert_called_once_with(start, end, list(BREAKDOWN_CODES))
+    assert len(labels) == 12
+    assert values == [round(8.0 + m, 2) for m in range(1, 13)]
 
 
 # ==================== TESTE 3 — Top paradas usa V1 ====================
@@ -82,22 +99,20 @@ def test_top_paradas_uses_v1(mock_names, mock_fetch):
 
     items = _fetch_top_paradas_real("PRENSA-01", month=5, year=2026, top_n=10)
 
-    # Confirma chamada V1 com BR-12 (janela semi-aberta)
     mock_fetch.assert_called_once()
     call_args = mock_fetch.call_args
     assert call_args[0][1] == datetime(2026, 5, 1)
-    assert call_args[0][2] == datetime(2026, 6, 1)  # primeiro instante do mês seguinte
+    assert call_args[0][2] == datetime(2026, 6, 1)
 
-    # Confirma adaptação do schema
     assert len(items) == 2
     assert items[0]["codigo"] == "201"
     assert items[0]["duracao_min"] == 120
     assert items[0]["count"] == 2
     assert items[0]["day"] == 15
-    assert items[1]["count"] == 1  # default quando ausente
+    assert items[1]["count"] == 1
 
 
-# ==================== TESTE 4 — Year range respeita BR-12 ====================
+# ==================== TESTE 4 — Year/month range BR-12 ====================
 
 def test_year_range_semi_open():
     from src.callbacks_registers.indicators_v2_callbacks import _year_range
@@ -108,11 +123,9 @@ def test_year_range_semi_open():
 
 def test_month_range_semi_open():
     from src.callbacks_registers.indicators_v2_callbacks import _month_range
-    # Mês comum
     s, e = _month_range(2026, 3)
     assert s == datetime(2026, 3, 1)
     assert e == datetime(2026, 4, 1)
-    # Mês de dezembro (boundary do ano)
     s, e = _month_range(2026, 12)
     assert s == datetime(2026, 12, 1)
     assert e == datetime(2027, 1, 1)
@@ -126,27 +139,226 @@ def test_resolve_target_real(mock_get):
     from src.callbacks_registers.indicators_v2_callbacks import _resolve_target
     mock_get.return_value = {"mtbf": 15.5, "mttr": 0.8, "breakdown_rate": 4.2}
     assert _resolve_target("mtbf") == 15.5
-    assert _resolve_target("mttr") == 48.0  # 0.8h × 60 = 48min
+    assert _resolve_target("mttr") == 48.0
     assert _resolve_target("breakdown") == 4.2
 
 
 @patch("src.callbacks_registers.indicators_v2_callbacks.get_kpi_targets",
        side_effect=Exception("Mongo offline"))
 def test_resolve_target_fallback(mock_get):
-    """Mongo offline → fallback pros valores hardcoded em KPI_META.
-    KPI_META["mttr"]["target"] já está em MINUTOS (90 == 1.5h)."""
     from src.callbacks_registers.indicators_v2_callbacks import _resolve_target, KPI_META
     assert _resolve_target("mtbf") == KPI_META["mtbf"]["target"]
-    assert _resolve_target("mttr") == KPI_META["mttr"]["target"]  # 90 min
+    assert _resolve_target("mttr") == KPI_META["mttr"]["target"]
     assert _resolve_target("breakdown") == KPI_META["breakdown"]["target"]
 
 
 def test_to_display_mttr_converts_hours_to_minutes():
-    """Helper de conversão: MTTR h→min, demais passa direto."""
     from src.callbacks_registers.indicators_v2_callbacks import _to_display
     assert _to_display("mttr", 1.5) == 90.0
     assert _to_display("mttr", 0.62) == 37.2
     assert _to_display("mttr", 0) == 0
     assert _to_display("mttr", None) is None
-    assert _to_display("mtbf", 23.8) == 23.8  # mtbf passa direto
-    assert _to_display("breakdown", 5.01) == 5.01  # breakdown passa direto
+    assert _to_display("mtbf", 23.8) == 23.8
+    assert _to_display("breakdown", 5.01) == 5.01
+
+
+# ==================== NOVOS — paridade total com filtros V1 ====================
+
+# --- N1 — _unpack_filters extrai e default-fila o store ---
+
+def test_unpack_filters_with_all_fields():
+    """Filtros completos do store viram (start, end, codes_tuple, equipment_filter, year)."""
+    from src.callbacks_registers.indicators_v2_callbacks import _unpack_filters
+    filters = {
+        "period_type": "custom",
+        "year":        2026,
+        "start_iso":   "2025-08-01T00:00:00",
+        "end_iso":     "2026-03-01T00:00:00",
+        "equipment":   ["LCL-08", "LCT-16"],
+        "codes":       ["201", "S201"],
+    }
+    start, end, codes, eq_filter, year = _unpack_filters(filters)
+    assert start == datetime(2025, 8, 1)
+    assert end == datetime(2026, 3, 1)
+    assert codes == ("201", "S201")
+    assert eq_filter == ["LCL-08", "LCT-16"]
+    assert year == 2025  # year = start.year (não o field "year" do store)
+
+
+def test_unpack_filters_with_empty_lists_defaults():
+    """Equipment vazio → None (toda planta). Codes vazio → BREAKDOWN_CODES."""
+    from src.callbacks_registers.indicators_v2_callbacks import _unpack_filters
+    from src.utils.zpp_kpi_calculator import BREAKDOWN_CODES
+
+    filters = {
+        "period_type": "year",
+        "year":        2026,
+        "start_iso":   "2026-01-01T00:00:00",
+        "end_iso":     "2027-01-01T00:00:00",
+        "equipment":   [],
+        "codes":       [],
+    }
+    start, end, codes, eq_filter, year = _unpack_filters(filters)
+    assert start == datetime(2026, 1, 1)
+    assert end == datetime(2027, 1, 1)
+    assert codes == tuple(BREAKDOWN_CODES)
+    assert eq_filter is None
+    assert year == 2026
+
+
+# --- N2 — period_type=last12 cross-year ---
+
+@patch("src.callbacks_registers.indicators_v2_callbacks.calculate_general_avg_by_month")
+@patch("src.callbacks_registers.indicators_v2_callbacks.fetch_zpp_kpi_data")
+def test_planta_monthly_respects_custom_range_cross_year(mock_fetch, mock_avg):
+    """Range custom cruzando ano → fetch chamado com (start, end) exatos do store;
+    labels cobrem todos os meses do range em ordem cronológica."""
+    from src.callbacks_registers.indicators_v2_callbacks import _fetch_planta_monthly
+
+    start = datetime(2025, 11, 1)
+    end = datetime(2026, 3, 1)  # nov/25, dez/25, jan/26, fev/26
+
+    mock_fetch.return_value = {"EQ1": [{"month": 1, "year": 2026, "breakdown_rate": 5.0}]}
+    mock_avg.return_value = {
+        "2025-11": {"mtbf": 10.0, "mttr": 0.5, "breakdown_rate": 4.0},
+        "2025-12": {"mtbf": 11.0, "mttr": 0.6, "breakdown_rate": 4.5},
+        "2026-01": {"mtbf": 12.0, "mttr": 0.7, "breakdown_rate": 5.0},
+        "2026-02": {"mtbf": 13.0, "mttr": 0.8, "breakdown_rate": 5.5},
+    }
+    labels, values = _fetch_planta_monthly("breakdown", start, end)
+
+    args_fetch = mock_fetch.call_args[0]
+    assert args_fetch[0] == start
+    assert args_fetch[1] == end
+
+    assert labels == ["Nov/25", "Dez/25", "Jan/26", "Fev/26"]
+    assert values == [4.0, 4.5, 5.0, 5.5]
+
+
+# --- N3 — equipment_filter aplicado no agg ---
+
+@patch("src.callbacks_registers.indicators_v2_callbacks.calculate_general_avg_by_month")
+@patch("src.callbacks_registers.indicators_v2_callbacks.fetch_zpp_kpi_data")
+def test_planta_monthly_filters_equipment_subset(mock_fetch, mock_avg):
+    """equipment_filter restringe equipment_ids passado ao calculate_general_avg_by_month."""
+    from src.callbacks_registers.indicators_v2_callbacks import _fetch_planta_monthly
+
+    mock_fetch.return_value = {
+        "LCL-08": [{"month": m, "year": 2026, "breakdown_rate": 2.0} for m in range(1, 13)],
+        "PRENSA-01": [{"month": m, "year": 2026, "breakdown_rate": 7.0} for m in range(1, 13)],
+        "LCT-16": [{"month": m, "year": 2026, "breakdown_rate": 3.0} for m in range(1, 13)],
+    }
+    mock_avg.return_value = {
+        f"2026-{m:02d}": {"mtbf": 10.0, "mttr": 0.5, "breakdown_rate": 2.5}
+        for m in range(1, 13)
+    }
+
+    start = datetime(2026, 1, 1)
+    end = datetime(2027, 1, 1)
+    labels, values = _fetch_planta_monthly(
+        "breakdown", start, end, equipment_filter=["LCL-08", "LCT-16"]
+    )
+
+    # equipment_ids passado ao agg deve ser SUBSET, não todos
+    avg_kwargs = mock_avg.call_args[1]
+    assert avg_kwargs["equipment_ids"] == ["LCL-08", "LCT-16"], (
+        "agg deve receber só os equipamentos selecionados, não todos do dict"
+    )
+    assert len(values) == 12
+
+
+# --- N4 — codes subset propagado ---
+
+@patch("src.callbacks_registers.indicators_v2_callbacks.calculate_general_avg_by_month")
+@patch("src.callbacks_registers.indicators_v2_callbacks.fetch_zpp_kpi_data")
+def test_fetch_kpi_propagates_codes_subset(mock_fetch, mock_avg):
+    """codes do store substitui BREAKDOWN_CODES default no fetch_zpp_kpi_data."""
+    from src.callbacks_registers.indicators_v2_callbacks import _fetch_planta_monthly
+
+    mock_fetch.return_value = {"EQ1": [{"month": 1, "year": 2026, "breakdown_rate": 5.0}]}
+    mock_avg.return_value = {
+        f"2026-{m:02d}": {"mtbf": 10.0, "mttr": 0.5, "breakdown_rate": 1.0}
+        for m in range(1, 13)
+    }
+
+    start = datetime(2026, 1, 1)
+    end = datetime(2027, 1, 1)
+    codes_subset = ("201", "S201")
+    _fetch_planta_monthly("breakdown", start, end, codes=codes_subset)
+
+    args_fetch = mock_fetch.call_args[0]
+    assert args_fetch[2] == list(codes_subset), "fetch deve receber codes do store"
+
+
+# --- N5 — _fetch_events_day_real filtra codes (paridade V1, contradiz IM-05) ---
+
+def test_events_day_filters_by_codes_paridade_v1():
+    """Drilldown nível 'tabela' deve filtrar por codes — paridade V1.
+    Decisão revoga IM-05 do SDD indicators-v2 que dizia 'mostra TODOS'."""
+    from src.callbacks_registers.indicators_v2_callbacks import _fetch_events_day_real
+
+    fake_col = MagicMock()
+    sort_mock = MagicMock()
+    sort_mock.__iter__ = lambda self: iter([])
+    fake_col.find.return_value.sort.return_value = sort_mock
+
+    with patch("src.callbacks_registers.indicators_v2_callbacks.get_mongo_connection",
+               return_value=fake_col), \
+         patch("src.callbacks_registers.indicators_v2_callbacks.get_zpp_equipment_names",
+               return_value={"LONGI001": "LCL-08"}), \
+         patch("src.callbacks_registers.indicators_v2_callbacks._mock_eventos_dia",
+               return_value=[{"placeholder": True}]):
+        _fetch_events_day_real(
+            "LCL-08", month=5, day=15, year=2026, codes=("201", "S201")
+        )
+
+    fake_col.find.assert_called_once()
+    query = fake_col.find.call_args[0][0]
+    assert query.get("causa_do_desvio") == {"$in": ["201", "S201"]}, (
+        "query Mongo deve restringir causa_do_desvio aos codes passados"
+    )
+
+
+def test_events_day_uses_breakdown_codes_default_when_no_codes():
+    """Sem codes explícito → usa BREAKDOWN_CODES (paridade V1)."""
+    from src.callbacks_registers.indicators_v2_callbacks import _fetch_events_day_real
+    from src.utils.zpp_kpi_calculator import BREAKDOWN_CODES
+
+    fake_col = MagicMock()
+    sort_mock = MagicMock()
+    sort_mock.__iter__ = lambda self: iter([])
+    fake_col.find.return_value.sort.return_value = sort_mock
+
+    with patch("src.callbacks_registers.indicators_v2_callbacks.get_mongo_connection",
+               return_value=fake_col), \
+         patch("src.callbacks_registers.indicators_v2_callbacks.get_zpp_equipment_names",
+               return_value={"LONGI001": "LCL-08"}), \
+         patch("src.callbacks_registers.indicators_v2_callbacks._mock_eventos_dia",
+               return_value=[{"placeholder": True}]):
+        _fetch_events_day_real("LCL-08", month=5, day=15, year=2026)
+
+    query = fake_col.find.call_args[0][0]
+    assert query.get("causa_do_desvio") == {"$in": list(BREAKDOWN_CODES)}
+
+
+# --- N6 — _iter_months_in_range helper ---
+
+def test_iter_months_in_range_simple_year():
+    from src.callbacks_registers.indicators_v2_callbacks import _iter_months_in_range
+    months = list(_iter_months_in_range(datetime(2026, 1, 1), datetime(2027, 1, 1)))
+    assert len(months) == 12
+    assert months[0] == ("Jan/26", datetime(2026, 1, 1), datetime(2026, 2, 1), 2026, 1)
+    assert months[11] == ("Dez/26", datetime(2026, 12, 1), datetime(2027, 1, 1), 2026, 12)
+
+
+def test_iter_months_in_range_cross_year():
+    from src.callbacks_registers.indicators_v2_callbacks import _iter_months_in_range
+    months = list(_iter_months_in_range(datetime(2025, 11, 1), datetime(2026, 3, 1)))
+    assert [m[0] for m in months] == ["Nov/25", "Dez/25", "Jan/26", "Fev/26"]
+
+
+def test_iter_months_in_range_single_month():
+    from src.callbacks_registers.indicators_v2_callbacks import _iter_months_in_range
+    months = list(_iter_months_in_range(datetime(2026, 5, 1), datetime(2026, 6, 1)))
+    assert len(months) == 1
+    assert months[0][0] == "Mai/26"
