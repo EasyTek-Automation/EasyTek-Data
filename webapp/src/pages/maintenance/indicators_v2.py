@@ -1137,6 +1137,7 @@ def layout():
             dcc.Store(id="store-v2-kpi", data=None),
             dcc.Store(id="store-v2-equipment", data=None),
             dcc.Store(id="store-v2-month", data=None),
+            dcc.Store(id="store-v2-year", data=None),
             dcc.Store(id="store-v2-day", data=None),
 
             # Modal drilldown (XL, scrollable)

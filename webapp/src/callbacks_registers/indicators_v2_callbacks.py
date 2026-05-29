@@ -182,42 +182,55 @@ def cache_invalidate_all():
     logger.info("V2 caches invalidados")
 
 
-def _cached_compact_bar(kpi: str, eq_id: str, year: int, values: list, target: float, color: str, unit: str):
-    """Bar compact cacheado por valores (mini-cards equipment grid)."""
-    key = (kpi, eq_id, year, tuple(values), target)
+def _cached_compact_bar(kpi: str, eq_id: str, year: int, values: list, target: float,
+                        color: str, unit: str, labels: list = None):
+    """Bar compact cacheado por valores (mini-cards equipment grid).
+
+    labels: lista de strings pro eixo X (cobre cross-year). Default = MESES_PT
+    quando há exatamente 12 valores; senão usa índices stringificados.
+    """
+    if labels is None:
+        labels = MESES_PT if len(values) == 12 else [str(i + 1) for i in range(len(values))]
+    key = (kpi, eq_id, year, tuple(values), target, tuple(labels))
     hit = _cache_get(_CACHE_FIG, key)
     if hit is not None:
         return hit
-    fig = _bar(MESES_PT, values, eq_id, color, unit,
+    fig = _bar(labels, values, eq_id, color, unit,
                target=target, show_trend=False, compact=True)
     fig.update_layout(margin=dict(l=30, r=10, t=40, b=30), height=220)
     _cache_set(_CACHE_FIG, key, fig)
     return fig
 
 
-def _cached_fetch_kpi(year: int, codes: tuple) -> dict:
-    """fetch_zpp_kpi_data com cache (year, codes)."""
-    key = (year, codes)
+def _cached_fetch_kpi(start: datetime, end: datetime, codes: tuple) -> dict:
+    """fetch_zpp_kpi_data com cache por (start_iso, end_iso, codes)."""
+    key = (start.isoformat(), end.isoformat(), codes)
     hit = _cache_get(_CACHE_KPI, key)
     if hit is not None:
         return hit
-    start, end = _year_range(year)
     data = fetch_zpp_kpi_data(start, end, list(codes))
     _cache_set(_CACHE_KPI, key, data)
     return data
 
 
-def _cached_agg(kpi_data: dict, year: int, codes: tuple) -> dict:
-    """calculate_general_avg_by_month com cache."""
-    key = (year, codes)
+def _cached_agg(kpi_data: dict, start: datetime, end: datetime, codes: tuple,
+                equipment_filter=None) -> dict:
+    """calculate_general_avg_by_month com cache, propaga filtro de equipamento.
+
+    equipment_filter=None significa toda planta (todos os equipamentos do kpi_data).
+    """
+    eq_key = tuple(sorted(equipment_filter)) if equipment_filter else None
+    key = (start.isoformat(), end.isoformat(), codes, eq_key)
     hit = _cache_get(_CACHE_AGG, key)
     if hit is not None:
         return hit
-    start, end = _year_range(year)
-    all_eq = list(kpi_data.keys())
+    if equipment_filter:
+        eq_ids = [e for e in equipment_filter if e in kpi_data] or list(kpi_data.keys())
+    else:
+        eq_ids = list(kpi_data.keys())
     agg = calculate_general_avg_by_month(
-        data=kpi_data, equipment_ids=all_eq,
-        months=list(range(1, 13)), year=year,
+        data=kpi_data, equipment_ids=eq_ids,
+        months=None, year=None,
         start_date=start, end_date=end,
     )
     _cache_set(_CACHE_AGG, key, agg)
@@ -254,9 +267,12 @@ def _cached_targets(equipment: str) -> dict:
 _CACHE_PERIOD = {}  # (year, codes) → (ts, {mtbf, mttr, breakdown_rate, ...})
 
 
-def _period_agg(year: int) -> dict:
+def _period_agg(start: datetime, end: datetime, codes: tuple = None,
+                equipment_filter=None) -> dict:
     """Agregado dos totais brutos da planta no período (BR-11 paridade V1).
     Retorna {mtbf, mttr, breakdown_rate} em unit V1 (mttr em horas).
+
+    Aceita range arbitrário (cross-year ok) e filtro de equipamento (None=toda planta).
 
     Mock mode: média simples dos 12 valores mensais mock (non-zero). MTTR mock
     está em minutos (display), divide por 60 pra respeitar contrato unit-interno
@@ -271,21 +287,26 @@ def _period_agg(year: int) -> dict:
             avg_internal = avg_display / 60.0 if kpi_v2 == "mttr" else avg_display
             out[agg_key] = round(avg_internal, 4)
         return out
-    codes = tuple(BREAKDOWN_CODES)
-    key = (year, codes)
+    if codes is None:
+        codes = tuple(BREAKDOWN_CODES)
+    eq_key = tuple(sorted(equipment_filter)) if equipment_filter else None
+    key = (start.isoformat(), end.isoformat(), codes, eq_key)
     hit = _cache_get(_CACHE_PERIOD, key)
     if hit is not None:
         return hit
     try:
         from src.utils.maintenance_demo_data import calculate_kpi_averages
-        kpi_data = _cached_fetch_kpi(year, codes)
-        all_eq = list(kpi_data.keys())
-        start, end = _year_range(year)
+        kpi_data = _cached_fetch_kpi(start, end, codes)
+        if equipment_filter:
+            eq_ids = [e for e in equipment_filter if e in kpi_data] or list(kpi_data.keys())
+        else:
+            eq_ids = list(kpi_data.keys())
+        months_in_range = sorted({m for _, _, _, _, m in _iter_months_in_range(start, end)})
         agg = calculate_kpi_averages(
             data=kpi_data,
-            equipment_filter=all_eq,
-            month_filter=list(range(1, 13)),
-            year=year,
+            equipment_filter=eq_ids,
+            month_filter=months_in_range,
+            year=start.year,
             start_date=start,
             end_date=end,
         )
@@ -328,40 +349,115 @@ def _month_range(year: int, month: int) -> tuple:
     return start, end
 
 
-def _fetch_planta_monthly(kpi: str, year: int = DEFAULT_YEAR) -> list:
-    """12 valores mensais agregados da planta — usa CACHE process-level.
-    1ª chamada (qualquer KPI) faz fetch+agg; subsequentes pegam cached.
+_MES_PT_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
+                 "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
+
+
+def _iter_months_in_range(start: datetime, end: datetime):
+    """Itera meses dentro da janela [start, end), cross-year ok.
+
+    Yield: (label "Mmm/yy", m_start, m_end, year, month). Inclui mês onde start
+    cai (alinhado ao 1º dia) e até o último mês cujo primeiro dia é < end.
     """
-    if not _HAS_REAL_DATA:
-        return _mock_planta_mes(kpi)
+    y, m = start.year, start.month
+    while True:
+        m_start = datetime(y, m, 1)
+        if m_start >= end:
+            break
+        m_end = datetime(y + 1, 1, 1) if m == 12 else datetime(y, m + 1, 1)
+        label = f"{_MES_PT_SHORT[m - 1]}/{y % 100:02d}"
+        yield label, m_start, m_end, y, m
+        if m == 12:
+            y, m = y + 1, 1
+        else:
+            m += 1
+
+
+def _unpack_filters(filters: dict):
+    """Extrai (start, end, codes_tuple, equipment_filter, year) do store-v2-filters.
+
+    Default-safe: codes vazios → BREAKDOWN_CODES; equipment vazio → None (toda planta).
+    year derivado de start.year (cross-year usa o ano inicial pra título).
+    """
+    f = filters or {}
     try:
+        start = datetime.fromisoformat(f.get("start_iso") or f"{DEFAULT_YEAR}-01-01T00:00:00")
+    except Exception:
+        start = datetime(DEFAULT_YEAR, 1, 1)
+    try:
+        end = datetime.fromisoformat(f.get("end_iso") or f"{DEFAULT_YEAR + 1}-01-01T00:00:00")
+    except Exception:
+        end = datetime(DEFAULT_YEAR + 1, 1, 1)
+    raw_codes = f.get("codes") or []
+    codes = tuple(raw_codes) if raw_codes else tuple(BREAKDOWN_CODES)
+    raw_eq = f.get("equipment") or []
+    equipment_filter = list(raw_eq) if raw_eq else None
+    year = start.year
+    return start, end, codes, equipment_filter, year
+
+
+def _fetch_planta_monthly(kpi: str, start: datetime = None, end: datetime = None,
+                          codes: tuple = None, equipment_filter=None) -> tuple:
+    """Valores mensais agregados da planta no range — cobre cross-year.
+
+    Retorna (labels, values) onde labels são "Mmm/yy" cobrindo todos os meses
+    dentro de [start, end). equipment_filter=None significa toda planta.
+    Usa CACHE process-level; 1ª chamada faz fetch+agg, subsequentes pegam cached.
+    """
+    if start is None or end is None:
+        start, end = _year_range(DEFAULT_YEAR)
+    if codes is None:
         codes = tuple(BREAKDOWN_CODES)
-        kpi_data = _cached_fetch_kpi(year, codes)
-        agg = _cached_agg(kpi_data, year, codes)
+    months_meta = list(_iter_months_in_range(start, end))
+    labels = [m[0] for m in months_meta]
+
+    if not _HAS_REAL_DATA:
+        # Mock retorna 12 valores aleatórios; alinha à quantidade de meses do range
+        full = _mock_planta_mes(kpi)
+        values = [full[(m[4] - 1) % 12] for m in months_meta]
+        return labels, values
+    try:
+        kpi_data = _cached_fetch_kpi(start, end, codes)
+        agg = _cached_agg(kpi_data, start, end, codes, equipment_filter)
         field = KPI_FIELD_MAP[kpi]
         values = []
-        for m in range(1, 13):
-            key = f"{year}-{m:02d}"
-            entry = agg.get(key) or agg.get(m) or {}
+        for _, _, _, yy, mm in months_meta:
+            key = f"{yy}-{mm:02d}"
+            entry = agg.get(key) or agg.get(mm) or {}
             raw = float(entry.get(field, 0) or 0)
             values.append(_to_display(kpi, raw))
         if all(v == 0 for v in values):
-            return _mock_planta_mes(kpi)
-        return values
+            full = _mock_planta_mes(kpi)
+            values = [full[(m[4] - 1) % 12] for m in months_meta]
+        return labels, values
     except Exception as e:
         logger.warning("V2 planta %s falhou (%s) — fallback mock", kpi, e)
-        return _mock_planta_mes(kpi)
+        full = _mock_planta_mes(kpi)
+        values = [full[(m[4] - 1) % 12] for m in months_meta]
+        return labels, values
 
 
-def _fetch_equipment_monthly(kpi: str, equipment: str, year: int = DEFAULT_YEAR) -> list:
-    """12 valores mensais do equipamento — usa CACHE process-level.
-    Loop sobre equipamentos no grid usa o MESMO cached kpi_data (1 query Mongo).
+def _fetch_equipment_monthly(kpi: str, equipment: str,
+                             start: datetime = None, end: datetime = None,
+                             codes: tuple = None) -> tuple:
+    """Valores mensais do equipamento no range — cobre cross-year.
+
+    Retorna (labels, values) cobrindo cada mês de [start, end). Loop sobre vários
+    equipamentos no grid usa o MESMO cached kpi_data (1 query Mongo).
     """
-    if not _HAS_REAL_DATA:
-        return _mock_equipamento_mes(kpi, equipment)
-    try:
+    if start is None or end is None:
+        start, end = _year_range(DEFAULT_YEAR)
+    if codes is None:
         codes = tuple(BREAKDOWN_CODES)
-        kpi_data = _cached_fetch_kpi(year, codes)
+    months_meta = list(_iter_months_in_range(start, end))
+    labels = [m[0] for m in months_meta]
+
+    if not _HAS_REAL_DATA:
+        full = _mock_equipamento_mes(kpi, equipment)
+        values = [full[(m[4] - 1) % 12] for m in months_meta]
+        return labels, values
+    try:
+        kpi_data = _cached_fetch_kpi(start, end, codes)
         eq_data = kpi_data.get(equipment, [])
         if not eq_data:
             names = _cached_names()
@@ -370,31 +466,41 @@ def _fetch_equipment_monthly(kpi: str, equipment: str, year: int = DEFAULT_YEAR)
             eq_data = kpi_data.get(internal_id, [])
         field = KPI_FIELD_MAP[kpi]
         values = []
-        for m in range(1, 13):
-            entry = next((d for d in eq_data if d.get("month") == m), None)
+        for _, _, _, yy, mm in months_meta:
+            entry = next(
+                (d for d in eq_data
+                 if d.get("month") == mm and (d.get("year") in (None, yy))),
+                None,
+            )
             if entry:
                 raw = float(entry.get(field, 0) or 0)
                 values.append(_to_display(kpi, raw))
             else:
                 values.append(0)
         if all(v == 0 for v in values):
-            return _mock_equipamento_mes(kpi, equipment)
-        return values
+            full = _mock_equipamento_mes(kpi, equipment)
+            values = [full[(m[4] - 1) % 12] for m in months_meta]
+        return labels, values
     except Exception as e:
         logger.warning("V2 equip %s/%s falhou (%s)", equipment, kpi, e)
-        return _mock_equipamento_mes(kpi, equipment)
+        full = _mock_equipamento_mes(kpi, equipment)
+        values = [full[(m[4] - 1) % 12] for m in months_meta]
+        return labels, values
 
 
-def _fetch_daily_kpi(kpi: str, equipment: str, month: int, year: int = DEFAULT_YEAR) -> tuple:
+def _fetch_daily_kpi(kpi: str, equipment: str, month: int,
+                     year: int = DEFAULT_YEAR, codes: tuple = None) -> tuple:
     """Retorna (dias, valores) por dia do mês para o KPI/equipamento.
-    Fallback mock se erro.
+    codes default = BREAKDOWN_CODES (paridade V1). Fallback mock se erro.
     """
+    if codes is None:
+        codes = tuple(BREAKDOWN_CODES)
     if not _HAS_REAL_DATA:
         return _mock_dias(kpi, equipment, month)
     try:
         start, end = _month_range(year, month)
         prod_df = fetch_zpp_production_data(start, end)
-        brk_df = fetch_zpp_breakdown_data(start, end, breakdown_codes=BREAKDOWN_CODES)
+        brk_df = fetch_zpp_breakdown_data(start, end, breakdown_codes=list(codes))
         # Resolver id interno se necessário
         names = get_zpp_equipment_names()
         reverse = {v: k for k, v in names.items()}
@@ -441,10 +547,14 @@ def _fetch_daily_kpi(kpi: str, equipment: str, month: int, year: int = DEFAULT_Y
         return _mock_dias(kpi, equipment, month)
 
 
-def _fetch_top_paradas_real(equipment: str, month: int, year: int = DEFAULT_YEAR, top_n: int = 10) -> list:
+def _fetch_top_paradas_real(equipment: str, month: int, year: int = DEFAULT_YEAR,
+                            top_n: int = 10, codes: tuple = None) -> list:
     """Top N paradas do mês — usa fetch_top_breakdowns_by_equipment da V1.
     Aplica BR-13 (agrupamento por dia+causa) já feito pela função V1.
+    codes default = BREAKDOWN_CODES (paridade V1).
     """
+    if codes is None:
+        codes = tuple(BREAKDOWN_CODES)
     if not _HAS_REAL_DATA:
         return _mock_top_paradas_mes(equipment, month, top_n)
     try:
@@ -453,7 +563,7 @@ def _fetch_top_paradas_real(equipment: str, month: int, year: int = DEFAULT_YEAR
         reverse = {v: k for k, v in names.items()}
         internal_id = reverse.get(equipment, equipment)
         items_v1 = fetch_top_breakdowns_by_equipment(
-            internal_id, start, end, top_n=top_n, breakdown_codes=BREAKDOWN_CODES
+            internal_id, start, end, top_n=top_n, breakdown_codes=list(codes)
         )
         if not items_v1:
             return _mock_top_paradas_mes(equipment, month, top_n)
@@ -480,10 +590,16 @@ def _fetch_top_paradas_real(equipment: str, month: int, year: int = DEFAULT_YEAR
         return _mock_top_paradas_mes(equipment, month, top_n)
 
 
-def _fetch_events_day_real(equipment: str, month: int, day: int, year: int = DEFAULT_YEAR) -> list:
-    """Eventos (paradas) do dia para o equipamento — SEM filtro de breakdown codes.
-    Mostra TODOS os códigos (operador quer ver tudo que aconteceu).
+def _fetch_events_day_real(equipment: str, month: int, day: int,
+                           year: int = DEFAULT_YEAR, codes: tuple = None) -> list:
+    """Eventos (paradas) do dia para o equipamento.
+
+    Filtra por `causa_do_desvio ∈ codes` (paridade V1). codes default =
+    BREAKDOWN_CODES (códigos de manutenção). Revoga IM-05 do SDD indicators-v2
+    que pedia "mostrar TODOS" — decisão sem apoio em BR/SP, contradiz V1.
     """
+    if codes is None:
+        codes = tuple(BREAKDOWN_CODES)
     if not _HAS_REAL_DATA:
         return _mock_eventos_dia(None, equipment, month, day)
     try:
@@ -498,6 +614,7 @@ def _fetch_events_day_real(equipment: str, month: int, day: int, year: int = DEF
         query = {
             "centro_de_trabalho": internal_id,
             "inicio_execucao": {"$gte": start, "$lt": end},  # BR-12 semi-aberta
+            "causa_do_desvio": {"$in": list(codes)},
         }
         cursor = col.find(
             query,
@@ -1059,13 +1176,13 @@ def register_indicators_v2_callbacks(app):
     def render_planta_cards(pathname, filters, lang):
         if pathname != "/maintenance/indicators-v2":
             return tuple([no_update] * 21)
-        year = (filters or {}).get("year", DEFAULT_YEAR)
+        start, end, codes, equipment_filter, year = _unpack_filters(filters)
         lang = lang or "pt"
         td_lang = _TRANS.get(lang, _TRANS["pt"])
         title_planta = td_lang.get("tl_planta_mensal", "Planta — mensal")
 
-        def _planta_fig(kpi, values, target):
-            fig = _bar_rich(MESES_PT, values, title_planta,
+        def _planta_fig(kpi, labels, values, target):
+            fig = _bar_rich(labels, values, title_planta,
                             KPI_META[kpi]["color"], KPI_META[kpi]["unit"],
                             target=target, direction=KPI_META[kpi]["direction"],
                             td=td_lang)
@@ -1197,9 +1314,9 @@ def register_indicators_v2_callbacks(app):
                 title=f"Último: {last_v}{KPI_META[kpi]['unit']} vs anterior: {prev_v}{KPI_META[kpi]['unit']}",
             )
 
-        v_br = _fetch_planta_monthly("breakdown", year)
-        v_mt = _fetch_planta_monthly("mtbf", year)
-        v_mtr = _fetch_planta_monthly("mttr", year)
+        labels_br, v_br = _fetch_planta_monthly("breakdown", start, end, codes, equipment_filter)
+        labels_mt, v_mt = _fetch_planta_monthly("mtbf", start, end, codes, equipment_filter)
+        labels_mtr, v_mtr = _fetch_planta_monthly("mttr", start, end, codes, equipment_filter)
         t_br = _resolve_target("breakdown")
         t_mt = _resolve_target("mtbf")
         t_mtr = _resolve_target("mttr")
@@ -1211,15 +1328,15 @@ def register_indicators_v2_callbacks(app):
         # Card value = AGREGADO DO PERÍODO (totais brutos, BR-11 paridade V1)
         # Não é último mês — é planta inteira agregada (sum active_h, sum brk_h,
         # sum failures → recalcula KPI). Igual cards V1.
-        agg = _period_agg(year)
+        agg = _period_agg(start, end, codes, equipment_filter)
         last_br  = _to_display("breakdown", agg.get("breakdown_rate", 0))
         last_mt  = _to_display("mtbf",      agg.get("mtbf", 0))
         last_mtr = _to_display("mttr",      agg.get("mttr", 0))
 
         return (
-            _planta_fig("breakdown", v_br, t_br),
-            _planta_fig("mtbf", v_mt, t_mt),
-            _planta_fig("mttr", v_mtr, t_mtr),
+            _planta_fig("breakdown", labels_br, v_br, t_br),
+            _planta_fig("mtbf", labels_mt, v_mt, t_mt),
+            _planta_fig("mttr", labels_mtr, v_mtr, t_mtr),
             _trend_delta("breakdown", v_br),
             _trend_delta("mtbf", v_mt),
             _trend_delta("mttr", v_mtr),
@@ -1254,22 +1371,23 @@ def register_indicators_v2_callbacks(app):
         from datetime import datetime as _dt
         import io
         import pandas as pd
-        year = (filters or {}).get("year", DEFAULT_YEAR)
+        start, end, codes, equipment_filter, year = _unpack_filters(filters)
         # Tabela: equipamento × mês × {mtbf, mttr, breakdown_rate}
         rows = []
         try:
             eq_list = _list_equipments_real()
+            if equipment_filter:
+                eq_list = [e for e in eq_list if e["id"] in equipment_filter] or eq_list
             for eq in eq_list:
                 eq_id = eq["id"]
                 cat = eq.get("categoria", "—")
                 for kpi in ("mtbf", "mttr", "breakdown"):
-                    monthly = _fetch_equipment_monthly(kpi, eq_id, year)
-                    for m, v in enumerate(monthly, start=1):
+                    labels, monthly = _fetch_equipment_monthly(kpi, eq_id, start, end, codes)
+                    for label, v in zip(labels, monthly):
                         rows.append({
                             "Equipamento": eq_id,
                             "Categoria":   cat,
-                            "Ano":         year,
-                            "Mês":         m,
+                            "Período":     label,
                             "KPI":         {"mtbf": "MTBF (h)", "mttr": "MTTR (min)", "breakdown": "Taxa Avaria (%)"}[kpi],
                             "Valor":       v,  # já em unit de display via _to_display nos fetchers
                             "Meta":        _resolve_target(kpi, eq.get("internal", eq_id)),
@@ -1281,7 +1399,8 @@ def register_indicators_v2_callbacks(app):
         with pd.ExcelWriter(buf, engine="openpyxl") as writer:
             df.to_excel(writer, sheet_name="Indicadores V2", index=False)
         buf.seek(0)
-        filename = f"indicators_v2_{year}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        range_tag = f"{start.strftime('%Y%m%d')}_{end.strftime('%Y%m%d')}"
+        filename = f"indicators_v2_{range_tag}_{_dt.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         from dash import dcc as _dcc
         return _dcc.send_bytes(buf.read(), filename)
 
@@ -1294,6 +1413,7 @@ def register_indicators_v2_callbacks(app):
         Output("store-v2-kpi", "data"),
         Output("store-v2-equipment", "data"),
         Output("store-v2-month", "data"),
+        Output("store-v2-year", "data"),
         Output("store-v2-day", "data"),
         Output("modal-v2-content", "children", allow_duplicate=True),
         Output("modal-v2-title", "children", allow_duplicate=True),
@@ -1302,42 +1422,46 @@ def register_indicators_v2_callbacks(app):
         Input("kpi-card-mtbf", "n_clicks"),
         Input("kpi-card-mttr", "n_clicks"),
         Input({"type": "v2-eq", "kpi": ALL, "equipment": ALL}, "n_clicks"),
-        Input({"type": "v2-month", "kpi": ALL, "equipment": ALL, "month": ALL}, "n_clicks"),
-        Input({"type": "v2-day", "kpi": ALL, "equipment": ALL, "month": ALL, "day": ALL}, "n_clicks"),
+        Input({"type": "v2-month", "kpi": ALL, "equipment": ALL, "month": ALL, "year": ALL}, "n_clicks"),
+        Input({"type": "v2-day", "kpi": ALL, "equipment": ALL, "month": ALL, "year": ALL, "day": ALL}, "n_clicks"),
         Input({"type": "v2-bar-month", "kpi": ALL, "equipment": ALL}, "clickData"),
-        Input({"type": "v2-bar-day", "kpi": ALL, "equipment": ALL, "month": ALL}, "clickData"),
+        Input({"type": "v2-bar-day", "kpi": ALL, "equipment": ALL, "month": ALL, "year": ALL}, "clickData"),
         Input("btn-v2-back", "n_clicks"),
         Input("btn-v2-close", "n_clicks"),
         State("store-v2-level", "data"),
         State("store-v2-kpi", "data"),
         State("store-v2-equipment", "data"),
         State("store-v2-month", "data"),
+        State("store-v2-year", "data"),
+        State("store-v2-filters", "data"),
         prevent_initial_call=True,
     )
     def control_modal(c_br, c_mtbf, c_mttr, eq_clicks, mo_clicks, dy_clicks,
                       bar_month_clicks, bar_day_clicks,
-                      back, close, level, kpi, equipment, month):
+                      back, close, level, kpi, equipment, month, year, filters):
         trig = dash.callback_context.triggered_id
 
         # CLEAR = limpa content/title/breadcrumb. render_modal_content preenche depois.
         CLEAR = (None, "", None)
         NOOP = (no_update,) * 3
+        # Output arity = 7 stores + 3 content (CLEAR) = 10. (no_update,)*7 + CLEAR
+        NOOP10 = (no_update,) * 7 + NOOP
 
         if trig == "btn-v2-close":
-            return (False, "planta", None, None, None, None) + CLEAR
+            return (False, "planta", None, None, None, None, None) + CLEAR
 
         if trig == "btn-v2-back":
             if level == "tabela":
-                return (True, "dias", kpi, equipment, month, None) + CLEAR
+                return (True, "dias", kpi, equipment, month, year, None) + CLEAR
             if level == "dias":
-                return (True, "meses", kpi, equipment, None, None) + CLEAR
+                return (True, "meses", kpi, equipment, None, None, None) + CLEAR
             if level == "mes-top":
-                return (True, "meses", kpi, equipment, None, None) + CLEAR
+                return (True, "meses", kpi, equipment, None, None, None) + CLEAR
             if level == "meses":
-                return (True, "equipamentos", kpi, None, None, None) + CLEAR
+                return (True, "equipamentos", kpi, None, None, None, None) + CLEAR
             if level == "equipamentos":
-                return (False, "planta", None, None, None, None) + CLEAR
-            return (no_update,) * 6 + NOOP
+                return (False, "planta", None, None, None, None, None) + CLEAR
+            return NOOP10
 
         # Click num card KPI (qualquer região do card) — trig é string id
         if isinstance(trig, str):
@@ -1347,32 +1471,45 @@ def register_indicators_v2_callbacks(app):
                 "kpi-card-mttr": "mttr",
             }
             if trig in kpi_map:
-                return (True, "equipamentos", kpi_map[trig], None, None, None) + CLEAR
+                return (True, "equipamentos", kpi_map[trig], None, None, None, None) + CLEAR
 
         # Pattern clicks — trig é AttributeDict (dict-like)
         if not isinstance(trig, str) and trig is not None:
             t = trig.get("type")
             if t == "v2-eq":
-                return (True, "meses", trig["kpi"], trig["equipment"], None, None) + CLEAR
+                return (True, "meses", trig["kpi"], trig["equipment"], None, None, None) + CLEAR
             if t == "v2-month":
                 # Click no CARD do mês → top paradas mensais (barras horizontais + tabela)
-                return (True, "mes-top", trig["kpi"], trig["equipment"], trig["month"], None) + CLEAR
+                return (True, "mes-top", trig["kpi"], trig["equipment"],
+                        trig["month"], trig["year"], None) + CLEAR
             if t == "v2-day":
-                return (True, "tabela", trig["kpi"], trig["equipment"], trig["month"], trig["day"]) + CLEAR
+                return (True, "tabela", trig["kpi"], trig["equipment"],
+                        trig["month"], trig["year"], trig["day"]) + CLEAR
 
             # Click numa barra do gráfico grande
             if t in ("v2-bar-month", "v2-bar-day"):
                 ctx_trig = dash.callback_context.triggered
                 if not ctx_trig or ctx_trig[0].get("value") is None:
-                    return (no_update,) * 6 + NOOP
+                    return NOOP10
                 click = ctx_trig[0]["value"]
                 x_val = click["points"][0]["x"]
                 if t == "v2-bar-month":
-                    return (True, "dias", trig["kpi"], trig["equipment"], MESES_PT.index(x_val) + 1, None) + CLEAR
+                    # Label "Nov/25" → resolve (year, month) via _iter_months_in_range
+                    f_start, f_end, _, _, _ = _unpack_filters(filters)
+                    bm_year, bm_month = None, None
+                    for lbl, _, _, yy, mm in _iter_months_in_range(f_start, f_end):
+                        if lbl == x_val:
+                            bm_year, bm_month = yy, mm
+                            break
+                    if bm_month is None:
+                        return NOOP10
+                    return (True, "dias", trig["kpi"], trig["equipment"],
+                            bm_month, bm_year, None) + CLEAR
                 if t == "v2-bar-day":
-                    return (True, "tabela", trig["kpi"], trig["equipment"], trig["month"], int(x_val)) + CLEAR
+                    return (True, "tabela", trig["kpi"], trig["equipment"],
+                            trig["month"], trig["year"], int(x_val)) + CLEAR
 
-        return (no_update,) * 6 + NOOP
+        return NOOP10
 
     # 3. Render conteúdo do modal por level (com i18n)
     # allow_duplicate porque control_modal também escreve nesses outputs (clear)
@@ -1385,17 +1522,23 @@ def register_indicators_v2_callbacks(app):
         Input("store-v2-kpi", "data"),
         Input("store-v2-equipment", "data"),
         Input("store-v2-month", "data"),
+        Input("store-v2-year", "data"),
         Input("store-v2-day", "data"),
         Input("store-v2-lang", "data"),
+        State("store-v2-filters", "data"),
         prevent_initial_call=True,
     )
-    def render_modal(level, kpi, equipment, month, day, lang):
+    def render_modal(level, kpi, equipment, month, drill_year, day, lang, filters):
         if not kpi:
             return None, "", None, {"display": "none"}
 
         lang = lang or "pt"
         td = _TRANS.get(lang, _TRANS["pt"])  # tradução por key
         meses_curtos = td.get("month_short", MESES_PT)
+        # Filtros do store (paridade V1): range + codes + equipment_filter
+        f_start, f_end, f_codes, f_eq_filter, f_year = _unpack_filters(filters)
+        # Year do mês clicado no drilldown (cross-year ok). Fallback = f_year.
+        d_year = drill_year if drill_year else f_year
         # Label KPI traduzido
         KPI_LABEL_I18N = {
             "breakdown": td.get("mdl_kpi_avaria", "Taxa de Avaria"),
@@ -1411,12 +1554,17 @@ def register_indicators_v2_callbacks(app):
         if level == "equipamentos":
             cards = []
             eq_list = _list_equipments_real()
+            if f_eq_filter:
+                eq_list = [e for e in eq_list if e["id"] in f_eq_filter] or eq_list
             for eq in eq_list:
-                values = _fetch_equipment_monthly(kpi, eq["id"])
+                labels_eq, values = _fetch_equipment_monthly(
+                    kpi, eq["id"], f_start, f_end, f_codes
+                )
                 eq_target = _resolve_target(kpi, eq.get("internal", eq["id"]))
                 # Compact + figure cacheada por (kpi, eq, values, target)
-                fig = _cached_compact_bar(kpi, eq["id"], DEFAULT_YEAR, values,
-                                          eq_target, meta["color"], meta["unit"])
+                fig = _cached_compact_bar(kpi, eq["id"], f_year, values,
+                                          eq_target, meta["color"], meta["unit"],
+                                          labels=labels_eq)
                 card = dbc.Col(
                     html.Div(
                         dbc.Card(
@@ -1455,23 +1603,27 @@ def register_indicators_v2_callbacks(app):
 
         # NÍVEL 2: meses (gráfico grande + grid de mini-meses clicáveis) — IM-03
         if level == "meses" and equipment:
-            values = _fetch_equipment_monthly(kpi, equipment)
+            labels_m, values = _fetch_equipment_monthly(
+                kpi, equipment, f_start, f_end, f_codes
+            )
+            months_meta = list(_iter_months_in_range(f_start, f_end))
             eq_target = _resolve_target(kpi, equipment)
-            main_fig = _bar(MESES_PT, values, f"{equipment} — {td.get('mdl_meses','12 meses')}",
+            main_fig = _bar(labels_m, values, f"{equipment} — {td.get('mdl_meses','12 meses')}",
                             meta["color"], meta["unit"],
                             target=eq_target, show_trend=True, td=td)
             main_fig.update_layout(height=380)
 
-            # mini-cards por mês (clicáveis) abaixo do gráfico grande
+            # mini-cards por mês (clicáveis) abaixo do gráfico grande.
+            # Cada card carrega month + year reais (cross-year ok) no pattern id.
             mini_rows = []
-            for idx, (m_label, val) in enumerate(zip(MESES_PT, values), start=1):
+            for label, val, (_, _, _, yy, mm) in zip(labels_m, values, months_meta):
                 mini_rows.append(
                     dbc.Col(
                         html.Div(
                             dbc.Card(
                                 dbc.CardBody(
                                     [
-                                        html.Div(m_label, className="text-muted small mb-1"),
+                                        html.Div(label, className="text-muted small mb-1"),
                                         html.Div(
                                             f"{val}{meta['unit']}",
                                             style={"fontSize": "1.2rem", "fontWeight": "bold",
@@ -1482,7 +1634,8 @@ def register_indicators_v2_callbacks(app):
                                 ),
                                 className="shadow-sm",
                             ),
-                            id={"type": "v2-month", "kpi": kpi, "equipment": equipment, "month": idx},
+                            id={"type": "v2-month", "kpi": kpi,
+                                "equipment": equipment, "month": mm, "year": yy},
                             n_clicks=0,
                             style={"cursor": "pointer"},
                         ),
@@ -1513,7 +1666,9 @@ def register_indicators_v2_callbacks(app):
 
         # NÍVEL 3: mes-top — IM-06
         if level == "mes-top" and equipment and month:
-            items = _fetch_top_paradas_real(equipment, month, top_n=10)
+            items = _fetch_top_paradas_real(
+                equipment, month, year=d_year, top_n=10, codes=f_codes
+            )
             h_bar = _top_paradas_h_bar(items, equipment, month, td=td)
 
             if not items:
@@ -1579,17 +1734,19 @@ def register_indicators_v2_callbacks(app):
                 html.Span(" › ", className="mx-1 text-muted"),
                 html.Span(td.get("mdl_top_paradas","Top paradas"), className="text-primary fw-semibold"),
             ]
-            title = f"{kpi_label} — {td.get('mdl_top_paradas','Top paradas')} — {equipment} — {meses_curtos[month-1]}/2026"
+            title = f"{kpi_label} — {td.get('mdl_top_paradas','Top paradas')} — {equipment} — {meses_curtos[month-1]}/{d_year}"
             return content, title, breadcrumb_items, {}
 
         # NÍVEL 4: dias — IM-04
         if level == "dias" and equipment and month:
-            dias, valores = _fetch_daily_kpi(kpi, equipment, month)
+            dias, valores = _fetch_daily_kpi(
+                kpi, equipment, month, year=d_year, codes=f_codes
+            )
             eq_target = _resolve_target(kpi, equipment)
             main_fig = _bar(
                 [f"{d:02d}" for d in dias],
                 valores,
-                f"{equipment} — {meses_curtos[month-1]}/2026",
+                f"{equipment} — {meses_curtos[month-1]}/{d_year}",
                 meta["color"],
                 meta["unit"],
                 target=eq_target,
@@ -1618,7 +1775,7 @@ def register_indicators_v2_callbacks(app):
                                 className="shadow-sm",
                             ),
                             id={"type": "v2-day", "kpi": kpi, "equipment": equipment,
-                                "month": month, "day": d},
+                                "month": month, "year": d_year, "day": d},
                             n_clicks=0,
                             style={"cursor": "pointer"},
                         ),
@@ -1630,7 +1787,8 @@ def register_indicators_v2_callbacks(app):
             content = html.Div(
                 [
                     dcc.Graph(
-                        id={"type": "v2-bar-day", "kpi": kpi, "equipment": equipment, "month": month},
+                        id={"type": "v2-bar-day", "kpi": kpi, "equipment": equipment,
+                            "month": month, "year": d_year},
                         figure=main_fig,
                         config={"displayModeBar": False, "responsive": True},
                         style={"height": "380px", "cursor": "pointer"},
@@ -1646,12 +1804,15 @@ def register_indicators_v2_callbacks(app):
                 html.Span(" › ", className="mx-1 text-muted"),
                 html.Span(meses_curtos[month - 1], className="text-primary fw-semibold"),
             ]
-            title = f"{kpi_label} — {equipment} — {meses_curtos[month-1]}/2026"
+            title = f"{kpi_label} — {equipment} — {meses_curtos[month-1]}/{d_year}"
             return content, title, breadcrumb_items, {}
 
-        # NÍVEL 5: tabela (paradas do dia) — IM-05
+        # NÍVEL 5: tabela (paradas do dia)
+        # Filtra por f_codes — paridade V1; revoga IM-05 ("mostra TODOS") do SDD indicators-v2.
         if level == "tabela" and equipment and month and day:
-            eventos = _fetch_events_day_real(equipment, month, day)
+            eventos = _fetch_events_day_real(
+                equipment, month, day, year=d_year, codes=f_codes
+            )
 
             if not eventos:
                 body = _empty_state(
@@ -1705,7 +1866,7 @@ def register_indicators_v2_callbacks(app):
                     dbc.Alert(
                         [
                             html.I(className="bi bi-info-circle me-2"),
-                            f"{td.get('mdl_paradas_em','Paradas em')} {equipment} — {day:02d}/{month:02d}/2026 — "
+                            f"{td.get('mdl_paradas_em','Paradas em')} {equipment} — {day:02d}/{month:02d}/{d_year} — "
                             f"{len(eventos)} {td.get('mdl_eventos','eventos')}.",
                         ],
                         color="info",
@@ -1722,7 +1883,7 @@ def register_indicators_v2_callbacks(app):
                 html.Span(" › ", className="mx-1 text-muted"),
                 html.Span(f"Dia {day:02d}", className="text-primary fw-semibold"),
             ]
-            title = f"{td.get('mdl_paradas_em','Paradas em')} — {equipment} — {day:02d}/{month:02d}/2026"
+            title = f"{td.get('mdl_paradas_em','Paradas em')} — {equipment} — {day:02d}/{month:02d}/{d_year}"
             return content, title, breadcrumb_items, {}
 
         return None, "", None, {"display": "none"}
