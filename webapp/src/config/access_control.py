@@ -156,6 +156,12 @@ ROUTE_ACCESS = {
         "min_level": 2,
         "description": "Log de Auditoria — Gantt"
     },
+    "/maintenance/hh-gantt": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 1,
+        "description": "Aproveitamento HH — Gantt (mock dados reais SAP)"
+    },
     "/maintenance/zpp-processor": {
         "shared": False,
         "perfis": ["manutencao"],

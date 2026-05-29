@@ -120,3 +120,6 @@ prompt-investigacao-*.md
 .coverage.*
 htmlcov/
 .pytest_cache/
+
+# Dados reais de produção SAP para mock HH Gantt — NÃO versionar
+webapp/src/data/hh_mock/

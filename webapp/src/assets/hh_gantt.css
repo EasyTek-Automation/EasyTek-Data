@@ -1,0 +1,99 @@
+/* HH Gantt — estilos do mock de aproveitamento hora-homem */
+
+.hh-gantt-root {
+    font-size: 0.8rem;
+}
+
+.hh-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+}
+
+.hh-legend-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+    flex-shrink: 0;
+}
+
+.hh-toggle-btn {
+    transition: all 0.18s ease;
+}
+
+/* rótulo de dia clicável (zoom in/out) — laranja da marca AMG (#E96D38) */
+.hh-day-btn {
+    background: #E96D38;
+    color: #fff;
+    border: 1px solid #C9551F;
+    border-radius: 5px;
+    cursor: pointer;
+    line-height: 1.05;
+    z-index: 4;                 /* acima do tracejado de hora (z-index 1) */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    transition: background 0.15s ease, box-shadow 0.15s ease;
+}
+.hh-day-btn .bi-zoom-in,
+.hh-day-btn .bi-zoom-out {
+    color: #fff;
+}
+.hh-day-btn:hover {
+    background: #C9551F;       /* laranja escurecida no hover */
+    color: #fff !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.28);
+}
+
+/* chip de zoom-out (modo dia): opaco (laranja sólida) cobre os rótulos de hora atrás */
+.hh-day-btn-back {
+    z-index: 8;
+    box-shadow: 1px 0 6px rgba(0, 0, 0, 0.28);
+}
+
+/* Mini week picker — Mon-first, pinta linha inteira em azul claro */
+.hh-pick-week-row {
+    cursor: pointer;
+    transition: background 0.12s ease;
+}
+.hh-pick-week-row:hover {
+    background: #cfe2ff !important;        /* azul clarinho — Seg→Dom inteiro */
+}
+.hh-pick-week-row.hh-pick-week-selected {
+    background: #9ec5fe !important;
+    font-weight: 600;
+}
+.hh-pick-week-row.hh-pick-week-disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+.hh-pick-week-row.hh-pick-week-disabled:hover {
+    background: transparent !important;
+}
+.hh-month-nav-btn:hover {
+    background: var(--bs-secondary-bg) !important;
+    border-radius: 4px;
+}
+
+/* Disponibilidade (janela do turno) — hachurado neutro + borda pontilhada
+   Distingue visualmente do Planejado (azul claro sólido) e do Executado (azul escuro sólido). */
+.hh-shift-cell {
+    background-image: repeating-linear-gradient(45deg,
+        rgba(108, 117, 125, 0.35) 0 1.2px,
+        rgba(255, 255, 255, 0)    1.2px 3.2px);
+    border-top:    1px dotted rgba(108, 117, 125, 0.55);
+    border-bottom: 1px dotted rgba(108, 117, 125, 0.55);
+}
+/* Extra (+2h após o turno) — hachurado âmbar */
+.hh-extra-cell {
+    background-image: repeating-linear-gradient(45deg,
+        rgba(255, 152, 0, 0.32) 0 1.2px,
+        rgba(255, 255, 255, 0)  1.2px 3.2px);
+    border-top:    1px dotted rgba(255, 152, 0, 0.55);
+    border-bottom: 1px dotted rgba(255, 152, 0, 0.55);
+}
+
+/* realce sutil ao passar sobre uma linha da timeline */
+.hh-gantt-root > div:hover {
+    box-shadow: inset 3px 0 0 var(--bs-primary);
+}
