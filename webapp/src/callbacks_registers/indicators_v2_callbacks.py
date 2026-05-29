@@ -589,11 +589,11 @@ def _fetch_top_paradas_real(equipment: str, month: int, year: int = DEFAULT_YEAR
                 day_int = 0
             items.append({
                 "day":         day_int,
-                "date":        date_str,
-                "descricao":   it.get("descricao", "—"),
-                "duracao_min": int(it.get("duracao_min", 0) or 0),
-                "count":       int(it.get("count", 1) or 1),
-                "codigo":      it.get("motivo", "—"),
+                "date":        date_str or "—",
+                "descricao":   it.get("descricao") or "—",
+                "duracao_min": int(it.get("duracao_min") or 0),
+                "count":       int(it.get("count") or 1),
+                "codigo":      it.get("motivo") or "—",
             })
         return items
     except Exception as e:
@@ -749,7 +749,9 @@ def _top_paradas_h_bar(items, equipment, month, td=None,
     top5 = items[:5]
 
     def wrap(text, max_chars=22):
-        words, lines, cur, ln = text.split(), [], [], 0
+        if not text:
+            text = "—"
+        words, lines, cur, ln = str(text).split(), [], [], 0
         for w in words:
             wl = len(w) + (1 if cur else 0)
             if ln + wl > max_chars and cur:
@@ -763,9 +765,9 @@ def _top_paradas_h_bar(items, equipment, month, td=None,
     # barras com mesmo label (caso de itens agrupados com data+descrição idênticas
     # mas códigos diferentes; ex: PRENSA-02 mar/2026, LCL-4,5 fev/2026).
     y_pos = list(range(len(top5)))
-    y_ticktext = [f"{bd['date'][:5]}<br>{wrap(bd['descricao'])}" for bd in top5]
-    x_values = [bd["duracao_min"] for bd in top5]
-    counts = [bd["count"] for bd in top5]
+    y_ticktext = [f"{(bd.get('date') or '—')[:5]}<br>{wrap(bd.get('descricao'))}" for bd in top5]
+    x_values = [bd.get("duracao_min") or 0 for bd in top5]
+    counts = [bd.get("count") or 1 for bd in top5]
     max_d = max(x_values) if x_values else 1
     colors = []
     for d in x_values:
