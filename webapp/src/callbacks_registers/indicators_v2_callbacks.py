@@ -45,6 +45,17 @@ except Exception as _imp_err:
     logger.warning("V2: import V1 modules failed (%s) — só mock disponível", _imp_err)
     _HAS_REAL_DATA = False
 
+# Cadastro de gatilhos de duração por equipamento (independente de Mongo offline)
+from src.utils.breakdown_thresholds import (
+    DEFAULT_THRESHOLD_MIN,
+    derive_threshold_2,
+    get_all_thresholds,
+    get_threshold,
+    get_thresholds_pair,
+    set_threshold,
+    invalidate_cache as invalidate_thresholds_cache,
+)
+
 # Demo override — força mock mesmo com Mongo ativo (esconde estágio real do projeto).
 # Set INDICATORS_V2_FORCE_MOCK=1 no env pra ativar.
 import os as _os
@@ -719,9 +730,12 @@ def _mock_top_paradas_mes(equipment, month, top_n=10):
     return items[:top_n]
 
 
-def _top_paradas_h_bar(items, equipment, month, td=None):
+def _top_paradas_h_bar(items, equipment, month, td=None,
+                       threshold_1=None, threshold_2=None):
     """Barras horizontais top 5 (gradient vermelho→verde por intensidade).
 
+    threshold_1 / threshold_2: linhas verticais (amarela / rosa) em min do
+    gatilho cadastrado pro equipamento. Se None, não desenha.
     td: dict TRANS[lang] pra title/axis i18n.
     """
     td = td or {}
@@ -784,13 +798,26 @@ def _top_paradas_h_bar(items, equipment, month, td=None):
         ),
     ))
     top_title_tpl = td.get("chart_top_n_paradas", "Top {n} Paradas")
+    # Linha vertical só do gatilho_1. gatilho_2 fica reservado pra animação
+    # das células (style_data_conditional da tabela), não polui o gráfico.
+    extra_x_for_axis = max_d
+    if threshold_1 is not None:
+        extra_x_for_axis = max(extra_x_for_axis, threshold_1)
+        fig.add_vline(
+            x=threshold_1,
+            line=dict(color="#cc9a06", width=2, dash="dash"),
+            annotation_text=f"Gatilho 1: {threshold_1}min",
+            annotation_position="top",
+            annotation=dict(font=dict(size=10, color="#cc9a06"), bgcolor="rgba(255,243,205,0.9)"),
+        )
+
     fig.update_layout(
         title=dict(
             text=f"{top_title_tpl.format(n=len(top5))} — {equipment} — {MESES_PT[month-1]}/2026",
             x=0.5, xanchor="center", font=dict(size=13),
         ),
         xaxis=dict(title=dict(text=td.get("chart_duracao_min","Duração (min)"), font=dict(size=10)),
-                   range=[0, max_d + 50]),
+                   range=[0, extra_x_for_axis + 50]),
         yaxis=dict(
             autorange="reversed",
             tickmode="array",
@@ -1089,6 +1116,194 @@ def register_indicators_v2_callbacks(app):
         if ptype == "custom":
             return {"display": "none"}, {"display": "block"}
         return {"display": "block"}, {"display": "none"}
+
+    # Toggle "Sem ferramentaria" — segue padrão sync/hydrate do switch mtto-only.
+    # OFF (default) = inclui códigos 202/S202; ON = filtra eles dos painéis de paradas
+    # (níveis mes-top e tabela do drilldown).
+    @app.callback(
+        Output("store-v2-hide-tooling", "data"),
+        Input("switch-v2-hide-tooling", "value"),
+        prevent_initial_call=True,
+    )
+    def sync_hide_tooling(value):
+        return bool(value)
+
+    @app.callback(
+        Output("switch-v2-hide-tooling", "value"),
+        Input("modal-v2", "is_open"),
+        State("store-v2-hide-tooling", "data"),
+    )
+    def hydrate_hide_tooling(is_open, stored):
+        # Hidrata o switch com o último valor persistido sempre que o modal abre.
+        if not is_open:
+            from dash.exceptions import PreventUpdate
+            raise PreventUpdate
+        return bool(stored)
+
+    @app.callback(
+        Output("wrap-v2-hide-tooling", "style"),
+        Input("store-v2-level", "data"),
+    )
+    def toggle_hide_tooling_visibility(level):
+        # Switch só aparece nos níveis que listam paradas individuais.
+        if level in ("mes-top", "tabela"):
+            return {"display": "block"}
+        return {"display": "none"}
+
+    # ============== Modal de cadastro de gatilhos por equipamento ==============
+
+    @app.callback(
+        Output("modal-v2-thresholds", "is_open"),
+        Input("btn-thresholds-v2", "n_clicks"),
+        Input("btn-thresholds-cancel", "n_clicks"),
+        Input("btn-thresholds-save", "n_clicks"),
+        State("modal-v2-thresholds", "is_open"),
+        prevent_initial_call=True,
+    )
+    def toggle_thresholds_modal(open_n, cancel_n, save_n, is_open):
+        trig = dash.callback_context.triggered_id
+        if trig == "btn-thresholds-v2":
+            return True
+        if trig in ("btn-thresholds-cancel", "btn-thresholds-save"):
+            return False
+        return is_open
+
+    @app.callback(
+        Output("modal-thresholds-table", "children"),
+        Output("modal-thresholds-status", "children", allow_duplicate=True),
+        Input("modal-v2-thresholds", "is_open"),
+        prevent_initial_call=True,
+    )
+    def populate_thresholds_table(is_open):
+        if not is_open:
+            from dash.exceptions import PreventUpdate
+            raise PreventUpdate
+        from flask_login import current_user
+        # Determina se o usuário pode editar (level 2+ — perfil manutencao/admin)
+        try:
+            can_edit = current_user.is_authenticated and getattr(current_user, "level", 0) >= 2
+        except Exception:
+            can_edit = False
+        eq_list = _list_equipments_real()
+        cadastro = get_all_thresholds()
+        rows = []
+        for eq in eq_list:
+            eq_id = eq["id"]
+            t1 = cadastro.get(eq_id, DEFAULT_THRESHOLD_MIN)
+            t2 = derive_threshold_2(t1)
+            rows.append({
+                "Equipamento": eq_id,
+                "Categoria":   eq.get("categoria", "—"),
+                "Gatilho 1 (min)": t1,
+                "Gatilho 2 (min)": t2,
+            })
+        editable_cols = ["Gatilho 1 (min)"] if can_edit else []
+        table = dash_table.DataTable(
+            id="thresholds-datatable",
+            data=rows,
+            columns=[
+                {"name": "Equipamento", "id": "Equipamento", "editable": False},
+                {"name": "Categoria", "id": "Categoria", "editable": False},
+                {"name": "Gatilho 1 (min)", "id": "Gatilho 1 (min)",
+                 "editable": can_edit, "type": "numeric"},
+                {"name": "Gatilho 2 (min) — auto ×1,20", "id": "Gatilho 2 (min)",
+                 "editable": False, "type": "numeric"},
+            ],
+            editable=can_edit,
+            style_table={"overflowX": "auto"},
+            style_cell={"padding": "8px", "fontFamily": "system-ui", "fontSize": "13px"},
+            style_header={
+                "backgroundColor": "#f1f3f5",
+                "fontWeight": "600",
+                "borderBottom": "2px solid #dee2e6",
+            },
+            style_data_conditional=[
+                {"if": {"column_id": "Gatilho 1 (min)"},
+                 "backgroundColor": "#fff8e1" if can_edit else "transparent",
+                 "fontWeight": "600"},
+                {"if": {"column_id": "Gatilho 2 (min)"},
+                 "backgroundColor": "#fde4e7", "color": "#6c757d"},
+            ],
+            page_size=20,
+            sort_action="native",
+        )
+        if can_edit:
+            status = html.Span(
+                "✏️ Edite os valores na coluna Gatilho 1. Gatilho 2 recalcula automaticamente. "
+                "Clique em Salvar pra persistir.",
+                className="text-muted small",
+            )
+        else:
+            status = html.Span(
+                "🔒 Sem permissão pra editar (requer nível 2+). Visualização somente.",
+                className="text-muted small",
+            )
+        return table, status
+
+    @app.callback(
+        Output("thresholds-datatable", "data", allow_duplicate=True),
+        Input("thresholds-datatable", "data_timestamp"),
+        State("thresholds-datatable", "data"),
+        State("thresholds-datatable", "data_previous"),
+        prevent_initial_call=True,
+    )
+    def recompute_threshold_2(_ts, data, data_prev):
+        # Sempre que gatilho_1 muda, recalcula gatilho_2 ao vivo.
+        if not data:
+            from dash.exceptions import PreventUpdate
+            raise PreventUpdate
+        changed = False
+        for row in data:
+            try:
+                t1 = int(float(row.get("Gatilho 1 (min)", DEFAULT_THRESHOLD_MIN) or DEFAULT_THRESHOLD_MIN))
+            except (TypeError, ValueError):
+                t1 = DEFAULT_THRESHOLD_MIN
+            new_t2 = derive_threshold_2(t1)
+            if row.get("Gatilho 2 (min)") != new_t2:
+                row["Gatilho 2 (min)"] = new_t2
+                changed = True
+        if not changed:
+            from dash.exceptions import PreventUpdate
+            raise PreventUpdate
+        return data
+
+    @app.callback(
+        Output("modal-thresholds-status", "children", allow_duplicate=True),
+        Input("btn-thresholds-save", "n_clicks"),
+        State("thresholds-datatable", "data"),
+        prevent_initial_call=True,
+    )
+    def save_thresholds_callback(n, data):
+        if not n:
+            from dash.exceptions import PreventUpdate
+            raise PreventUpdate
+        from flask_login import current_user
+        try:
+            if not current_user.is_authenticated or getattr(current_user, "level", 0) < 2:
+                return html.Span("🔒 Sem permissão pra salvar (requer nível 2+).",
+                                 className="text-danger small")
+        except Exception:
+            return html.Span("🔒 Sem permissão pra salvar.", className="text-danger small")
+        username = getattr(current_user, "username", "unknown")
+        cadastro_atual = get_all_thresholds()
+        saved = 0
+        for row in data or []:
+            eq_id = row.get("Equipamento")
+            try:
+                t1 = int(float(row.get("Gatilho 1 (min)", DEFAULT_THRESHOLD_MIN)))
+            except (TypeError, ValueError):
+                continue
+            if t1 < 1:
+                continue
+            if cadastro_atual.get(eq_id) == t1:
+                continue  # sem mudança
+            if set_threshold(eq_id, t1, updated_by=username):
+                saved += 1
+        invalidate_thresholds_cache()
+        return html.Span(
+            f"✅ {saved} gatilho(s) atualizado(s) por {username}. Modal fechará.",
+            className="text-success small",
+        )
 
     @app.callback(
         Output("filter-v2-equipment", "options"),
@@ -1525,10 +1740,12 @@ def register_indicators_v2_callbacks(app):
         Input("store-v2-year", "data"),
         Input("store-v2-day", "data"),
         Input("store-v2-lang", "data"),
+        Input("store-v2-hide-tooling", "data"),
         State("store-v2-filters", "data"),
         prevent_initial_call=True,
     )
-    def render_modal(level, kpi, equipment, month, drill_year, day, lang, filters):
+    def render_modal(level, kpi, equipment, month, drill_year, day, lang,
+                     hide_tooling, filters):
         if not kpi:
             return None, "", None, {"display": "none"}
 
@@ -1669,7 +1886,13 @@ def register_indicators_v2_callbacks(app):
             items = _fetch_top_paradas_real(
                 equipment, month, year=d_year, top_n=10, codes=f_codes
             )
-            h_bar = _top_paradas_h_bar(items, equipment, month, td=td)
+            if hide_tooling:
+                items = [it for it in items if it.get("codigo") not in ("202", "S202")]
+            t1, t2 = get_thresholds_pair(equipment)
+            h_bar = _top_paradas_h_bar(
+                items, equipment, month, td=td,
+                threshold_1=t1, threshold_2=t2,
+            )
 
             if not items:
                 table = _empty_state(
@@ -1707,9 +1930,9 @@ def register_indicators_v2_callbacks(app):
                         "borderBottom": "2px solid #dee2e6",
                     },
                     style_data_conditional=[
-                        {"if": {"filter_query": "{" + col_dur + "} >= 200"},
+                        {"if": {"filter_query": f"{{{col_dur}}} >= {t1}"},
                          "backgroundColor": "#fff3cd"},
-                        {"if": {"filter_query": "{" + col_dur + "} >= 400"},
+                        {"if": {"filter_query": f"{{{col_dur}}} >= {t2}"},
                          "backgroundColor": "#f8d7da"},
                     ],
                     sort_action="native",
@@ -1813,6 +2036,9 @@ def register_indicators_v2_callbacks(app):
             eventos = _fetch_events_day_real(
                 equipment, month, day, year=d_year, codes=f_codes
             )
+            if hide_tooling:
+                eventos = [e for e in eventos if e.get("Código") not in ("202", "S202")]
+            t1_day, t2_day = get_thresholds_pair(equipment)
 
             if not eventos:
                 body = _empty_state(
@@ -1852,9 +2078,9 @@ def register_indicators_v2_callbacks(app):
                         "borderBottom": "2px solid #dee2e6",
                     },
                     style_data_conditional=[
-                        {"if": {"filter_query": "{" + col_dur + "} >= 120"},
+                        {"if": {"filter_query": f"{{{col_dur}}} >= {t1_day}"},
                          "backgroundColor": "#fff3cd"},
-                        {"if": {"filter_query": "{" + col_dur + "} >= 240"},
+                        {"if": {"filter_query": f"{{{col_dur}}} >= {t2_day}"},
                          "backgroundColor": "#f8d7da"},
                     ],
                     page_size=20,
