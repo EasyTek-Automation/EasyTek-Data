@@ -422,7 +422,7 @@ def fetch_zpp_breakdown_data(start_date: datetime, end_date: datetime,
     Returns:
         DataFrame com colunas: [linea, date, year, month, year_month, motivo, duracao_min, boundary_case]
     """
-    codes = breakdown_codes if breakdown_codes else BREAKDOWN_CODES
+    codes = BREAKDOWN_CODES if breakdown_codes is None else breakdown_codes
     try:
         from calendar import monthrange
 
@@ -793,7 +793,7 @@ def get_zpp_data_coverage(start_date: datetime, end_date: datetime,
             result["prod_num_days"] = len(prod_days)
 
         # ── ZPP_Paradas ───────────────────────────────────────────────
-        codes = breakdown_codes if breakdown_codes else BREAKDOWN_CODES
+        codes = BREAKDOWN_CODES if breakdown_codes is None else breakdown_codes
         paradas_coll = get_mongo_connection(ZPP_PARADAS_COLLECTION)
         paradas_docs = list(paradas_coll.find(
             {
@@ -1026,7 +1026,7 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str,
             ...
         ]
     """
-    codes = breakdown_codes if breakdown_codes else BREAKDOWN_CODES
+    codes = BREAKDOWN_CODES if breakdown_codes is None else breakdown_codes
     # Overlay KPI_FORCE_ZERO_EQUIPMENTS — não busca paradas (espelha SAP=0).
     if equipment_id in KPI_FORCE_ZERO_EQUIPMENTS:
         return []
@@ -1142,7 +1142,7 @@ def fetch_top_breakdowns_all(start_date: datetime, end_date: datetime,
         Lista de dicts ordenados por duração desc:
         [{"equipamento", "inicio_execucao", "duration_min", "causa_do_desvio", "descricao"}, ...]
     """
-    codes = breakdown_codes if breakdown_codes else BREAKDOWN_CODES
+    codes = BREAKDOWN_CODES if breakdown_codes is None else breakdown_codes
 
     if equipamentos_excluidos is None:
         # Import lazy — evita circular import entre zpp_kpi_calculator ↔ kpi_report_config

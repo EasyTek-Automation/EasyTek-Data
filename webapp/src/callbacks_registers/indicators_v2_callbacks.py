@@ -225,11 +225,34 @@ def _cached_fetch_kpi(start: datetime, end: datetime, codes: tuple,
     return data
 
 
+def _resolve_equipment_internal_ids(equipment_filter, kpi_data: dict) -> list:
+    """Filtra equipment_filter (internal IDs do dropdown V2) contra chaves
+    de kpi_data (também internal). Aceita fallback friendly→internal
+    pra resistir a registros legados no store.
+    """
+    if equipment_filter is None:
+        return list(kpi_data.keys())
+    if not equipment_filter:
+        return []
+    names = _cached_names() or {}  # internal → friendly
+    friendly_to_internal = {v: k for k, v in names.items()}
+    resolved = []
+    for raw in equipment_filter:
+        if raw in kpi_data:
+            resolved.append(raw)
+        else:
+            internal = friendly_to_internal.get(raw)
+            if internal and internal in kpi_data:
+                resolved.append(internal)
+    return resolved
+
+
 def _cached_agg(kpi_data: dict, start: datetime, end: datetime, codes: tuple,
                 equipment_filter=None, lwb_simulate: bool = False) -> dict:
     """calculate_general_avg_by_month com cache, propaga filtro de equipamento.
 
     equipment_filter=None significa toda planta (todos os equipamentos do kpi_data).
+    Lista vazia [] significa intenção explícita ("zero equipamento").
     lwb_simulate entra na chave pra invalidar quando o switch alterna.
     """
     # eq_key distingue None (toda planta) de lista (mesmo vazia)
@@ -238,15 +261,16 @@ def _cached_agg(kpi_data: dict, start: datetime, end: datetime, codes: tuple,
     hit = _cache_get(_CACHE_AGG, key)
     if hit is not None:
         return hit
-    if equipment_filter is None:
-        eq_ids = list(kpi_data.keys())
-    else:
-        eq_ids = [e for e in equipment_filter if e in kpi_data]
+    eq_ids = _resolve_equipment_internal_ids(equipment_filter, kpi_data)
+    # equipment_ids=None mantém compat V1 (planta inteira); lista (mesmo vazia)
+    # ativa filter dentro de calculate_general_avg_by_month.
+    eq_ids_param = None if equipment_filter is None else eq_ids
     agg = calculate_general_avg_by_month(
-        data=kpi_data, equipment_ids=eq_ids,
+        data=kpi_data, equipment_ids=eq_ids_param,
         months=None, year=None,
         start_date=start, end_date=end,
         lwb_simulate=lwb_simulate,
+        breakdown_codes=list(codes),
     )
     _cache_set(_CACHE_AGG, key, agg)
     return agg
@@ -313,10 +337,7 @@ def _period_agg(start: datetime, end: datetime, codes: tuple = None,
     try:
         from src.utils.maintenance_demo_data import calculate_kpi_averages
         kpi_data = _cached_fetch_kpi(start, end, codes, lwb_simulate=lwb_simulate)
-        if equipment_filter is None:
-            eq_ids = list(kpi_data.keys())
-        else:
-            eq_ids = [e for e in equipment_filter if e in kpi_data]
+        eq_ids = _resolve_equipment_internal_ids(equipment_filter, kpi_data)
         months_in_range = sorted({m for _, _, _, _, m in _iter_months_in_range(start, end)})
         agg = calculate_kpi_averages(
             data=kpi_data,
@@ -1327,8 +1348,13 @@ def register_indicators_v2_callbacks(app):
         if pathname != "/maintenance/indicators-v2":
             return no_update, no_update
         eq_list = _list_equipments_real()
-        options = [{"label": eq["id"], "value": eq["id"]} for eq in eq_list]
-        value = [eq["id"] for eq in eq_list]
+        # Value usa internal ID (canonical) pra evitar dependência da cache de
+        # names em conversões friendly→internal. Label mostra o friendly.
+        options = [
+            {"label": eq["id"], "value": eq.get("internal") or eq["id"]}
+            for eq in eq_list
+        ]
+        value = [eq.get("internal") or eq["id"] for eq in eq_list]
         return options, value
 
     # IM-11 — Apply filters → escreve store-v2-filters
@@ -1369,23 +1395,19 @@ def register_indicators_v2_callbacks(app):
             start = _dt(start_year, end.month if end.month > 1 else 1, 1)
         else:
             start, end = _year_range(year)
-        # Convenção pós-fix: lista vazia respeita intenção do usuário ("nenhum
-        # equipamento/código selecionado") quando Apply foi clicado. Em load
-        # inicial / refresh / lwb toggle, fallback pra todos (caso State ainda
-        # esteja vazio porque populate_equipment_filter não rodou).
+        # Convenção pós-fix:
+        #   - explicit (Apply clicado): respeita lista vazia como intenção
+        #     ("zero selecionado"); equip/codes viram [] no store.
+        #   - non-explicit (load url / refresh / lwb): se State estiver vazio
+        #     (populate ainda não rodou), salva None no store → unpack trata como
+        #     "toda planta / todos os códigos" sem depender de cache de names.
         explicit = (trig == "btn-apply-v2-filters")
         if explicit:
             equip_out = list(equip) if equip is not None else []
             codes_out = list(codes) if codes is not None else []
         else:
-            if equip:
-                equip_out = list(equip)
-            else:
-                try:
-                    equip_out = [eq["id"] for eq in _list_equipments_real()]
-                except Exception:
-                    equip_out = []
-            codes_out = list(codes) if codes else list(BREAKDOWN_CODES)
+            equip_out = list(equip) if equip else None
+            codes_out = list(codes) if codes else None
         return {
             "period_type":  ptype or "year",
             "year":         year,
@@ -1627,7 +1649,11 @@ def register_indicators_v2_callbacks(app):
         try:
             eq_list = _list_equipments_real()
             if equipment_filter is not None:
-                eq_list = [e for e in eq_list if e["id"] in equipment_filter]
+                _set = set(equipment_filter)
+                eq_list = [
+                    e for e in eq_list
+                    if (e.get("internal") or e["id"]) in _set or e["id"] in _set
+                ]
             for eq in eq_list:
                 eq_id = eq["id"]
                 cat = eq.get("categoria", "—")
@@ -1807,7 +1833,11 @@ def register_indicators_v2_callbacks(app):
             cards = []
             eq_list = _list_equipments_real()
             if f_eq_filter is not None:
-                eq_list = [e for e in eq_list if e["id"] in f_eq_filter]
+                _set = set(f_eq_filter)
+                eq_list = [
+                    e for e in eq_list
+                    if (e.get("internal") or e["id"]) in _set or e["id"] in _set
+                ]
             for eq in eq_list:
                 labels_eq, values = _fetch_equipment_monthly(
                     kpi, eq["id"], f_start, f_end, f_codes, lwb_simulate=f_lwb_sim

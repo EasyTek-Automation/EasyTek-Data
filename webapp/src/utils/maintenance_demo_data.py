@@ -555,7 +555,8 @@ def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
                                    year: int = None,
                                    start_date=None,
                                    end_date=None,
-                                   lwb_simulate: bool = False) -> Dict:
+                                   lwb_simulate: bool = False,
+                                   breakdown_codes=None) -> Dict:
     """
     Calcula KPI geral por mês agregando dados BRUTOS de todos os equipamentos.
 
@@ -631,7 +632,21 @@ def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
         # Horas reais (incluindo equipamentos do overlay) — SAP mantém esses no
         # denominador da planta. O overlay zera só o KPI individual, não os totais.
         production_df = fetch_zpp_production_data(start_date, end_date)
-        breakdown_df = fetch_zpp_breakdown_data(start_date, end_date, lwb_simulate=lwb_simulate)
+        breakdown_df = fetch_zpp_breakdown_data(
+            start_date, end_date,
+            breakdown_codes=breakdown_codes,
+            lwb_simulate=lwb_simulate,
+        )
+
+        # Filtro de equipamento: V2 passa equipment_ids (internal IDs do SAP).
+        # V1 e callers legados passam None ou lista cobrindo planta toda — comportamento
+        # equivalente. Coluna `linea` reflete o equipamento original (pto_trab/centro_de_trabalho).
+        if equipment_ids is not None:
+            allowed = set(equipment_ids)
+            if not production_df.empty and 'linea' in production_df.columns:
+                production_df = production_df[production_df['linea'].isin(allowed)]
+            if not breakdown_df.empty and 'linea' in breakdown_df.columns:
+                breakdown_df = breakdown_df[breakdown_df['linea'].isin(allowed)]
 
         if production_df.empty:
             return result
