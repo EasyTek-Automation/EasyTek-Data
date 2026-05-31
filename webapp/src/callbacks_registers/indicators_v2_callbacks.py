@@ -1315,13 +1315,16 @@ def register_indicators_v2_callbacks(app):
 
     @app.callback(
         Output("filter-v2-equipment", "options"),
+        Output("filter-v2-equipment", "value"),
         Input("url", "pathname"),
     )
     def populate_equipment_filter(pathname):
         if pathname != "/maintenance/indicators-v2":
-            return no_update
+            return no_update, no_update
         eq_list = _list_equipments_real()
-        return [{"label": eq["id"], "value": eq["id"]} for eq in eq_list]
+        options = [{"label": eq["id"], "value": eq["id"]} for eq in eq_list]
+        value = [eq["id"] for eq in eq_list]
+        return options, value
 
     # IM-11 — Apply filters → escreve store-v2-filters
     @app.callback(
