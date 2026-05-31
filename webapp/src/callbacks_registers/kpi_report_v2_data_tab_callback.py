@@ -66,6 +66,7 @@ def _build_full_stored_data_v2(
     end: datetime,
     codes: list[str] | None = None,
     equipment_filter: list[str] | None = None,
+    lwb_simulate: bool = False,
 ) -> dict:
     """Carrega janela [start, end) para a aba Dados V2, respeitando filtros.
 
@@ -83,7 +84,7 @@ def _build_full_stored_data_v2(
     data: dict = {}
     has_data = False
     try:
-        data = fetch_zpp_kpi_data(start, end, breakdown_codes=codes)
+        data = fetch_zpp_kpi_data(start, end, breakdown_codes=codes, lwb_simulate=lwb_simulate)
         has_data = bool(data)
     except Exception:
         logger.exception("KPI v2 data tab: fetch_zpp_kpi_data falhou")
@@ -401,14 +402,15 @@ def _render_coverage(coverage: dict) -> dbc.Card:
     ], className="shadow-sm mb-3 border-start border-primary border-3")
 
 
-def _render_motivos(period_start: str, period_end: str) -> dbc.Card | html.P:
+def _render_motivos(period_start: str, period_end: str,
+                    lwb_simulate: bool = False) -> dbc.Card | html.P:
     if not period_start or not period_end:
         return html.P("Sem dados disponíveis.",
                        className="text-muted text-center py-3")
     try:
         ps = datetime.fromisoformat(period_start)
         pe = datetime.fromisoformat(period_end)
-        motivos = aggregate_breakdown_by_cause(ps, pe)
+        motivos = aggregate_breakdown_by_cause(ps, pe, lwb_simulate=lwb_simulate)
     except Exception:
         logger.exception("KPI v2 data tab: aggregate_breakdown_by_cause falhou")
         motivos = []
@@ -500,10 +502,11 @@ def register_kpi_report_v2_data_tab_callback(app: dash.Dash) -> None:
 
         # Import lazy — evita ciclo entre indicators_v2_callbacks ↔ este módulo
         from src.callbacks_registers.indicators_v2_callbacks import _unpack_filters
-        start, end, codes, equipment_filter, _year = _unpack_filters(filters)
+        start, end, codes, equipment_filter, _year, lwb_sim = _unpack_filters(filters)
 
         try:
-            stored = _build_full_stored_data_v2(start, end, list(codes), equipment_filter)
+            stored = _build_full_stored_data_v2(start, end, list(codes), equipment_filter,
+                                                lwb_simulate=lwb_sim)
         except Exception:
             logger.exception("KPI v2 data tab: _build_full_stored_data_v2 falhou")
             return [empty] * 5
@@ -532,6 +535,7 @@ def register_kpi_report_v2_data_tab_callback(app: dash.Dash) -> None:
             _render_coverage(stored.get("data_coverage") or {}),
             _render_monthly_debug(data, equipment_ids, year_months, months),
             _render_summary_cards(totals),
-            _render_motivos(stored.get("period_start"), stored.get("period_end")),
+            _render_motivos(stored.get("period_start"), stored.get("period_end"),
+                            lwb_simulate=lwb_sim),
             _render_equipment_table(rows, totals),
         )

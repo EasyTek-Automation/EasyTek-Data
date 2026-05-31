@@ -76,7 +76,7 @@ def test_equipment_monthly_uses_v1(mock_names, mock_fetch):
     labels, values = _fetch_equipment_monthly("mtbf", "LCL-08", start, end)
 
     from src.utils.zpp_kpi_calculator import BREAKDOWN_CODES
-    mock_fetch.assert_called_once_with(start, end, list(BREAKDOWN_CODES))
+    mock_fetch.assert_called_once_with(start, end, list(BREAKDOWN_CODES), lwb_simulate=False)
     assert len(labels) == 12
     assert values == [round(8.0 + m, 2) for m in range(1, 13)]
 
@@ -177,12 +177,13 @@ def test_unpack_filters_with_all_fields():
         "equipment":   ["LCL-08", "LCT-16"],
         "codes":       ["201", "S201"],
     }
-    start, end, codes, eq_filter, year = _unpack_filters(filters)
+    start, end, codes, eq_filter, year, lwb_sim = _unpack_filters(filters)
     assert start == datetime(2025, 8, 1)
     assert end == datetime(2026, 3, 1)
     assert codes == ("201", "S201")
     assert eq_filter == ["LCL-08", "LCT-16"]
     assert year == 2025  # year = start.year (não o field "year" do store)
+    assert lwb_sim is False
 
 
 def test_unpack_filters_with_empty_lists_defaults():
@@ -198,12 +199,13 @@ def test_unpack_filters_with_empty_lists_defaults():
         "equipment":   [],
         "codes":       [],
     }
-    start, end, codes, eq_filter, year = _unpack_filters(filters)
+    start, end, codes, eq_filter, year, lwb_sim = _unpack_filters(filters)
     assert start == datetime(2026, 1, 1)
     assert end == datetime(2027, 1, 1)
     assert codes == tuple(BREAKDOWN_CODES)
     assert eq_filter is None
     assert year == 2026
+    assert lwb_sim is False
 
 
 # --- N2 — period_type=last12 cross-year ---

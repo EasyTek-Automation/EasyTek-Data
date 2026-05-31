@@ -213,25 +213,27 @@ def _cached_compact_bar(kpi: str, eq_id: str, year: int, values: list, target: f
     return fig
 
 
-def _cached_fetch_kpi(start: datetime, end: datetime, codes: tuple) -> dict:
-    """fetch_zpp_kpi_data com cache por (start_iso, end_iso, codes)."""
-    key = (start.isoformat(), end.isoformat(), codes)
+def _cached_fetch_kpi(start: datetime, end: datetime, codes: tuple,
+                      lwb_simulate: bool = False) -> dict:
+    """fetch_zpp_kpi_data com cache por (start_iso, end_iso, codes, lwb_simulate)."""
+    key = (start.isoformat(), end.isoformat(), codes, bool(lwb_simulate))
     hit = _cache_get(_CACHE_KPI, key)
     if hit is not None:
         return hit
-    data = fetch_zpp_kpi_data(start, end, list(codes))
+    data = fetch_zpp_kpi_data(start, end, list(codes), lwb_simulate=lwb_simulate)
     _cache_set(_CACHE_KPI, key, data)
     return data
 
 
 def _cached_agg(kpi_data: dict, start: datetime, end: datetime, codes: tuple,
-                equipment_filter=None) -> dict:
+                equipment_filter=None, lwb_simulate: bool = False) -> dict:
     """calculate_general_avg_by_month com cache, propaga filtro de equipamento.
 
     equipment_filter=None significa toda planta (todos os equipamentos do kpi_data).
+    lwb_simulate entra na chave pra invalidar quando o switch alterna.
     """
     eq_key = tuple(sorted(equipment_filter)) if equipment_filter else None
-    key = (start.isoformat(), end.isoformat(), codes, eq_key)
+    key = (start.isoformat(), end.isoformat(), codes, eq_key, bool(lwb_simulate))
     hit = _cache_get(_CACHE_AGG, key)
     if hit is not None:
         return hit
@@ -279,7 +281,7 @@ _CACHE_PERIOD = {}  # (year, codes) → (ts, {mtbf, mttr, breakdown_rate, ...})
 
 
 def _period_agg(start: datetime, end: datetime, codes: tuple = None,
-                equipment_filter=None) -> dict:
+                equipment_filter=None, lwb_simulate: bool = False) -> dict:
     """Agregado dos totais brutos da planta no período (BR-11 paridade V1).
     Retorna {mtbf, mttr, breakdown_rate} em unit V1 (mttr em horas).
 
@@ -301,13 +303,13 @@ def _period_agg(start: datetime, end: datetime, codes: tuple = None,
     if codes is None:
         codes = tuple(BREAKDOWN_CODES)
     eq_key = tuple(sorted(equipment_filter)) if equipment_filter else None
-    key = (start.isoformat(), end.isoformat(), codes, eq_key)
+    key = (start.isoformat(), end.isoformat(), codes, eq_key, bool(lwb_simulate))
     hit = _cache_get(_CACHE_PERIOD, key)
     if hit is not None:
         return hit
     try:
         from src.utils.maintenance_demo_data import calculate_kpi_averages
-        kpi_data = _cached_fetch_kpi(start, end, codes)
+        kpi_data = _cached_fetch_kpi(start, end, codes, lwb_simulate=lwb_simulate)
         if equipment_filter:
             eq_ids = [e for e in equipment_filter if e in kpi_data] or list(kpi_data.keys())
         else:
@@ -385,10 +387,11 @@ def _iter_months_in_range(start: datetime, end: datetime):
 
 
 def _unpack_filters(filters: dict):
-    """Extrai (start, end, codes_tuple, equipment_filter, year) do store-v2-filters.
+    """Extrai (start, end, codes_tuple, equipment_filter, year, lwb_simulate) do
+    store-v2-filters.
 
-    Default-safe: codes vazios → BREAKDOWN_CODES; equipment vazio → None (toda planta).
-    year derivado de start.year (cross-year usa o ano inicial pra título).
+    Default-safe: codes vazios → BREAKDOWN_CODES; equipment vazio → None (toda planta);
+    lwb_simulate ausente → False (régua estrita do EasyTek).
     """
     f = filters or {}
     try:
@@ -404,11 +407,13 @@ def _unpack_filters(filters: dict):
     raw_eq = f.get("equipment") or []
     equipment_filter = list(raw_eq) if raw_eq else None
     year = start.year
-    return start, end, codes, equipment_filter, year
+    lwb_simulate = bool(f.get("lwb_simulate", False))
+    return start, end, codes, equipment_filter, year, lwb_simulate
 
 
 def _fetch_planta_monthly(kpi: str, start: datetime = None, end: datetime = None,
-                          codes: tuple = None, equipment_filter=None) -> tuple:
+                          codes: tuple = None, equipment_filter=None,
+                          lwb_simulate: bool = False) -> tuple:
     """Valores mensais agregados da planta no range — cobre cross-year.
 
     Retorna (labels, values) onde labels são "Mmm/yy" cobrindo todos os meses
@@ -428,8 +433,9 @@ def _fetch_planta_monthly(kpi: str, start: datetime = None, end: datetime = None
         values = [full[(m[4] - 1) % 12] for m in months_meta]
         return labels, values
     try:
-        kpi_data = _cached_fetch_kpi(start, end, codes)
-        agg = _cached_agg(kpi_data, start, end, codes, equipment_filter)
+        kpi_data = _cached_fetch_kpi(start, end, codes, lwb_simulate=lwb_simulate)
+        agg = _cached_agg(kpi_data, start, end, codes, equipment_filter,
+                          lwb_simulate=lwb_simulate)
         field = KPI_FIELD_MAP[kpi]
         values = []
         for _, _, _, yy, mm in months_meta:
@@ -445,7 +451,8 @@ def _fetch_planta_monthly(kpi: str, start: datetime = None, end: datetime = None
 
 def _fetch_equipment_monthly(kpi: str, equipment: str,
                              start: datetime = None, end: datetime = None,
-                             codes: tuple = None) -> tuple:
+                             codes: tuple = None,
+                             lwb_simulate: bool = False) -> tuple:
     """Valores mensais do equipamento no range — cobre cross-year.
 
     Retorna (labels, values) cobrindo cada mês de [start, end). Loop sobre vários
@@ -463,7 +470,7 @@ def _fetch_equipment_monthly(kpi: str, equipment: str,
         values = [full[(m[4] - 1) % 12] for m in months_meta]
         return labels, values
     try:
-        kpi_data = _cached_fetch_kpi(start, end, codes)
+        kpi_data = _cached_fetch_kpi(start, end, codes, lwb_simulate=lwb_simulate)
         eq_data = kpi_data.get(equipment, [])
         if not eq_data:
             names = _cached_names()
@@ -499,16 +506,18 @@ def _fetch_daily_kpi(kpi: str, equipment: str, month: int,
     if not _HAS_REAL_DATA:
         return _mock_dias(kpi, equipment, month)
     try:
-        from src.utils.zpp_kpi_calculator import filter_force_zero_production
+        from src.utils.zpp_kpi_calculator import KPI_FORCE_ZERO_EQUIPMENTS
         start, end = _month_range(year, month)
-        prod_df = fetch_zpp_production_data(start, end)
-        # Overlay: KPI diário também ignora produção do equipamento forçado
-        prod_df = filter_force_zero_production(prod_df)
-        brk_df = fetch_zpp_breakdown_data(start, end, breakdown_codes=list(codes))
-        # Resolver id interno se necessário
+        # Resolver id interno (equipment pode ser nome amigável "LCT-08")
         names = get_zpp_equipment_names()
         reverse = {v: k for k, v in names.items()}
         internal_id = reverse.get(equipment, equipment)
+        # Short-circuit: equipamento do overlay tem KPI diário zerado direto.
+        if internal_id in KPI_FORCE_ZERO_EQUIPMENTS:
+            n_days = calendar.monthrange(year, month)[1]
+            return list(range(1, n_days + 1)), [0] * n_days
+        prod_df = fetch_zpp_production_data(start, end)
+        brk_df = fetch_zpp_breakdown_data(start, end, breakdown_codes=list(codes))
         # Filtrar por equipamento
         if "linea" in prod_df.columns:
             prod_eq = prod_df[prod_df["linea"] == internal_id]
@@ -1318,6 +1327,7 @@ def register_indicators_v2_callbacks(app):
         Input("btn-apply-v2-filters", "n_clicks"),
         Input("btn-refresh-indicators-v2", "n_clicks"),
         Input("url", "pathname"),
+        Input("switch-v2-lwb-simulate", "value"),
         State("filter-v2-period-type", "value"),
         State("filter-v2-reference-year", "value"),
         State("filter-v2-date-range", "start_date"),
@@ -1326,7 +1336,7 @@ def register_indicators_v2_callbacks(app):
         State("filter-v2-breakdown-codes", "value"),
         prevent_initial_call=False,
     )
-    def apply_v2_filters(apply_n, refresh_n, pathname, ptype, year, sdate, edate, equip, codes):
+    def apply_v2_filters(apply_n, refresh_n, pathname, lwb_sim, ptype, year, sdate, edate, equip, codes):
         # Invalida cache se user clicou "Atualizar" — força refetch
         trig = dash.callback_context.triggered_id
         if trig == "btn-refresh-indicators-v2":
@@ -1350,12 +1360,13 @@ def register_indicators_v2_callbacks(app):
         else:
             start, end = _year_range(year)
         return {
-            "period_type": ptype or "year",
-            "year":        year,
-            "start_iso":   start.isoformat(),
-            "end_iso":     end.isoformat(),
-            "equipment":   equip or [],
-            "codes":       codes or list(BREAKDOWN_CODES) if _HAS_REAL_DATA else codes,
+            "period_type":  ptype or "year",
+            "year":         year,
+            "start_iso":    start.isoformat(),
+            "end_iso":      end.isoformat(),
+            "equipment":    equip or [],
+            "codes":        codes or list(BREAKDOWN_CODES) if _HAS_REAL_DATA else codes,
+            "lwb_simulate": bool(lwb_sim),
         }
 
     # 1. Renderiza cards KPI + deltas + sparklines + pulse + ring + animated value
@@ -1388,7 +1399,7 @@ def register_indicators_v2_callbacks(app):
     def render_planta_cards(pathname, filters, lang):
         if pathname != "/maintenance/indicators-v2":
             return tuple([no_update] * 21)
-        start, end, codes, equipment_filter, year = _unpack_filters(filters)
+        start, end, codes, equipment_filter, year, lwb_sim = _unpack_filters(filters)
         lang = lang or "pt"
         td_lang = _TRANS.get(lang, _TRANS["pt"])
         title_planta = td_lang.get("tl_planta_mensal", "Planta — mensal")
@@ -1526,9 +1537,9 @@ def register_indicators_v2_callbacks(app):
                 title=f"Último: {last_v}{KPI_META[kpi]['unit']} vs anterior: {prev_v}{KPI_META[kpi]['unit']}",
             )
 
-        labels_br, v_br = _fetch_planta_monthly("breakdown", start, end, codes, equipment_filter)
-        labels_mt, v_mt = _fetch_planta_monthly("mtbf", start, end, codes, equipment_filter)
-        labels_mtr, v_mtr = _fetch_planta_monthly("mttr", start, end, codes, equipment_filter)
+        labels_br, v_br = _fetch_planta_monthly("breakdown", start, end, codes, equipment_filter, lwb_simulate=lwb_sim)
+        labels_mt, v_mt = _fetch_planta_monthly("mtbf", start, end, codes, equipment_filter, lwb_simulate=lwb_sim)
+        labels_mtr, v_mtr = _fetch_planta_monthly("mttr", start, end, codes, equipment_filter, lwb_simulate=lwb_sim)
         t_br = _resolve_target("breakdown")
         t_mt = _resolve_target("mtbf")
         t_mtr = _resolve_target("mttr")
@@ -1540,7 +1551,7 @@ def register_indicators_v2_callbacks(app):
         # Card value = AGREGADO DO PERÍODO (totais brutos, BR-11 paridade V1)
         # Não é último mês — é planta inteira agregada (sum active_h, sum brk_h,
         # sum failures → recalcula KPI). Igual cards V1.
-        agg = _period_agg(start, end, codes, equipment_filter)
+        agg = _period_agg(start, end, codes, equipment_filter, lwb_simulate=lwb_sim)
         last_br  = _to_display("breakdown", agg.get("breakdown_rate", 0))
         last_mt  = _to_display("mtbf",      agg.get("mtbf", 0))
         last_mtr = _to_display("mttr",      agg.get("mttr", 0))
@@ -1583,7 +1594,7 @@ def register_indicators_v2_callbacks(app):
         from datetime import datetime as _dt
         import io
         import pandas as pd
-        start, end, codes, equipment_filter, year = _unpack_filters(filters)
+        start, end, codes, equipment_filter, year, lwb_sim = _unpack_filters(filters)
         # Tabela: equipamento × mês × {mtbf, mttr, breakdown_rate}
         rows = []
         try:
@@ -1594,7 +1605,7 @@ def register_indicators_v2_callbacks(app):
                 eq_id = eq["id"]
                 cat = eq.get("categoria", "—")
                 for kpi in ("mtbf", "mttr", "breakdown"):
-                    labels, monthly = _fetch_equipment_monthly(kpi, eq_id, start, end, codes)
+                    labels, monthly = _fetch_equipment_monthly(kpi, eq_id, start, end, codes, lwb_simulate=lwb_sim)
                     for label, v in zip(labels, monthly):
                         rows.append({
                             "Equipamento": eq_id,
@@ -1707,7 +1718,7 @@ def register_indicators_v2_callbacks(app):
                 x_val = click["points"][0]["x"]
                 if t == "v2-bar-month":
                     # Label "Nov/25" → resolve (year, month) via _iter_months_in_range
-                    f_start, f_end, _, _, _ = _unpack_filters(filters)
+                    f_start, f_end, _, _, _, _ = _unpack_filters(filters)
                     bm_year, bm_month = None, None
                     for lbl, _, _, yy, mm in _iter_months_in_range(f_start, f_end):
                         if lbl == x_val:
@@ -1750,7 +1761,7 @@ def register_indicators_v2_callbacks(app):
         td = _TRANS.get(lang, _TRANS["pt"])  # tradução por key
         meses_curtos = td.get("month_short", MESES_PT)
         # Filtros do store (paridade V1): range + codes + equipment_filter
-        f_start, f_end, f_codes, f_eq_filter, f_year = _unpack_filters(filters)
+        f_start, f_end, f_codes, f_eq_filter, f_year, f_lwb_sim = _unpack_filters(filters)
         # Year do mês clicado no drilldown (cross-year ok). Fallback = f_year.
         d_year = drill_year if drill_year else f_year
         # Label KPI traduzido
@@ -1772,7 +1783,7 @@ def register_indicators_v2_callbacks(app):
                 eq_list = [e for e in eq_list if e["id"] in f_eq_filter] or eq_list
             for eq in eq_list:
                 labels_eq, values = _fetch_equipment_monthly(
-                    kpi, eq["id"], f_start, f_end, f_codes
+                    kpi, eq["id"], f_start, f_end, f_codes, lwb_simulate=f_lwb_sim
                 )
                 eq_target = _resolve_target(kpi, eq.get("internal", eq["id"]))
                 # Compact + figure cacheada por (kpi, eq, values, target)
@@ -1818,7 +1829,7 @@ def register_indicators_v2_callbacks(app):
         # NÍVEL 2: meses (gráfico grande + grid de mini-meses clicáveis) — IM-03
         if level == "meses" and equipment:
             labels_m, values = _fetch_equipment_monthly(
-                kpi, equipment, f_start, f_end, f_codes
+                kpi, equipment, f_start, f_end, f_codes, lwb_simulate=f_lwb_sim
             )
             months_meta = list(_iter_months_in_range(f_start, f_end))
             eq_target = _resolve_target(kpi, equipment)

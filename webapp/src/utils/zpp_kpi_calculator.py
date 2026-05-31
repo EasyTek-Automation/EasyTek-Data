@@ -63,6 +63,40 @@ BREAKDOWN_CODES = ['201', 'S201', '202', 'S202', '203', 'S203',
 KPI_FORCE_ZERO_EQUIPMENTS: set[str] = {"DECAP001"}
 
 
+# ============================================================================
+# Switch "Simular erro LWB" — códigos extras por equipamento que o SAP conta
+# como avaria mas o EasyTek (régua estrita) não conta por default.
+# ============================================================================
+# SOLDA001 (LWB): S401 (falta de material siderúrgico) e 303 (setup de bobina)
+# entram no contador de avarias do SAP. Não são quebra de equipamento — por isso
+# o EasyTek é mais correto não contando. O switch só existe pra reproduzir o
+# número do SAP em modo beta / auditoria.
+#
+# Ativação: `lwb_simulate=True` propagado de _unpack_filters via store-v2-filters
+# (controlado pelo dbc.Switch "switch-v2-lwb-simulate" na UI).
+LWB_EXTRA_CODES_BY_EQUIPMENT: dict[str, list[str]] = {
+    "SOLDA001": ["S401", "303"],
+}
+
+
+def build_breakdown_match(codes: List[str], lwb_simulate: bool = False) -> dict:
+    """Constrói o filtro Mongo de avarias considerando o switch LWB.
+
+    Sem `lwb_simulate`: filtro simples `causa_do_desvio in codes`.
+    Com `lwb_simulate`: union com `(centro_de_trabalho=eq AND causa in extras)`
+    para cada equipamento em LWB_EXTRA_CODES_BY_EQUIPMENT.
+    """
+    if not lwb_simulate or not LWB_EXTRA_CODES_BY_EQUIPMENT:
+        return {"causa_do_desvio": {"$in": codes}}
+    or_clauses: list[dict] = [{"causa_do_desvio": {"$in": codes}}]
+    for eq, extras in LWB_EXTRA_CODES_BY_EQUIPMENT.items():
+        or_clauses.append({
+            "centro_de_trabalho": eq,
+            "causa_do_desvio": {"$in": extras},
+        })
+    return {"$or": or_clauses}
+
+
 def filter_force_zero_production(df: "pd.DataFrame") -> "pd.DataFrame":
     """Remove linhas dos equipamentos em KPI_FORCE_ZERO_EQUIPMENTS de um DataFrame de
     produção. Usar APENAS nos contextos de cálculo de KPI de manutenção (MBTF/MTTR/Avaria).
@@ -370,7 +404,8 @@ def fetch_zpp_production_data(start_date: datetime, end_date: datetime) -> pd.Da
 
 
 def fetch_zpp_breakdown_data(start_date: datetime, end_date: datetime,
-                             breakdown_codes: Optional[List[str]] = None) -> pd.DataFrame:
+                             breakdown_codes: Optional[List[str]] = None,
+                             lwb_simulate: bool = False) -> pd.DataFrame:
     """
     Busca dados de paradas (avarias) da collection ZPP (nome fixo: ZPP_Paradas)
 
@@ -402,10 +437,12 @@ def fetch_zpp_breakdown_data(start_date: datetime, end_date: datetime,
         one_month_before = start_date - timedelta(days=31)
         query = {
             "_processed": True,
-            "causa_do_desvio": {"$in": codes},
             "inicio_execucao": {"$gte": one_month_before, "$lt": end_date},
             "fim_execucao": {"$gte": start_date, "$lt": end_date},
         }
+        # Switch "Simular erro LWB" — inclui códigos extras só para os equipamentos
+        # mapeados em LWB_EXTRA_CODES_BY_EQUIPMENT. Sem o switch: filtro simples.
+        query.update(build_breakdown_match(codes, lwb_simulate=lwb_simulate))
 
         # Buscar documentos com AMBAS as datas
         cursor = collection.find(
@@ -533,14 +570,16 @@ def fetch_zpp_breakdown_data(start_date: datetime, end_date: datetime,
 
 
 def aggregate_breakdown_by_cause(start_date: datetime, end_date: datetime,
-                                  breakdown_codes: Optional[List[str]] = None) -> List[Dict]:
+                                  breakdown_codes: Optional[List[str]] = None,
+                                  lwb_simulate: bool = False) -> List[Dict]:
     """
     Agrega eventos de parada por código de motivo (causa_do_desvio).
 
     Returns:
         Lista de dicts [{motivo, count, total_min, total_h}] ordenada por total_min desc.
     """
-    df = fetch_zpp_breakdown_data(start_date, end_date, breakdown_codes=breakdown_codes)
+    df = fetch_zpp_breakdown_data(start_date, end_date, breakdown_codes=breakdown_codes,
+                                  lwb_simulate=lwb_simulate)
 
     if df.empty:
         return []
@@ -679,6 +718,16 @@ def calculate_monthly_kpis(production_df: pd.DataFrame, breakdown_df: pd.DataFra
                 "breakdown_rate": round(breakdown_rate, 2) if breakdown_rate is not None else None
             })
 
+        # Overlay KPI_FORCE_ZERO_EQUIPMENTS — força os 3 KPIs de manutenção a 0
+        # no card individual do equipamento, MAS preserva total_active_hours pra
+        # que o agregado da planta (calculate_kpi_averages, _build_raw_table_internal)
+        # continue contando as horas reais no denominador (igual ao SAP).
+        if linea in KPI_FORCE_ZERO_EQUIPMENTS:
+            for m in monthly_data:
+                m["mtbf"] = 0
+                m["mttr"] = 0
+                m["breakdown_rate"] = 0
+
         result[linea] = monthly_data
 
     return result
@@ -776,7 +825,8 @@ def get_zpp_data_coverage(start_date: datetime, end_date: datetime,
 # ==================== FUNÇÃO PRINCIPAL ====================
 
 def fetch_zpp_kpi_data(start_date: datetime, end_date: datetime,
-                       breakdown_codes: Optional[List[str]] = None) -> Dict:
+                       breakdown_codes: Optional[List[str]] = None,
+                       lwb_simulate: bool = False) -> Dict:
     """
     Função principal: busca dados do MongoDB e calcula KPIs
 
@@ -793,13 +843,17 @@ def fetch_zpp_kpi_data(start_date: datetime, end_date: datetime,
     """
 
     try:
-        # 1. Buscar dados de produção (filtrar equipamentos do overlay — paridade
-        #    com fetch_zpp_breakdown_data, que já é filtrado no próprio fetch)
+        # 1. Buscar dados de produção — NÃO filtra equipamentos do overlay aqui.
+        #    A planta precisa das horas reais (incluindo DECAP001) no denominador
+        #    pra bater com o SAP. O overlay zera o KPI por equipamento depois,
+        #    em calculate_monthly_kpis, sem tocar nas horas brutas.
         production_df = fetch_zpp_production_data(start_date, end_date)
-        production_df = filter_force_zero_production(production_df)
 
         # 2. Buscar dados de paradas (com filtro de códigos selecionados)
-        breakdown_df = fetch_zpp_breakdown_data(start_date, end_date, breakdown_codes=breakdown_codes)
+        breakdown_df = fetch_zpp_breakdown_data(
+            start_date, end_date, breakdown_codes=breakdown_codes,
+            lwb_simulate=lwb_simulate,
+        )
 
         # 3. Calcular KPIs
         kpi_data = calculate_monthly_kpis(production_df, breakdown_df)

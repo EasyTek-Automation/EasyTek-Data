@@ -597,6 +597,16 @@ def layout():
                                         ),
                                     ]
                                 ),
+                                # Switch (beta) — espelhar a régua do SAP no SOLDA001 (LWB),
+                                # somando S401 (falta de material) e 303 (setup) ao set de
+                                # códigos de avaria. Default OFF = régua estrita do EasyTek
+                                # (só os 12 BREAKDOWN_CODES); ON = bate o SAP exato.
+                                dbc.Switch(
+                                    id="switch-v2-lwb-simulate",
+                                    label="Simular erro LWB (SOLDA001)",
+                                    value=False,
+                                    className="small text-muted",
+                                ),
                             ],
                             className="d-flex flex-column align-items-md-end align-items-start gap-2",
                         ),

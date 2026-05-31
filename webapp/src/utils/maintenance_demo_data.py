@@ -622,13 +622,12 @@ def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
     # Método principal: busca dados brutos usando range de datas completo
     try:
         from src.utils.zpp_kpi_calculator import (
-            fetch_zpp_production_data, fetch_zpp_breakdown_data,
-            filter_force_zero_production, _get_month_periods
+            fetch_zpp_production_data, fetch_zpp_breakdown_data, _get_month_periods
         )
 
+        # Horas reais (incluindo equipamentos do overlay) — SAP mantém esses no
+        # denominador da planta. O overlay zera só o KPI individual, não os totais.
         production_df = fetch_zpp_production_data(start_date, end_date)
-        # Overlay: KPI manutenção da planta não conta horas dos equipamentos forçados
-        production_df = filter_force_zero_production(production_df)
         breakdown_df = fetch_zpp_breakdown_data(start_date, end_date)
 
         if production_df.empty:
@@ -725,6 +724,9 @@ def _build_raw_table_internal(
             totals: dict da planta (soma + recálculo PRO017)
         Se nenhum equipamento tem dados na janela, rows é lista vazia e totals tem zeros.
     """
+    # Import lazy — evita ciclo
+    from src.utils.zpp_kpi_calculator import KPI_FORCE_ZERO_EQUIPMENTS
+
     rows = []
     for eq_id in equipment_ids:
         if eq_id not in data:
@@ -754,6 +756,13 @@ def _build_raw_table_internal(
         else:
             mtbf = None
             mttr_min = None
+
+        # Overlay KPI_FORCE_ZERO_EQUIPMENTS — zera KPIs por equipamento mas
+        # mantém os totais brutos (horas, ordens) pra agregado planta usar.
+        if eq_id in KPI_FORCE_ZERO_EQUIPMENTS:
+            mtbf = 0.0
+            mttr_min = 0.0
+            bd_rate = 0.0
 
         rows.append({
             "eq_id": eq_id,
