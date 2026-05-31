@@ -622,10 +622,13 @@ def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
     # Método principal: busca dados brutos usando range de datas completo
     try:
         from src.utils.zpp_kpi_calculator import (
-            fetch_zpp_production_data, fetch_zpp_breakdown_data, _get_month_periods
+            fetch_zpp_production_data, fetch_zpp_breakdown_data,
+            filter_force_zero_production, _get_month_periods
         )
 
         production_df = fetch_zpp_production_data(start_date, end_date)
+        # Overlay: KPI manutenção da planta não conta horas dos equipamentos forçados
+        production_df = filter_force_zero_production(production_df)
         breakdown_df = fetch_zpp_breakdown_data(start_date, end_date)
 
         if production_df.empty:

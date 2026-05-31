@@ -62,6 +62,22 @@ BREAKDOWN_CODES = ['201', 'S201', '202', 'S202', '203', 'S203',
 #     atividade e na listagem de equipamentos.
 KPI_FORCE_ZERO_EQUIPMENTS: set[str] = {"DECAP001"}
 
+
+def filter_force_zero_production(df: "pd.DataFrame") -> "pd.DataFrame":
+    """Remove linhas dos equipamentos em KPI_FORCE_ZERO_EQUIPMENTS de um DataFrame de
+    produção. Usar APENAS nos contextos de cálculo de KPI de manutenção (MBTF/MTTR/Avaria).
+
+    Sem esta filtragem, MBTF = (∑horasact − ∑breakdown_h) / num_falhas devolve as
+    horas de atividade do equipamento (com num_falhas=0 pelo overlay de paradas), o
+    que infla MBTF do próprio equipamento e da planta. Paginas de produção (TON/HORA,
+    horas, ordens) chamam fetch_zpp_production_data direto e ficam inalteradas.
+    """
+    if df is None or df.empty or not KPI_FORCE_ZERO_EQUIPMENTS:
+        return df
+    if "linea" not in df.columns:
+        return df
+    return df[~df["linea"].isin(KPI_FORCE_ZERO_EQUIPMENTS)].copy()
+
 # Mapeamento de categorias por prefixo de equipamento
 EQUIPMENT_CATEGORY_PREFIXES = {
     "Longitudinais": ["LONGI"],
@@ -777,8 +793,10 @@ def fetch_zpp_kpi_data(start_date: datetime, end_date: datetime,
     """
 
     try:
-        # 1. Buscar dados de produção
+        # 1. Buscar dados de produção (filtrar equipamentos do overlay — paridade
+        #    com fetch_zpp_breakdown_data, que já é filtrado no próprio fetch)
         production_df = fetch_zpp_production_data(start_date, end_date)
+        production_df = filter_force_zero_production(production_df)
 
         # 2. Buscar dados de paradas (com filtro de códigos selecionados)
         breakdown_df = fetch_zpp_breakdown_data(start_date, end_date, breakdown_codes=breakdown_codes)

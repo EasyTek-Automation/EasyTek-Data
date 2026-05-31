@@ -499,8 +499,11 @@ def _fetch_daily_kpi(kpi: str, equipment: str, month: int,
     if not _HAS_REAL_DATA:
         return _mock_dias(kpi, equipment, month)
     try:
+        from src.utils.zpp_kpi_calculator import filter_force_zero_production
         start, end = _month_range(year, month)
         prod_df = fetch_zpp_production_data(start, end)
+        # Overlay: KPI diário também ignora produção do equipamento forçado
+        prod_df = filter_force_zero_production(prod_df)
         brk_df = fetch_zpp_breakdown_data(start, end, breakdown_codes=list(codes))
         # Resolver id interno se necessário
         names = get_zpp_equipment_names()
