@@ -245,6 +245,7 @@ def _cached_agg(kpi_data: dict, start: datetime, end: datetime, codes: tuple,
         data=kpi_data, equipment_ids=eq_ids,
         months=None, year=None,
         start_date=start, end_date=end,
+        lwb_simulate=lwb_simulate,
     )
     _cache_set(_CACHE_AGG, key, agg)
     return agg
@@ -322,6 +323,7 @@ def _period_agg(start: datetime, end: datetime, codes: tuple = None,
             year=start.year,
             start_date=start,
             end_date=end,
+            lwb_simulate=lwb_simulate,
         )
         _cache_set(_CACHE_PERIOD, key, agg)
         return agg

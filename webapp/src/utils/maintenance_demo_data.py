@@ -380,7 +380,8 @@ def calculate_kpi_averages(data: Dict[str, List[Dict]],
                            monthly_aggregates: Dict = None,
                            year_months: List[str] = None,
                            start_date=None,
-                           end_date=None) -> Dict:
+                           end_date=None,
+                           lwb_simulate: bool = False) -> Dict:
     """
     Calcula médias dos KPIs considerando filtros.
 
@@ -474,12 +475,13 @@ def calculate_kpi_averages(data: Dict[str, List[Dict]],
     elif start_date is not None and end_date is not None:
         # Novo caminho: usar start_date/end_date (suporta multi-ano)
         monthly_values = calculate_general_avg_by_month(
-            data, equipment_filter, start_date=start_date, end_date=end_date
+            data, equipment_filter, start_date=start_date, end_date=end_date,
+            lwb_simulate=lwb_simulate,
         )
     elif year is not None:
         # Legado: usar year + months
         monthly_values = calculate_general_avg_by_month(
-            data, equipment_filter, month_filter, year=year
+            data, equipment_filter, month_filter, year=year, lwb_simulate=lwb_simulate,
         )
     else:
         monthly_values = None
@@ -552,7 +554,8 @@ def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
                                    months: List[int] = None,
                                    year: int = None,
                                    start_date=None,
-                                   end_date=None) -> Dict:
+                                   end_date=None,
+                                   lwb_simulate: bool = False) -> Dict:
     """
     Calcula KPI geral por mês agregando dados BRUTOS de todos os equipamentos.
 
@@ -628,7 +631,7 @@ def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
         # Horas reais (incluindo equipamentos do overlay) — SAP mantém esses no
         # denominador da planta. O overlay zera só o KPI individual, não os totais.
         production_df = fetch_zpp_production_data(start_date, end_date)
-        breakdown_df = fetch_zpp_breakdown_data(start_date, end_date)
+        breakdown_df = fetch_zpp_breakdown_data(start_date, end_date, lwb_simulate=lwb_simulate)
 
         if production_df.empty:
             return result
