@@ -232,15 +232,16 @@ def _cached_agg(kpi_data: dict, start: datetime, end: datetime, codes: tuple,
     equipment_filter=None significa toda planta (todos os equipamentos do kpi_data).
     lwb_simulate entra na chave pra invalidar quando o switch alterna.
     """
-    eq_key = tuple(sorted(equipment_filter)) if equipment_filter else None
+    # eq_key distingue None (toda planta) de lista (mesmo vazia)
+    eq_key = "ALL" if equipment_filter is None else tuple(sorted(equipment_filter))
     key = (start.isoformat(), end.isoformat(), codes, eq_key, bool(lwb_simulate))
     hit = _cache_get(_CACHE_AGG, key)
     if hit is not None:
         return hit
-    if equipment_filter:
-        eq_ids = [e for e in equipment_filter if e in kpi_data] or list(kpi_data.keys())
-    else:
+    if equipment_filter is None:
         eq_ids = list(kpi_data.keys())
+    else:
+        eq_ids = [e for e in equipment_filter if e in kpi_data]
     agg = calculate_general_avg_by_month(
         data=kpi_data, equipment_ids=eq_ids,
         months=None, year=None,
@@ -303,7 +304,8 @@ def _period_agg(start: datetime, end: datetime, codes: tuple = None,
         return out
     if codes is None:
         codes = tuple(BREAKDOWN_CODES)
-    eq_key = tuple(sorted(equipment_filter)) if equipment_filter else None
+    # eq_key distingue None (toda planta) de lista (mesmo vazia)
+    eq_key = "ALL" if equipment_filter is None else tuple(sorted(equipment_filter))
     key = (start.isoformat(), end.isoformat(), codes, eq_key, bool(lwb_simulate))
     hit = _cache_get(_CACHE_PERIOD, key)
     if hit is not None:
@@ -311,10 +313,10 @@ def _period_agg(start: datetime, end: datetime, codes: tuple = None,
     try:
         from src.utils.maintenance_demo_data import calculate_kpi_averages
         kpi_data = _cached_fetch_kpi(start, end, codes, lwb_simulate=lwb_simulate)
-        if equipment_filter:
-            eq_ids = [e for e in equipment_filter if e in kpi_data] or list(kpi_data.keys())
-        else:
+        if equipment_filter is None:
             eq_ids = list(kpi_data.keys())
+        else:
+            eq_ids = [e for e in equipment_filter if e in kpi_data]
         months_in_range = sorted({m for _, _, _, _, m in _iter_months_in_range(start, end)})
         agg = calculate_kpi_averages(
             data=kpi_data,
@@ -404,10 +406,13 @@ def _unpack_filters(filters: dict):
         end = datetime.fromisoformat(f.get("end_iso") or f"{DEFAULT_YEAR + 1}-01-01T00:00:00")
     except Exception:
         end = datetime(DEFAULT_YEAR + 1, 1, 1)
-    raw_codes = f.get("codes") or []
-    codes = tuple(raw_codes) if raw_codes else tuple(BREAKDOWN_CODES)
-    raw_eq = f.get("equipment") or []
-    equipment_filter = list(raw_eq) if raw_eq else None
+    # Convenção pós-fix:
+    #   None (chave ausente) → fallback (toda planta / BREAKDOWN_CODES) — legacy
+    #   lista vazia          → intenção explícita ("nada selecionado")
+    raw_codes = f.get("codes")
+    codes = tuple(BREAKDOWN_CODES) if raw_codes is None else tuple(raw_codes)
+    raw_eq = f.get("equipment")
+    equipment_filter = None if raw_eq is None else list(raw_eq)
     year = start.year
     lwb_simulate = bool(f.get("lwb_simulate", False))
     return start, end, codes, equipment_filter, year, lwb_simulate
@@ -1364,13 +1369,30 @@ def register_indicators_v2_callbacks(app):
             start = _dt(start_year, end.month if end.month > 1 else 1, 1)
         else:
             start, end = _year_range(year)
+        # Convenção pós-fix: lista vazia respeita intenção do usuário ("nenhum
+        # equipamento/código selecionado") quando Apply foi clicado. Em load
+        # inicial / refresh / lwb toggle, fallback pra todos (caso State ainda
+        # esteja vazio porque populate_equipment_filter não rodou).
+        explicit = (trig == "btn-apply-v2-filters")
+        if explicit:
+            equip_out = list(equip) if equip is not None else []
+            codes_out = list(codes) if codes is not None else []
+        else:
+            if equip:
+                equip_out = list(equip)
+            else:
+                try:
+                    equip_out = [eq["id"] for eq in _list_equipments_real()]
+                except Exception:
+                    equip_out = []
+            codes_out = list(codes) if codes else list(BREAKDOWN_CODES)
         return {
             "period_type":  ptype or "year",
             "year":         year,
             "start_iso":    start.isoformat(),
             "end_iso":      end.isoformat(),
-            "equipment":    equip or [],
-            "codes":        codes or list(BREAKDOWN_CODES) if _HAS_REAL_DATA else codes,
+            "equipment":    equip_out,
+            "codes":        codes_out if _HAS_REAL_DATA else codes_out,
             "lwb_simulate": bool(lwb_sim),
         }
 
@@ -1604,8 +1626,8 @@ def register_indicators_v2_callbacks(app):
         rows = []
         try:
             eq_list = _list_equipments_real()
-            if equipment_filter:
-                eq_list = [e for e in eq_list if e["id"] in equipment_filter] or eq_list
+            if equipment_filter is not None:
+                eq_list = [e for e in eq_list if e["id"] in equipment_filter]
             for eq in eq_list:
                 eq_id = eq["id"]
                 cat = eq.get("categoria", "—")
@@ -1784,8 +1806,8 @@ def register_indicators_v2_callbacks(app):
         if level == "equipamentos":
             cards = []
             eq_list = _list_equipments_real()
-            if f_eq_filter:
-                eq_list = [e for e in eq_list if e["id"] in f_eq_filter] or eq_list
+            if f_eq_filter is not None:
+                eq_list = [e for e in eq_list if e["id"] in f_eq_filter]
             for eq in eq_list:
                 labels_eq, values = _fetch_equipment_monthly(
                     kpi, eq["id"], f_start, f_end, f_codes, lwb_simulate=f_lwb_sim
