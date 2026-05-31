@@ -626,7 +626,9 @@ def calculate_monthly_kpis(production_df: pd.DataFrame, breakdown_df: pd.DataFra
                 "total_breakdown_hours": round(total_breakdown_hours, 4),
                 "uptime_hours": round(max(total_active_hours - total_breakdown_hours, 0), 4),
                 "mtbf": round(mtbf, 2) if mtbf is not None else None,
-                "mttr": round(mttr, 2) if mttr is not None else None,
+                # mttr em HORAS — round(6) preserva precisão para conversão para minutos
+                # (×60) sem perda visível. Round(2) introduzia erro ~0.3 min após ×60.
+                "mttr": round(mttr, 6) if mttr is not None else None,
                 "breakdown_rate": round(breakdown_rate, 2) if breakdown_rate is not None else None
             })
 

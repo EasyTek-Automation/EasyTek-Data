@@ -14,13 +14,12 @@ Trigger: `tabs-indicators-v2.active_tab == 'tab-v2-data'`.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 import dash
 import dash_bootstrap_components as dbc
 from dash import Input, Output, dash_table, html
 
-from src.utils import kpi_report_config as cfg
 from src.utils.maintenance_demo_data import (
     _build_raw_table_internal,
     calculate_general_avg_by_month,
@@ -45,24 +44,57 @@ _MN = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
 # Carregador de stored_data (espelha process_filters_and_load_data V1)
 # ============================================================================
 
-def _build_full_stored_data_v2(now: datetime) -> dict:
-    """Carrega janela 'ano corrente até 31/12' para a aba Dados V2.
+def _iter_year_months(start: datetime, end: datetime) -> list[str]:
+    """Lista de "YYYY-MM" cobrindo [start, end) — suporta cross-year.
+
+    Inclui o mês `(y, m)` se seu primeiro dia `< end`; caller passa `end` como
+    primeiro instante do mês seguinte (convenção BR-12).
+    """
+    out = []
+    y, m = start.year, start.month
+    while datetime(y, m, 1) < end:
+        out.append(f"{y}-{m:02d}")
+        if m == 12:
+            y, m = y + 1, 1
+        else:
+            m += 1
+    return out
+
+
+def _build_full_stored_data_v2(
+    start: datetime,
+    end: datetime,
+    codes: list[str] | None = None,
+    equipment_filter: list[str] | None = None,
+) -> dict:
+    """Carrega janela [start, end) para a aba Dados V2, respeitando filtros.
 
     Reusa funções canônicas v1 (fetch_zpp_kpi_data, get_zpp_equipment_*,
     calculate_general_avg_by_month, get_zpp_data_coverage). Não recalcula KPI.
+
+    Args:
+        start: início da janela (datetime naïve, inclusivo)
+        end: fim da janela (datetime naïve, exclusivo — primeiro instante do mês seguinte)
+        codes: códigos de avaria a considerar (default: BREAKDOWN_CODES)
+        equipment_filter: lista de equipamentos a incluir (default: todos os retornados)
     """
-    year = now.year
-    start = datetime(year, 1, 1)
-    end = datetime(year, 12, 31, 23, 59, 59)
+    codes = list(codes) if codes else list(BREAKDOWN_CODES)
 
     data: dict = {}
     has_data = False
     try:
-        data = fetch_zpp_kpi_data(start, end, breakdown_codes=BREAKDOWN_CODES)
+        data = fetch_zpp_kpi_data(start, end, breakdown_codes=codes)
         has_data = bool(data)
     except Exception:
         logger.exception("KPI v2 data tab: fetch_zpp_kpi_data falhou")
         data = {}
+
+    # Aplica filtro de equipamento (preserva apenas os solicitados que existem nos dados)
+    if has_data and equipment_filter:
+        filtered = {k: v for k, v in data.items() if k in equipment_filter}
+        if filtered:
+            data = filtered
+        # se filtro não bateu com nenhum equipamento retornado, mantém todos (fallback graceful)
 
     try:
         names = get_zpp_equipment_names() if has_data else {}
@@ -90,17 +122,16 @@ def _build_full_stored_data_v2(now: datetime) -> dict:
     if has_data:
         try:
             data_coverage = get_zpp_data_coverage(
-                start, end, breakdown_codes=BREAKDOWN_CODES,
+                start, end, breakdown_codes=codes,
             ) or {}
         except Exception:
             logger.exception("KPI v2 data tab: data_coverage falhou")
 
-    # year_months Jan..Dez (formato YYYY-MM)
-    year_months = [f"{year}-{m:02d}" for m in range(1, 13)]
-    months = list(range(1, 13))
+    year_months = _iter_year_months(start, end)
+    months = sorted({int(ym.split("-")[1]) for ym in year_months})
 
     return {
-        "year":              year,
+        "year":              start.year,
         "months":            months,
         "year_months":       year_months,
         "equipment_ids":     list(data.keys()),
@@ -457,17 +488,22 @@ def register_kpi_report_v2_data_tab_callback(app: dash.Dash) -> None:
         Output("rd-v2-data-motivos", "children"),
         Output("rd-v2-data-table", "children"),
         Input("tabs-indicators-v2", "active_tab"),
+        Input("store-v2-filters", "data"),
         prevent_initial_call=True,
     )
-    def render_dados_v2(active_tab):
+    def render_dados_v2(active_tab, filters):
         if active_tab != "tab-v2-data":
             raise dash.exceptions.PreventUpdate
 
         empty = html.P("Sem dados disponíveis para o período.",
                         className="text-muted text-center py-5")
-        agora = cfg._now_in_report_timezone()
+
+        # Import lazy — evita ciclo entre indicators_v2_callbacks ↔ este módulo
+        from src.callbacks_registers.indicators_v2_callbacks import _unpack_filters
+        start, end, codes, equipment_filter, _year = _unpack_filters(filters)
+
         try:
-            stored = _build_full_stored_data_v2(agora)
+            stored = _build_full_stored_data_v2(start, end, list(codes), equipment_filter)
         except Exception:
             logger.exception("KPI v2 data tab: _build_full_stored_data_v2 falhou")
             return [empty] * 5
