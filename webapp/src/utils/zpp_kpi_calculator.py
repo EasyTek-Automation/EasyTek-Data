@@ -36,6 +36,32 @@ ZPP_PARADAS_COLLECTION = "ZPP_Paradas"
 BREAKDOWN_CODES = ['201', 'S201', '202', 'S202', '203', 'S203',
                    '204', 'S204', '205', 'S205', '110', 'S110']
 
+# ============================================================================
+# OVERLAY DE NEGÓCIO — Equipamentos com KPIs de manutenção forçados a ZERO
+# ============================================================================
+# Lista de equipamentos cujas paradas são IGNORADAS no cálculo de KPIs de
+# manutenção (MTBF, MTTR, Taxa de Avaria, Top Paradas, etc.).
+#
+# Motivo atual:
+#   DECAP001 — a linha de decapagem pegou fogo e está fora de operação.
+#     Sobrou só uma embaladora que, por gambiarra de cadastro de mão de obra,
+#     é lançada no SAP como DECAP001. O SAP (ZBRPP029/ZPP_NT0001) mostra 0
+#     paradas no DECAP001; o EasyTek deve espelhar isso enquanto a linha está
+#     parada.
+#
+# REVERSÃO (quando a máquina nova entrar em operação):
+#   REMOVER o equipamento deste set — a matemática volta a valer automaticamente,
+#   sem precisar mudar mais nada. Os documentos do Mongo nunca foram apagados;
+#   este overlay só os ignora no momento do cálculo.
+#
+# Importante:
+#   - NÃO altera os documentos em ZPP_Paradas. A supressão é só no cálculo.
+#   - Aplica-se em fetch_zpp_breakdown_data e em fetch_top_breakdowns_by_equipment
+#     (todos os caminhos de leitura de paradas para KPI passam por esses dois).
+#   - Não filtra ZPP_Producao — o equipamento continua aparecendo nas horas de
+#     atividade e na listagem de equipamentos.
+KPI_FORCE_ZERO_EQUIPMENTS: set[str] = {"DECAP001"}
+
 # Mapeamento de categorias por prefixo de equipamento
 EQUIPMENT_CATEGORY_PREFIXES = {
     "Longitudinais": ["LONGI"],
@@ -471,6 +497,11 @@ def fetch_zpp_breakdown_data(start_date: datetime, end_date: datetime,
                 break
 
         df = pd.DataFrame(processed_records)
+
+        # Overlay KPI_FORCE_ZERO_EQUIPMENTS — descarta paradas dos equipamentos
+        # forçados a zero. Documentos no Mongo intactos; só some do cálculo.
+        if not df.empty and KPI_FORCE_ZERO_EQUIPMENTS:
+            df = df[~df["linea"].isin(KPI_FORCE_ZERO_EQUIPMENTS)].copy()
 
         if boundary_count > 0:
             pass
@@ -924,6 +955,9 @@ def fetch_top_breakdowns_by_equipment(equipment_id: str,
         ]
     """
     codes = breakdown_codes if breakdown_codes else BREAKDOWN_CODES
+    # Overlay KPI_FORCE_ZERO_EQUIPMENTS — não busca paradas (espelha SAP=0).
+    if equipment_id in KPI_FORCE_ZERO_EQUIPMENTS:
+        return []
     try:
         # IMPORTANTE: Usar constante fixa, não nome dinâmico
         collection = get_mongo_connection(ZPP_PARADAS_COLLECTION)
@@ -1045,6 +1079,10 @@ def fetch_top_breakdowns_all(start_date: datetime, end_date: datetime,
             equipamentos_excluidos = EQUIPAMENTOS_EXCLUIDOS
         except ImportError:
             equipamentos_excluidos = []
+
+    # Overlay KPI_FORCE_ZERO_EQUIPMENTS — adiciona aos excluídos da query Mongo.
+    if KPI_FORCE_ZERO_EQUIPMENTS:
+        equipamentos_excluidos = list(set(equipamentos_excluidos) | KPI_FORCE_ZERO_EQUIPMENTS)
 
     try:
         collection = get_mongo_connection(ZPP_PARADAS_COLLECTION)

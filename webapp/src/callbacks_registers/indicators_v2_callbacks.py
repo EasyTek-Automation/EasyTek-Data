@@ -437,15 +437,10 @@ def _fetch_planta_monthly(kpi: str, start: datetime = None, end: datetime = None
             entry = agg.get(key) or agg.get(mm) or {}
             raw = float(entry.get(field, 0) or 0)
             values.append(_to_display(kpi, raw))
-        if all(v == 0 for v in values):
-            full = _mock_planta_mes(kpi)
-            values = [full[(m[4] - 1) % 12] for m in months_meta]
         return labels, values
     except Exception as e:
-        logger.warning("V2 planta %s falhou (%s) — fallback mock", kpi, e)
-        full = _mock_planta_mes(kpi)
-        values = [full[(m[4] - 1) % 12] for m in months_meta]
-        return labels, values
+        logger.warning("V2 planta %s falhou (%s) — retornando zeros", kpi, e)
+        return labels, [0] * len(months_meta)
 
 
 def _fetch_equipment_monthly(kpi: str, equipment: str,
@@ -488,15 +483,10 @@ def _fetch_equipment_monthly(kpi: str, equipment: str,
                 values.append(_to_display(kpi, raw))
             else:
                 values.append(0)
-        if all(v == 0 for v in values):
-            full = _mock_equipamento_mes(kpi, equipment)
-            values = [full[(m[4] - 1) % 12] for m in months_meta]
         return labels, values
     except Exception as e:
-        logger.warning("V2 equip %s/%s falhou (%s)", equipment, kpi, e)
-        full = _mock_equipamento_mes(kpi, equipment)
-        values = [full[(m[4] - 1) % 12] for m in months_meta]
-        return labels, values
+        logger.warning("V2 equip %s/%s falhou (%s) — retornando zeros", equipment, kpi, e)
+        return labels, [0] * len(months_meta)
 
 
 def _fetch_daily_kpi(kpi: str, equipment: str, month: int,
@@ -550,12 +540,11 @@ def _fetch_daily_kpi(kpi: str, equipment: str, month: int,
             else:  # breakdown rate
                 v = (breakdown_h / active_h * 100) if active_h > 0 else 0
             values.append(_to_display(kpi, v))  # MTTR: ×60 (h→min)
-        if all(v == 0 for v in values):
-            return _mock_dias(kpi, equipment, month)
         return dias, values
     except Exception as e:
-        logger.warning("V2 daily %s/%s/%s falhou (%s)", equipment, month, kpi, e)
-        return _mock_dias(kpi, equipment, month)
+        logger.warning("V2 daily %s/%s/%s falhou (%s) — retornando zeros", equipment, month, kpi, e)
+        n_days = calendar.monthrange(year, month)[1]
+        return list(range(1, n_days + 1)), [0] * n_days
 
 
 def _fetch_top_paradas_real(equipment: str, month: int, year: int = DEFAULT_YEAR,
@@ -577,7 +566,7 @@ def _fetch_top_paradas_real(equipment: str, month: int, year: int = DEFAULT_YEAR
             internal_id, start, end, top_n=top_n, breakdown_codes=list(codes)
         )
         if not items_v1:
-            return _mock_top_paradas_mes(equipment, month, top_n)
+            return []
         items = []
         for it in items_v1:
             date_obj = it.get("date")
@@ -597,8 +586,8 @@ def _fetch_top_paradas_real(equipment: str, month: int, year: int = DEFAULT_YEAR
             })
         return items
     except Exception as e:
-        logger.warning("V2 top paradas %s/%s falhou (%s)", equipment, month, e)
-        return _mock_top_paradas_mes(equipment, month, top_n)
+        logger.warning("V2 top paradas %s/%s falhou (%s) — retornando vazio", equipment, month, e)
+        return []
 
 
 def _fetch_events_day_real(equipment: str, month: int, day: int,
@@ -614,14 +603,19 @@ def _fetch_events_day_real(equipment: str, month: int, day: int,
     if not _HAS_REAL_DATA:
         return _mock_eventos_dia(None, equipment, month, day)
     try:
+        from src.utils.zpp_kpi_calculator import KPI_FORCE_ZERO_EQUIPMENTS
         names = get_zpp_equipment_names()
         reverse = {v: k for k, v in names.items()}
         internal_id = reverse.get(equipment, equipment)
+        # Overlay KPI_FORCE_ZERO_EQUIPMENTS — não traz eventos (espelha SAP=0).
+        if internal_id in KPI_FORCE_ZERO_EQUIPMENTS:
+            return []
         start = datetime(year, month, day)
         end = start + timedelta(days=1)
         col = get_mongo_connection("ZPP_Paradas")
         if col is None:
-            return _mock_eventos_dia(None, equipment, month, day)
+            logger.warning("V2 eventos dia: collection ZPP_Paradas indisponivel — retornando vazio")
+            return []
         query = {
             "centro_de_trabalho": internal_id,
             "inicio_execucao": {"$gte": start, "$lt": end},  # BR-12 semi-aberta
@@ -649,12 +643,10 @@ def _fetch_events_day_real(equipment: str, month: int, day: int,
                 "Duração (min)": int(doc.get("duration_min", 0) or 0),
                 "Código":        doc.get("causa_do_desvio", "—"),
             })
-        if not eventos:
-            return _mock_eventos_dia(None, equipment, month, day)
         return eventos
     except Exception as e:
-        logger.warning("V2 eventos dia %s/%s/%s falhou (%s)", equipment, month, day, e)
-        return _mock_eventos_dia(None, equipment, month, day)
+        logger.warning("V2 eventos dia %s/%s/%s falhou (%s) — retornando vazio", equipment, month, day, e)
+        return []
 
 
 def _list_equipments_real() -> list:
