@@ -1954,9 +1954,10 @@ def register_indicators_v2_callbacks(app):
             labels_m, values, statuses_m = _fetch_equipment_monthly(
                 kpi, equipment, f_start, f_end, f_codes, lwb_simulate=f_lwb_sim
             )
-            # months_meta segue _iter_months_in_range pra preservar drilldown
-            # day → table; usa filtro original (range exato selecionado).
-            months_meta = list(_iter_months_in_range(f_start, f_end))
+            # months_meta_full alinhado a labels_m/values/statuses_m (12 itens),
+            # carrega (year, month) reais pra montar IDs dos mini-cards e
+            # decidir clicabilidade por status.
+            months_meta_full = list(_chart_months_with_status(f_start, f_end))
             eq_target = _resolve_target(kpi, equipment)
             main_fig = _bar(labels_m, values, f"{equipment} — {td.get('mdl_meses','12 meses')}",
                             meta["color"], meta["unit"],
@@ -1965,34 +1966,46 @@ def register_indicators_v2_callbacks(app):
             main_fig.update_layout(height=380)
 
             # mini-cards por mês (clicáveis) abaixo do gráfico grande.
-            # Cada card carrega month + year reais (cross-year ok) no pattern id.
+            # Meses "out" do filtro ficam visualmente apagados e não-clicáveis.
             mini_rows = []
-            for label, val, (_, _, _, yy, mm) in zip(labels_m, values, months_meta):
-                mini_rows.append(
-                    dbc.Col(
-                        html.Div(
-                            dbc.Card(
-                                dbc.CardBody(
-                                    [
-                                        html.Div(label, className="text-muted small mb-1"),
-                                        html.Div(
-                                            f"{val}{meta['unit']}",
-                                            style={"fontSize": "1.2rem", "fontWeight": "bold",
-                                                   "color": meta["color"]},
-                                        ),
-                                    ],
-                                    className="text-center py-2",
+            for label, val, (_, _, _, yy, mm, status) in zip(labels_m, values, months_meta_full):
+                clickable = status in ("in", "partial")
+                if status == "out":
+                    card_style = {"opacity": 0.45}
+                    val_color = "#adb5bd"
+                    cursor = "default"
+                elif status == "partial":
+                    card_style = {"borderLeft": f"3px solid {_PARTIAL_COLOR}"}
+                    val_color = _PARTIAL_COLOR
+                    cursor = "pointer"
+                else:
+                    card_style = {}
+                    val_color = meta["color"]
+                    cursor = "pointer"
+                card_div = html.Div(
+                    dbc.Card(
+                        dbc.CardBody(
+                            [
+                                html.Div(label, className="text-muted small mb-1"),
+                                html.Div(
+                                    f"{val}{meta['unit']}",
+                                    style={"fontSize": "1.2rem", "fontWeight": "bold",
+                                           "color": val_color},
                                 ),
-                                className="shadow-sm",
-                            ),
-                            id={"type": "v2-month", "kpi": kpi,
-                                "equipment": equipment, "month": mm, "year": yy},
-                            n_clicks=0,
-                            style={"cursor": "pointer"},
+                            ],
+                            className="text-center py-2",
                         ),
-                        xs=6, sm=4, md=3, lg=2,
-                        className="mb-2",
-                    )
+                        className="shadow-sm",
+                        style=card_style,
+                    ),
+                    n_clicks=0,
+                    style={"cursor": cursor},
+                )
+                if clickable:
+                    card_div.id = {"type": "v2-month", "kpi": kpi,
+                                   "equipment": equipment, "month": mm, "year": yy}
+                mini_rows.append(
+                    dbc.Col(card_div, xs=6, sm=4, md=3, lg=2, className="mb-2")
                 )
 
             content = html.Div(
