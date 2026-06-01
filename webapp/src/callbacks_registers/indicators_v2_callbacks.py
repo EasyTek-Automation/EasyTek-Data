@@ -883,6 +883,56 @@ def _fetch_production_days(equipment_ids, start: datetime, end: datetime) -> set
         return set()
 
 
+def _fetch_breakdown_durations_list(equipment_ids, start: datetime, end: datetime,
+                                    codes: tuple) -> list:
+    """Lista de duration_min por parada individual no período.
+
+    Usado pra estatísticas (média/mediana das paradas vs contagem/soma
+    acima/abaixo). equipment_ids=None → planta inteira (exclui overlay
+    zerado). codes vazia → lista vazia. Filtra duration_min > 0.
+    """
+    if not _HAS_REAL_DATA:
+        return []
+    if codes is not None and len(codes) == 0:
+        return []
+    try:
+        from src.utils.zpp_kpi_calculator import (
+            ZPP_PARADAS_COLLECTION, KPI_FORCE_ZERO_EQUIPMENTS,
+        )
+        col = get_mongo_connection(ZPP_PARADAS_COLLECTION)
+        if col is None:
+            return []
+        match = {
+            "_processed": True,
+            "inicio_execucao": {"$gte": start, "$lt": end},
+            "causa_do_desvio": {"$in": list(codes if codes is not None else BREAKDOWN_CODES)},
+        }
+        if equipment_ids is None:
+            excluded = list(KPI_FORCE_ZERO_EQUIPMENTS)
+            if excluded:
+                match["centro_de_trabalho"] = {"$nin": excluded}
+        else:
+            if not equipment_ids:
+                return []
+            match["centro_de_trabalho"] = {"$in": list(equipment_ids)}
+        cursor = col.find(match, {"_id": 0, "duration_min": 1})
+        durations = []
+        for doc in cursor:
+            d = doc.get("duration_min")
+            if d is None:
+                continue
+            try:
+                d = float(d)
+            except (TypeError, ValueError):
+                continue
+            if d > 0:
+                durations.append(d)
+        return durations
+    except Exception as e:
+        logger.warning("V2 fetch durations falhou (%s)", e)
+        return []
+
+
 def _fetch_breakdown_by_day_by_equip(equipment_ids, start: datetime, end: datetime,
                                      codes: tuple) -> dict:
     """{date_str: [(equip_friendly, duration_min), ...]} ordenado desc por duração.
@@ -1855,6 +1905,77 @@ def register_indicators_v2_callbacks(app):
             "lwb_simulate": bool(lwb_sim),
         }
 
+    def _heat_kpi_card(title: str, icon: str, ref_label: str, ref_val: str,
+                       below_label: str, below_val: str,
+                       above_label: str, above_val: str,
+                       below_color: str = "#198754",
+                       above_color: str = "#dc3545") -> dbc.Card:
+        """Mini KPI card mostrando 'abaixo/acima' de uma referência (média/mediana)."""
+        return dbc.Card(
+            dbc.CardBody(
+                [
+                    html.Div(
+                        [
+                            html.I(className=f"bi {icon} me-2", style={"color": "#6c757d"}),
+                            html.Strong(title, style={"fontSize": "0.85rem"}),
+                        ],
+                        className="d-flex align-items-center mb-2",
+                    ),
+                    html.Div(
+                        [
+                            html.Span(ref_label + " ", className="small text-muted"),
+                            html.Span(ref_val, className="small fw-semibold"),
+                        ],
+                        className="mb-2",
+                    ),
+                    dbc.Row(
+                        [
+                            dbc.Col(
+                                html.Div(
+                                    [
+                                        html.Div(below_label, className="text-muted",
+                                                 style={"fontSize": "0.7rem"}),
+                                        html.Div(below_val,
+                                                 style={"fontSize": "1.35rem",
+                                                        "fontWeight": "700",
+                                                        "color": below_color}),
+                                    ],
+                                    className="text-center",
+                                ),
+                                xs=6,
+                            ),
+                            dbc.Col(
+                                html.Div(
+                                    [
+                                        html.Div(above_label, className="text-muted",
+                                                 style={"fontSize": "0.7rem"}),
+                                        html.Div(above_val,
+                                                 style={"fontSize": "1.35rem",
+                                                        "fontWeight": "700",
+                                                        "color": above_color}),
+                                    ],
+                                    className="text-center",
+                                ),
+                                xs=6,
+                            ),
+                        ],
+                        className="g-2",
+                    ),
+                ],
+                className="py-2 px-3",
+            ),
+            className="shadow-sm h-100",
+        )
+
+    def _format_minutes(value: float) -> str:
+        """'120min', '1.2k min', '12.5k min' — compacta valores grandes."""
+        value = int(round(value))
+        if value < 1000:
+            return f"{value}min"
+        if value < 1_000_000:
+            return f"{value/1000:.1f}k min".replace(".0k", "k")
+        return f"{value/1_000_000:.2f}M min"
+
     def _heatmap_legend(stats: dict) -> list:
         """Legenda em minutos (4 bins + cinza pra sem produção)."""
         if not stats or stats.get("median_min", 0) <= 0:
@@ -1890,12 +2011,16 @@ def register_indicators_v2_callbacks(app):
             base += f" · vs planta {ref}min"
         return base
 
-    # 0. Heatmap de Falhas — Planta (1 grande) + grid 3-col por equipamento
+    # 0. Heatmap de Falhas — Planta (1 grande) + grid 3-col por equipamento + 4 KPIs
     @app.callback(
         Output("v2-heatmap-planta", "figure"),
         Output("v2-heatmap-planta-stats", "children"),
         Output("v2-heatmap-planta-legend", "children"),
         Output("v2-heatmap-grid", "children"),
+        Output("v2-heat-kpi-dist-mean", "children"),
+        Output("v2-heat-kpi-dist-median", "children"),
+        Output("v2-heat-kpi-sum-mean", "children"),
+        Output("v2-heat-kpi-sum-median", "children"),
         Input("url", "pathname"),
         Input("store-v2-filters", "data"),
         Input("modal-v2-thresholds", "is_open"),
@@ -1903,9 +2028,10 @@ def register_indicators_v2_callbacks(app):
     )
     def render_v2_heatmaps(pathname, filters, _modal_open, mini_mode):
         if pathname != "/maintenance/indicators-v2":
-            return no_update, no_update, no_update, no_update
+            return tuple([no_update] * 8)
         start, end, codes, equipment_filter, _year, _lwb = _unpack_filters(filters)
         from src.utils.breakdown_thresholds import get_heatmap_pcts
+        import statistics as _stats
         y_pct, x_pct, z_pct = get_heatmap_pcts()
         mini_mode = mini_mode or "self"
 
@@ -1917,11 +2043,84 @@ def register_indicators_v2_callbacks(app):
             title="Planta", compact=False,
             y_pct=y_pct, x_pct=x_pct, z_pct=z_pct,
         )
-        # Mediana da planta — usada como referência quando modo == "planta".
         planta_median_for_override = (
             stats_planta.get("median_min", 0.0)
             if mini_mode == "planta" else None
         )
+
+        # ===== 4 KPIs de distribuição/soma =====
+        durations = _fetch_breakdown_durations_list(planta_eq, start, end, codes)
+        total = len(durations)
+        if total == 0:
+            empty_msg = dbc.Card(
+                dbc.CardBody(
+                    [html.Strong("Sem paradas no período",
+                                 className="small text-muted")],
+                    className="py-3 text-center",
+                ),
+                className="shadow-sm h-100",
+            )
+            kpi_dist_mean = empty_msg
+            kpi_dist_median = empty_msg
+            kpi_sum_mean = empty_msg
+            kpi_sum_median = empty_msg
+        else:
+            mean = _stats.mean(durations)
+            median = _stats.median(durations)
+            below_mean = [d for d in durations if d < mean]
+            above_mean = [d for d in durations if d >= mean]
+            below_median = [d for d in durations if d < median]
+            above_median = [d for d in durations if d >= median]
+
+            kpi_dist_mean = _heat_kpi_card(
+                title="Distribuição vs Média",
+                icon="bi-bar-chart-steps",
+                ref_label="Média:",
+                ref_val=_format_minutes(mean),
+                below_label="Paradas abaixo",
+                below_val=f"{len(below_mean)} ({len(below_mean)*100//total}%)",
+                above_label="Paradas acima",
+                above_val=f"{len(above_mean)} ({len(above_mean)*100//total}%)",
+            )
+            kpi_dist_median = _heat_kpi_card(
+                title="Distribuição vs Mediana",
+                icon="bi-bar-chart-steps",
+                ref_label="Mediana:",
+                ref_val=_format_minutes(median),
+                below_label="Paradas abaixo",
+                below_val=f"{len(below_median)} ({len(below_median)*100//total}%)",
+                above_label="Paradas acima",
+                above_val=f"{len(above_median)} ({len(above_median)*100//total}%)",
+            )
+            sum_total = sum(durations)
+            sum_below_mean = sum(below_mean)
+            sum_above_mean = sum(above_mean)
+            sum_below_median = sum(below_median)
+            sum_above_median = sum(above_median)
+            kpi_sum_mean = _heat_kpi_card(
+                title="Tempo total vs Média",
+                icon="bi-stopwatch",
+                ref_label="Total:",
+                ref_val=_format_minutes(sum_total),
+                below_label="Min abaixo",
+                below_val=(f"{_format_minutes(sum_below_mean)} "
+                           f"({sum_below_mean*100//sum_total}%)") if sum_total else "0min",
+                above_label="Min acima",
+                above_val=(f"{_format_minutes(sum_above_mean)} "
+                           f"({sum_above_mean*100//sum_total}%)") if sum_total else "0min",
+            )
+            kpi_sum_median = _heat_kpi_card(
+                title="Tempo total vs Mediana",
+                icon="bi-stopwatch",
+                ref_label="Total:",
+                ref_val=_format_minutes(sum_total),
+                below_label="Min abaixo",
+                below_val=(f"{_format_minutes(sum_below_median)} "
+                           f"({sum_below_median*100//sum_total}%)") if sum_total else "0min",
+                above_label="Min acima",
+                above_val=(f"{_format_minutes(sum_above_median)} "
+                           f"({sum_above_median*100//sum_total}%)") if sum_total else "0min",
+            )
 
         # ===== Grid POR EQUIPAMENTO =====
         eq_list = _list_equipments_real()
@@ -1994,6 +2193,10 @@ def register_indicators_v2_callbacks(app):
             _heatmap_stats_str(stats_planta),
             _heatmap_legend(stats_planta),
             grid,
+            kpi_dist_mean,
+            kpi_dist_median,
+            kpi_sum_mean,
+            kpi_sum_median,
         )
 
     # 1. Renderiza cards KPI + deltas + sparklines + pulse + ring + animated value

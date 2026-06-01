@@ -948,84 +948,107 @@ def layout():
                                     style={"display": "none"},
                                 ),
 
-                                # ===== ROW 3: HEATMAPS — planta + grid por equipamento =====
-                                dbc.Row(
-                                    dbc.Col(
-                                        dbc.Card(
-                                            [
-                                                dbc.CardHeader(
-                                                    html.Div(
-                                                        [
-                                                            html.I(className="bi bi-calendar3 me-2",
-                                                                   style={"color": "#0d6efd", "fontSize": "1.15rem"}),
-                                                            html.Strong(
-                                                                "Mapa de Falhas — Planta",
-                                                                id="v2-i18n-heatmap-planta-title",
-                                                                style={"fontSize": "1rem"},
-                                                            ),
-                                                            html.Span(
-                                                                id="v2-heatmap-planta-stats",
-                                                                className="ms-auto small text-muted",
-                                                            ),
-                                                        ],
-                                                        className="d-flex align-items-center",
+                                # ===== ROW 3: HEATMAPS (KPIs distribuição + planta + grid) =====
+                                dbc.Card(
+                                    [
+                                        dbc.CardHeader(
+                                            html.Div(
+                                                [
+                                                    html.I(className="bi bi-calendar3 me-2",
+                                                           style={"color": "#0d6efd", "fontSize": "1.25rem"}),
+                                                    html.Strong(
+                                                        "Heatmap de Falhas",
+                                                        id="v2-i18n-heatmap-section-title",
+                                                        style={"fontSize": "1.05rem"},
                                                     ),
-                                                ),
-                                                dbc.CardBody(
+                                                ],
+                                                className="d-flex align-items-center",
+                                            ),
+                                        ),
+                                        dbc.CardBody(
+                                            [
+                                                # 4 KPI cards de distribuição/soma
+                                                dbc.Row(
                                                     [
-                                                        dcc.Loading(
-                                                            id="loading-v2-heatmap-planta",
-                                                            type="circle",
-                                                            color="#0d6efd",
-                                                            children=dcc.Graph(
-                                                                id="v2-heatmap-planta",
-                                                                config={"displayModeBar": False, "responsive": True},
-                                                                style={"height": "280px"},
-                                                            ),
-                                                            delay_show=120,
-                                                        ),
-                                                        html.Div(
-                                                            id="v2-heatmap-planta-legend",
-                                                            className="mt-2",
-                                                        ),
-                                                    ]
+                                                        dbc.Col(html.Div(id="v2-heat-kpi-dist-mean"),  xs=12, sm=6, lg=3, className="mb-2"),
+                                                        dbc.Col(html.Div(id="v2-heat-kpi-dist-median"), xs=12, sm=6, lg=3, className="mb-2"),
+                                                        dbc.Col(html.Div(id="v2-heat-kpi-sum-mean"),   xs=12, sm=6, lg=3, className="mb-2"),
+                                                        dbc.Col(html.Div(id="v2-heat-kpi-sum-median"), xs=12, sm=6, lg=3, className="mb-2"),
+                                                    ],
+                                                    className="g-2 mb-3",
                                                 ),
-                                            ],
-                                            className="shadow-sm",
+
+                                                # Heatmap PLANTA (sub-card)
+                                                dbc.Card(
+                                                    [
+                                                        dbc.CardHeader(
+                                                            html.Div(
+                                                                [
+                                                                    html.I(className="bi bi-grid-3x3 me-2",
+                                                                           style={"color": "#0d6efd", "fontSize": "1rem"}),
+                                                                    html.Strong(
+                                                                        "Mapa de Falhas — Planta",
+                                                                        id="v2-i18n-heatmap-planta-title",
+                                                                        style={"fontSize": "0.95rem"},
+                                                                    ),
+                                                                    html.Span(
+                                                                        id="v2-heatmap-planta-stats",
+                                                                        className="ms-auto small text-muted",
+                                                                    ),
+                                                                ],
+                                                                className="d-flex align-items-center",
+                                                            ),
+                                                            className="py-2",
+                                                        ),
+                                                        dbc.CardBody(
+                                                            [
+                                                                dcc.Loading(
+                                                                    id="loading-v2-heatmap-planta",
+                                                                    type="circle",
+                                                                    color="#0d6efd",
+                                                                    children=dcc.Graph(
+                                                                        id="v2-heatmap-planta",
+                                                                        config={"displayModeBar": False, "responsive": True},
+                                                                        style={"height": "280px"},
+                                                                    ),
+                                                                    delay_show=120,
+                                                                ),
+                                                                html.Div(
+                                                                    id="v2-heatmap-planta-legend",
+                                                                    className="mt-2",
+                                                                ),
+                                                            ]
+                                                        ),
+                                                    ],
+                                                    className="shadow-sm mb-3",
+                                                ),
+
+                                                # Radio individual/geral + grid mini
+                                                dbc.RadioItems(
+                                                    id="v2-heatmap-mini-mode",
+                                                    options=[
+                                                        {"label": "Visão individual (cada equipamento vs sua própria mediana)",
+                                                         "value": "self"},
+                                                        {"label": "Visão geral (todos comparados à mediana da planta)",
+                                                         "value": "planta"},
+                                                    ],
+                                                    value="self",
+                                                    inline=True,
+                                                    className="small text-muted mb-3",
+                                                    inputClassName="me-1",
+                                                    labelClassName="me-3",
+                                                ),
+                                                dcc.Loading(
+                                                    id="loading-v2-heatmap-grid",
+                                                    type="circle",
+                                                    color="#0d6efd",
+                                                    children=html.Div(id="v2-heatmap-grid"),
+                                                    delay_show=120,
+                                                ),
+                                            ]
                                         ),
-                                    ),
-                                    className="mb-3",
-                                ),
-                                dbc.Row(
-                                    dbc.Col(
-                                        dbc.RadioItems(
-                                            id="v2-heatmap-mini-mode",
-                                            options=[
-                                                {"label": "Visão individual (cada equipamento vs sua própria mediana)",
-                                                 "value": "self"},
-                                                {"label": "Visão geral (todos comparados à mediana da planta)",
-                                                 "value": "planta"},
-                                            ],
-                                            value="self",
-                                            inline=True,
-                                            className="small text-muted mb-3",
-                                            inputClassName="me-1",
-                                            labelClassName="me-3",
-                                        ),
-                                    ),
-                                    className="mb-2",
-                                ),
-                                dbc.Row(
-                                    dbc.Col(
-                                        dcc.Loading(
-                                            id="loading-v2-heatmap-grid",
-                                            type="circle",
-                                            color="#0d6efd",
-                                            children=html.Div(id="v2-heatmap-grid"),
-                                            delay_show=120,
-                                        ),
-                                    ),
-                                    className="mb-4",
+                                    ],
+                                    className="shadow-sm mb-4",
                                 ),
 
                             ],
