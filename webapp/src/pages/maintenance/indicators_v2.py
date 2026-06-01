@@ -1118,7 +1118,7 @@ def layout():
                                             ]
                                         ),
                                     ],
-                                    className="shadow-sm mb-4 indicator-v2-card",
+                                    className="shadow-sm mb-4 indicator-v2-card-static",
                                     style={"borderTop": "4px solid #fd7e14"},
                                 ),
 

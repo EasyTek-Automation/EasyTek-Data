@@ -382,6 +382,14 @@
     border-bottom: 1px solid #eef0f3;
 }
 
+/* Wrapper estático: estilo visual igual ao indicator-v2-card mas SEM hover
+   scale — usado pra cards "container" grandes que abrigam outros (heatmap
+   section). Evita estourar limites quando o card é a row inteira. */
+.indicator-v2-card-static .card-header {
+    background-color: #fafbfc;
+    border-bottom: 1px solid #eef0f3;
+}
+
 /* Hovered → amplia + sombra forte + z-index */
 .indicator-v2-card:hover {
     transform: scale(1.06) translateY(-3px);
