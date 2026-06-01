@@ -885,18 +885,91 @@ def _fetch_production_days(equipment_ids, start: datetime, end: datetime) -> set
         return set()
 
 
+def _fetch_breakdown_by_day_by_equip(equipment_ids, start: datetime, end: datetime,
+                                     codes: tuple) -> dict:
+    """{date_str: [(equip_friendly, duration_min), ...]} ordenado desc por duração.
+
+    Usado pra tooltip da planta — mostra contribuição de cada máquina.
+    equipment_ids=None → planta (exclui KPI_FORCE_ZERO_EQUIPMENTS).
+    """
+    if not _HAS_REAL_DATA:
+        return {}
+    if codes is not None and len(codes) == 0:
+        return {}
+    try:
+        from src.utils.zpp_kpi_calculator import (
+            ZPP_PARADAS_COLLECTION, KPI_FORCE_ZERO_EQUIPMENTS,
+        )
+        col = get_mongo_connection(ZPP_PARADAS_COLLECTION)
+        if col is None:
+            return {}
+        match = {
+            "_processed": True,
+            "inicio_execucao": {"$gte": start, "$lt": end},
+            "causa_do_desvio": {"$in": list(codes if codes is not None else BREAKDOWN_CODES)},
+        }
+        if equipment_ids is None:
+            excluded = list(KPI_FORCE_ZERO_EQUIPMENTS)
+            if excluded:
+                match["centro_de_trabalho"] = {"$nin": excluded}
+        else:
+            if not equipment_ids:
+                return {}
+            match["centro_de_trabalho"] = {"$in": list(equipment_ids)}
+        pipeline = [
+            {"$match": match},
+            {"$group": {
+                "_id": {
+                    "date":      {"$dateToString": {"format": "%Y-%m-%d", "date": "$inicio_execucao"}},
+                    "equipment": "$centro_de_trabalho",
+                },
+                "duration_total": {"$sum": "$duration_min"},
+            }},
+        ]
+        names = _cached_names() or {}  # internal → friendly
+        by_day: dict = {}
+        for doc in col.aggregate(pipeline):
+            ds = doc["_id"]["date"]
+            internal = doc["_id"]["equipment"]
+            dur = float(doc.get("duration_total") or 0.0)
+            if dur <= 0:
+                continue
+            friendly = names.get(internal, internal)
+            by_day.setdefault(ds, []).append((friendly, dur))
+        for ds in by_day:
+            by_day[ds].sort(key=lambda x: x[1], reverse=True)
+        return by_day
+    except Exception as e:
+        logger.warning("V2 heatmap by_equip falhou (%s)", e)
+        return {}
+
+
+def _format_top_machines_until_median(items, median_min: float) -> str:
+    """'PRENSA-01: 45min · LCT-08: 25min' até cumsum atingir mediana."""
+    if not items or median_min <= 0:
+        return ""
+    cumsum = 0.0
+    parts = []
+    for name, dur in items:
+        parts.append(f"{name}: {int(dur)}min")
+        cumsum += dur
+        if cumsum >= median_min:
+            break
+    return " · ".join(parts)
+
+
 def _build_heatmap(start: datetime, end: datetime, codes: tuple,
                    equipment_ids=None, title: str = "Planta", compact: bool = False,
                    y_pct: int = None, x_pct: int = None):
     """Heatmap calendário (semana × dia da semana) das falhas POR DURAÇÃO.
 
-    equipment_ids=None → planta inteira (exclui overlay zerado).
-    equipment_ids=[ids] → restringe.
-    compact=True → versão menor pros mini-cards por equipamento.
-    y_pct/x_pct → limites em %% da mediana das durações por dia (BR cor heatmap).
-    Mediana é calculada por escopo (planta = sobre os dias da planta; mini =
-    sobre os dias daquele equipamento), apenas em dias com produção e
-    duration > 0.
+    Retorna (fig, stats) onde stats = {median_min, mean_min, y_thr_min,
+    x_thr_min, total_dias_com_falha}.
+
+    compact=True desliga tooltips e título interno (versão p/ mini-cards).
+    Para o modo planta (compact=False, equipment_ids=None) a tooltip lista
+    as máquinas (ordem desc) até que a soma das durações ultrapasse a
+    mediana — as demais omitidas.
     """
     import plotly.graph_objects as go
     from datetime import timedelta as _td
@@ -912,15 +985,20 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
 
     duracoes = _fetch_breakdown_duration_by_day(equipment_ids, start, end, codes)
     producao = _fetch_production_days(equipment_ids, start, end)
+    breakdown_by_machine = (
+        _fetch_breakdown_by_day_by_equip(equipment_ids, start, end, codes)
+        if not compact else {}
+    )
 
-    # Mediana sobre dias com produção E com duration > 0 (escopo deste heatmap).
     nonzero_durations = [
         v for ds, v in duracoes.items()
         if ds in producao and v and v > 0
     ]
     median_min = _stats.median(nonzero_durations) if nonzero_durations else 0.0
+    mean_min = (_stats.mean(nonzero_durations) if nonzero_durations else 0.0)
+    y_thr_min = median_min * (y_pct / 100.0)
+    x_thr_min = median_min * (x_pct / 100.0)
 
-    # Gera lista de dias [start, end) e calcula coords semana/diaSemana
     weeks, days_of_week, colors, hover_texts = [], [], [], []
     cur = datetime(start.year, start.month, start.day)
     end_day = datetime(end.year, end.month, end.day)
@@ -930,7 +1008,7 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
         ds = cur.strftime("%Y-%m-%d")
         has_prod = ds in producao
         duration = float(duracoes.get(ds, 0)) if has_prod else 0.0
-        color, status = _heatmap_color_by_duration(
+        color, _status = _heatmap_color_by_duration(
             duration, has_prod, median_min, y_pct, x_pct
         )
         iso_yr, iso_wk, _ = cur.isocalendar()
@@ -938,28 +1016,56 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
         weeks.append(week_idx)
         days_of_week.append(cur.weekday())
         colors.append(color)
-        hover_texts.append(
-            f"<b>{cur.strftime('%d/%m/%Y')}</b><br>{status}<br>"
-            f"<i>{cur.strftime('%A')}</i><br>"
-            f"<small>Mediana escopo: {int(median_min)}min | Y={y_pct}% X={x_pct}%</small>"
-        )
+        if not compact:
+            # Tooltip em linguagem natural: data + duração total + top máquinas
+            if not has_prod:
+                txt = f"<b>{cur.strftime('%d/%m/%Y')}</b><br>Sem produção"
+            elif duration <= 0:
+                txt = f"<b>{cur.strftime('%d/%m/%Y')}</b><br>Sem paradas"
+            else:
+                top_str = _format_top_machines_until_median(
+                    breakdown_by_machine.get(ds, []), median_min
+                )
+                txt = (
+                    f"<b>{cur.strftime('%d/%m/%Y')}</b><br>"
+                    f"Total: {int(duration)}min"
+                )
+                if top_str:
+                    txt += f"<br>{top_str}"
+            hover_texts.append(txt)
         cur += _td(days=1)
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=weeks,
-        y=days_of_week,
-        mode="markers",
-        marker=dict(
-            size=22 if compact else 22,
-            color=colors,
-            symbol="square",
-            line=dict(color="rgba(0,0,0,0.08)", width=1),
-        ),
-        text=hover_texts,
-        hovertemplate="%{text}<extra></extra>",
-        showlegend=False,
-    ))
+    if compact:
+        fig.add_trace(go.Scatter(
+            x=weeks,
+            y=days_of_week,
+            mode="markers",
+            marker=dict(
+                size=22,
+                color=colors,
+                symbol="square",
+                line=dict(color="rgba(0,0,0,0.08)", width=1),
+            ),
+            hoverinfo="skip",
+            showlegend=False,
+        ))
+    else:
+        fig.add_trace(go.Scatter(
+            x=weeks,
+            y=days_of_week,
+            mode="markers",
+            marker=dict(
+                size=22,
+                color=colors,
+                symbol="square",
+                line=dict(color="rgba(0,0,0,0.08)", width=1),
+            ),
+            text=hover_texts,
+            hovertemplate="%{text}<extra></extra>",
+            showlegend=False,
+        ))
+
     weekday_labels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
     fig.update_layout(
         title=None if compact else dict(text=title, font=dict(size=13)),
@@ -976,7 +1082,16 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
             tickfont=dict(size=9 if compact else 11),
         ),
     )
-    return fig
+    stats = {
+        "median_min":  median_min,
+        "mean_min":    mean_min,
+        "y_thr_min":   y_thr_min,
+        "x_thr_min":   x_thr_min,
+        "y_pct":       y_pct,
+        "x_pct":       x_pct,
+        "n_dias_falha": len(nonzero_durations),
+    }
+    return fig, stats
 
 
 def _mock_planta_mes(kpi):
@@ -1737,40 +1852,58 @@ def register_indicators_v2_callbacks(app):
             "lwb_simulate": bool(lwb_sim),
         }
 
+    def _heatmap_legend(stats: dict) -> list:
+        """Lista de Spans com legenda em minutos (não % da mediana)."""
+        if not stats or stats.get("median_min", 0) <= 0:
+            return [
+                html.Span("⬜ sem produção  ", className="me-2 small text-muted"),
+                html.Span("🟢 sem paradas no período", className="me-2 small text-muted"),
+            ]
+        y_thr = int(round(stats["y_thr_min"]))
+        x_thr = int(round(stats["x_thr_min"]))
+        return [
+            html.Span("⬜ sem produção  ", className="me-2 small text-muted"),
+            html.Span(f"🟢 ≤ {y_thr}min  ", className="me-2 small text-muted"),
+            html.Span(f"🟡 {y_thr}min–{x_thr}min  ", className="me-2 small text-muted"),
+            html.Span(f"🔴 > {x_thr}min  ", className="me-2 small text-muted"),
+        ]
+
+    def _heatmap_stats_str(stats: dict) -> str:
+        """'Média 45min · Mediana 30min' (dias com produção e parada > 0)."""
+        if not stats or stats.get("n_dias_falha", 0) == 0:
+            return "Sem paradas no período"
+        return (
+            f"Média {int(round(stats['mean_min']))}min · "
+            f"Mediana {int(round(stats['median_min']))}min"
+        )
+
     # 0. Heatmap de Falhas — Planta (1 grande) + grid 3-col por equipamento
     @app.callback(
         Output("v2-heatmap-planta", "figure"),
+        Output("v2-heatmap-planta-stats", "children"),
+        Output("v2-heatmap-planta-legend", "children"),
         Output("v2-heatmap-grid", "children"),
-        Output("v2-heatmap-thresholds-info", "children"),
         Input("url", "pathname"),
         Input("store-v2-filters", "data"),
-        Input("modal-v2-thresholds", "is_open"),  # refresh ao fechar modal salvo
+        Input("modal-v2-thresholds", "is_open"),
     )
     def render_v2_heatmaps(pathname, filters, _modal_open):
         if pathname != "/maintenance/indicators-v2":
-            return no_update, no_update, no_update
+            return no_update, no_update, no_update, no_update
         start, end, codes, equipment_filter, _year, _lwb = _unpack_filters(filters)
-        # Limites cor (cadastrados no modal de gatilhos)
         from src.utils.breakdown_thresholds import get_heatmap_pcts
         y_pct, x_pct = get_heatmap_pcts()
-        info_str = f"(Y={y_pct}% · X={x_pct}% — ajustável no modal Gatilhos)"
 
         # ===== Heatmap PLANTA =====
-        # equipment_filter respeitado: None → toda planta (excluindo overlay zerado),
-        # lista → restringe.
         planta_eq = None
         if equipment_filter is not None:
-            # Converte friendly→internal usando _cached_names; já é internal IDs após
-            # populate_equipment_filter passar a usar internal como value, mas
-            # _resolve_equipment_internal_ids resolve ambos.
             names = _cached_names() or {}
             friendly_to_internal = {v: k for k, v in names.items()}
-            planta_eq = []
-            for raw in equipment_filter:
-                planta_eq.append(friendly_to_internal.get(raw, raw))
-        fig_planta = _build_heatmap(start, end, codes, equipment_ids=planta_eq,
-                                    title="Planta", compact=False,
-                                    y_pct=y_pct, x_pct=x_pct)
+            planta_eq = [friendly_to_internal.get(raw, raw) for raw in equipment_filter]
+        fig_planta, stats_planta = _build_heatmap(
+            start, end, codes, equipment_ids=planta_eq,
+            title="Planta", compact=False, y_pct=y_pct, x_pct=x_pct,
+        )
 
         # ===== Grid POR EQUIPAMENTO =====
         eq_list = _list_equipments_real()
@@ -1783,9 +1916,10 @@ def register_indicators_v2_callbacks(app):
         cards = []
         for eq in eq_list:
             internal = eq.get("internal") or eq["id"]
-            fig_eq = _build_heatmap(start, end, codes,
-                                    equipment_ids=[internal], title=eq["id"], compact=True,
-                                    y_pct=y_pct, x_pct=x_pct)
+            fig_eq, stats_eq = _build_heatmap(
+                start, end, codes, equipment_ids=[internal],
+                title=eq["id"], compact=True, y_pct=y_pct, x_pct=x_pct,
+            )
             cards.append(
                 dbc.Col(
                     dbc.Card(
@@ -1793,19 +1927,38 @@ def register_indicators_v2_callbacks(app):
                             dbc.CardHeader(
                                 html.Div(
                                     [
-                                        html.Strong(eq["id"], style={"fontSize": "0.85rem"}),
-                                        html.Br(),
-                                        html.Small(eq.get("categoria", "—"), className="text-muted"),
-                                    ]
+                                        html.Div(
+                                            [
+                                                html.Strong(eq["id"], style={"fontSize": "0.85rem"}),
+                                                html.Br(),
+                                                html.Small(eq.get("categoria", "—"),
+                                                           className="text-muted"),
+                                            ]
+                                        ),
+                                        html.Div(
+                                            _heatmap_stats_str(stats_eq),
+                                            className="ms-auto small text-muted text-end",
+                                            style={"fontSize": "0.75rem", "lineHeight": "1.1"},
+                                        ),
+                                    ],
+                                    className="d-flex align-items-center",
                                 ),
                                 className="py-2",
                             ),
                             dbc.CardBody(
-                                dcc.Graph(
-                                    figure=fig_eq,
-                                    config={"displayModeBar": False, "staticPlot": True, "responsive": True},
-                                    style={"height": "200px"},
-                                ),
+                                [
+                                    dcc.Graph(
+                                        figure=fig_eq,
+                                        config={"displayModeBar": False,
+                                                "staticPlot": True,
+                                                "responsive": True},
+                                        style={"height": "200px"},
+                                    ),
+                                    html.Div(
+                                        _heatmap_legend(stats_eq),
+                                        className="mt-1",
+                                    ),
+                                ],
                                 className="p-2",
                             ),
                         ],
@@ -1816,7 +1969,12 @@ def register_indicators_v2_callbacks(app):
                 )
             )
         grid = dbc.Row(cards, className="g-3") if cards else html.Div()
-        return fig_planta, grid, info_str
+        return (
+            fig_planta,
+            _heatmap_stats_str(stats_planta),
+            _heatmap_legend(stats_planta),
+            grid,
+        )
 
     # 1. Renderiza cards KPI + deltas + sparklines + pulse + ring + animated value
     @app.callback(

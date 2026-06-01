@@ -963,6 +963,10 @@ def layout():
                                                                 id="v2-i18n-heatmap-planta-title",
                                                                 style={"fontSize": "1rem"},
                                                             ),
+                                                            html.Span(
+                                                                id="v2-heatmap-planta-stats",
+                                                                className="ms-auto small text-muted",
+                                                            ),
                                                         ],
                                                         className="d-flex align-items-center",
                                                     ),
@@ -981,16 +985,7 @@ def layout():
                                                             delay_show=120,
                                                         ),
                                                         html.Div(
-                                                            [
-                                                                html.Span("⬜ sem produção  ", className="me-2 small text-muted"),
-                                                                html.Span("🟢 ≤ Y% mediana  ", className="me-2 small text-muted"),
-                                                                html.Span("🟡 Y%–X%  ", className="me-2 small text-muted"),
-                                                                html.Span("🔴 > X% (= mediana)  ", className="me-2 small text-muted"),
-                                                                html.Span(
-                                                                    id="v2-heatmap-thresholds-info",
-                                                                    className="small text-muted ms-2 fst-italic",
-                                                                ),
-                                                            ],
+                                                            id="v2-heatmap-planta-legend",
                                                             className="mt-2",
                                                         ),
                                                     ]
