@@ -983,10 +983,13 @@ def layout():
                                                         html.Div(
                                                             [
                                                                 html.Span("⬜ sem produção  ", className="me-2 small text-muted"),
-                                                                html.Span("🟢 0 falhas  ", className="me-2 small text-muted"),
-                                                                html.Span("🟡 1  ", className="me-2 small text-muted"),
-                                                                html.Span("🟠 2  ", className="me-2 small text-muted"),
-                                                                html.Span("🔴 3+", className="me-2 small text-muted"),
+                                                                html.Span("🟢 ≤ Y% mediana  ", className="me-2 small text-muted"),
+                                                                html.Span("🟡 Y%–X%  ", className="me-2 small text-muted"),
+                                                                html.Span("🔴 > X% (= mediana)  ", className="me-2 small text-muted"),
+                                                                html.Span(
+                                                                    id="v2-heatmap-thresholds-info",
+                                                                    className="small text-muted ms-2 fst-italic",
+                                                                ),
                                                             ],
                                                             className="mt-2",
                                                         ),
@@ -1328,6 +1331,75 @@ def layout():
                                 className="text-muted mb-3",
                             ),
                             html.Div(id="modal-thresholds-status", className="mb-2"),
+
+                            # ===== Bloco do Heatmap (limites % da mediana) =====
+                            dbc.Card(
+                                [
+                                    dbc.CardHeader(
+                                        html.Div(
+                                            [
+                                                html.I(className="bi bi-calendar3 me-2"),
+                                                html.Strong("Heatmap — limites de cor (% da mediana)"),
+                                            ]
+                                        )
+                                    ),
+                                    dbc.CardBody(
+                                        [
+                                            html.P(
+                                                [
+                                                    "Cor de cada dia depende da ",
+                                                    html.B("duração total de paradas"),
+                                                    " comparada à ",
+                                                    html.B("mediana"),
+                                                    " do escopo (planta vs. cada equipamento). ",
+                                                    html.Span("Verde", style={"backgroundColor": "#d4edda", "padding": "0 6px"}),
+                                                    " ≤ Y% · ",
+                                                    html.Span("Amarelo", style={"backgroundColor": "#fff3cd", "padding": "0 6px"}),
+                                                    " Y%–X% · ",
+                                                    html.Span("Vermelho", style={"backgroundColor": "#f8a5ad", "padding": "0 6px"}),
+                                                    " > X% (X=100 = mediana).",
+                                                ],
+                                                className="text-muted small mb-3",
+                                            ),
+                                            dbc.Row(
+                                                [
+                                                    dbc.Col(
+                                                        [
+                                                            html.Label("Y% (limite verde)",
+                                                                       className="form-label small fw-semibold"),
+                                                            dbc.Input(
+                                                                id="input-heatmap-y-pct",
+                                                                type="number",
+                                                                min=1, max=199, step=1,
+                                                                placeholder="50",
+                                                            ),
+                                                        ],
+                                                        md=6,
+                                                    ),
+                                                    dbc.Col(
+                                                        [
+                                                            html.Label("X% (limite vermelho)",
+                                                                       className="form-label small fw-semibold"),
+                                                            dbc.Input(
+                                                                id="input-heatmap-x-pct",
+                                                                type="number",
+                                                                min=2, max=200, step=1,
+                                                                placeholder="100",
+                                                            ),
+                                                        ],
+                                                        md=6,
+                                                    ),
+                                                ],
+                                                className="g-2",
+                                            ),
+                                        ]
+                                    ),
+                                ],
+                                className="mb-3 shadow-sm",
+                            ),
+
+                            html.Hr(className="my-3"),
+                            html.H6("Gatilhos por equipamento (minutos)", className="mb-2"),
                             html.Div(id="modal-thresholds-table"),
                         ]
                     ),
