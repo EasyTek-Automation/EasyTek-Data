@@ -147,14 +147,15 @@ def _calc_mes_referencia(df: pd.DataFrame, tipo: str, today: datetime) -> str:
     dominant = month_counts.index[0]
     ratio = month_counts.iloc[0] / total
 
-    if ratio < config.MIN_REFERENCE_MONTH_RATIO if hasattr(config, "MIN_REFERENCE_MONTH_RATIO") else 0.80:
+    threshold = getattr(config, "MIN_REFERENCE_MONTH_RATIO", 0.80)
+    if ratio < threshold:
         dist = " | ".join(
             f"{_month_label(m)} ({(c/total*100):.0f}%)"
             for m, c in month_counts.items()
         )
         raise RejectionError(
             f"Arquivo rejeitado: apenas {ratio*100:.0f}% dos registros pertencem ao mês "
-            f"dominante {_month_label(dominant)} (mínimo: 80%). "
+            f"dominante {_month_label(dominant)} (mínimo: {threshold*100:.0f}%). "
             f"Verifique o período exportado no SAP ou use o canal retroativo.\n"
             f"Distribuição detectada: {dist}"
         )

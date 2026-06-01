@@ -44,6 +44,10 @@ MONTH_BOUNDARY_RULE_FIELD = {
     },
 }
 
+# Threshold mínimo de ratio do mês dominante na janela de tolerância (dia 1).
+# Arquivos com menos que esse percentual no mês dominante são rejeitados.
+MIN_REFERENCE_MONTH_RATIO = float(os.getenv("MIN_REFERENCE_MONTH_RATIO", "0.80"))
+
 # URL interna do webapp para validação de sessão
 WEBAPP_INTERNAL_URL = os.getenv("WEBAPP_INTERNAL_URL", "http://webapp:8050")
 
