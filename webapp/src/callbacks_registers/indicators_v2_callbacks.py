@@ -230,25 +230,17 @@ def _cached_fetch_kpi(start: datetime, end: datetime, codes: tuple,
 
 
 def _resolve_equipment_internal_ids(equipment_filter, kpi_data: dict) -> list:
-    """Filtra equipment_filter (internal IDs do dropdown V2) contra chaves
-    de kpi_data (também internal). Aceita fallback friendly→internal
-    pra resistir a registros legados no store.
+    """Filtra equipment_filter contra chaves de kpi_data (ambos internal).
+
+    Dropdown V2 grava internal IDs no store desde o fix 2026-05-31; o store
+    é memory-only (não persiste sessão), então não há mais necessidade de
+    fallback friendly→internal.
     """
     if equipment_filter is None:
         return list(kpi_data.keys())
     if not equipment_filter:
         return []
-    names = _cached_names() or {}  # internal → friendly
-    friendly_to_internal = {v: k for k, v in names.items()}
-    resolved = []
-    for raw in equipment_filter:
-        if raw in kpi_data:
-            resolved.append(raw)
-        else:
-            internal = friendly_to_internal.get(raw)
-            if internal and internal in kpi_data:
-                resolved.append(internal)
-    return resolved
+    return [raw for raw in equipment_filter if raw in kpi_data]
 
 
 def _cached_agg(kpi_data: dict, start: datetime, end: datetime, codes: tuple,
@@ -317,9 +309,13 @@ def _period_agg(start: datetime, end: datetime, codes: tuple = None,
 
     Aceita range arbitrário (cross-year ok) e filtro de equipamento (None=toda planta).
 
-    Mock mode: média simples dos 12 valores mensais mock (non-zero). MTTR mock
-    está em minutos (display), divide por 60 pra respeitar contrato unit-interno
-    que o caller espera (_to_display reaplica ×60).
+    Mock mode (INDICATORS_V2_FORCE_MOCK=1): média simples dos 12 valores mensais
+    mock (non-zero). MTTR mock está em minutos (display), divide por 60 pra
+    respeitar contrato unit-interno que o caller espera (_to_display reaplica ×60).
+
+    NOTA — dívida conhecida: mock IGNORA equipment_filter e codes; só é usado
+    em dev/demo (modo real é o canônico). Honrar filtros no mock exigiria
+    redesenhar o gerador mock — não vale o custo enquanto o uso é só decorativo.
     """
     if not _HAS_REAL_DATA:
         out = {}
@@ -1855,7 +1851,7 @@ def register_indicators_v2_callbacks(app):
             "start_iso":    start.isoformat(),
             "end_iso":      end.isoformat(),
             "equipment":    equip_out,
-            "codes":        codes_out if _HAS_REAL_DATA else codes_out,
+            "codes":        codes_out,
             "lwb_simulate": bool(lwb_sim),
         }
 
@@ -1914,11 +1910,8 @@ def register_indicators_v2_callbacks(app):
         mini_mode = mini_mode or "self"
 
         # ===== Heatmap PLANTA =====
-        planta_eq = None
-        if equipment_filter is not None:
-            names = _cached_names() or {}
-            friendly_to_internal = {v: k for k, v in names.items()}
-            planta_eq = [friendly_to_internal.get(raw, raw) for raw in equipment_filter]
+        # equipment_filter já vem com internal IDs (vide populate_equipment_filter).
+        planta_eq = list(equipment_filter) if equipment_filter is not None else None
         fig_planta, stats_planta = _build_heatmap(
             start, end, codes, equipment_ids=planta_eq,
             title="Planta", compact=False,
@@ -1936,7 +1929,7 @@ def register_indicators_v2_callbacks(app):
             _set = set(equipment_filter)
             eq_list = [
                 e for e in eq_list
-                if (e.get("internal") or e["id"]) in _set or e["id"] in _set
+                if (e.get("internal") or e["id"]) in _set
             ]
         cards = []
         for eq in eq_list:
@@ -2237,7 +2230,7 @@ def register_indicators_v2_callbacks(app):
                 _set = set(equipment_filter)
                 eq_list = [
                     e for e in eq_list
-                    if (e.get("internal") or e["id"]) in _set or e["id"] in _set
+                    if (e.get("internal") or e["id"]) in _set
                 ]
             for eq in eq_list:
                 eq_id = eq["id"]
@@ -2421,7 +2414,7 @@ def register_indicators_v2_callbacks(app):
                 _set = set(f_eq_filter)
                 eq_list = [
                     e for e in eq_list
-                    if (e.get("internal") or e["id"]) in _set or e["id"] in _set
+                    if (e.get("internal") or e["id"]) in _set
                 ]
             for eq in eq_list:
                 labels_eq, values, statuses_eq = _fetch_equipment_monthly(
