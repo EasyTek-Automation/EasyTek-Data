@@ -416,10 +416,14 @@ def _iter_months_in_range(start: datetime, end: datetime):
 
 
 def _chart_months_with_status(start: datetime, end: datetime):
-    """Retorna SEMPRE 12 meses de contexto + status de cada mês vs [start, end).
+    """Retorna meses de contexto + status de cada mês vs [start, end).
 
-    Quando o filtro cobre <1 ano, expande o range de display pra cobrir o ano
-    de `start.year` inteiro (Jan→Dez). Quando cobre ≥1 ano, usa o próprio range.
+    Política de expansão do range de display:
+      - Range ≥12 meses → usa exato (contexto já é histórico amplo).
+      - Range <12 meses, MESMO ano → expande pra Jan→Dez do start.year
+        (12 barras de contexto histórico do ano calendário).
+      - Range <12 meses, CROSS-YEAR → usa exato (evita expansão ambígua;
+        cross-year curto não tem ano calendário óbvio pra escolher).
 
     Yield: (label, m_start, m_end, year, month, status)
       - status="in":      mês 100% dentro de [start, end)
@@ -427,11 +431,12 @@ def _chart_months_with_status(start: datetime, end: datetime):
       - status="out":     mês 100% fora (sem overlap)
     """
     months_span = (end.year - start.year) * 12 + (end.month - start.month)
-    if months_span >= 12:
-        # Range já cobre ano completo; usar exato
+    # end pode cair em 01/<mês+1>; o mês "real" do end é mês anterior
+    last_month_year = end.year if end.month > 1 else end.year - 1
+    same_year = (start.year == last_month_year)
+    if months_span >= 12 or not same_year:
         display_start, display_end = start, end
     else:
-        # Expandir pra cobrir Jan→Dez do ano do start
         display_start = datetime(start.year, 1, 1)
         display_end = datetime(start.year + 1, 1, 1)
 

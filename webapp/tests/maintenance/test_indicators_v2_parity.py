@@ -45,7 +45,7 @@ def test_planta_cards_use_v1_calc(mock_fetch, mock_avg):
 
     start = datetime(2026, 1, 1)
     end = datetime(2027, 1, 1)
-    labels, values = _fetch_planta_monthly("breakdown", start, end)
+    labels, values, _ = _fetch_planta_monthly("breakdown", start, end)
 
     mock_fetch.assert_called_once()
     args_fetch = mock_fetch.call_args[0]
@@ -73,7 +73,7 @@ def test_equipment_monthly_uses_v1(mock_names, mock_fetch):
 
     start = datetime(2026, 1, 1)
     end = datetime(2027, 1, 1)
-    labels, values = _fetch_equipment_monthly("mtbf", "LCL-08", start, end)
+    labels, values, _ = _fetch_equipment_monthly("mtbf", "LCL-08", start, end)
 
     from src.utils.zpp_kpi_calculator import BREAKDOWN_CODES
     mock_fetch.assert_called_once_with(start, end, list(BREAKDOWN_CODES), lwb_simulate=False)
@@ -186,10 +186,32 @@ def test_unpack_filters_with_all_fields():
     assert lwb_sim is False
 
 
-def test_unpack_filters_with_empty_lists_defaults():
-    """Equipment vazio → None (toda planta). Codes vazio → BREAKDOWN_CODES."""
+def test_unpack_filters_with_missing_keys_defaults():
+    """Chave ausente (None) → fallback para defaults (toda planta, BREAKDOWN_CODES).
+    Distinto de lista vazia explícita, que significa 'zero selecionado'."""
     from src.callbacks_registers.indicators_v2_callbacks import _unpack_filters
     from src.utils.zpp_kpi_calculator import BREAKDOWN_CODES
+
+    filters = {
+        "period_type": "year",
+        "year":        2026,
+        "start_iso":   "2026-01-01T00:00:00",
+        "end_iso":     "2027-01-01T00:00:00",
+        # equipment e codes ausentes do dict
+    }
+    start, end, codes, eq_filter, year, lwb_sim = _unpack_filters(filters)
+    assert start == datetime(2026, 1, 1)
+    assert end == datetime(2027, 1, 1)
+    assert codes == tuple(BREAKDOWN_CODES)
+    assert eq_filter is None
+    assert year == 2026
+    assert lwb_sim is False
+
+
+def test_unpack_filters_empty_lists_are_explicit_zero():
+    """Lista vazia no store significa intenção explícita 'zero selecionado'
+    (não fallback). Convenção pós-fix indicators-v2 empty filter."""
+    from src.callbacks_registers.indicators_v2_callbacks import _unpack_filters
 
     filters = {
         "period_type": "year",
@@ -200,12 +222,8 @@ def test_unpack_filters_with_empty_lists_defaults():
         "codes":       [],
     }
     start, end, codes, eq_filter, year, lwb_sim = _unpack_filters(filters)
-    assert start == datetime(2026, 1, 1)
-    assert end == datetime(2027, 1, 1)
-    assert codes == tuple(BREAKDOWN_CODES)
-    assert eq_filter is None
-    assert year == 2026
-    assert lwb_sim is False
+    assert codes == ()
+    assert eq_filter == []
 
 
 # --- N2 — period_type=last12 cross-year ---
@@ -227,7 +245,7 @@ def test_planta_monthly_respects_custom_range_cross_year(mock_fetch, mock_avg):
         "2026-01": {"mtbf": 12.0, "mttr": 0.7, "breakdown_rate": 5.0},
         "2026-02": {"mtbf": 13.0, "mttr": 0.8, "breakdown_rate": 5.5},
     }
-    labels, values = _fetch_planta_monthly("breakdown", start, end)
+    labels, values, _ = _fetch_planta_monthly("breakdown", start, end)
 
     args_fetch = mock_fetch.call_args[0]
     assert args_fetch[0] == start
@@ -257,7 +275,7 @@ def test_planta_monthly_filters_equipment_subset(mock_fetch, mock_avg):
 
     start = datetime(2026, 1, 1)
     end = datetime(2027, 1, 1)
-    labels, values = _fetch_planta_monthly(
+    labels, values, _ = _fetch_planta_monthly(
         "breakdown", start, end, equipment_filter=["LCL-08", "LCT-16"]
     )
 
