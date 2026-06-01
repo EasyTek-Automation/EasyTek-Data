@@ -717,6 +717,7 @@ def _fetch_events_day_real(equipment: str, month: int, day: int,
                 "inicio_execucao": 1,
                 "centro_de_trabalho": 1,
                 "descricao": 1,
+                "texto_de_confirmacao": 1,
                 "duration_min": 1,
                 "causa_do_desvio": 1,
             },
@@ -725,12 +726,18 @@ def _fetch_events_day_real(equipment: str, month: int, day: int,
         for doc in cursor:
             ts = doc.get("inicio_execucao")
             hora = ts.strftime("%H:%M") if hasattr(ts, "strftime") else "—"
+            motivo = doc.get("causa_do_desvio", "—")
+            # Prioridade igual à V1 fetch_top_breakdowns_by_equipment:
+            # texto_de_confirmacao > descricao > fallback "Motivo {codigo}"
+            causa = (doc.get("texto_de_confirmacao")
+                     or doc.get("descricao")
+                     or f"Motivo {motivo}")
             eventos.append({
                 "Hora":          hora,
                 "Equipamento":   equipment,
-                "Causa":         doc.get("descricao", "—"),
+                "Causa":         causa,
                 "Duração (min)": int(doc.get("duration_min", 0) or 0),
-                "Código":        doc.get("causa_do_desvio", "—"),
+                "Código":        motivo,
             })
         return eventos
     except Exception as e:
@@ -2192,6 +2199,27 @@ def register_indicators_v2_callbacks(app):
                 eventos = [e for e in eventos if e.get("Código") not in ("202", "S202")]
             t1_day, t2_day = get_thresholds_pair(equipment)
 
+            # H-bar das paradas do dia (top 5 por duração) — mesma UX do nível mes-top.
+            day_label = f"{day:02d}/{month:02d}/{d_year}"
+            h_bar_items = sorted(
+                [
+                    {
+                        "date":        day_label,
+                        "descricao":   e.get("Causa", "—"),
+                        "duracao_min": int(e.get("Duração (min)", 0) or 0),
+                        "count":       1,
+                        "codigo":      e.get("Código", "—"),
+                    }
+                    for e in eventos
+                ],
+                key=lambda x: x["duracao_min"],
+                reverse=True,
+            )
+            day_h_bar = _top_paradas_h_bar(
+                h_bar_items, equipment, month, td=td,
+                threshold_1=t1_day, threshold_2=t2_day,
+            )
+
             if not eventos:
                 body = _empty_state(
                     icon="bi-emoji-sunglasses",
@@ -2239,20 +2267,33 @@ def register_indicators_v2_callbacks(app):
                     sort_action="native",
                 )
 
-            content = html.Div(
-                [
-                    dbc.Alert(
-                        [
-                            html.I(className="bi bi-info-circle me-2"),
-                            f"{td.get('mdl_paradas_em','Paradas em')} {equipment} — {day:02d}/{month:02d}/{d_year} — "
-                            f"{len(eventos)} {td.get('mdl_eventos','eventos')}.",
-                        ],
-                        color="info",
-                        className="mb-3",
+            content_children = [
+                dbc.Alert(
+                    [
+                        html.I(className="bi bi-info-circle me-2"),
+                        f"{td.get('mdl_paradas_em','Paradas em')} {equipment} — {day:02d}/{month:02d}/{d_year} — "
+                        f"{len(eventos)} {td.get('mdl_eventos','eventos')}.",
+                    ],
+                    color="info",
+                    className="mb-3",
+                ),
+            ]
+            # H-bar só faz sentido quando há eventos.
+            if eventos:
+                content_children += [
+                    dcc.Graph(
+                        figure=day_h_bar,
+                        config={"displayModeBar": False, "staticPlot": True, "responsive": True},
+                        style={"height": "380px"},
                     ),
-                    body,
+                    html.Hr(),
+                    html.H6(
+                        td.get("mdl_top_10_paradas", "Top 10 paradas — detalhe:"),
+                        className="v2-section-h6 text-muted",
+                    ),
                 ]
-            )
+            content_children.append(body)
+            content = html.Div(content_children)
             breadcrumb_items += [
                 html.Span(" › ", className="mx-1 text-muted"),
                 html.Span(equipment, className="text-primary fw-semibold"),
