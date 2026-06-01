@@ -1039,17 +1039,35 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
         x_pct = cfg_x if x_pct is None else x_pct
         z_pct = cfg_z if z_pct is None else z_pct
 
-    duracoes = _fetch_breakdown_duration_by_day(equipment_ids, start, end, codes)
-    producao = _fetch_production_days(equipment_ids, start, end)
+    # Janela de DISPLAY (sempre cobre 12 meses quando filtro <1 ano). Dias
+    # fora do filtro selecionado [start, end) aparecem com opacity baixa
+    # ('disabled') — mesma lógica do eixo das barras mensais (IM-18).
+    months_meta_disp = list(_chart_months_with_status(start, end))
+    if months_meta_disp:
+        display_start = months_meta_disp[0][1]
+        display_end = months_meta_disp[-1][2]
+    else:
+        display_start, display_end = start, end
+
+    duracoes = _fetch_breakdown_duration_by_day(equipment_ids, display_start, display_end, codes)
+    producao = _fetch_production_days(equipment_ids, display_start, display_end)
     # Breakdown por máquina só pra heatmap da planta (mais de 1 equipamento).
     breakdown_by_machine = (
-        _fetch_breakdown_by_day_by_equip(equipment_ids, start, end, codes)
+        _fetch_breakdown_by_day_by_equip(equipment_ids, display_start, display_end, codes)
         if not compact else {}
     )
 
+    # Stats (média/mediana) refletem APENAS o filtro [start, end).
+    def _in_filter_range(date_str: str) -> bool:
+        try:
+            d = datetime.strptime(date_str, "%Y-%m-%d")
+        except Exception:
+            return False
+        return start <= d < end
+
     nonzero_durations = [
         v for ds, v in duracoes.items()
-        if ds in producao and v and v > 0
+        if _in_filter_range(ds) and ds in producao and v and v > 0
     ]
     median_min_local = _stats.median(nonzero_durations) if nonzero_durations else 0.0
     mean_min = (_stats.mean(nonzero_durations) if nonzero_durations else 0.0)
@@ -1061,13 +1079,14 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
     x_thr_min = median_min_cmp * (x_pct / 100.0)
     z_thr_min = median_min_cmp * (z_pct / 100.0)
 
-    weeks, days_of_week, colors, hover_texts = [], [], [], []
-    cur = datetime(start.year, start.month, start.day)
-    end_day = datetime(end.year, end.month, end.day)
+    weeks, days_of_week, colors, opacities, hover_texts = [], [], [], [], []
+    cur = datetime(display_start.year, display_start.month, display_start.day)
+    end_day = datetime(display_end.year, display_end.month, display_end.day)
     base_iso_week = cur.isocalendar()[1]
     base_year = cur.year
     while cur < end_day:
         ds = cur.strftime("%Y-%m-%d")
+        in_filter = start <= cur < end
         has_prod = ds in producao
         duration = float(duracoes.get(ds, 0)) if has_prod else 0.0
         color, _status = _heatmap_color_by_duration(
@@ -1078,8 +1097,14 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
         weeks.append(week_idx)
         days_of_week.append(cur.weekday())
         colors.append(color)
+        opacities.append(1.0 if in_filter else 0.22)
         # Tooltip — planta lista máquinas, mini só mostra duração.
-        if not has_prod:
+        if not in_filter:
+            txt = (
+                f"<b>{cur.strftime('%d/%m/%Y')}</b><br>"
+                f"<i>Fora do filtro selecionado</i>"
+            )
+        elif not has_prod:
             txt = f"<b>{cur.strftime('%d/%m/%Y')}</b><br>Sem produção"
         elif duration <= 0:
             txt = f"<b>{cur.strftime('%d/%m/%Y')}</b><br>Sem paradas"
@@ -1105,6 +1130,7 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
         marker=dict(
             size=22,
             color=colors,
+            opacity=opacities,
             symbol="square",
             line=dict(color="rgba(0,0,0,0.08)", width=1),
         ),
@@ -1908,15 +1934,22 @@ def register_indicators_v2_callbacks(app):
     def _heat_kpi_card(title: str, icon: str, ref_label: str, ref_val: str,
                        below_label: str, below_val: str,
                        above_label: str, above_val: str,
+                       accent: str = "#0d6efd",
                        below_color: str = "#198754",
                        above_color: str = "#dc3545") -> dbc.Card:
-        """Mini KPI card mostrando 'abaixo/acima' de uma referência (média/mediana)."""
+        """Mini KPI card mostrando 'abaixo/acima' de uma referência (média/mediana).
+
+        accent: cor do borderTop (alinha visual com o resto dos cards V2).
+        """
         return dbc.Card(
             dbc.CardBody(
                 [
                     html.Div(
                         [
-                            html.I(className=f"bi {icon} me-2", style={"color": "#6c757d"}),
+                            html.I(
+                                className=f"bi {icon} me-2",
+                                style={"color": accent, "fontSize": "1rem"},
+                            ),
                             html.Strong(title, style={"fontSize": "0.85rem"}),
                         ],
                         className="d-flex align-items-center mb-2",
@@ -1938,7 +1971,8 @@ def register_indicators_v2_callbacks(app):
                                         html.Div(below_val,
                                                  style={"fontSize": "1.35rem",
                                                         "fontWeight": "700",
-                                                        "color": below_color}),
+                                                        "color": below_color,
+                                                        "letterSpacing": "-0.5px"}),
                                     ],
                                     className="text-center",
                                 ),
@@ -1952,7 +1986,8 @@ def register_indicators_v2_callbacks(app):
                                         html.Div(above_val,
                                                  style={"fontSize": "1.35rem",
                                                         "fontWeight": "700",
-                                                        "color": above_color}),
+                                                        "color": above_color,
+                                                        "letterSpacing": "-0.5px"}),
                                     ],
                                     className="text-center",
                                 ),
@@ -1964,7 +1999,8 @@ def register_indicators_v2_callbacks(app):
                 ],
                 className="py-2 px-3",
             ),
-            className="shadow-sm h-100",
+            className="shadow-sm h-100 indicator-v2-card",
+            style={"borderTop": f"4px solid {accent}"},
         )
 
     def _format_minutes(value: float) -> str:
@@ -2081,16 +2117,18 @@ def register_indicators_v2_callbacks(app):
                 below_val=f"{len(below_mean)} ({len(below_mean)*100//total}%)",
                 above_label="Paradas acima",
                 above_val=f"{len(above_mean)} ({len(above_mean)*100//total}%)",
+                accent="#0d6efd",
             )
             kpi_dist_median = _heat_kpi_card(
                 title="Distribuição vs Mediana",
-                icon="bi-bar-chart-steps",
+                icon="bi-bullseye",
                 ref_label="Mediana:",
                 ref_val=_format_minutes(median),
                 below_label="Paradas abaixo",
                 below_val=f"{len(below_median)} ({len(below_median)*100//total}%)",
                 above_label="Paradas acima",
                 above_val=f"{len(above_median)} ({len(above_median)*100//total}%)",
+                accent="#6f42c1",
             )
             sum_total = sum(durations)
             sum_below_mean = sum(below_mean)
@@ -2099,7 +2137,7 @@ def register_indicators_v2_callbacks(app):
             sum_above_median = sum(above_median)
             kpi_sum_mean = _heat_kpi_card(
                 title="Tempo total vs Média",
-                icon="bi-stopwatch",
+                icon="bi-hourglass-split",
                 ref_label="Total:",
                 ref_val=_format_minutes(sum_total),
                 below_label="Min abaixo",
@@ -2108,6 +2146,7 @@ def register_indicators_v2_callbacks(app):
                 above_label="Min acima",
                 above_val=(f"{_format_minutes(sum_above_mean)} "
                            f"({sum_above_mean*100//sum_total}%)") if sum_total else "0min",
+                accent="#20c997",
             )
             kpi_sum_median = _heat_kpi_card(
                 title="Tempo total vs Mediana",
@@ -2120,6 +2159,7 @@ def register_indicators_v2_callbacks(app):
                 above_label="Min acima",
                 above_val=(f"{_format_minutes(sum_above_median)} "
                            f"({sum_above_median*100//sum_total}%)") if sum_total else "0min",
+                accent="#fd7e14",
             )
 
         # ===== Grid POR EQUIPAMENTO =====
@@ -2148,16 +2188,27 @@ def register_indicators_v2_callbacks(app):
                                     [
                                         html.Div(
                                             [
-                                                html.Strong(eq["id"], style={"fontSize": "0.85rem"}),
-                                                html.Br(),
+                                                html.Div(
+                                                    [
+                                                        html.I(
+                                                            className="bi bi-hdd-stack me-1",
+                                                            style={"color": "#6c757d",
+                                                                   "fontSize": "0.85rem"},
+                                                        ),
+                                                        html.Strong(eq["id"],
+                                                                    style={"fontSize": "0.85rem"}),
+                                                    ],
+                                                    className="d-flex align-items-center",
+                                                ),
                                                 html.Small(eq.get("categoria", "—"),
-                                                           className="text-muted"),
+                                                           className="text-muted",
+                                                           style={"fontSize": "0.7rem"}),
                                             ]
                                         ),
                                         html.Div(
                                             _heatmap_stats_str(stats_eq),
                                             className="ms-auto small text-muted text-end",
-                                            style={"fontSize": "0.75rem", "lineHeight": "1.1"},
+                                            style={"fontSize": "0.72rem", "lineHeight": "1.2"},
                                         ),
                                     ],
                                     className="d-flex align-items-center",
@@ -2181,7 +2232,8 @@ def register_indicators_v2_callbacks(app):
                                 className="p-2",
                             ),
                         ],
-                        className="shadow-sm h-100",
+                        className="shadow-sm h-100 indicator-v2-card",
+                        style={"borderTop": "3px solid #e9ecef"},
                     ),
                     xs=12, sm=6, md=4, lg=4, xl=4,
                     className="mb-3",

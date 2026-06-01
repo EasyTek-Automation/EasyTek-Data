@@ -948,55 +948,103 @@ def layout():
                                     style={"display": "none"},
                                 ),
 
-                                # ===== ROW 3: HEATMAPS (KPIs distribuição + planta + grid) =====
+                                # ===== ROW 3: HEATMAPS — card sofisticado (KPIs + planta + grid)
                                 dbc.Card(
                                     [
                                         dbc.CardHeader(
                                             html.Div(
                                                 [
-                                                    html.I(className="bi bi-calendar3 me-2",
-                                                           style={"color": "#0d6efd", "fontSize": "1.25rem"}),
-                                                    html.Strong(
-                                                        "Heatmap de Falhas",
-                                                        id="v2-i18n-heatmap-section-title",
-                                                        style={"fontSize": "1.05rem"},
+                                                    html.Div(
+                                                        [
+                                                            html.I(
+                                                                className="bi bi-calendar3 me-2",
+                                                                style={
+                                                                    "color": "#fd7e14",
+                                                                    "fontSize": "1.35rem",
+                                                                },
+                                                            ),
+                                                            html.Strong(
+                                                                "Mapa de Falhas",
+                                                                id="v2-i18n-heatmap-section-title",
+                                                                style={"fontSize": "1.05rem"},
+                                                            ),
+                                                        ],
+                                                        className="d-flex align-items-center",
+                                                    ),
+                                                    html.Div(
+                                                        [
+                                                            html.Span(
+                                                                "Distribuição diária das paradas por duração — comparação contra média e mediana do período filtrado",
+                                                                id="v2-i18n-heatmap-section-sub",
+                                                                className="text-muted",
+                                                                style={"fontSize": "0.78rem"},
+                                                            ),
+                                                        ],
+                                                        className="mt-1",
                                                     ),
                                                 ],
-                                                className="d-flex align-items-center",
                                             ),
+                                            className="py-2",
                                         ),
                                         dbc.CardBody(
                                             [
                                                 # 4 KPI cards de distribuição/soma
                                                 dbc.Row(
                                                     [
-                                                        dbc.Col(html.Div(id="v2-heat-kpi-dist-mean"),  xs=12, sm=6, lg=3, className="mb-2"),
+                                                        dbc.Col(html.Div(id="v2-heat-kpi-dist-mean"),   xs=12, sm=6, lg=3, className="mb-2"),
                                                         dbc.Col(html.Div(id="v2-heat-kpi-dist-median"), xs=12, sm=6, lg=3, className="mb-2"),
-                                                        dbc.Col(html.Div(id="v2-heat-kpi-sum-mean"),   xs=12, sm=6, lg=3, className="mb-2"),
-                                                        dbc.Col(html.Div(id="v2-heat-kpi-sum-median"), xs=12, sm=6, lg=3, className="mb-2"),
+                                                        dbc.Col(html.Div(id="v2-heat-kpi-sum-mean"),    xs=12, sm=6, lg=3, className="mb-2"),
+                                                        dbc.Col(html.Div(id="v2-heat-kpi-sum-median"),  xs=12, sm=6, lg=3, className="mb-2"),
                                                     ],
-                                                    className="g-2 mb-3",
+                                                    className="g-3 mb-3",
                                                 ),
 
-                                                # Heatmap PLANTA (sub-card)
+                                                # Heatmap PLANTA (sub-card sofisticado)
                                                 dbc.Card(
                                                     [
                                                         dbc.CardHeader(
                                                             html.Div(
                                                                 [
-                                                                    html.I(className="bi bi-grid-3x3 me-2",
-                                                                           style={"color": "#0d6efd", "fontSize": "1rem"}),
-                                                                    html.Strong(
-                                                                        "Mapa de Falhas — Planta",
-                                                                        id="v2-i18n-heatmap-planta-title",
-                                                                        style={"fontSize": "0.95rem"},
+                                                                    html.Div(
+                                                                        [
+                                                                            html.Div(
+                                                                                [
+                                                                                    html.I(
+                                                                                        className="bi bi-grid-3x3-gap-fill me-2",
+                                                                                        style={
+                                                                                            "color": "#fd7e14",
+                                                                                            "fontSize": "1.1rem",
+                                                                                        },
+                                                                                    ),
+                                                                                    html.Strong(
+                                                                                        "Visão da Planta",
+                                                                                        id="v2-i18n-heatmap-planta-title",
+                                                                                        style={"fontSize": "0.98rem"},
+                                                                                    ),
+                                                                                ],
+                                                                                className="d-flex align-items-center",
+                                                                            ),
+                                                                            html.Span(
+                                                                                "calendário diário · agregado de todos os equipamentos do filtro",
+                                                                                className="text-muted",
+                                                                                style={
+                                                                                    "fontSize": "0.74rem",
+                                                                                    "lineHeight": "1.2",
+                                                                                },
+                                                                            ),
+                                                                        ],
+                                                                        style={"flex": "1"},
                                                                     ),
                                                                     html.Span(
                                                                         id="v2-heatmap-planta-stats",
-                                                                        className="ms-auto small text-muted",
+                                                                        className="ms-auto small text-muted text-end",
+                                                                        style={
+                                                                            "fontSize": "0.78rem",
+                                                                            "lineHeight": "1.3",
+                                                                        },
                                                                     ),
                                                                 ],
-                                                                className="d-flex align-items-center",
+                                                                className="d-flex justify-content-between align-items-start gap-2",
                                                             ),
                                                             className="py-2",
                                                         ),
@@ -1005,7 +1053,7 @@ def layout():
                                                                 dcc.Loading(
                                                                     id="loading-v2-heatmap-planta",
                                                                     type="circle",
-                                                                    color="#0d6efd",
+                                                                    color="#fd7e14",
                                                                     children=dcc.Graph(
                                                                         id="v2-heatmap-planta",
                                                                         config={"displayModeBar": False, "responsive": True},
@@ -1020,35 +1068,58 @@ def layout():
                                                             ]
                                                         ),
                                                     ],
-                                                    className="shadow-sm mb-3",
+                                                    className="shadow-sm mb-4 indicator-v2-card",
+                                                    style={"borderTop": "4px solid #fd7e14"},
                                                 ),
 
-                                                # Radio individual/geral + grid mini
-                                                dbc.RadioItems(
-                                                    id="v2-heatmap-mini-mode",
-                                                    options=[
-                                                        {"label": "Visão individual (cada equipamento vs sua própria mediana)",
-                                                         "value": "self"},
-                                                        {"label": "Visão geral (todos comparados à mediana da planta)",
-                                                         "value": "planta"},
+                                                # Divisor + cabeçalho do grid
+                                                html.Div(
+                                                    [
+                                                        html.Div(
+                                                            [
+                                                                html.I(
+                                                                    className="bi bi-collection me-2",
+                                                                    style={
+                                                                        "color": "#6c757d",
+                                                                        "fontSize": "1rem",
+                                                                    },
+                                                                ),
+                                                                html.Strong(
+                                                                    "Por equipamento",
+                                                                    id="v2-i18n-heatmap-grid-title",
+                                                                    style={"fontSize": "0.95rem"},
+                                                                ),
+                                                            ],
+                                                            className="d-flex align-items-center mb-1",
+                                                        ),
+                                                        dbc.RadioItems(
+                                                            id="v2-heatmap-mini-mode",
+                                                            options=[
+                                                                {"label": "Visão individual (cada equipamento vs sua própria mediana)",
+                                                                 "value": "self"},
+                                                                {"label": "Visão geral (todos comparados à mediana da planta)",
+                                                                 "value": "planta"},
+                                                            ],
+                                                            value="self",
+                                                            inline=True,
+                                                            className="small text-muted mb-3",
+                                                            inputClassName="me-1",
+                                                            labelClassName="me-3",
+                                                        ),
                                                     ],
-                                                    value="self",
-                                                    inline=True,
-                                                    className="small text-muted mb-3",
-                                                    inputClassName="me-1",
-                                                    labelClassName="me-3",
                                                 ),
                                                 dcc.Loading(
                                                     id="loading-v2-heatmap-grid",
                                                     type="circle",
-                                                    color="#0d6efd",
+                                                    color="#fd7e14",
                                                     children=html.Div(id="v2-heatmap-grid"),
                                                     delay_show=120,
                                                 ),
                                             ]
                                         ),
                                     ],
-                                    className="shadow-sm mb-4",
+                                    className="shadow-sm mb-4 indicator-v2-card",
+                                    style={"borderTop": "4px solid #fd7e14"},
                                 ),
 
                             ],

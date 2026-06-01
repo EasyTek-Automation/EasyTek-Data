@@ -152,8 +152,8 @@ def create_header(pathname, user):
                         html.Span(html.I(className="bi bi-speedometer2 me-2")),
                         "Dashboard"
                     ], className="d-flex align-items-center ps-4"),
-                    href="/maintenance/indicators",
-                    active=(pathname == "/maintenance/indicators")
+                    href="/maintenance/indicators-v2",
+                    active=(pathname == "/maintenance/indicators-v2")
                 ),
                 dbc.DropdownMenuItem(
                     html.Div([
