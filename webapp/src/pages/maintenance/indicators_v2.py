@@ -774,7 +774,9 @@ def layout():
                                     className="mb-4 kpi-row-v2",
                                 ),
 
-                                # ===== ROW 2: TIMELINE (visual sofisticado matching cards top) =====
+                                # ===== ROW 2: TIMELINE (OCULTA — guardada via display:none;
+                                # Stores/Interval/callbacks continuam ativos pra restauração
+                                # rápida quando voltar a trabalhar nela) =====
                                 dbc.Row(
                                     dbc.Col(
                                         html.Div(
@@ -939,6 +941,71 @@ def layout():
                                                 className="shadow-sm indicator-v2-card-timeline",
                                                 style={"borderTop": "4px solid #0d6efd"},
                                             ),
+                                        ),
+                                    ),
+                                    className="mb-4",
+                                    id="v2-timeline-row",
+                                    style={"display": "none"},
+                                ),
+
+                                # ===== ROW 3: HEATMAPS — planta + grid por equipamento =====
+                                dbc.Row(
+                                    dbc.Col(
+                                        dbc.Card(
+                                            [
+                                                dbc.CardHeader(
+                                                    html.Div(
+                                                        [
+                                                            html.I(className="bi bi-calendar3 me-2",
+                                                                   style={"color": "#0d6efd", "fontSize": "1.15rem"}),
+                                                            html.Strong(
+                                                                "Mapa de Falhas — Planta",
+                                                                id="v2-i18n-heatmap-planta-title",
+                                                                style={"fontSize": "1rem"},
+                                                            ),
+                                                        ],
+                                                        className="d-flex align-items-center",
+                                                    ),
+                                                ),
+                                                dbc.CardBody(
+                                                    [
+                                                        dcc.Loading(
+                                                            id="loading-v2-heatmap-planta",
+                                                            type="circle",
+                                                            color="#0d6efd",
+                                                            children=dcc.Graph(
+                                                                id="v2-heatmap-planta",
+                                                                config={"displayModeBar": False, "responsive": True},
+                                                                style={"height": "280px"},
+                                                            ),
+                                                            delay_show=120,
+                                                        ),
+                                                        html.Div(
+                                                            [
+                                                                html.Span("⬜ sem produção  ", className="me-2 small text-muted"),
+                                                                html.Span("🟢 0 falhas  ", className="me-2 small text-muted"),
+                                                                html.Span("🟡 1  ", className="me-2 small text-muted"),
+                                                                html.Span("🟠 2  ", className="me-2 small text-muted"),
+                                                                html.Span("🔴 3+", className="me-2 small text-muted"),
+                                                            ],
+                                                            className="mt-2",
+                                                        ),
+                                                    ]
+                                                ),
+                                            ],
+                                            className="shadow-sm",
+                                        ),
+                                    ),
+                                    className="mb-3",
+                                ),
+                                dbc.Row(
+                                    dbc.Col(
+                                        dcc.Loading(
+                                            id="loading-v2-heatmap-grid",
+                                            type="circle",
+                                            color="#0d6efd",
+                                            children=html.Div(id="v2-heatmap-grid"),
+                                            delay_show=120,
                                         ),
                                     ),
                                     className="mb-4",

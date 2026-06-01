@@ -766,6 +766,180 @@ def _list_equipments_real() -> list:
         return EQUIPAMENTOS
 
 
+# ============== HEATMAP DE FALHAS ==============
+# Constantes do gradiente (mantém compat com legenda do layout):
+_HEATMAP_COLOR_NO_PROD  = "#e9ecef"  # cinza claro
+_HEATMAP_COLOR_OK       = "#d4edda"  # verde claro (0 falhas)
+_HEATMAP_COLOR_1        = "#fff3cd"  # amarelo claro
+_HEATMAP_COLOR_2        = "#ffc170"  # laranja
+_HEATMAP_COLOR_3_PLUS   = "#f8a5ad"  # vermelho claro
+
+
+def _heatmap_color(count: int, has_prod: bool) -> tuple:
+    """(cor_hex, label_status) por dia. Mantém faixas absolutas (0/1/2/3+)."""
+    if not has_prod:
+        return _HEATMAP_COLOR_NO_PROD, "Sem produção"
+    if count == 0:
+        return _HEATMAP_COLOR_OK, "Sem falhas"
+    if count == 1:
+        return _HEATMAP_COLOR_1, "1 falha"
+    if count == 2:
+        return _HEATMAP_COLOR_2, "2 falhas"
+    return _HEATMAP_COLOR_3_PLUS, f"{count} falhas"
+
+
+def _fetch_breakdown_count_by_day(equipment_ids, start: datetime, end: datetime,
+                                  codes: tuple) -> dict:
+    """Retorna {date_str_YYYY-MM-DD: count_breakdowns}.
+
+    equipment_ids: lista de internal IDs OU None (planta inteira excluindo
+    KPI_FORCE_ZERO_EQUIPMENTS, paridade com V1 que zera o overlay).
+    codes: tupla de códigos de avaria; ausente → BREAKDOWN_CODES.
+    """
+    if not _HAS_REAL_DATA:
+        return {}
+    if codes is None or len(codes) == 0:
+        return {} if codes == () else {}
+    try:
+        from src.utils.zpp_kpi_calculator import (
+            ZPP_PARADAS_COLLECTION, KPI_FORCE_ZERO_EQUIPMENTS,
+        )
+        col = get_mongo_connection(ZPP_PARADAS_COLLECTION)
+        if col is None:
+            return {}
+        match = {
+            "_processed": True,
+            "inicio_execucao": {"$gte": start, "$lt": end},
+            "causa_do_desvio": {"$in": list(codes)},
+        }
+        if equipment_ids is None:
+            # Planta inteira excluindo overlay zerado (BR equivalente à V1).
+            excluded = list(KPI_FORCE_ZERO_EQUIPMENTS)
+            if excluded:
+                match["centro_de_trabalho"] = {"$nin": excluded}
+        else:
+            if not equipment_ids:
+                return {}
+            match["centro_de_trabalho"] = {"$in": list(equipment_ids)}
+        pipeline = [
+            {"$match": match},
+            {"$group": {
+                "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$inicio_execucao"}},
+                "count": {"$sum": 1},
+            }},
+        ]
+        return {doc["_id"]: int(doc["count"]) for doc in col.aggregate(pipeline)}
+    except Exception as e:
+        logger.warning("V2 heatmap paradas falhou (%s)", e)
+        return {}
+
+
+def _fetch_production_days(equipment_ids, start: datetime, end: datetime) -> set:
+    """Retorna set de date_str_YYYY-MM-DD onde houve produção."""
+    if not _HAS_REAL_DATA:
+        return set()
+    try:
+        from src.utils.zpp_kpi_calculator import (
+            ZPP_PRODUCAO_COLLECTION, KPI_FORCE_ZERO_EQUIPMENTS,
+        )
+        col = get_mongo_connection(ZPP_PRODUCAO_COLLECTION)
+        if col is None:
+            return set()
+        match = {
+            "_processed": True,
+            "fininotif": {"$gte": start, "$lt": end},
+        }
+        if equipment_ids is None:
+            excluded = list(KPI_FORCE_ZERO_EQUIPMENTS)
+            if excluded:
+                match["pto_trab"] = {"$nin": excluded}
+        else:
+            if not equipment_ids:
+                return set()
+            match["pto_trab"] = {"$in": list(equipment_ids)}
+        pipeline = [
+            {"$match": match},
+            {"$group": {"_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$fininotif"}}}},
+        ]
+        return {doc["_id"] for doc in col.aggregate(pipeline)}
+    except Exception as e:
+        logger.warning("V2 heatmap produção falhou (%s)", e)
+        return set()
+
+
+def _build_heatmap(start: datetime, end: datetime, codes: tuple,
+                   equipment_ids=None, title: str = "Planta", compact: bool = False):
+    """Heatmap calendário (semana × dia da semana) das falhas.
+
+    equipment_ids=None → planta inteira (exclui overlay zerado).
+    equipment_ids=[ids] → restringe.
+    compact=True → versão menor pros mini-cards por equipamento.
+    """
+    import plotly.graph_objects as go
+    from datetime import timedelta as _td
+
+    if codes is None:
+        codes = tuple(BREAKDOWN_CODES)
+
+    paradas = _fetch_breakdown_count_by_day(equipment_ids, start, end, codes)
+    producao = _fetch_production_days(equipment_ids, start, end)
+
+    # Gera lista de dias [start, end) e calcula coords semana/diaSemana
+    weeks, days_of_week, colors, hover_texts = [], [], [], []
+    cur = datetime(start.year, start.month, start.day)
+    end_day = datetime(end.year, end.month, end.day)
+    base_iso_week = cur.isocalendar()[1]
+    base_year = cur.year
+    while cur < end_day:
+        ds = cur.strftime("%Y-%m-%d")
+        has_prod = ds in producao
+        count = paradas.get(ds, 0) if has_prod else 0
+        color, status = _heatmap_color(count, has_prod)
+        # Semana absoluta (compensa virada de ano)
+        iso_yr, iso_wk, _ = cur.isocalendar()
+        week_idx = iso_wk - base_iso_week + (52 if iso_yr > base_year else 0)
+        weeks.append(week_idx)
+        days_of_week.append(cur.weekday())
+        colors.append(color)
+        hover_texts.append(
+            f"<b>{cur.strftime('%d/%m/%Y')}</b><br>{status}<br><i>{cur.strftime('%A')}</i>"
+        )
+        cur += _td(days=1)
+
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=weeks,
+        y=days_of_week,
+        mode="markers",
+        marker=dict(
+            size=18 if compact else 22,
+            color=colors,
+            symbol="square",
+            line=dict(color="rgba(0,0,0,0.08)", width=1),
+        ),
+        text=hover_texts,
+        hovertemplate="%{text}<extra></extra>",
+        showlegend=False,
+    ))
+    weekday_labels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
+    fig.update_layout(
+        title=None if compact else dict(text=title, font=dict(size=13)),
+        margin=dict(l=40 if compact else 50, r=10, t=10 if compact else 36, b=20),
+        height=160 if compact else 260,
+        plot_bgcolor="white",
+        paper_bgcolor="rgba(0,0,0,0)",
+        xaxis=dict(visible=False, range=[-0.5, (max(weeks) if weeks else 0) + 0.5]),
+        yaxis=dict(
+            tickmode="array",
+            tickvals=list(range(7)),
+            ticktext=weekday_labels,
+            autorange="reversed",
+            tickfont=dict(size=9 if compact else 11),
+        ),
+    )
+    return fig
+
+
 def _mock_planta_mes(kpi):
     """12 valores mensais da planta inteira pro KPI."""
     rng = random.Random(_seed("planta", kpi))
@@ -1495,6 +1669,79 @@ def register_indicators_v2_callbacks(app):
             "codes":        codes_out if _HAS_REAL_DATA else codes_out,
             "lwb_simulate": bool(lwb_sim),
         }
+
+    # 0. Heatmap de Falhas — Planta (1 grande) + grid 4-col por equipamento
+    @app.callback(
+        Output("v2-heatmap-planta", "figure"),
+        Output("v2-heatmap-grid", "children"),
+        Input("url", "pathname"),
+        Input("store-v2-filters", "data"),
+    )
+    def render_v2_heatmaps(pathname, filters):
+        if pathname != "/maintenance/indicators-v2":
+            return no_update, no_update
+        start, end, codes, equipment_filter, _year, _lwb = _unpack_filters(filters)
+
+        # ===== Heatmap PLANTA =====
+        # equipment_filter respeitado: None → toda planta (excluindo overlay zerado),
+        # lista → restringe.
+        planta_eq = None
+        if equipment_filter is not None:
+            # Converte friendly→internal usando _cached_names; já é internal IDs após
+            # populate_equipment_filter passar a usar internal como value, mas
+            # _resolve_equipment_internal_ids resolve ambos.
+            names = _cached_names() or {}
+            friendly_to_internal = {v: k for k, v in names.items()}
+            planta_eq = []
+            for raw in equipment_filter:
+                planta_eq.append(friendly_to_internal.get(raw, raw))
+        fig_planta = _build_heatmap(start, end, codes, equipment_ids=planta_eq,
+                                    title="Planta", compact=False)
+
+        # ===== Grid POR EQUIPAMENTO =====
+        eq_list = _list_equipments_real()
+        if equipment_filter is not None:
+            _set = set(equipment_filter)
+            eq_list = [
+                e for e in eq_list
+                if (e.get("internal") or e["id"]) in _set or e["id"] in _set
+            ]
+        cards = []
+        for eq in eq_list:
+            internal = eq.get("internal") or eq["id"]
+            fig_eq = _build_heatmap(start, end, codes,
+                                    equipment_ids=[internal], title=eq["id"], compact=True)
+            cards.append(
+                dbc.Col(
+                    dbc.Card(
+                        [
+                            dbc.CardHeader(
+                                html.Div(
+                                    [
+                                        html.Strong(eq["id"], style={"fontSize": "0.85rem"}),
+                                        html.Br(),
+                                        html.Small(eq.get("categoria", "—"), className="text-muted"),
+                                    ]
+                                ),
+                                className="py-2",
+                            ),
+                            dbc.CardBody(
+                                dcc.Graph(
+                                    figure=fig_eq,
+                                    config={"displayModeBar": False, "staticPlot": True, "responsive": True},
+                                    style={"height": "160px"},
+                                ),
+                                className="p-2",
+                            ),
+                        ],
+                        className="shadow-sm h-100",
+                    ),
+                    xs=12, sm=6, md=4, xl=3,
+                    className="mb-3",
+                )
+            )
+        grid = dbc.Row(cards, className="g-3") if cards else html.Div()
+        return fig_planta, grid
 
     # 1. Renderiza cards KPI + deltas + sparklines + pulse + ring + animated value
     @app.callback(
