@@ -28,10 +28,12 @@ DEFAULT_THRESHOLD_MIN = 200
 TOOL_MULT = 1.20  # gatilho_2 = gatilho_1 × 1.20
 
 # Limites de cor do heatmap (% da mediana das durações totais por dia).
-# Verde ≤ Y%; Amarelo entre Y% e X%; Vermelho > X% (X=100 = mediana).
+# Verde ≤ Y%; Amarelo entre Y% e X%; Vermelho entre X% e Z%; Vermelho forte > Z%.
+# X=100 = mediana; Z=150 = 1.5× mediana (acima vira alerta intenso).
 HEATMAP_GLOBAL_KEY = "_HEATMAP_GLOBAL"
-DEFAULT_HEATMAP_Y_PCT = 50   # verde
-DEFAULT_HEATMAP_X_PCT = 100  # vermelho a partir daqui
+DEFAULT_HEATMAP_Y_PCT = 50
+DEFAULT_HEATMAP_X_PCT = 100
+DEFAULT_HEATMAP_Z_PCT = 150
 
 _CACHE_TTL_SECONDS = 60
 _cache: Dict[str, tuple] = {"all": (0, None)}
@@ -129,38 +131,40 @@ def invalidate_cache() -> None:
     _cache["heatmap_pcts"] = (0, None)
 
 
-def get_heatmap_pcts() -> tuple[int, int]:
-    """Retorna (y_pct, x_pct) globais do heatmap. Default se ausente.
+def get_heatmap_pcts() -> tuple[int, int, int]:
+    """Retorna (y_pct, x_pct, z_pct) globais do heatmap.
 
-    Persistido no mesmo collection com equipment_id='_HEATMAP_GLOBAL'.
-    Documento tem y_pct e x_pct ao invés de threshold_min.
+    Persistido em maintenance_breakdown_thresholds com equipment_id='_HEATMAP_GLOBAL'.
+    Documentos legados (sem z_pct) usam DEFAULT_HEATMAP_Z_PCT.
     """
     entry = _cache.get("heatmap_pcts")
     if entry and entry[0] and (_time.time() - entry[0]) < _CACHE_TTL_SECONDS:
         return entry[1]
     col = _get_collection()
-    pair = (DEFAULT_HEATMAP_Y_PCT, DEFAULT_HEATMAP_X_PCT)
+    trio = (DEFAULT_HEATMAP_Y_PCT, DEFAULT_HEATMAP_X_PCT, DEFAULT_HEATMAP_Z_PCT)
     if col is None:
-        _cache["heatmap_pcts"] = (_time.time(), pair)
-        return pair
+        _cache["heatmap_pcts"] = (_time.time(), trio)
+        return trio
     try:
         doc = col.find_one({"equipment_id": HEATMAP_GLOBAL_KEY},
-                           {"_id": 0, "y_pct": 1, "x_pct": 1})
+                           {"_id": 0, "y_pct": 1, "x_pct": 1, "z_pct": 1})
         if doc and "y_pct" in doc and "x_pct" in doc:
-            pair = (int(doc["y_pct"]), int(doc["x_pct"]))
+            z = int(doc.get("z_pct") or DEFAULT_HEATMAP_Z_PCT)
+            trio = (int(doc["y_pct"]), int(doc["x_pct"]), z)
     except Exception as e:
         logger.warning("get_heatmap_pcts falhou: %s", e)
-    _cache["heatmap_pcts"] = (_time.time(), pair)
-    return pair
+    _cache["heatmap_pcts"] = (_time.time(), trio)
+    return trio
 
 
-def set_heatmap_pcts(y_pct: int, x_pct: int, updated_by: Optional[str] = None) -> bool:
-    """Persiste Y%/X% do heatmap. Valida 0 < y < x ≤ 200."""
+def set_heatmap_pcts(y_pct: int, x_pct: int, z_pct: int,
+                     updated_by: Optional[str] = None) -> bool:
+    """Persiste Y%/X%/Z% do heatmap. Valida 0 < y < x < z ≤ 300."""
     try:
-        y, x = int(y_pct), int(x_pct)
+        y, x, z = int(y_pct), int(x_pct), int(z_pct)
     except (TypeError, ValueError):
         return False
-    if y <= 0 or x <= y or x > 200:
+    if y <= 0 or x <= y or z <= x or z > 300:
         return False
     col = _get_collection()
     if col is None:
@@ -172,6 +176,7 @@ def set_heatmap_pcts(y_pct: int, x_pct: int, updated_by: Optional[str] = None) -
                 "equipment_id": HEATMAP_GLOBAL_KEY,
                 "y_pct": y,
                 "x_pct": x,
+                "z_pct": z,
                 "updated_at": datetime.utcnow(),
                 "updated_by": updated_by or "unknown",
             }},
@@ -180,5 +185,5 @@ def set_heatmap_pcts(y_pct: int, x_pct: int, updated_by: Optional[str] = None) -
         invalidate_cache()
         return True
     except Exception as e:
-        logger.warning("set_heatmap_pcts(%s, %s) falhou: %s", y_pct, x_pct, e)
+        logger.warning("set_heatmap_pcts(%s, %s, %s) falhou: %s", y_pct, x_pct, z_pct, e)
         return False

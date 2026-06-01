@@ -767,29 +767,28 @@ def _list_equipments_real() -> list:
 
 
 # ============== HEATMAP DE FALHAS ==============
-# Cores (escala absoluta de 3 bins + cinza pra sem produção).
-_HEATMAP_COLOR_NO_PROD = "#e9ecef"  # cinza claro
-_HEATMAP_COLOR_GREEN   = "#d4edda"  # verde — ≤ Y% da mediana (inclui dia sem falhas)
-_HEATMAP_COLOR_YELLOW  = "#fff3cd"  # amarelo — entre Y% e X% da mediana
-_HEATMAP_COLOR_RED     = "#f8a5ad"  # vermelho — > X% (X=100 = mediana)
+# Cores (4 bins + cinza pra sem produção).
+_HEATMAP_COLOR_NO_PROD  = "#e9ecef"  # cinza claro
+_HEATMAP_COLOR_GREEN    = "#d4edda"  # verde       — ≤ Y% da mediana (inclui 0)
+_HEATMAP_COLOR_YELLOW   = "#fff3cd"  # amarelo     — entre Y% e X%
+_HEATMAP_COLOR_RED      = "#f8a5ad"  # vermelho    — entre X% e Z%
+_HEATMAP_COLOR_RED_DARK = "#c82333"  # vermelho forte — > Z%
 
 
 def _heatmap_color_by_duration(duration_min: float, has_prod: bool,
-                               median_min: float, y_pct: int, x_pct: int) -> tuple:
-    """(cor_hex, label_status) por dia, dado:
-    - duration_min: soma de minutos das paradas no dia
-    - has_prod: dia teve produção
-    - median_min: mediana das durações totais por dia (escopo do heatmap)
-    - y_pct/x_pct: limites em %% da mediana
+                               median_min: float,
+                               y_pct: int, x_pct: int, z_pct: int) -> tuple:
+    """(cor_hex, label_status) por dia.
 
     BR de cor:
-      sem produção         → cinza
-      duration ≤ Y% mediana → verde (inclui duration=0)
-      Y% < duration ≤ X%   → amarelo
-      duration > X%        → vermelho
+      sem produção       → cinza
+      duration ≤ Y%      → verde (inclui duration=0)
+      Y% < duration ≤ X% → amarelo
+      X% < duration ≤ Z% → vermelho
+      duration > Z%      → vermelho forte
 
-    Sem mediana definida (median=0 — período sem nenhuma parada com produção),
-    todo dia com produção fica verde.
+    Sem mediana (median=0 — sem paradas no escopo), todo dia com
+    produção vira verde.
     """
     if not has_prod:
         return _HEATMAP_COLOR_NO_PROD, "Sem produção"
@@ -797,12 +796,15 @@ def _heatmap_color_by_duration(duration_min: float, has_prod: bool,
         return _HEATMAP_COLOR_GREEN, "Sem falhas (período sem mediana)"
     y_thr = median_min * (y_pct / 100.0)
     x_thr = median_min * (x_pct / 100.0)
+    z_thr = median_min * (z_pct / 100.0)
     if duration_min <= y_thr:
-        label = "Sem falhas" if duration_min == 0 else f"{int(duration_min)}min (≤Y%)"
-        return _HEATMAP_COLOR_GREEN, label
+        return _HEATMAP_COLOR_GREEN, ("Sem falhas" if duration_min == 0
+                                      else f"{int(duration_min)}min")
     if duration_min <= x_thr:
-        return _HEATMAP_COLOR_YELLOW, f"{int(duration_min)}min (Y%–X%)"
-    return _HEATMAP_COLOR_RED, f"{int(duration_min)}min (>X%)"
+        return _HEATMAP_COLOR_YELLOW, f"{int(duration_min)}min"
+    if duration_min <= z_thr:
+        return _HEATMAP_COLOR_RED, f"{int(duration_min)}min"
+    return _HEATMAP_COLOR_RED_DARK, f"{int(duration_min)}min"
 
 
 def _fetch_breakdown_duration_by_day(equipment_ids, start: datetime, end: datetime,
@@ -945,31 +947,31 @@ def _fetch_breakdown_by_day_by_equip(equipment_ids, start: datetime, end: dateti
 
 
 def _format_top_machines_until_median(items, median_min: float) -> str:
-    """'PRENSA-01: 45min · LCT-08: 25min' até cumsum atingir mediana."""
+    """'PRENSA-01: 45min<br>LCT-08: 25min' até cumsum atingir mediana."""
     if not items or median_min <= 0:
         return ""
     cumsum = 0.0
     parts = []
     for name, dur in items:
-        parts.append(f"{name}: {int(dur)}min")
+        parts.append(f"• {name}: {int(dur)}min")
         cumsum += dur
         if cumsum >= median_min:
             break
-    return " · ".join(parts)
+    return "<br>".join(parts)
 
 
 def _build_heatmap(start: datetime, end: datetime, codes: tuple,
                    equipment_ids=None, title: str = "Planta", compact: bool = False,
-                   y_pct: int = None, x_pct: int = None):
+                   y_pct: int = None, x_pct: int = None, z_pct: int = None):
     """Heatmap calendário (semana × dia da semana) das falhas POR DURAÇÃO.
 
-    Retorna (fig, stats) onde stats = {median_min, mean_min, y_thr_min,
-    x_thr_min, total_dias_com_falha}.
+    Retorna (fig, stats) onde stats inclui median_min, mean_min, y_thr_min,
+    x_thr_min, z_thr_min, n_dias_falha.
 
-    compact=True desliga tooltips e título interno (versão p/ mini-cards).
-    Para o modo planta (compact=False, equipment_ids=None) a tooltip lista
-    as máquinas (ordem desc) até que a soma das durações ultrapasse a
-    mediana — as demais omitidas.
+    compact=True: mini-card (sem título interno, mais compacto).
+      Tooltip mostra data + duração total do dia (escopo é o equipamento).
+    compact=False (planta): tooltip mostra data + total + máquinas em
+      ordem desc até a soma ultrapassar a mediana (uma por linha).
     """
     import plotly.graph_objects as go
     from datetime import timedelta as _td
@@ -977,14 +979,16 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
 
     if codes is None:
         codes = tuple(BREAKDOWN_CODES)
-    if y_pct is None or x_pct is None:
+    if y_pct is None or x_pct is None or z_pct is None:
         from src.utils.breakdown_thresholds import get_heatmap_pcts
-        cfg_y, cfg_x = get_heatmap_pcts()
+        cfg_y, cfg_x, cfg_z = get_heatmap_pcts()
         y_pct = cfg_y if y_pct is None else y_pct
         x_pct = cfg_x if x_pct is None else x_pct
+        z_pct = cfg_z if z_pct is None else z_pct
 
     duracoes = _fetch_breakdown_duration_by_day(equipment_ids, start, end, codes)
     producao = _fetch_production_days(equipment_ids, start, end)
+    # Breakdown por máquina só pra heatmap da planta (mais de 1 equipamento).
     breakdown_by_machine = (
         _fetch_breakdown_by_day_by_equip(equipment_ids, start, end, codes)
         if not compact else {}
@@ -998,6 +1002,7 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
     mean_min = (_stats.mean(nonzero_durations) if nonzero_durations else 0.0)
     y_thr_min = median_min * (y_pct / 100.0)
     x_thr_min = median_min * (x_pct / 100.0)
+    z_thr_min = median_min * (z_pct / 100.0)
 
     weeks, days_of_week, colors, hover_texts = [], [], [], []
     cur = datetime(start.year, start.month, start.day)
@@ -1009,62 +1014,47 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
         has_prod = ds in producao
         duration = float(duracoes.get(ds, 0)) if has_prod else 0.0
         color, _status = _heatmap_color_by_duration(
-            duration, has_prod, median_min, y_pct, x_pct
+            duration, has_prod, median_min, y_pct, x_pct, z_pct
         )
         iso_yr, iso_wk, _ = cur.isocalendar()
         week_idx = iso_wk - base_iso_week + (52 if iso_yr > base_year else 0)
         weeks.append(week_idx)
         days_of_week.append(cur.weekday())
         colors.append(color)
-        if not compact:
-            # Tooltip em linguagem natural: data + duração total + top máquinas
-            if not has_prod:
-                txt = f"<b>{cur.strftime('%d/%m/%Y')}</b><br>Sem produção"
-            elif duration <= 0:
-                txt = f"<b>{cur.strftime('%d/%m/%Y')}</b><br>Sem paradas"
-            else:
+        # Tooltip — planta lista máquinas, mini só mostra duração.
+        if not has_prod:
+            txt = f"<b>{cur.strftime('%d/%m/%Y')}</b><br>Sem produção"
+        elif duration <= 0:
+            txt = f"<b>{cur.strftime('%d/%m/%Y')}</b><br>Sem paradas"
+        else:
+            txt = (
+                f"<b>{cur.strftime('%d/%m/%Y')}</b><br>"
+                f"Total: {int(duration)}min"
+            )
+            if not compact:
                 top_str = _format_top_machines_until_median(
                     breakdown_by_machine.get(ds, []), median_min
                 )
-                txt = (
-                    f"<b>{cur.strftime('%d/%m/%Y')}</b><br>"
-                    f"Total: {int(duration)}min"
-                )
                 if top_str:
                     txt += f"<br>{top_str}"
-            hover_texts.append(txt)
+        hover_texts.append(txt)
         cur += _td(days=1)
 
     fig = go.Figure()
-    if compact:
-        fig.add_trace(go.Scatter(
-            x=weeks,
-            y=days_of_week,
-            mode="markers",
-            marker=dict(
-                size=22,
-                color=colors,
-                symbol="square",
-                line=dict(color="rgba(0,0,0,0.08)", width=1),
-            ),
-            hoverinfo="skip",
-            showlegend=False,
-        ))
-    else:
-        fig.add_trace(go.Scatter(
-            x=weeks,
-            y=days_of_week,
-            mode="markers",
-            marker=dict(
-                size=22,
-                color=colors,
-                symbol="square",
-                line=dict(color="rgba(0,0,0,0.08)", width=1),
-            ),
-            text=hover_texts,
-            hovertemplate="%{text}<extra></extra>",
-            showlegend=False,
-        ))
+    fig.add_trace(go.Scatter(
+        x=weeks,
+        y=days_of_week,
+        mode="markers",
+        marker=dict(
+            size=22,
+            color=colors,
+            symbol="square",
+            line=dict(color="rgba(0,0,0,0.08)", width=1),
+        ),
+        text=hover_texts,
+        hovertemplate="%{text}<extra></extra>",
+        showlegend=False,
+    ))
 
     weekday_labels = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"]
     fig.update_layout(
@@ -1087,8 +1077,10 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
         "mean_min":    mean_min,
         "y_thr_min":   y_thr_min,
         "x_thr_min":   x_thr_min,
+        "z_thr_min":   z_thr_min,
         "y_pct":       y_pct,
         "x_pct":       x_pct,
+        "z_pct":       z_pct,
         "n_dias_falha": len(nonzero_durations),
     }
     return fig, stats
@@ -1713,9 +1705,10 @@ def register_indicators_v2_callbacks(app):
         State("thresholds-datatable", "data"),
         State("input-heatmap-y-pct", "value"),
         State("input-heatmap-x-pct", "value"),
+        State("input-heatmap-z-pct", "value"),
         prevent_initial_call=True,
     )
-    def save_thresholds_callback(n, data, hm_y, hm_x):
+    def save_thresholds_callback(n, data, hm_y, hm_x, hm_z):
         if not n:
             from dash.exceptions import PreventUpdate
             raise PreventUpdate
@@ -1741,37 +1734,38 @@ def register_indicators_v2_callbacks(app):
                 continue  # sem mudança
             if set_threshold(eq_id, t1, updated_by=username):
                 saved += 1
-        # Limites do heatmap (Y%/X% — % da mediana)
+        # Limites do heatmap (Y/X/Z — % da mediana)
         from src.utils.breakdown_thresholds import (
             get_heatmap_pcts, set_heatmap_pcts,
         )
         hm_saved = False
-        if hm_y is not None and hm_x is not None:
-            cur_y, cur_x = get_heatmap_pcts()
+        if hm_y is not None and hm_x is not None and hm_z is not None:
+            cur_y, cur_x, cur_z = get_heatmap_pcts()
             try:
-                hy, hx = int(hm_y), int(hm_x)
+                hy, hx, hz = int(hm_y), int(hm_x), int(hm_z)
             except (TypeError, ValueError):
-                hy, hx = cur_y, cur_x
-            if (hy, hx) != (cur_y, cur_x):
-                hm_saved = set_heatmap_pcts(hy, hx, updated_by=username)
+                hy, hx, hz = cur_y, cur_x, cur_z
+            if (hy, hx, hz) != (cur_y, cur_x, cur_z):
+                hm_saved = set_heatmap_pcts(hy, hx, hz, updated_by=username)
         invalidate_thresholds_cache()
         msg = f"✅ {saved} gatilho(s) atualizado(s) por {username}"
         if hm_saved:
-            msg += " · limites Y/X do heatmap salvos"
+            msg += " · limites Y/X/Z do heatmap salvos"
         return html.Span(msg + ". Modal fechará.", className="text-success small")
 
-    # Hidrata os inputs Y%/X% sempre que o modal abrir
+    # Hidrata os inputs Y/X/Z sempre que o modal abrir
     @app.callback(
         Output("input-heatmap-y-pct", "value"),
         Output("input-heatmap-x-pct", "value"),
+        Output("input-heatmap-z-pct", "value"),
         Input("modal-v2-thresholds", "is_open"),
     )
     def hydrate_heatmap_pcts(is_open):
         if not is_open:
-            return no_update, no_update
+            return no_update, no_update, no_update
         from src.utils.breakdown_thresholds import get_heatmap_pcts
-        y, x = get_heatmap_pcts()
-        return y, x
+        y, x, z = get_heatmap_pcts()
+        return y, x, z
 
     @app.callback(
         Output("filter-v2-equipment", "options"),
@@ -1853,7 +1847,7 @@ def register_indicators_v2_callbacks(app):
         }
 
     def _heatmap_legend(stats: dict) -> list:
-        """Lista de Spans com legenda em minutos (não % da mediana)."""
+        """Legenda em minutos (4 bins + cinza pra sem produção)."""
         if not stats or stats.get("median_min", 0) <= 0:
             return [
                 html.Span("⬜ sem produção  ", className="me-2 small text-muted"),
@@ -1861,11 +1855,13 @@ def register_indicators_v2_callbacks(app):
             ]
         y_thr = int(round(stats["y_thr_min"]))
         x_thr = int(round(stats["x_thr_min"]))
+        z_thr = int(round(stats["z_thr_min"]))
         return [
             html.Span("⬜ sem produção  ", className="me-2 small text-muted"),
             html.Span(f"🟢 ≤ {y_thr}min  ", className="me-2 small text-muted"),
-            html.Span(f"🟡 {y_thr}min–{x_thr}min  ", className="me-2 small text-muted"),
-            html.Span(f"🔴 > {x_thr}min  ", className="me-2 small text-muted"),
+            html.Span(f"🟡 {y_thr}–{x_thr}min  ", className="me-2 small text-muted"),
+            html.Span(f"🟥 {x_thr}–{z_thr}min  ", className="me-2 small text-muted"),
+            html.Span(f"🔴 > {z_thr}min  ", className="me-2 small text-muted"),
         ]
 
     def _heatmap_stats_str(stats: dict) -> str:
@@ -1892,7 +1888,7 @@ def register_indicators_v2_callbacks(app):
             return no_update, no_update, no_update, no_update
         start, end, codes, equipment_filter, _year, _lwb = _unpack_filters(filters)
         from src.utils.breakdown_thresholds import get_heatmap_pcts
-        y_pct, x_pct = get_heatmap_pcts()
+        y_pct, x_pct, z_pct = get_heatmap_pcts()
 
         # ===== Heatmap PLANTA =====
         planta_eq = None
@@ -1902,7 +1898,8 @@ def register_indicators_v2_callbacks(app):
             planta_eq = [friendly_to_internal.get(raw, raw) for raw in equipment_filter]
         fig_planta, stats_planta = _build_heatmap(
             start, end, codes, equipment_ids=planta_eq,
-            title="Planta", compact=False, y_pct=y_pct, x_pct=x_pct,
+            title="Planta", compact=False,
+            y_pct=y_pct, x_pct=x_pct, z_pct=z_pct,
         )
 
         # ===== Grid POR EQUIPAMENTO =====
@@ -1918,7 +1915,8 @@ def register_indicators_v2_callbacks(app):
             internal = eq.get("internal") or eq["id"]
             fig_eq, stats_eq = _build_heatmap(
                 start, end, codes, equipment_ids=[internal],
-                title=eq["id"], compact=True, y_pct=y_pct, x_pct=x_pct,
+                title=eq["id"], compact=True,
+                y_pct=y_pct, x_pct=x_pct, z_pct=z_pct,
             )
             cards.append(
                 dbc.Col(
@@ -1950,7 +1948,7 @@ def register_indicators_v2_callbacks(app):
                                     dcc.Graph(
                                         figure=fig_eq,
                                         config={"displayModeBar": False,
-                                                "staticPlot": True,
+                                                "staticPlot": False,
                                                 "responsive": True},
                                         style={"height": "200px"},
                                     ),
