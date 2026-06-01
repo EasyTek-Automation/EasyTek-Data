@@ -998,6 +998,25 @@ def layout():
                                 ),
                                 dbc.Row(
                                     dbc.Col(
+                                        dbc.RadioItems(
+                                            id="v2-heatmap-mini-mode",
+                                            options=[
+                                                {"label": "Visão individual (cada equipamento vs sua própria mediana)",
+                                                 "value": "self"},
+                                                {"label": "Visão geral (todos comparados à mediana da planta)",
+                                                 "value": "planta"},
+                                            ],
+                                            value="self",
+                                            inline=True,
+                                            className="small text-muted mb-3",
+                                            inputClassName="me-1",
+                                            labelClassName="me-3",
+                                        ),
+                                    ),
+                                    className="mb-2",
+                                ),
+                                dbc.Row(
+                                    dbc.Col(
                                         dcc.Loading(
                                             id="loading-v2-heatmap-grid",
                                             type="circle",

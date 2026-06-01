@@ -962,7 +962,8 @@ def _format_top_machines_until_median(items, median_min: float) -> str:
 
 def _build_heatmap(start: datetime, end: datetime, codes: tuple,
                    equipment_ids=None, title: str = "Planta", compact: bool = False,
-                   y_pct: int = None, x_pct: int = None, z_pct: int = None):
+                   y_pct: int = None, x_pct: int = None, z_pct: int = None,
+                   override_median_min: float = None):
     """Heatmap calendário (semana × dia da semana) das falhas POR DURAÇÃO.
 
     Retorna (fig, stats) onde stats inclui median_min, mean_min, y_thr_min,
@@ -972,6 +973,12 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
       Tooltip mostra data + duração total do dia (escopo é o equipamento).
     compact=False (planta): tooltip mostra data + total + máquinas em
       ordem desc até a soma ultrapassar a mediana (uma por linha).
+
+    override_median_min: se != None, usa esse valor como mediana de
+    referência para as cores E para os limites Y/X/Z. Mean e mediana
+    no dict stats continuam refletindo o escopo local (pra mostrar no
+    header). Usado pelo modo 'visão geral' dos mini-cards (comparar
+    com mediana da planta inteira).
     """
     import plotly.graph_objects as go
     from datetime import timedelta as _td
@@ -998,11 +1005,15 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
         v for ds, v in duracoes.items()
         if ds in producao and v and v > 0
     ]
-    median_min = _stats.median(nonzero_durations) if nonzero_durations else 0.0
+    median_min_local = _stats.median(nonzero_durations) if nonzero_durations else 0.0
     mean_min = (_stats.mean(nonzero_durations) if nonzero_durations else 0.0)
-    y_thr_min = median_min * (y_pct / 100.0)
-    x_thr_min = median_min * (x_pct / 100.0)
-    z_thr_min = median_min * (z_pct / 100.0)
+    # Mediana de comparação (override domina se passada e > 0)
+    median_min_cmp = (override_median_min
+                     if (override_median_min is not None and override_median_min > 0)
+                     else median_min_local)
+    y_thr_min = median_min_cmp * (y_pct / 100.0)
+    x_thr_min = median_min_cmp * (x_pct / 100.0)
+    z_thr_min = median_min_cmp * (z_pct / 100.0)
 
     weeks, days_of_week, colors, hover_texts = [], [], [], []
     cur = datetime(start.year, start.month, start.day)
@@ -1014,7 +1025,7 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
         has_prod = ds in producao
         duration = float(duracoes.get(ds, 0)) if has_prod else 0.0
         color, _status = _heatmap_color_by_duration(
-            duration, has_prod, median_min, y_pct, x_pct, z_pct
+            duration, has_prod, median_min_cmp, y_pct, x_pct, z_pct
         )
         iso_yr, iso_wk, _ = cur.isocalendar()
         week_idx = iso_wk - base_iso_week + (52 if iso_yr > base_year else 0)
@@ -1033,7 +1044,7 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
             )
             if not compact:
                 top_str = _format_top_machines_until_median(
-                    breakdown_by_machine.get(ds, []), median_min
+                    breakdown_by_machine.get(ds, []), median_min_cmp
                 )
                 if top_str:
                     txt += f"<br>{top_str}"
@@ -1073,15 +1084,17 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
         ),
     )
     stats = {
-        "median_min":  median_min,
-        "mean_min":    mean_min,
-        "y_thr_min":   y_thr_min,
-        "x_thr_min":   x_thr_min,
-        "z_thr_min":   z_thr_min,
-        "y_pct":       y_pct,
-        "x_pct":       x_pct,
-        "z_pct":       z_pct,
-        "n_dias_falha": len(nonzero_durations),
+        "median_min":        median_min_local,
+        "median_min_cmp":    median_min_cmp,
+        "mean_min":          mean_min,
+        "y_thr_min":         y_thr_min,
+        "x_thr_min":         x_thr_min,
+        "z_thr_min":         z_thr_min,
+        "y_pct":             y_pct,
+        "x_pct":             x_pct,
+        "z_pct":             z_pct,
+        "n_dias_falha":      len(nonzero_durations),
+        "is_override":       override_median_min is not None and override_median_min > 0,
     }
     return fig, stats
 
@@ -1865,13 +1878,21 @@ def register_indicators_v2_callbacks(app):
         ]
 
     def _heatmap_stats_str(stats: dict) -> str:
-        """'Média 45min · Mediana 30min' (dias com produção e parada > 0)."""
+        """'Média 45min · Mediana 30min' (dias com produção e parada > 0).
+
+        Em modo override (vs mediana da planta), adiciona '· vs planta Wmin'
+        pra deixar claro qual referência colore o heatmap.
+        """
         if not stats or stats.get("n_dias_falha", 0) == 0:
             return "Sem paradas no período"
-        return (
+        base = (
             f"Média {int(round(stats['mean_min']))}min · "
             f"Mediana {int(round(stats['median_min']))}min"
         )
+        if stats.get("is_override"):
+            ref = int(round(stats.get("median_min_cmp", 0)))
+            base += f" · vs planta {ref}min"
+        return base
 
     # 0. Heatmap de Falhas — Planta (1 grande) + grid 3-col por equipamento
     @app.callback(
@@ -1882,13 +1903,15 @@ def register_indicators_v2_callbacks(app):
         Input("url", "pathname"),
         Input("store-v2-filters", "data"),
         Input("modal-v2-thresholds", "is_open"),
+        Input("v2-heatmap-mini-mode", "value"),
     )
-    def render_v2_heatmaps(pathname, filters, _modal_open):
+    def render_v2_heatmaps(pathname, filters, _modal_open, mini_mode):
         if pathname != "/maintenance/indicators-v2":
             return no_update, no_update, no_update, no_update
         start, end, codes, equipment_filter, _year, _lwb = _unpack_filters(filters)
         from src.utils.breakdown_thresholds import get_heatmap_pcts
         y_pct, x_pct, z_pct = get_heatmap_pcts()
+        mini_mode = mini_mode or "self"
 
         # ===== Heatmap PLANTA =====
         planta_eq = None
@@ -1900,6 +1923,11 @@ def register_indicators_v2_callbacks(app):
             start, end, codes, equipment_ids=planta_eq,
             title="Planta", compact=False,
             y_pct=y_pct, x_pct=x_pct, z_pct=z_pct,
+        )
+        # Mediana da planta — usada como referência quando modo == "planta".
+        planta_median_for_override = (
+            stats_planta.get("median_min", 0.0)
+            if mini_mode == "planta" else None
         )
 
         # ===== Grid POR EQUIPAMENTO =====
@@ -1917,6 +1945,7 @@ def register_indicators_v2_callbacks(app):
                 start, end, codes, equipment_ids=[internal],
                 title=eq["id"], compact=True,
                 y_pct=y_pct, x_pct=x_pct, z_pct=z_pct,
+                override_median_min=planta_median_for_override,
             )
             cards.append(
                 dbc.Col(
