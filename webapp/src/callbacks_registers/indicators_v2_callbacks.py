@@ -194,20 +194,24 @@ def cache_invalidate_all():
 
 
 def _cached_compact_bar(kpi: str, eq_id: str, year: int, values: list, target: float,
-                        color: str, unit: str, labels: list = None):
+                        color: str, unit: str, labels: list = None,
+                        statuses: list = None):
     """Bar compact cacheado por valores (mini-cards equipment grid).
 
     labels: lista de strings pro eixo X (cobre cross-year). Default = MESES_PT
     quando há exatamente 12 valores; senão usa índices stringificados.
+    statuses: lista paralela "in"|"partial"|"out" pra colorir barras (None=all "in").
     """
     if labels is None:
         labels = MESES_PT if len(values) == 12 else [str(i + 1) for i in range(len(values))]
-    key = (kpi, eq_id, year, tuple(values), target, tuple(labels))
+    st_key = tuple(statuses) if statuses else None
+    key = (kpi, eq_id, year, tuple(values), target, tuple(labels), st_key)
     hit = _cache_get(_CACHE_FIG, key)
     if hit is not None:
         return hit
     fig = _bar(labels, values, eq_id, color, unit,
-               target=target, show_trend=False, compact=True)
+               target=target, show_trend=False, compact=True,
+               bar_statuses=statuses)
     fig.update_layout(margin=dict(l=30, r=10, t=40, b=30), height=220)
     _cache_set(_CACHE_FIG, key, fig)
     return fig
@@ -411,6 +415,36 @@ def _iter_months_in_range(start: datetime, end: datetime):
             m += 1
 
 
+def _chart_months_with_status(start: datetime, end: datetime):
+    """Retorna SEMPRE 12 meses de contexto + status de cada mês vs [start, end).
+
+    Quando o filtro cobre <1 ano, expande o range de display pra cobrir o ano
+    de `start.year` inteiro (Jan→Dez). Quando cobre ≥1 ano, usa o próprio range.
+
+    Yield: (label, m_start, m_end, year, month, status)
+      - status="in":      mês 100% dentro de [start, end)
+      - status="partial": mês com overlap parcial
+      - status="out":     mês 100% fora (sem overlap)
+    """
+    months_span = (end.year - start.year) * 12 + (end.month - start.month)
+    if months_span >= 12:
+        # Range já cobre ano completo; usar exato
+        display_start, display_end = start, end
+    else:
+        # Expandir pra cobrir Jan→Dez do ano do start
+        display_start = datetime(start.year, 1, 1)
+        display_end = datetime(start.year + 1, 1, 1)
+
+    for label, m_start, m_end, y, m in _iter_months_in_range(display_start, display_end):
+        if m_end <= start or m_start >= end:
+            status = "out"
+        elif m_start >= start and m_end <= end:
+            status = "in"
+        else:
+            status = "partial"
+        yield label, m_start, m_end, y, m, status
+
+
 def _unpack_filters(filters: dict):
     """Extrai (start, end, codes_tuple, equipment_filter, year, lwb_simulate) do
     store-v2-filters.
@@ -444,37 +478,42 @@ def _fetch_planta_monthly(kpi: str, start: datetime = None, end: datetime = None
                           lwb_simulate: bool = False) -> tuple:
     """Valores mensais agregados da planta no range — cobre cross-year.
 
-    Retorna (labels, values) onde labels são "Mmm/yy" cobrindo todos os meses
-    dentro de [start, end). equipment_filter=None significa toda planta.
+    Retorna (labels, values, statuses) cobrindo SEMPRE 12 meses (ano de
+    contexto) quando o filtro for menor que 1 ano. status por mês:
+    "in"/"partial"/"out". equipment_filter=None significa toda planta.
     Usa CACHE process-level; 1ª chamada faz fetch+agg, subsequentes pegam cached.
     """
     if start is None or end is None:
         start, end = _year_range(DEFAULT_YEAR)
     if codes is None:
         codes = tuple(BREAKDOWN_CODES)
-    months_meta = list(_iter_months_in_range(start, end))
+    months_meta = list(_chart_months_with_status(start, end))
     labels = [m[0] for m in months_meta]
+    statuses = [m[5] for m in months_meta]
+
+    # Range expandido pra cobrir TODOS os meses do display (incluindo "out").
+    display_start = months_meta[0][1] if months_meta else start
+    display_end = months_meta[-1][2] if months_meta else end
 
     if not _HAS_REAL_DATA:
-        # Mock retorna 12 valores aleatórios; alinha à quantidade de meses do range
         full = _mock_planta_mes(kpi)
         values = [full[(m[4] - 1) % 12] for m in months_meta]
-        return labels, values
+        return labels, values, statuses
     try:
-        kpi_data = _cached_fetch_kpi(start, end, codes, lwb_simulate=lwb_simulate)
-        agg = _cached_agg(kpi_data, start, end, codes, equipment_filter,
+        kpi_data = _cached_fetch_kpi(display_start, display_end, codes, lwb_simulate=lwb_simulate)
+        agg = _cached_agg(kpi_data, display_start, display_end, codes, equipment_filter,
                           lwb_simulate=lwb_simulate)
         field = KPI_FIELD_MAP[kpi]
         values = []
-        for _, _, _, yy, mm in months_meta:
+        for _, _, _, yy, mm, _st in months_meta:
             key = f"{yy}-{mm:02d}"
             entry = agg.get(key) or agg.get(mm) or {}
             raw = float(entry.get(field, 0) or 0)
             values.append(_to_display(kpi, raw))
-        return labels, values
+        return labels, values, statuses
     except Exception as e:
         logger.warning("V2 planta %s falhou (%s) — retornando zeros", kpi, e)
-        return labels, [0] * len(months_meta)
+        return labels, [0] * len(months_meta), statuses
 
 
 def _fetch_equipment_monthly(kpi: str, equipment: str,
@@ -483,22 +522,27 @@ def _fetch_equipment_monthly(kpi: str, equipment: str,
                              lwb_simulate: bool = False) -> tuple:
     """Valores mensais do equipamento no range — cobre cross-year.
 
-    Retorna (labels, values) cobrindo cada mês de [start, end). Loop sobre vários
-    equipamentos no grid usa o MESMO cached kpi_data (1 query Mongo).
+    Retorna (labels, values, statuses) cobrindo SEMPRE 12 meses (ano de contexto)
+    quando filtro for menor que 1 ano. Status por mês: "in"/"partial"/"out".
+    Loop sobre vários equipamentos no grid usa o MESMO cached kpi_data.
     """
     if start is None or end is None:
         start, end = _year_range(DEFAULT_YEAR)
     if codes is None:
         codes = tuple(BREAKDOWN_CODES)
-    months_meta = list(_iter_months_in_range(start, end))
+    months_meta = list(_chart_months_with_status(start, end))
     labels = [m[0] for m in months_meta]
+    statuses = [m[5] for m in months_meta]
+
+    display_start = months_meta[0][1] if months_meta else start
+    display_end = months_meta[-1][2] if months_meta else end
 
     if not _HAS_REAL_DATA:
         full = _mock_equipamento_mes(kpi, equipment)
         values = [full[(m[4] - 1) % 12] for m in months_meta]
-        return labels, values
+        return labels, values, statuses
     try:
-        kpi_data = _cached_fetch_kpi(start, end, codes, lwb_simulate=lwb_simulate)
+        kpi_data = _cached_fetch_kpi(display_start, display_end, codes, lwb_simulate=lwb_simulate)
         eq_data = kpi_data.get(equipment, [])
         if not eq_data:
             names = _cached_names()
@@ -507,7 +551,7 @@ def _fetch_equipment_monthly(kpi: str, equipment: str,
             eq_data = kpi_data.get(internal_id, [])
         field = KPI_FIELD_MAP[kpi]
         values = []
-        for _, _, _, yy, mm in months_meta:
+        for _, _, _, yy, mm, _st in months_meta:
             entry = next(
                 (d for d in eq_data
                  if d.get("month") == mm and (d.get("year") in (None, yy))),
@@ -518,10 +562,10 @@ def _fetch_equipment_monthly(kpi: str, equipment: str,
                 values.append(_to_display(kpi, raw))
             else:
                 values.append(0)
-        return labels, values
+        return labels, values, statuses
     except Exception as e:
         logger.warning("V2 equip %s/%s falhou (%s) — retornando zeros", equipment, kpi, e)
-        return labels, [0] * len(months_meta)
+        return labels, [0] * len(months_meta), statuses
 
 
 def _fetch_daily_kpi(kpi: str, equipment: str, month: int,
@@ -888,13 +932,16 @@ def _mock_eventos_dia(kpi, equipment, month, day):
     return eventos
 
 
-def _bar_rich(x, y, title, color, unit="", target=None, direction="higher", td=None):
+def _bar_rich(x, y, title, color, unit="", target=None, direction="higher",
+              td=None, bar_statuses=None):
     """Wrap _bar adicionando hovertemplate enriquecido (valor, meta, delta, status).
 
     td: dict TRANS[lang] pra i18n labels.
+    bar_statuses: lista paralela a y com "in"|"partial"|"out" (propaga p/ _bar).
     """
     td = td or {}
-    fig = _bar(x, y, title, color, unit, target=target, show_trend=True, compact=False, td=td)
+    fig = _bar(x, y, title, color, unit, target=target, show_trend=True,
+               compact=False, td=td, bar_statuses=bar_statuses)
     if target is not None:
         # Customdata: [target, delta_abs, status_emoji]
         custom = []
@@ -938,13 +985,19 @@ def _empty_state(icon="bi-emoji-smile", title="Nada por aqui", desc="Sem registr
     )
 
 
-def _bar(x, y, title, color, unit="", target=None, show_trend=True, compact=False, td=None):
+_PARTIAL_COLOR = "#fd7e14"   # laranja — mês com overlap parcial do filtro
+_OUT_COLOR = "#d6d8db"       # cinza claro — mês fora do filtro selecionado
+
+
+def _bar(x, y, title, color, unit="", target=None, show_trend=True, compact=False,
+         td=None, bar_statuses=None):
     """Bar chart com overlay opcional de meta (linha tracejada) e tendência (poly grau 2).
 
     target: valor da linha de meta horizontal; None oculta.
-    show_trend: True desenha tendência sobre as barras.
+    show_trend: True desenha tendência sobre as barras (só pelos pontos "in").
     compact: True reduz fontes/margens pra mini-cards.
     td: dict de traduções (TRANS[lang]) pra labels "Tendência"/"Meta"/"Valor"; default PT.
+    bar_statuses: lista paralela a y, cada item "in"|"partial"|"out". None=tudo "in".
     """
     td = td or {}
     bar_color = color
@@ -953,11 +1006,24 @@ def _bar(x, y, title, color, unit="", target=None, show_trend=True, compact=Fals
 
     fig = go.Figure()
 
+    # Cor por barra quando statuses fornecidos
+    if bar_statuses and len(bar_statuses) == len(y):
+        marker_color = [
+            _OUT_COLOR if s == "out" else (_PARTIAL_COLOR if s == "partial" else color)
+            for s in bar_statuses
+        ]
+        marker_opacity = [0.45 if s == "out" else 1.0 for s in bar_statuses]
+    else:
+        marker_color = bar_color
+        marker_opacity = 1.0
+        bar_statuses = None
+
     fig.add_trace(
         go.Bar(
             x=x,
             y=y,
-            marker_color=bar_color,
+            marker_color=marker_color,
+            marker_opacity=marker_opacity,
             text=[f"{v}{unit}" for v in y] if not compact else None,
             textposition="outside",
             cliponaxis=False,  # texto outside não corta no topo
@@ -1453,11 +1519,11 @@ def register_indicators_v2_callbacks(app):
         td_lang = _TRANS.get(lang, _TRANS["pt"])
         title_planta = td_lang.get("tl_planta_mensal", "Planta — mensal")
 
-        def _planta_fig(kpi, labels, values, target):
+        def _planta_fig(kpi, labels, values, target, statuses=None):
             fig = _bar_rich(labels, values, title_planta,
                             KPI_META[kpi]["color"], KPI_META[kpi]["unit"],
                             target=target, direction=KPI_META[kpi]["direction"],
-                            td=td_lang)
+                            td=td_lang, bar_statuses=statuses)
             fig.update_layout(height=280)  # reduzido pra acomodar valor+ring na linha topo
             return fig
 
@@ -1586,9 +1652,9 @@ def register_indicators_v2_callbacks(app):
                 title=f"Último: {last_v}{KPI_META[kpi]['unit']} vs anterior: {prev_v}{KPI_META[kpi]['unit']}",
             )
 
-        labels_br, v_br = _fetch_planta_monthly("breakdown", start, end, codes, equipment_filter, lwb_simulate=lwb_sim)
-        labels_mt, v_mt = _fetch_planta_monthly("mtbf", start, end, codes, equipment_filter, lwb_simulate=lwb_sim)
-        labels_mtr, v_mtr = _fetch_planta_monthly("mttr", start, end, codes, equipment_filter, lwb_simulate=lwb_sim)
+        labels_br, v_br, st_br = _fetch_planta_monthly("breakdown", start, end, codes, equipment_filter, lwb_simulate=lwb_sim)
+        labels_mt, v_mt, st_mt = _fetch_planta_monthly("mtbf", start, end, codes, equipment_filter, lwb_simulate=lwb_sim)
+        labels_mtr, v_mtr, st_mtr = _fetch_planta_monthly("mttr", start, end, codes, equipment_filter, lwb_simulate=lwb_sim)
         t_br = _resolve_target("breakdown")
         t_mt = _resolve_target("mtbf")
         t_mtr = _resolve_target("mttr")
@@ -1606,9 +1672,9 @@ def register_indicators_v2_callbacks(app):
         last_mtr = _to_display("mttr",      agg.get("mttr", 0))
 
         return (
-            _planta_fig("breakdown", labels_br, v_br, t_br),
-            _planta_fig("mtbf", labels_mt, v_mt, t_mt),
-            _planta_fig("mttr", labels_mtr, v_mtr, t_mtr),
+            _planta_fig("breakdown", labels_br, v_br, t_br, statuses=st_br),
+            _planta_fig("mtbf", labels_mt, v_mt, t_mt, statuses=st_mt),
+            _planta_fig("mttr", labels_mtr, v_mtr, t_mtr, statuses=st_mtr),
             _trend_delta("breakdown", v_br),
             _trend_delta("mtbf", v_mt),
             _trend_delta("mttr", v_mtr),
@@ -1658,7 +1724,7 @@ def register_indicators_v2_callbacks(app):
                 eq_id = eq["id"]
                 cat = eq.get("categoria", "—")
                 for kpi in ("mtbf", "mttr", "breakdown"):
-                    labels, monthly = _fetch_equipment_monthly(kpi, eq_id, start, end, codes, lwb_simulate=lwb_sim)
+                    labels, monthly, _ = _fetch_equipment_monthly(kpi, eq_id, start, end, codes, lwb_simulate=lwb_sim)
                     for label, v in zip(labels, monthly):
                         rows.append({
                             "Equipamento": eq_id,
@@ -1839,14 +1905,14 @@ def register_indicators_v2_callbacks(app):
                     if (e.get("internal") or e["id"]) in _set or e["id"] in _set
                 ]
             for eq in eq_list:
-                labels_eq, values = _fetch_equipment_monthly(
+                labels_eq, values, statuses_eq = _fetch_equipment_monthly(
                     kpi, eq["id"], f_start, f_end, f_codes, lwb_simulate=f_lwb_sim
                 )
                 eq_target = _resolve_target(kpi, eq.get("internal", eq["id"]))
-                # Compact + figure cacheada por (kpi, eq, values, target)
+                # Compact + figure cacheada por (kpi, eq, values, target, statuses)
                 fig = _cached_compact_bar(kpi, eq["id"], f_year, values,
                                           eq_target, meta["color"], meta["unit"],
-                                          labels=labels_eq)
+                                          labels=labels_eq, statuses=statuses_eq)
                 card = dbc.Col(
                     html.Div(
                         dbc.Card(
@@ -1885,14 +1951,17 @@ def register_indicators_v2_callbacks(app):
 
         # NÍVEL 2: meses (gráfico grande + grid de mini-meses clicáveis) — IM-03
         if level == "meses" and equipment:
-            labels_m, values = _fetch_equipment_monthly(
+            labels_m, values, statuses_m = _fetch_equipment_monthly(
                 kpi, equipment, f_start, f_end, f_codes, lwb_simulate=f_lwb_sim
             )
+            # months_meta segue _iter_months_in_range pra preservar drilldown
+            # day → table; usa filtro original (range exato selecionado).
             months_meta = list(_iter_months_in_range(f_start, f_end))
             eq_target = _resolve_target(kpi, equipment)
             main_fig = _bar(labels_m, values, f"{equipment} — {td.get('mdl_meses','12 meses')}",
                             meta["color"], meta["unit"],
-                            target=eq_target, show_trend=True, td=td)
+                            target=eq_target, show_trend=True, td=td,
+                            bar_statuses=statuses_m)
             main_fig.update_layout(height=380)
 
             # mini-cards por mês (clicáveis) abaixo do gráfico grande.
