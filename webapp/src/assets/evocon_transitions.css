@@ -390,6 +390,15 @@
     border-bottom: 1px solid #eef0f3;
 }
 
+/* Versão 'média' do hover scale — pra cards que ocupam largura grande
+   (ex: heatmap planta, gráficos full-width). 1.06 dá sensação de
+   estourar a tela; 1.012 mantém o feedback visual sem expandir muito. */
+.indicator-v2-card-md:hover {
+    transform: scale(1.012) translateY(-2px) !important;
+    box-shadow: 0 10px 24px rgba(13, 110, 253, 0.14),
+                0 3px 8px rgba(0, 0, 0, 0.06) !important;
+}
+
 /* Hovered → amplia + sombra forte + z-index */
 .indicator-v2-card:hover {
     transform: scale(1.06) translateY(-3px);
