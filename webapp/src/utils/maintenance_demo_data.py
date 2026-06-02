@@ -687,7 +687,8 @@ def calculate_general_avg_by_month(data: Dict[str, List[Dict]],
                 mttr = total_breakdown_hours / num_failures
                 breakdown_rate = (total_breakdown_hours / total_active_hours) * 100
             elif total_active_hours > 0:
-                mtbf = 999.0
+                # Sem falhas → MTBF = 0 (paridade ZBRPP029). Era 999.0 sentinela.
+                mtbf = 0.0
                 mttr = 0.0
                 breakdown_rate = 0.0
             else:
@@ -769,7 +770,8 @@ def _build_raw_table_internal(
             mtbf = (tot_act_h - tot_bd_h) / tot_fail
             mttr_min = tot_bd_min / tot_fail
         elif tot_act_h > 0:
-            mtbf = tot_act_h
+            # Sem falhas → MTBF = 0 (paridade ZBRPP029). Era tot_act_h.
+            mtbf = 0.0
             mttr_min = 0.0
         else:
             mtbf = None
@@ -804,7 +806,8 @@ def _build_raw_table_internal(
     p_bd_h = p_bd_min / 60.0
     p_up_h = sum(r["uptime_h"] for r in rows)
     p_bd_rate = round(p_bd_h / p_act_h * 100, 3) if p_act_h > 0 else None
-    p_mtbf = round((p_act_h - p_bd_h) / p_fail, 3) if p_fail > 0 else (round(p_act_h, 3) if p_act_h > 0 else None)
+    # Sem falhas → MTBF = 0 (paridade ZBRPP029). Era p_act_h.
+    p_mtbf = round((p_act_h - p_bd_h) / p_fail, 3) if p_fail > 0 else (0.0 if p_act_h > 0 else None)
     p_mttr = round(p_bd_min / p_fail, 3) if p_fail > 0 else 0.0
 
     totals = {

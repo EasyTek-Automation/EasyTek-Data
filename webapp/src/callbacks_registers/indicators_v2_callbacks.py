@@ -387,6 +387,17 @@ def _month_range(year: int, month: int) -> tuple:
     return start, end
 
 
+def _custom_range(sdate: str, edate: str) -> tuple:
+    """Janela semi-aberta [start, end) pra range custom — preserva o dia da end_date.
+    end = end_date + 1 dia (semi-aberto no dia seguinte).
+    Mês cheio (end=31/05) → 31/05+1d = 01/06 (paridade contrato BR-12 pra mês cheio).
+    Sub-mês (end=01/06) → 02/06 (viabiliza consulta de 1 dia).
+    """
+    start = datetime.fromisoformat(sdate[:10])
+    e = datetime.fromisoformat(edate[:10])
+    return start, e + timedelta(days=1)
+
+
 _MES_PT_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
                  "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
 
@@ -619,7 +630,8 @@ def _fetch_daily_kpi(kpi: str, equipment: str, month: int,
                 num_failures = 0
             # Calcula KPI do dia (internamente em horas pra MTBF/MTTR)
             if kpi == "mtbf":
-                v = (active_h - breakdown_h) / num_failures if num_failures > 0 else active_h
+                # Sem falhas → MTBF = 0 (paridade ZBRPP029). Era active_h.
+                v = (active_h - breakdown_h) / num_failures if num_failures > 0 else 0
             elif kpi == "mttr":
                 v = breakdown_h / num_failures if num_failures > 0 else 0
             else:  # breakdown rate
@@ -1009,7 +1021,7 @@ def _format_top_machines_until_median(items, median_min: float) -> str:
 def _build_heatmap(start: datetime, end: datetime, codes: tuple,
                    equipment_ids=None, title: str = "Planta", compact: bool = False,
                    y_pct: int = None, x_pct: int = None, z_pct: int = None,
-                   override_median_min: float = None):
+                   override_median_min: float = None, td: dict = None):
     """Heatmap calendário (semana × dia da semana) das falhas POR DURAÇÃO.
 
     Retorna (fig, stats) onde stats inclui median_min, mean_min, y_thr_min,
@@ -1029,6 +1041,9 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
     import plotly.graph_objects as go
     from datetime import timedelta as _td
     import statistics as _stats
+
+    if td is None:
+        td = _TRANS["pt"]
 
     if codes is None:
         codes = tuple(BREAKDOWN_CODES)
@@ -1102,16 +1117,18 @@ def _build_heatmap(start: datetime, end: datetime, codes: tuple,
         if not in_filter:
             txt = (
                 f"<b>{cur.strftime('%d/%m/%Y')}</b><br>"
-                f"<i>Fora do filtro selecionado</i>"
+                f"<i>{td.get('heat_fora_filtro', 'Fora do filtro selecionado')}</i>"
             )
         elif not has_prod:
-            txt = f"<b>{cur.strftime('%d/%m/%Y')}</b><br>Sem produção"
+            txt = (f"<b>{cur.strftime('%d/%m/%Y')}</b><br>"
+                   f"{td.get('heat_sem_producao', 'Sem produção')}")
         elif duration <= 0:
-            txt = f"<b>{cur.strftime('%d/%m/%Y')}</b><br>Sem paradas"
+            txt = (f"<b>{cur.strftime('%d/%m/%Y')}</b><br>"
+                   f"{td.get('heat_sem_paradas', 'Sem paradas')}")
         else:
             txt = (
                 f"<b>{cur.strftime('%d/%m/%Y')}</b><br>"
-                f"Total: {int(duration)}min"
+                f"{td.get('heat_total', 'Total')}: {int(duration)}min"
             )
             if not compact:
                 top_str = _format_top_machines_until_median(
@@ -1583,6 +1600,12 @@ def register_indicators_v2_callbacks(app):
         ("v2-i18n-lg-mtto",        "lg_mtto"),
         ("v2-i18n-lg-processo",    "lg_processo"),
         ("v2-i18n-beta-badge",     "beta_badge"),
+        # Heatmap (IM-20/21/22)
+        ("v2-i18n-btn-thresholds",       "btn_thresholds"),
+        ("v2-i18n-heatmap-section-title","heatmap_section_title"),
+        ("v2-i18n-heatmap-section-sub",  "heatmap_section_sub"),
+        ("v2-i18n-heatmap-planta-title", "heatmap_planta_title"),
+        ("v2-i18n-heatmap-grid-title",   "heatmap_grid_title"),
     ]
 
     @app.callback(
@@ -1594,6 +1617,9 @@ def register_indicators_v2_callbacks(app):
             Output("filter-v2-period-type", "options"),
             Output("filter-v2-equipment", "placeholder"),
             Output("v2-beta-tooltip", "children"),
+            Output("switch-v2-lwb-simulate", "label"),
+            Output("switch-v2-hide-tooling", "label"),
+            Output("v2-heatmap-mini-mode", "options"),
         ],
         Input("store-v2-lang", "data"),
     )
@@ -1612,6 +1638,13 @@ def register_indicators_v2_callbacks(app):
         ])
         results.append(f"({'all' if lang == 'en' else ('todos' if lang == 'pt' else 'todos')})")
         results.append(d.get("beta_tooltip", "Página em validação. Dados sintéticos."))
+        # Heatmap (IM-20/21/22): switches LWB + sem-ferramentaria + radio individual/geral
+        results.append(d.get("switch_lwb", "Simular erro LWB (SOLDA001)"))
+        results.append(d.get("switch_hide_tooling", "Sem ferramentaria (202 / S202)"))
+        results.append([
+            {"label": d.get("heat_view_self", "Visão individual"), "value": "self"},
+            {"label": d.get("heat_view_planta", "Visão geral"), "value": "planta"},
+        ])
         return results
 
     # IM-11 — Toggle do collapse de filtros + condicional visibilidade ano/range
@@ -1894,11 +1927,8 @@ def register_indicators_v2_callbacks(app):
         from datetime import datetime as _dt
         year = year or DEFAULT_YEAR
         if ptype == "custom" and sdate and edate:
-            # BR-12: end_date = primeiro instante do mês seguinte ao end
             try:
-                e = _dt.fromisoformat(edate[:10])
-                start = _dt.fromisoformat(sdate[:10])
-                end = _dt(e.year + 1, 1, 1) if e.month == 12 else _dt(e.year, e.month + 1, 1)
+                start, end = _custom_range(sdate, edate)
             except Exception:
                 start, end = _year_range(year)
         elif ptype == "last12":
@@ -2012,39 +2042,46 @@ def register_indicators_v2_callbacks(app):
             return f"{value/1000:.1f}k min".replace(".0k", "k")
         return f"{value/1_000_000:.2f}M min"
 
-    def _heatmap_legend(stats: dict) -> list:
+    def _heatmap_legend(stats: dict, td: dict = None) -> list:
         """Legenda em minutos (4 bins + cinza pra sem produção)."""
+        td = td or _TRANS["pt"]
+        sem_prod = td.get("heat_sem_producao", "Sem produção").lower()
+        sem_par_per = td.get("heat_no_paradas_periodo", "Sem paradas no período").lower()
         if not stats or stats.get("median_min", 0) <= 0:
             return [
-                html.Span("⬜ sem produção  ", className="me-2 small text-muted"),
-                html.Span("🟢 sem paradas no período", className="me-2 small text-muted"),
+                html.Span(f"⬜ {sem_prod}  ", className="me-2 small text-muted"),
+                html.Span(f"🟢 {sem_par_per}", className="me-2 small text-muted"),
             ]
         y_thr = int(round(stats["y_thr_min"]))
         x_thr = int(round(stats["x_thr_min"]))
         z_thr = int(round(stats["z_thr_min"]))
         return [
-            html.Span("⬜ sem produção  ", className="me-2 small text-muted"),
+            html.Span(f"⬜ {sem_prod}  ", className="me-2 small text-muted"),
             html.Span(f"🟢 ≤ {y_thr}min  ", className="me-2 small text-muted"),
             html.Span(f"🟡 {y_thr}–{x_thr}min  ", className="me-2 small text-muted"),
             html.Span(f"🟥 {x_thr}–{z_thr}min  ", className="me-2 small text-muted"),
             html.Span(f"🔴 > {z_thr}min  ", className="me-2 small text-muted"),
         ]
 
-    def _heatmap_stats_str(stats: dict) -> str:
+    def _heatmap_stats_str(stats: dict, td: dict = None) -> str:
         """'Média 45min · Mediana 30min' (dias com produção e parada > 0).
 
         Em modo override (vs mediana da planta), adiciona '· vs planta Wmin'
         pra deixar claro qual referência colore o heatmap.
         """
+        td = td or _TRANS["pt"]
         if not stats or stats.get("n_dias_falha", 0) == 0:
-            return "Sem paradas no período"
+            return td.get("heat_no_paradas_periodo", "Sem paradas no período")
+        media_lbl = td.get("heat_stats_media", "Média")
+        mediana_lbl = td.get("heat_stats_mediana", "Mediana")
         base = (
-            f"Média {int(round(stats['mean_min']))}min · "
-            f"Mediana {int(round(stats['median_min']))}min"
+            f"{media_lbl} {int(round(stats['mean_min']))}min · "
+            f"{mediana_lbl} {int(round(stats['median_min']))}min"
         )
         if stats.get("is_override"):
             ref = int(round(stats.get("median_min_cmp", 0)))
-            base += f" · vs planta {ref}min"
+            vs_planta = td.get("heat_stats_vs_planta", "vs planta")
+            base += f" · {vs_planta} {ref}min"
         return base
 
     # 0. Heatmap de Falhas — Planta (1 grande) + grid 3-col por equipamento + 4 KPIs
@@ -2061,8 +2098,9 @@ def register_indicators_v2_callbacks(app):
         Input("store-v2-filters", "data"),
         Input("modal-v2-thresholds", "is_open"),
         Input("v2-heatmap-mini-mode", "value"),
+        Input("store-v2-lang", "data"),
     )
-    def render_v2_heatmaps(pathname, filters, _modal_open, mini_mode):
+    def render_v2_heatmaps(pathname, filters, _modal_open, mini_mode, lang):
         if pathname != "/maintenance/indicators-v2":
             return tuple([no_update] * 8)
         start, end, codes, equipment_filter, _year, _lwb = _unpack_filters(filters)
@@ -2070,14 +2108,15 @@ def register_indicators_v2_callbacks(app):
         import statistics as _stats
         y_pct, x_pct, z_pct = get_heatmap_pcts()
         mini_mode = mini_mode or "self"
+        td = _TRANS.get(lang or "pt", _TRANS["pt"])
 
         # ===== Heatmap PLANTA =====
         # equipment_filter já vem com internal IDs (vide populate_equipment_filter).
         planta_eq = list(equipment_filter) if equipment_filter is not None else None
         fig_planta, stats_planta = _build_heatmap(
             start, end, codes, equipment_ids=planta_eq,
-            title="Planta", compact=False,
-            y_pct=y_pct, x_pct=x_pct, z_pct=z_pct,
+            title=td.get("heatmap_planta_title", "Planta"), compact=False,
+            y_pct=y_pct, x_pct=x_pct, z_pct=z_pct, td=td,
         )
         planta_median_for_override = (
             stats_planta.get("median_min", 0.0)
@@ -2090,7 +2129,7 @@ def register_indicators_v2_callbacks(app):
         if total == 0:
             empty_msg = dbc.Card(
                 dbc.CardBody(
-                    [html.Strong("Sem paradas no período",
+                    [html.Strong(td.get("heat_no_paradas_periodo", "Sem paradas no período"),
                                  className="small text-muted")],
                     className="py-3 text-center",
                 ),
@@ -2109,24 +2148,24 @@ def register_indicators_v2_callbacks(app):
             above_median = [d for d in durations if d >= median]
 
             kpi_dist_mean = _heat_kpi_card(
-                title="Distribuição vs Média",
+                title=td.get("heat_kpi_dist_mean_title", "Distribuição vs Média"),
                 icon="bi-bar-chart-steps",
-                ref_label="Média:",
+                ref_label=td.get("heat_ref_media", "Média:"),
                 ref_val=_format_minutes(mean),
-                below_label="Paradas abaixo",
+                below_label=td.get("heat_below_paradas", "Paradas abaixo"),
                 below_val=f"{len(below_mean)} ({len(below_mean)*100//total}%)",
-                above_label="Paradas acima",
+                above_label=td.get("heat_above_paradas", "Paradas acima"),
                 above_val=f"{len(above_mean)} ({len(above_mean)*100//total}%)",
                 accent="#0d6efd",
             )
             kpi_dist_median = _heat_kpi_card(
-                title="Distribuição vs Mediana",
+                title=td.get("heat_kpi_dist_median_title", "Distribuição vs Mediana"),
                 icon="bi-bullseye",
-                ref_label="Mediana:",
+                ref_label=td.get("heat_ref_mediana", "Mediana:"),
                 ref_val=_format_minutes(median),
-                below_label="Paradas abaixo",
+                below_label=td.get("heat_below_paradas", "Paradas abaixo"),
                 below_val=f"{len(below_median)} ({len(below_median)*100//total}%)",
-                above_label="Paradas acima",
+                above_label=td.get("heat_above_paradas", "Paradas acima"),
                 above_val=f"{len(above_median)} ({len(above_median)*100//total}%)",
                 accent="#6f42c1",
             )
@@ -2135,28 +2174,29 @@ def register_indicators_v2_callbacks(app):
             sum_above_mean = sum(above_mean)
             sum_below_median = sum(below_median)
             sum_above_median = sum(above_median)
+            _total_lbl = td.get("heat_total", "Total") + ":"
             kpi_sum_mean = _heat_kpi_card(
-                title="Tempo total vs Média",
+                title=td.get("heat_kpi_sum_mean_title", "Tempo total vs Média"),
                 icon="bi-hourglass-split",
-                ref_label="Total:",
+                ref_label=_total_lbl,
                 ref_val=_format_minutes(sum_total),
-                below_label="Min abaixo",
+                below_label=td.get("heat_below_tempo", "Tempo abaixo"),
                 below_val=(f"{_format_minutes(sum_below_mean)} "
                            f"({sum_below_mean*100//sum_total}%)") if sum_total else "0min",
-                above_label="Min acima",
+                above_label=td.get("heat_above_tempo", "Tempo acima"),
                 above_val=(f"{_format_minutes(sum_above_mean)} "
                            f"({sum_above_mean*100//sum_total}%)") if sum_total else "0min",
                 accent="#20c997",
             )
             kpi_sum_median = _heat_kpi_card(
-                title="Tempo total vs Mediana",
+                title=td.get("heat_kpi_sum_median_title", "Tempo total vs Mediana"),
                 icon="bi-stopwatch",
-                ref_label="Total:",
+                ref_label=_total_lbl,
                 ref_val=_format_minutes(sum_total),
-                below_label="Min abaixo",
+                below_label=td.get("heat_below_tempo", "Tempo abaixo"),
                 below_val=(f"{_format_minutes(sum_below_median)} "
                            f"({sum_below_median*100//sum_total}%)") if sum_total else "0min",
-                above_label="Min acima",
+                above_label=td.get("heat_above_tempo", "Tempo acima"),
                 above_val=(f"{_format_minutes(sum_above_median)} "
                            f"({sum_above_median*100//sum_total}%)") if sum_total else "0min",
                 accent="#fd7e14",
@@ -2176,7 +2216,7 @@ def register_indicators_v2_callbacks(app):
             fig_eq, stats_eq = _build_heatmap(
                 start, end, codes, equipment_ids=[internal],
                 title=eq["id"], compact=True,
-                y_pct=y_pct, x_pct=x_pct, z_pct=z_pct,
+                y_pct=y_pct, x_pct=x_pct, z_pct=z_pct, td=td,
                 override_median_min=planta_median_for_override,
             )
             cards.append(
@@ -2207,7 +2247,7 @@ def register_indicators_v2_callbacks(app):
                                             style={"flex": "1", "minWidth": "0"},
                                         ),
                                         html.Div(
-                                            _heatmap_stats_str(stats_eq),
+                                            _heatmap_stats_str(stats_eq, td),
                                             className="ms-auto small text-muted text-end",
                                             style={"fontSize": "0.72rem",
                                                    "lineHeight": "1.2",
@@ -2229,7 +2269,7 @@ def register_indicators_v2_callbacks(app):
                                         style={"height": "200px"},
                                     ),
                                     html.Div(
-                                        _heatmap_legend(stats_eq),
+                                        _heatmap_legend(stats_eq, td),
                                         className="mt-1",
                                     ),
                                 ],
@@ -2246,8 +2286,8 @@ def register_indicators_v2_callbacks(app):
         grid = dbc.Row(cards, className="g-3") if cards else html.Div()
         return (
             fig_planta,
-            _heatmap_stats_str(stats_planta),
-            _heatmap_legend(stats_planta),
+            _heatmap_stats_str(stats_planta, td),
+            _heatmap_legend(stats_planta, td),
             grid,
             kpi_dist_mean,
             kpi_dist_median,

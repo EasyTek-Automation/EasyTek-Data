@@ -683,9 +683,9 @@ def calculate_monthly_kpis(production_df: pd.DataFrame, breakdown_df: pd.DataFra
                 if num_failures > 0:
                     mtbf = (total_active_hours - total_breakdown_hours) / num_failures
                 else:
-                    # Sem falhas = usar tempo total de produção como MTBF
-                    # Lógica: se produziu X horas sem falhar, o tempo entre falhas é X
-                    mtbf = total_active_hours
+                    # Sem falhas → MTBF = 0 (paridade ZBRPP029).
+                    # Convenção SAP: sem amostra, sem média.
+                    mtbf = 0.0
 
                 # M02 - MTTR (horas)
                 if num_failures > 0:
@@ -961,7 +961,9 @@ def get_zpp_equipment_names() -> Dict[str, str]:
         "PRENS002": "PRENSA-02",
         "TRANS001": "LCT-08",
         "TRANS002": "LCT-16",
-        "TRANS003": "LCT-2,5"
+        "TRANS003": "LCT-2,5",
+        "DECAP001": "Decapado",
+        "SOLDA001": "LWB",
         }
 
     try:

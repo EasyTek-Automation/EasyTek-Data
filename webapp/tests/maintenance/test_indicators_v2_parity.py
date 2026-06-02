@@ -382,3 +382,137 @@ def test_iter_months_in_range_single_month():
     months = list(_iter_months_in_range(datetime(2026, 5, 1), datetime(2026, 6, 1)))
     assert len(months) == 1
     assert months[0][0] == "Mai/26"
+
+
+# ==================== IM-23 — _custom_range preserva o dia da end_date ====================
+
+def test_custom_range_single_day_preserves_day():
+    """Janela de 1 dia: end_date=01/06 → end_iso=02/06 (semi-aberto no dia seguinte).
+    Antes snapava pro 1º do mês seguinte → end=01/07 (perdia o dia).
+    """
+    from src.callbacks_registers.indicators_v2_callbacks import _custom_range
+    start, end = _custom_range("2026-06-01", "2026-06-01")
+    assert start == datetime(2026, 6, 1)
+    assert end == datetime(2026, 6, 2)
+
+
+def test_custom_range_two_day_window():
+    """Janela de 2 dias: end_date=02/06 → end_iso=03/06."""
+    from src.callbacks_registers.indicators_v2_callbacks import _custom_range
+    start, end = _custom_range("2026-06-01", "2026-06-02")
+    assert start == datetime(2026, 6, 1)
+    assert end == datetime(2026, 6, 3)
+
+
+def test_custom_range_full_month_matches_legacy_contract():
+    """Regressão: mês cheio continua gerando 1º do mês seguinte (paridade BR-12).
+    end_date=31/05 → end_iso=01/06 (idêntico ao comportamento antigo).
+    """
+    from src.callbacks_registers.indicators_v2_callbacks import _custom_range
+    start, end = _custom_range("2026-05-01", "2026-05-31")
+    assert start == datetime(2026, 5, 1)
+    assert end == datetime(2026, 6, 1)
+
+
+def test_custom_range_crosses_month_boundary():
+    """Janela 15/05 → 03/06: end_iso=04/06 (não 01/07 como antes do fix)."""
+    from src.callbacks_registers.indicators_v2_callbacks import _custom_range
+    start, end = _custom_range("2026-05-15", "2026-06-03")
+    assert start == datetime(2026, 5, 15)
+    assert end == datetime(2026, 6, 4)
+
+
+def test_custom_range_crosses_year():
+    """Cross-year: end_date=01/01 → end_iso=02/01 (sem snap pro mês seguinte)."""
+    from src.callbacks_registers.indicators_v2_callbacks import _custom_range
+    start, end = _custom_range("2025-12-30", "2026-01-01")
+    assert start == datetime(2025, 12, 30)
+    assert end == datetime(2026, 1, 2)
+
+
+def test_custom_range_december_full_month():
+    """Mês cheio em dezembro: end_date=31/12/2025 → end_iso=01/01/2026."""
+    from src.callbacks_registers.indicators_v2_callbacks import _custom_range
+    start, end = _custom_range("2025-12-01", "2025-12-31")
+    assert start == datetime(2025, 12, 1)
+    assert end == datetime(2026, 1, 1)
+
+
+def test_custom_range_accepts_iso_with_time_suffix():
+    """DatePickerRange pode mandar 'YYYY-MM-DDTHH:MM:SS'. Helper deve truncar."""
+    from src.callbacks_registers.indicators_v2_callbacks import _custom_range
+    start, end = _custom_range("2026-06-01T00:00:00", "2026-06-01T23:59:59")
+    assert start == datetime(2026, 6, 1)
+    assert end == datetime(2026, 6, 2)
+
+
+# ==================== IM-24 — MTBF = 0 quando N_falhas = 0 (paridade ZBRPP029) ====================
+
+def test_daily_kpi_mtbf_zero_when_no_failures():
+    """Drilldown V2 nível 'dias': dia com HA > 0 e N_falhas = 0 → MTBF = 0.
+    Antes retornava MTBF = active_hours, divergindo do SAP ZBRPP029.
+    """
+    from src.callbacks_registers.indicators_v2_callbacks import _fetch_daily_kpi
+    import pandas as pd
+
+    prod = pd.DataFrame([
+        {"linea": "LONGI001", "date": datetime(2026, 6, 1), "horasact": 4.47,
+         "year": 2026, "month": 6},
+    ])
+    brk_empty = pd.DataFrame(columns=["linea", "date", "duracao_min", "year", "month"])
+
+    with patch("src.callbacks_registers.indicators_v2_callbacks.fetch_zpp_production_data",
+               return_value=prod), \
+         patch("src.callbacks_registers.indicators_v2_callbacks.fetch_zpp_breakdown_data",
+               return_value=brk_empty), \
+         patch("src.callbacks_registers.indicators_v2_callbacks.get_zpp_equipment_names",
+               return_value={"LONGI001": "LCL-08"}):
+        dias, values = _fetch_daily_kpi("mtbf", "LCL-08", month=6, year=2026)
+
+    assert dias[0] == 1
+    assert values[0] == 0, "MTBF dia 01 sem falhas deve ser 0 (paridade ZBRPP029), não 4.47h"
+
+
+def test_zpp_calculator_mtbf_zero_when_no_failures_plant_wide():
+    """Pipeline V1 canônico `fetch_zpp_kpi_data`: mês sem falhas + HA > 0 → MTBF = 0.
+    Antes retornava MTBF = total_active_hours.
+    """
+    import pandas as pd
+    from src.utils.zpp_kpi_calculator import fetch_zpp_kpi_data
+
+    prod = pd.DataFrame([
+        {"linea": "TRANS002", "date": datetime(2026, 6, 1), "horasact": 5.98,
+         "year": 2026, "month": 6, "year_month": "2026-06"},
+    ])
+    brk_empty = pd.DataFrame(columns=["linea", "date", "duracao_min", "year", "month", "year_month"])
+
+    with patch("src.utils.zpp_kpi_calculator.fetch_zpp_production_data", return_value=prod), \
+         patch("src.utils.zpp_kpi_calculator.fetch_zpp_breakdown_data", return_value=brk_empty):
+        result = fetch_zpp_kpi_data(datetime(2026, 6, 1), datetime(2026, 6, 2))
+
+    assert "TRANS002" in result
+    monthly = result["TRANS002"][0]
+    assert monthly["num_failures"] == 0
+    assert monthly["mtbf"] == 0.0, "Sem falhas → MTBF=0 (paridade ZBRPP029), não 5.98"
+    assert monthly["mttr"] == 0.0
+    assert monthly["breakdown_rate"] == 0.0
+
+
+def test_build_raw_table_mtbf_zero_when_no_failures():
+    """`_build_raw_table_internal` (V1 raw + KPIReport): equipamento sem falhas → MTBF=0."""
+    from src.utils.maintenance_demo_data import _build_raw_table_internal
+
+    data = {
+        "EQ_ZERO": [{
+            "month": 6, "year_month": "2026-06",
+            "num_failures": 0, "num_orders": 10,
+            "total_active_hours": 150.0, "total_breakdown_minutes": 0.0,
+        }],
+    }
+    rows, totals = _build_raw_table_internal(
+        data, ["EQ_ZERO"], {"EQ_ZERO": "Equipamento Zero"},
+        months=[6], year_months=["2026-06"],
+    )
+    assert len(rows) == 1
+    assert rows[0]["mtbf_h"] == 0.0, "Sem falhas → MTBF=0 (paridade ZBRPP029)"
+    assert totals["mtbf_h"] == 0.0, "Totais planta sem falhas → MTBF=0"
