@@ -1082,3 +1082,35 @@
         animation: none;
     }
 }
+
+/* ============================================================================
+   IM-23 — DatePickerRange compacto e inline (filtro custom V2)
+   ============================================================================
+   Por padrão o DatePickerRange do dash-core-components renderiza inputs com
+   width fixo (~115px cada) + seta, totalizando ~250px. Em colunas Bootstrap
+   estreitas (≤ md=3) o componente quebra em 3 linhas (start / seta / end).
+   Esta regra força layout inline e adapta o input ao espaço disponível.
+*/
+.v2-date-range-inline .DateRangePicker {
+    width: 100%;
+}
+.v2-date-range-inline .DateRangePickerInput {
+    display: inline-flex;
+    align-items: center;
+    width: 100%;
+    border-radius: 0.375rem;
+}
+.v2-date-range-inline .DateInput {
+    width: calc(50% - 12px);
+    min-width: 0;
+}
+.v2-date-range-inline .DateInput_input {
+    font-size: 0.9rem;
+    padding: 0.375rem 0.5rem;
+    text-align: center;
+    width: 100%;
+}
+.v2-date-range-inline .DateRangePickerInput_arrow {
+    flex: 0 0 24px;
+    padding: 0 4px;
+}
