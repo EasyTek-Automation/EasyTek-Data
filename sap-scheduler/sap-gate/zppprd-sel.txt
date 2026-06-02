@@ -1,0 +1,69 @@
+Python 3.13.13 | 32-bit
+[OK] ScriptingEngine conectada
+[OK] sessão 0/0 sys=GM3 user=40CPMANUT mandante=040 tx=SESSION_MANAGER
+
+======================================================================
+ DUMP tela atual — tx=ZPPPRD
+======================================================================
+título: 'Consulta datos de producción'
+statusbar: [] 
+GuiUserArea              | /app/con[0]/ses[0]/wnd[0]/usr
+                           name='usr' text=''
+  GuiBox                   | /app/con[0]/ses[0]/wnd[0]/usr/box%B001000_BLOCK_1000
+                             name='%B001000_BLOCK_1000' text='Selección'
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_P_WERKS_%_APP_%-TEXT
+                             name='%_P_WERKS_%_APP_%-TEXT' text='Centro'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtP_WERKS
+                             name='P_WERKS' text=''
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_S_AUFNR_%_APP_%-TEXT
+                             name='%_S_AUFNR_%_APP_%-TEXT' text='Ordem'
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txtS_AUFNR-LOW
+                             name='S_AUFNR-LOW' text=''
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_S_AUFNR_%_APP_%-TO_TEXT
+                             name='%_S_AUFNR_%_APP_%-TO_TEXT' text='até'
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txtS_AUFNR-HIGH
+                             name='S_AUFNR-HIGH' text=''
+  GuiButton                | /app/con[0]/ses[0]/wnd[0]/usr/btn%_S_AUFNR_%_APP_%-VALU_PUSH
+                             name='%_S_AUFNR_%_APP_%-VALU_PUSH' text=''
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_S_ARBPL_%_APP_%-TEXT
+                             name='%_S_ARBPL_%_APP_%-TEXT' text='Posto de Trabalho'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtS_ARBPL-LOW
+                             name='S_ARBPL-LOW' text=''
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_S_ARBPL_%_APP_%-TO_TEXT
+                             name='%_S_ARBPL_%_APP_%-TO_TEXT' text='até'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtS_ARBPL-HIGH
+                             name='S_ARBPL-HIGH' text=''
+  GuiButton                | /app/con[0]/ses[0]/wnd[0]/usr/btn%_S_ARBPL_%_APP_%-VALU_PUSH
+                             name='%_S_ARBPL_%_APP_%-VALU_PUSH' text=''
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_S_FECFIN_%_APP_%-TEXT
+                             name='%_S_FECFIN_%_APP_%-TEXT' text='Fecha'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtS_FECFIN-LOW
+                             name='S_FECFIN-LOW' text=''
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_S_FECFIN_%_APP_%-TO_TEXT
+                             name='%_S_FECFIN_%_APP_%-TO_TEXT' text='até'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtS_FECFIN-HIGH
+                             name='S_FECFIN-HIGH' text=''
+  GuiButton                | /app/con[0]/ses[0]/wnd[0]/usr/btn%_S_FECFIN_%_APP_%-VALU_PUSH
+                             name='%_S_FECFIN_%_APP_%-VALU_PUSH' text=''
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_S_HORFIN_%_APP_%-TEXT
+                             name='%_S_HORFIN_%_APP_%-TEXT' text='Hora'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtS_HORFIN-LOW
+                             name='S_HORFIN-LOW' text='00:00:00'
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_S_HORFIN_%_APP_%-TO_TEXT
+                             name='%_S_HORFIN_%_APP_%-TO_TEXT' text='até'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtS_HORFIN-HIGH
+                             name='S_HORFIN-HIGH' text='00:00:00'
+  GuiButton                | /app/con[0]/ses[0]/wnd[0]/usr/btn%_S_HORFIN_%_APP_%-VALU_PUSH
+                             name='%_S_HORFIN_%_APP_%-VALU_PUSH' text=''
+  GuiBox                   | /app/con[0]/ses[0]/wnd[0]/usr/box%B%_F007
+                             name='%B%_F007' text=''
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_P_VARI_%_APP_%-TEXT
+                             name='%_P_VARI_%_APP_%-TEXT' text='Layout'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtP_VARI
+                             name='P_VARI' text=''
+  GuiBox                   | /app/con[0]/ses[0]/wnd[0]/usr/box%B%_F010
+                             name='%B%_F010' text=''
+  GuiRadioButton           | /app/con[0]/ses[0]/wnd[0]/usr/radP_REL
+                             name='P_REL' text='Exibir Dados'
+  GuiRadioButton           | /app/con[0]/ses[0]/wnd[0]/usr/radP_ARQ
+                             name='P_ARQ' text='Gerar Arquivo'

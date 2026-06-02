@@ -1,0 +1,57 @@
+Python 3.13.13 | 32-bit
+[OK] ScriptingEngine conectada
+[OK] sessão 0/0 sys=GM3 user=40CPMANUT mandante=040 tx=ZPPPRD
+
+======================================================================
+ DUMP tela atual — tx=ZPP_NT0001
+======================================================================
+título: 'Listagem de paragens por línha'
+statusbar: [] 
+GuiUserArea              | /app/con[0]/ses[0]/wnd[0]/usr
+                           name='usr' text=''
+  GuiBox                   | /app/con[0]/ses[0]/wnd[0]/usr/box%BB01000_BLOCK_1000
+                             name='%BB01000_BLOCK_1000' text=''
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_PA_WERKS_%_APP_%-TEXT
+                             name='%_PA_WERKS_%_APP_%-TEXT' text='Centro'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtPA_WERKS
+                             name='PA_WERKS' text='BR02'
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_SO_ARBPL_%_APP_%-TEXT
+                             name='%_SO_ARBPL_%_APP_%-TEXT' text='Centro de trabalho'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtSO_ARBPL-LOW
+                             name='SO_ARBPL-LOW' text=''
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_SO_ARBPL_%_APP_%-TO_TEXT
+                             name='%_SO_ARBPL_%_APP_%-TO_TEXT' text='até'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtSO_ARBPL-HIGH
+                             name='SO_ARBPL-HIGH' text=''
+  GuiButton                | /app/con[0]/ses[0]/wnd[0]/usr/btn%_SO_ARBPL_%_APP_%-VALU_PUSH
+                             name='%_SO_ARBPL_%_APP_%-VALU_PUSH' text=''
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_SO_BUDAT_%_APP_%-TEXT
+                             name='%_SO_BUDAT_%_APP_%-TEXT' text='Data de lançamento'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtSO_BUDAT-LOW
+                             name='SO_BUDAT-LOW' text=''
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_SO_BUDAT_%_APP_%-TO_TEXT
+                             name='%_SO_BUDAT_%_APP_%-TO_TEXT' text='até'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtSO_BUDAT-HIGH
+                             name='SO_BUDAT-HIGH' text=''
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%F001005_1000
+                             name='%F001005_1000' text=''
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtPA_HRINI
+                             name='PA_HRINI' text='00:00:00'
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%F002007_1000
+                             name='%F002007_1000' text=''
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtPA_HRFIN
+                             name='PA_HRFIN' text='24:00:00'
+  GuiBox                   | /app/con[0]/ses[0]/wnd[0]/usr/box%BZ01011_BLOCK_1000
+                             name='%BZ01011_BLOCK_1000' text=''
+  GuiCheckBox              | /app/con[0]/ses[0]/wnd[0]/usr/chkPA_EXMEM
+                             name='PA_EXMEM' text='Exportação para a memória'
+  GuiTextField             | /app/con[0]/ses[0]/wnd[0]/usr/txt%_PA_VARIA_%_APP_%-TEXT
+                             name='%_PA_VARIA_%_APP_%-TEXT' text='Layout'
+  GuiCTextField            | /app/con[0]/ses[0]/wnd[0]/usr/ctxtPA_VARIA
+                             name='PA_VARIA' text=''
+  GuiBox                   | /app/con[0]/ses[0]/wnd[0]/usr/box%B%_F015
+                             name='%B%_F015' text=''
+  GuiRadioButton           | /app/con[0]/ses[0]/wnd[0]/usr/radP_REL
+                             name='P_REL' text='Exibir Dados'
+  GuiRadioButton           | /app/con[0]/ses[0]/wnd[0]/usr/radP_ARQ
+                             name='P_ARQ' text='Gerar Arquivo'

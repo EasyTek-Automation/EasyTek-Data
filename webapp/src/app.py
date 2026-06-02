@@ -62,6 +62,31 @@ app = dash.Dash(
     ]
 )
 
+# --- sap-scheduler boot (DS-03 + IM-B3) ---
+# Inicia APScheduler em background que insere docs em sap_jobs no cron configurado.
+# Callback do rodapé da home é registrado em IM-C2 (não-bloqueante se ausente).
+try:
+    from src.sap_scheduler.config import load_config as _sap_load_config
+    from src.sap_scheduler.cron import init_scheduler as _sap_init_scheduler
+    from src.sap_scheduler.mongo_helpers import get_db as _sap_get_db, ensure_indexes as _sap_ensure_indexes
+    from src.sap_scheduler.timestamp_callback import register_callback as _sap_register_rodape_callback
+
+    _sap_config = _sap_load_config()
+    _sap_db = _sap_get_db()
+    if _sap_db is not None:
+        _sap_ensure_indexes(_sap_db, _sap_config.collection)
+        _sap_init_scheduler(_sap_config, _sap_db)
+    else:
+        logging.getLogger("sap_scheduler").warning(
+            "sap_scheduler: Mongo offline no boot — scheduler nao inicia (proximo restart do webapp tenta de novo)"
+        )
+    _sap_register_rodape_callback(app, _sap_config)
+except RuntimeError as _sap_e:
+    logging.getLogger("sap_scheduler").error("sap_scheduler: config invalida no boot: %s", _sap_e)
+    raise
+except Exception:
+    logging.getLogger("sap_scheduler").exception("sap_scheduler: erro inesperado no boot (webapp continua)")
+
 # --- Configuração do Favicon Customizado ---
 app.index_string = '''
 <!DOCTYPE html>

@@ -123,3 +123,6 @@ htmlcov/
 
 # Dados reais de produção SAP para mock HH Gantt — NÃO versionar
 webapp/src/data/hh_mock/
+
+# ai-jail config (CLAUDE.md raiz menciona)
+.ai-jail

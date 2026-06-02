@@ -24,6 +24,7 @@ requests
 pandas==2.3.1
 plotly==6.1.2
 pymongo==4.13.2
+APScheduler>=3.10,<4.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.1.1
 pytz==2025.2
