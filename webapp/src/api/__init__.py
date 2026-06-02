@@ -10,4 +10,4 @@ from flask import Blueprint
 api_bp = Blueprint('api', __name__, url_prefix='/api/v1')
 
 # Importar rotas (isso registra os endpoints)
-from . import auth, producao
+from . import auth, producao, sap_scheduler
