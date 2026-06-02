@@ -1,0 +1,61 @@
+tx        : ZPPPRD
+título    : 'Consulta datos de producción'
+statusbar : [] 
+
+grid_id   : /app/con[0]/ses[0]/wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell
+RowCount  : 10937
+Colunas   : 46
+
+COLUNAS (técnico | título de exibição):
+   AUFNR                        | Ordem
+   ARBPL                        | Pto.Trab.
+   ZKG_ENTR                     | Kg.Entr.
+   ZKG_PROC                     | Kg.Proc.
+   ZKG_ELAB                     | Kg.Elab
+   ZKG_DESP                     | Kg.Desp.
+   ZKG_CANUT                    | Kg.Canut.
+   ZKG_SUBP                     | Kg.Subp.
+   ZKG_DPROC                    | Kg.DProc.
+   ZKG_RETIR                    | Kg.Retir.
+   ZMONTAJE                     | NºMontajes
+   ZBOBINAS_ENTR                | Nº Bobinas Entrada
+   ZBOBINAS                     | Nº Bobinas Notif.
+   ZBULTOS                      | NºBultos
+   ZPAQUET                      | NºPaquetes
+   ZRETIR                       | NºRetiradas
+   KG_CONS_CANUT                | Kg.Cons.Canut.
+   KG_CONS_CHAPA                | Kg.Cons.Chapa
+   KG_A_TRANS                   | Kg.ATrans.
+   KG_A_PRENSA                  | Kg.APrensa
+   KG_A_LONGI                   | Kg.ALongi
+   KG_A_OTROS                   | Kg.AOtros
+   KG_A_STOCK                   | Kg.AStock
+   FINI_NOTIF                   | FIniNotif
+   HINI_NOTIF                   | HIniNotif
+   FFIN_NOTIF                   | FFinNotif
+   HFIN_NOTIF                   | HFinNotif
+   DURACION                     | Duración
+   ZHORAS_ACT                   | HorasAct.
+   ZH_PI3H                      | ParoInf.3H
+   ZH_PS3H                      | ParoSup.3H
+   ZH_PBOC                      | ParoBocad.
+   ZH_PTP                       | ParoTurnoP
+   ZH_PFT                       | ParoFinTurno
+   ZH_PIP                       | ParoInt.Proc.
+   ZCAMBIOS                     | NºCambios
+   ZMETROS                      | Metros
+   ZGOLPES                      | NºGolpes
+   MAQUILA                      | Ind.Maq.
+   CHARG                        | Lote
+   MATNR                        | Material
+   ZZESPESOR                    | Espesor
+   ZZANCHO                      | Ancho
+   NFRACCION                    | Nº Fracc.
+   CTNOK                        | Qtd.Peças NOk (kg).
+   METROS                       | Metros bobina
+
+AMOSTRA (linhas 0..2 + última):
+   row[0] {'AUFNR': '10267528', 'ARBPL': 'EMBBOBCP', 'ZKG_ENTR': '13.900,000', 'ZKG_PROC': '0,000', 'ZKG_ELAB': '13.900,000', 'ZKG_DESP': '0,000', 'ZKG_CANUT': '0,000', 'ZKG_SUBP': '0,000', 'ZKG_DPROC': '0,000', 'ZKG_RETIR': '0,000', 'ZMONTAJE': '0,000', 'ZBOBINAS_ENTR': '1,000', 'ZBOBINAS': '0,000', 'ZBULTOS': '0,000', 'ZPAQUET': '0,000', 'ZRETIR': '0,000', 'KG_CONS_CANUT': '0,000', 'KG_CONS_CHAPA': '0,000', 'KG_A_TRANS': '0,000', 'KG_A_PRENSA': '0,000', 'KG_A_LONGI': '0,000', 'KG_A_OTROS': '0,000', 'KG_A_STOCK': '0,000', 'FINI_NOTIF': '22.05.2026', 'HINI_NOTIF': '20:48:17', 'FFIN_NOTIF': '22.05.2026', 'HFIN_NOTIF': '20:48:17', 'DURACION': '0,000', 'ZHORAS_ACT': '0,000', 'ZH_PI3H': '0,000', 'ZH_PS3H': '0,000', 'ZH_PBOC': '0,000', 'ZH_PTP': '0,000', 'ZH_PFT': '0,000', 'ZH_PIP': '0,000', 'ZCAMBIOS': '0,000', 'ZMETROS': '815,9911', 'ZGOLPES': '0,000', 'MAQUILA': 'X', 'CHARG': '', 'MATNR': '', 'ZZESPESOR': '0,00', 'ZZANCHO': '0,00', 'NFRACCION': '0', 'CTNOK': '0,000', 'METROS': '0'}
+   row[1] {'AUFNR': '10412060', 'ARBPL': 'TRANS002', 'ZKG_ENTR': '29.200,000', 'ZKG_PROC': '29.200,000', 'ZKG_ELAB': '29.185,000', 'ZKG_DESP': '0,000', 'ZKG_CANUT': '0,000', 'ZKG_SUBP': '15,000', 'ZKG_DPROC': '0,000', 'ZKG_RETIR': '0,000', 'ZMONTAJE': '1,000', 'ZBOBINAS_ENTR': '1,000', 'ZBOBINAS': '0,000', 'ZBULTOS': '65,000', 'ZPAQUET': '17,000', 'ZRETIR': '0,000', 'KG_CONS_CANUT': '0,000', 'KG_CONS_CHAPA': '0,000', 'KG_A_TRANS': '0,000', 'KG_A_PRENSA': '0,000', 'KG_A_LONGI': '0,000', 'KG_A_OTROS': '0,000', 'KG_A_STOCK': '0,000', 'FINI_NOTIF': '20.05.2026', 'HINI_NOTIF': '19:23:00', 'FFIN_NOTIF': '20.05.2026', 'HFIN_NOTIF': '21:19:00', 'DURACION': '1,933', 'ZHORAS_ACT': '1,933', 'ZH_PI3H': '1,683', 'ZH_PS3H': '0,000', 'ZH_PBOC': '0,000', 'ZH_PTP': '0,000', 'ZH_PFT': '0,000', 'ZH_PIP': '0,000', 'ZCAMBIOS': '1,000', 'ZMETROS': '198,4204', 'ZGOLPES': '65,000', 'MAQUILA': '', 'CHARG': '0012439826', 'MATNR': 'BN000424', 'ZZESPESOR': '12,50', 'ZZANCHO': '1.500,00', 'NFRACCION': '17', 'CTNOK': '0,000', 'METROS': '198'}
+   row[2] {'AUFNR': '10426880', 'ARBPL': 'DECAP001', 'ZKG_ENTR': '11.230,000', 'ZKG_PROC': '11.230,000', 'ZKG_ELAB': '11.200,000', 'ZKG_DESP': '0,000', 'ZKG_CANUT': '0,000', 'ZKG_SUBP': '0,000', 'ZKG_DPROC': '30,000', 'ZKG_RETIR': '0,000', 'ZMONTAJE': '1,000', 'ZBOBINAS_ENTR': '1,000', 'ZBOBINAS': '2,000', 'ZBULTOS': '1,000', 'ZPAQUET': '0,000', 'ZRETIR': '0,000', 'KG_CONS_CANUT': '0,000', 'KG_CONS_CHAPA': '0,000', 'KG_A_TRANS': '0,000', 'KG_A_PRENSA': '0,000', 'KG_A_LONGI': '0,000', 'KG_A_OTROS': '0,000', 'KG_A_STOCK': '0,000', 'FINI_NOTIF': '11.05.2026', 'HINI_NOTIF': '07:37:00', 'FFIN_NOTIF': '11.05.2026', 'HFIN_NOTIF': '07:47:00', 'DURACION': '0,167', 'ZHORAS_ACT': '0,167', 'ZH_PI3H': '0,000', 'ZH_PS3H': '0,000', 'ZH_PBOC': '0,000', 'ZH_PTP': '0,000', 'ZH_PFT': '0,000', 'ZH_PIP': '0,000', 'ZCAMBIOS': '0,000', 'ZMETROS': '576,8441', 'ZGOLPES': '0,000', 'MAQUILA': 'X', 'CHARG': '0012492613', 'MATNR': 'BDM00001', 'ZZESPESOR': '2,00', 'ZZANCHO': '1.240,00', 'NFRACCION': '1', 'CTNOK': '0,000', 'METROS': '577'}
+   row[10936] (ÚLTIMA) {'AUFNR': '10501138', 'ARBPL': 'EMBAL3', 'ZKG_ENTR': '1.699,000', 'ZKG_PROC': '0,000', 'ZKG_ELAB': '1.708,000', 'ZKG_DESP': '0,000', 'ZKG_CANUT': '0,000', 'ZKG_SUBP': '0,000', 'ZKG_DPROC': '0,000', 'ZKG_RETIR': '0,000', 'ZMONTAJE': '0,000', 'ZBOBINAS_ENTR': '0,000', 'ZBOBINAS': '0,000', 'ZBULTOS': '0,000', 'ZPAQUET': '0,000', 'ZRETIR': '0,000', 'KG_CONS_CANUT': '0,000', 'KG_CONS_CHAPA': '1.699,000', 'KG_A_TRANS': '0,000', 'KG_A_PRENSA': '0,000', 'KG_A_LONGI': '0,000', 'KG_A_OTROS': '0,000', 'KG_A_STOCK': '0,000', 'FINI_NOTIF': '23.05.2026', 'HINI_NOTIF': '11:41:48', 'FFIN_NOTIF': '23.05.2026', 'HFIN_NOTIF': '11:41:48', 'DURACION': '0,000', 'ZHORAS_ACT': '0,000', 'ZH_PI3H': '0,000', 'ZH_PS3H': '0,000', 'ZH_PBOC': '0,000', 'ZH_PTP': '0,000', 'ZH_PFT': '0,000', 'ZH_PIP': '0,000', 'ZCAMBIOS': '0,000', 'ZMETROS': '15,0181', 'ZGOLPES': '0,000', 'MAQUILA': '', 'CHARG': '', 'MATNR': '', 'ZZESPESOR': '0,00', 'ZZANCHO': '0,00', 'NFRACCION': '0', 'CTNOK': '0,000', 'METROS': '0'}

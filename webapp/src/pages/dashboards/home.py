@@ -5,6 +5,7 @@ import dash_bootstrap_components as dbc
 from datetime import datetime
 from src.utils.demo_helpers import add_page_demo_warning, add_demo_badge_to_card_header
 from src.components.demo_badge import demo_data_badge
+from src.sap_scheduler.rodape_component import build_rodape
 
 def layout():
     """
@@ -469,6 +470,8 @@ def layout():
                     ])
                 ], className="shadow-sm")
             ])
-        ])
-        
+        ]),
+
+        build_rodape(),
+
     ], fluid=True, className="p-4")

@@ -1,0 +1,26 @@
+tx        : ZPP_NT0001
+título    : 'Listagem de paragens por línha'
+statusbar : [] 
+
+grid_id   : /app/con[0]/ses[0]/wnd[0]/usr/cntlGRID1/shellcont/shell
+RowCount  : 2900
+Colunas   : 11
+
+COLUNAS (técnico | título de exibição):
+   ARBPL                        | Centro de trabalho
+   AUFNR                        | Ordem
+   ISDZ                         | Início real (hora)
+   IEDZ                         | Fim real (hora)
+   GRUND                        | Causa do desvio
+   GRDTX                        | Descrição
+   LTXA1                        | Texto de confirmação
+   AGRPR                        | Agrupamento de paragens
+   ISDD                         | Início execução
+   IEDD                         | Fim execução
+   MINPR                        | Duration (min)
+
+AMOSTRA (linhas 0..2 + última):
+   row[0] {'ARBPL': 'TRANS002', 'AUFNR': '10412060', 'ISDZ': '21:02:00', 'IEDZ': '21:07:00', 'GRUND': '503', 'GRDTX': 'Outras perdas de velocidade', 'LTXA1': 'Perda de velocidade tablero', 'AGRPR': '500', 'ISDD': '20.05.2026', 'IEDD': '20.05.2026', 'MINPR': '5,00'}
+   row[1] {'ARBPL': 'TRANS002', 'AUFNR': '10412060', 'ISDZ': '19:23:00', 'IEDZ': '19:29:00', 'GRUND': '301', 'GRDTX': 'Troca de refêrencia e bobina', 'LTXA1': 'Setup', 'AGRPR': '300', 'ISDD': '20.05.2026', 'IEDD': '20.05.2026', 'MINPR': '6,00'}
+   row[2] {'ARBPL': 'TRANS002', 'AUFNR': '10412060', 'ISDZ': '19:30:00', 'IEDZ': '20:30:00', 'GRUND': '102N', 'GRDTX': 'Descansos e Refeições', 'LTXA1': '', 'AGRPR': '100', 'ISDD': '20.05.2026', 'IEDD': '20.05.2026', 'MINPR': '60,00'}
+   row[2899] (ÚLTIMA) {'ARBPL': 'PRENS001', 'AUFNR': '10500521', 'ISDZ': '15:23:00', 'IEDZ': '15:53:00', 'GRUND': '301', 'GRDTX': 'Troca de refêrencia e bobina', 'LTXA1': 'SET UP F0095', 'AGRPR': '300', 'ISDD': '22.05.2026', 'IEDD': '22.05.2026', 'MINPR': '30,00'}

@@ -1,0 +1,7 @@
+# sap-scheduler daemon — Python 3.13 32-bit (Windows)
+# Documentado em DS-05 + IM-F1
+
+pymongo>=4.0,<5.0
+python-dotenv>=1.0,<2.0
+pywin32>=305
+pytz>=2024.1
