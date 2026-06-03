@@ -393,6 +393,13 @@ ROUTE_ACCESS = {
         "min_level": 3,
         "description": "Criar Novo Usuário"
     },
+    "/config/sap-scheduler": {
+        # Página admin de agendamento do SAP Scheduler (SDD sap-scheduler / SP-09).
+        # Permissão alinhada com precedente /config/users/create (qualquer lvl 3).
+        "shared": True,
+        "min_level": 3,
+        "description": "Agendamento SAP",
+    },
 }
 
 

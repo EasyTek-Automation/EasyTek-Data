@@ -23,6 +23,7 @@ from pymongo.errors import PyMongoError
 from .config import SapSchedulerConfig
 from .mongo_helpers import find_ultimo_concluido_por_tipo, get_db
 from .rodape_component import RODAPE_CONTENT_ID
+from .validators import TIPOS_VALIDOS
 
 logger = logging.getLogger(__name__)
 
@@ -108,11 +109,15 @@ def register_callback(app, cfg: SapSchedulerConfig) -> None:
 
             agora_utc = datetime.now(tz=pytz.UTC)
             spans = []
-            for job in cfg.agendados:
-                doc = find_ultimo_concluido_por_tipo(db, job.tipo, cfg.collection)
+            # DS-03 refresh: itera whitelist tecnica (TIPOS_VALIDOS) em vez de
+            # cfg.agendados (que era source-of-truth antiga). Rodape mostra
+            # 'ultima coleta' por tipo independente de estar `ativo` na config —
+            # comportamento preservado do Bloco C.
+            for tipo in sorted(TIPOS_VALIDOS):
+                doc = find_ultimo_concluido_por_tipo(db, tipo, cfg.collection)
                 spans.append(
                     _render_por_tipo(
-                        job.tipo, doc, agora_utc, cfg.frescor_horas_limite, cfg.timezone
+                        tipo, doc, agora_utc, cfg.frescor_horas_limite, cfg.timezone
                     )
                 )
             return html.Span(spans)

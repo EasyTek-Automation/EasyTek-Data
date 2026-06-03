@@ -417,6 +417,15 @@ def create_header(pathname, user):
                 ),
                 dbc.DropdownMenuItem(divider=True),
                 dbc.DropdownMenuItem(
+                    html.Div([
+                        html.I(className="bi bi-calendar-check", style={"marginRight": "8px"}),
+                        "Agendamento SAP"
+                    ], className="d-flex align-items-center"),
+                    href="/config/sap-scheduler",
+                    active=(pathname == "/config/sap-scheduler")
+                ),
+                dbc.DropdownMenuItem(divider=True),
+                dbc.DropdownMenuItem(
                     html.Div([html.Span(sliders_icon(), style={"marginRight": "8px"}), "Preferências"], className="d-flex align-items-center"),
                     href="/config/preferences", disabled=True, style={"opacity": "0.5"}
                 ),
