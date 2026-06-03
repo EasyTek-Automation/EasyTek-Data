@@ -1585,20 +1585,6 @@ def register_indicators_v2_callbacks(app):
         ("v2-i18n-kpi-title-mtbf",      "kpi_mtbf_title"),
         ("v2-i18n-kpi-title-mttr",      "kpi_mttr_title"),
         ("v2-i18n-kpi-title-breakdown", "kpi_br_title"),
-        ("v2-i18n-tl-title",       "tl_title"),
-        ("v2-i18n-tl-focus",       "tl_focus"),
-        ("v2-i18n-tl-scale",       "tl_scale"),
-        ("v2-i18n-tl-nav",         "tl_nav"),
-        ("v2-i18n-tl-btn-hours",   "tl_hours"),
-        ("v2-i18n-tl-btn-days",    "tl_days"),
-        ("v2-i18n-tl-btn-today",   "tl_today"),
-        ("v2-i18n-lg-producao",    "lg_producao"),
-        ("v2-i18n-lg-avaria",      "lg_avaria"),
-        ("v2-i18n-lg-setup",       "lg_setup"),
-        ("v2-i18n-lg-logistica",   "lg_logistica"),
-        ("v2-i18n-lg-refeicao",    "lg_refeicao"),
-        ("v2-i18n-lg-mtto",        "lg_mtto"),
-        ("v2-i18n-lg-processo",    "lg_processo"),
         ("v2-i18n-beta-badge",     "beta_badge"),
         # Heatmap (IM-20/21/22)
         ("v2-i18n-btn-thresholds",       "btn_thresholds"),
@@ -1610,7 +1596,6 @@ def register_indicators_v2_callbacks(app):
 
     @app.callback(
         [Output(eid, "children") for eid, _ in I18N_OUTPUTS] + [
-            Output("switch-v2-mtto-only", "label"),
             Output("tab-v2-general-component", "label"),
             Output("tab-v2-data-component", "label"),
             Output("tab-v2-report-component", "label"),
@@ -1627,7 +1612,6 @@ def register_indicators_v2_callbacks(app):
         lang = lang or "pt"
         d = _TRANS.get(lang, _TRANS["pt"])
         results = [d.get(key, key) for _, key in I18N_OUTPUTS]
-        results.append(d.get("tl_only_av", "Só avaria"))
         results.append(d.get("tab_general", "📊 Geral"))
         results.append(d.get("tab_data", "📋 Dados"))
         results.append(d.get("tab_report", "📅 Relatório"))

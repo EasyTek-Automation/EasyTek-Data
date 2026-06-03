@@ -24,8 +24,6 @@ from src.callbacks_registers.tempgraph_callback import register_tempgraph_callba
 from src.callbacks_registers.hourlyconsumption_callback import register_hourlyconsumption_callbacks
 from src.callbacks_registers.sidebar_content_callback import register_sidebar_content_callback
 from src.callbacks_registers.sidebar_toggle_callback import register_sidebar_toggle_callback
-from src.callbacks_registers.home_callbacks import register_home_callbacks
-from src.callbacks_registers.home_drilldown_callbacks import register_home_drilldown_callbacks
 from src.callbacks_registers.indicators_v2_callbacks import register_indicators_v2_callbacks
 from src.callbacks_registers.hh_gantt_callbacks import register_hh_gantt_callbacks
 from src.callbacks_registers.alarms_callbacks import register_alarms_callbacks
@@ -105,8 +103,6 @@ def register_callbacks(app):
     register_hourlyconsumption_callbacks(app, collection_consumo)
     register_sidebar_content_callback(app)
     register_sidebar_toggle_callback(app)
-    register_home_callbacks(app)
-    register_home_drilldown_callbacks(app)
     register_indicators_v2_callbacks(app)
     register_hh_gantt_callbacks(app)
     register_alarms_callbacks(app)
