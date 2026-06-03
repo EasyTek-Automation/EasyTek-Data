@@ -32,6 +32,7 @@ from src.callbacks_registers.alarms_callbacks import register_alarms_callbacks
 from src.callbacks_registers.create_user_callbacks import register_create_user_callbacks
 from src.callbacks_registers.change_password_callbacks import register_change_password_callbacks
 from src.callbacks_registers.manage_users_callbacks import register_manage_users_callbacks
+from src.callbacks_registers.sap_scheduler_config_callbacks import register_sap_scheduler_config_callbacks
 from src.callbacks_registers.energy_config_callbacks import register_energy_config_callbacks
 from src.callbacks_registers.energy_sidebar_callbacks import register_energy_sidebar_callbacks
 from src.callbacks_registers.procedures_collapse_callbacks import register_procedures_collapse_callbacks
@@ -112,6 +113,7 @@ def register_callbacks(app):
     register_create_user_callbacks(app)
     register_change_password_callbacks(app)
     register_manage_users_callbacks(app)
+    register_sap_scheduler_config_callbacks(app)
 
     # Energy configuration and costs
     register_energy_config_callbacks(app)

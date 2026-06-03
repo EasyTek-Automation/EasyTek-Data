@@ -49,7 +49,7 @@ from src.pages.reports import reports
 from src.pages.common import under_development
 
 # Admin
-from src.pages.admin import create_user, manage_users
+from src.pages.admin import create_user, manage_users, sap_scheduler_config
 
 # ========================================
 # MAPEAMENTO DE ROTAS (NOVA ESTRUTURA)
@@ -139,6 +139,7 @@ ROUTES = {
     # Configurações
     "/config/users": manage_users.layout_wrapper,
     "/config/users/create": create_user.layout_wrapper,
+    "/config/sap-scheduler": sap_scheduler_config.layout_wrapper,
     "/config/preferences": lambda: under_development.config_development(),
     "/config/logs": lambda: under_development.config_development(),
 }

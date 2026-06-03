@@ -62,19 +62,40 @@ app = dash.Dash(
     ]
 )
 
-# --- sap-scheduler boot (DS-03 + IM-B3) ---
-# Inicia APScheduler em background que insere docs em sap_jobs no cron configurado.
-# Callback do rodapé da home é registrado em IM-C2 (não-bloqueante se ausente).
+# --- sap-scheduler boot (DS-03 refresh + DS-06 + DS-07) ---
+# Ordem OBRIGATORIA do boot (DC-03-R-01 / RF-01-16):
+#   1. load_config
+#   2. get_db
+#   3. migracao_dedup_sap_jobs(db)     -> limpa duplicatas antes do unique index
+#   4. ensure_indexes(db)               -> cria 3 indices, com idx_dedup_agendamento UNIQUE
+#   5. bootstrap_config(db, seed)       -> semeia sap_scheduler_config (idempotente)
+#   6. init_scheduler(cfg, db)          -> BackgroundScheduler.start (rele config a cada tick)
+# Falha em (3), (4) ou (5) trava o boot — preferir webapp nao-iniciar a webapp com bug A-06.
 try:
     from src.sap_scheduler.config import load_config as _sap_load_config
     from src.sap_scheduler.cron import init_scheduler as _sap_init_scheduler
+    from src.sap_scheduler.migrations import migracao_dedup_sap_jobs as _sap_migracao_dedup
     from src.sap_scheduler.mongo_helpers import get_db as _sap_get_db, ensure_indexes as _sap_ensure_indexes
+    from src.sap_scheduler.storage import bootstrap_config as _sap_bootstrap_config
     from src.sap_scheduler.timestamp_callback import register_callback as _sap_register_rodape_callback
 
     _sap_config = _sap_load_config()
     _sap_db = _sap_get_db()
     if _sap_db is not None:
+        # 3. Migracao idempotente de duplicatas pre-existentes (DS-07 RF-08-10)
+        _sap_migracao_dedup(_sap_db, _sap_config.collection)
+        # 4. Indices (com idx_dedup_agendamento UNIQUE novo — DS-07 RF-08-02)
         _sap_ensure_indexes(_sap_db, _sap_config.collection)
+        # 5. Bootstrap do sap_scheduler_config singleton (DS-06 RF-07-16)
+        _sap_bootstrap_config(
+            seed_agendamentos=_sap_config.agendados_legacy,
+            collection_name=_sap_config.collection_sap_scheduler_config,
+        )
+        if _sap_config.agendados_legacy:
+            logging.getLogger("sap_scheduler").info(
+                "sap_scheduler: SAP_JOBS_AGENDADOS env var lida como seed (so usado se collection vazia)"
+            )
+        # 6. BackgroundScheduler — _tick rele config Mongo a cada 60s
         _sap_init_scheduler(_sap_config, _sap_db)
     else:
         logging.getLogger("sap_scheduler").warning(

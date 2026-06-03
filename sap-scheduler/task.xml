@@ -4,6 +4,11 @@
     <Description>SAP Job Scheduler — daemon Python 32-bit que executa jobs SAP via GUI Scripting</Description>
     <Author>%USERNAME%</Author>
   </RegistrationInfo>
+  <!--
+    Bloco I A-02: Task Scheduler NAO expande variaveis de ambiente em <UserId>.
+    Antes de registrar, substituir %USERDOMAIN%\%USERNAME% pelo valor LITERAL
+    (ex: MADRID\cmanutencao). RUNBOOK-instalacao.md TAREFA 6 documenta o procedimento.
+  -->
   <Triggers>
     <LogonTrigger>
       <Enabled>true</Enabled>
@@ -43,8 +48,15 @@
   </Settings>
   <Actions Context="Author">
     <Exec>
-      <Command>%USERPROFILE%\sap-scheduler\.venv\Scripts\python.exe</Command>
-      <Arguments>%USERPROFILE%\sap-scheduler\daemon.py</Arguments>
+      <!--
+        Bloco I A-01: usa launcher.vbs (wscript) em vez de python.exe direto.
+        pythonw.exe nao funciona porque zpp_gridcap.export_grid faz print()
+        e pythonw tem stdout=None. wscript //B //Nologo + Run(_, 0, True)
+        executa python.exe (com stdout) em janela oculta + bloqueante
+        (preserva single-instance + LogonTrigger repeat 1min).
+      -->
+      <Command>C:\Windows\System32\wscript.exe</Command>
+      <Arguments>//B //Nologo "%USERPROFILE%\sap-scheduler\launcher.vbs"</Arguments>
       <WorkingDirectory>%USERPROFILE%\sap-scheduler</WorkingDirectory>
     </Exec>
   </Actions>
