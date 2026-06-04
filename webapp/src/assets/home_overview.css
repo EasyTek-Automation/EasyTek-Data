@@ -17,6 +17,27 @@
     border-color: rgba(255, 255, 255, 0.08);
 }
 
+/* Bloco "Atualização dos dados" (substitui o veredito) */
+.home-fresh-head {
+    font-size: 0.82rem;
+}
+.home-fresh-row {
+    font-size: 0.74rem;
+    margin-top: 3px;
+    gap: 4px;
+}
+.home-fresh-label {
+    min-width: 84px;
+    font-size: 0.8rem;
+}
+body.home-present-mode .home-fresh-row {
+    font-size: 1.05rem;
+}
+body.home-present-mode .home-fresh-head,
+body.home-present-mode .home-fresh-label {
+    font-size: 1.1rem;
+}
+
 /* Arena (card que segura os confrontos) */
 .home-duel-arena {
     border-radius: 12px;

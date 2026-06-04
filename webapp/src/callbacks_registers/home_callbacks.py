@@ -100,7 +100,7 @@ def register_home_callbacks(app):
         psub = home_page.period_meta(period, lang, today=home_page._data_anchor())["psub"]
         return (
             home_page.render_duels(period, lang),
-            home_page.render_verdict(period, lang),
+            home_page.render_freshness(lang),
             psub,
             t("title", lang),
             t("subtitle", lang),

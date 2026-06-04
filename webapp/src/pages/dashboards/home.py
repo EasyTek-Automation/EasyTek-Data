@@ -206,6 +206,8 @@ TRANS = {
         "split_by_count": "por nº de paradas", "split_by_time": "por tempo total (min)",
         "v_up": "Operação melhorando", "v_down": "Requer atenção", "v_flat": "Operação estável",
         "v_detail": "Período atual vence em {n} de {total} indicadores",
+        "fresh_title": "Atualização dos dados", "fresh_prod": "Produção", "fresh_stops": "Paradas",
+        "fresh_collect": "última coleta", "fresh_through": "dado até",
     },
     "es": {
         "title": "Visión General del Mantenimiento",
@@ -231,6 +233,8 @@ TRANS = {
         "split_by_count": "por nº de paradas", "split_by_time": "por tiempo total (min)",
         "v_up": "Operación mejorando", "v_down": "Requiere atención", "v_flat": "Operación estable",
         "v_detail": "El período actual gana en {n} de {total} indicadores",
+        "fresh_title": "Actualización de datos", "fresh_prod": "Producción", "fresh_stops": "Paradas",
+        "fresh_collect": "última recolección", "fresh_through": "datos hasta",
     },
     "en": {
         "title": "Maintenance Overview",
@@ -256,6 +260,8 @@ TRANS = {
         "split_by_count": "by stop count", "split_by_time": "by total time (min)",
         "v_up": "Operation improving", "v_down": "Needs attention", "v_flat": "Operation stable",
         "v_detail": "Current period wins {n} of {total} indicators",
+        "fresh_title": "Data update", "fresh_prod": "Production", "fresh_stops": "Stops",
+        "fresh_collect": "last collected", "fresh_through": "data through",
     },
 }
 
@@ -559,29 +565,94 @@ def render_duels(period, lang):
     )
 
 
-def render_verdict(period, lang):
-    """Banner de veredito — em quantos dos indicadores (operacionais + KPIs) o atual vence."""
-    data, _meta = _collect(period, lang)
-    allm = METRICS + KPIS
-    total = len(allm)
-    wins = sum(1 for key, _ in allm if _duel(data[key])[3] == "good")
-    if wins >= total - 1:
-        vkey, vcolor, vicon = "v_up", C_GOOD, "bi-trophy"
-    elif wins <= 1:
-        vkey, vcolor, vicon = "v_down", C_BAD, "bi-exclamation-triangle"
-    else:
-        vkey, vcolor, vicon = "v_flat", C_FLAT, "bi-dash-circle"
+_FRESH_CACHE = {"data": None, "ts": 0.0}
+
+
+def _data_freshness():
+    """Datas de frescor dos dados ZPP (TTL 60s). Por fonte (produção/paradas):
+      • última coleta  = ts do _id mais recente (ZPP faz delete+reinsert → última carga)
+      • último dado    = maior ffinnotif (produção) / fim_execucao (paradas)
+    Robusto a Mongo offline → None (UI mostra "—"). Coleta convertida p/ America/Sao_Paulo.
+    """
+    import time as _t
+    if _FRESH_CACHE["data"] and (_t.time() - _FRESH_CACHE["ts"]) < 60:
+        return _FRESH_CACHE["data"]
+    out = {"prod_load": None, "prod_data": None, "par_load": None, "par_data": None}
+    try:
+        from src.database.connection import get_mongo_connection
+        from src.utils.zpp_kpi_calculator import (
+            ZPP_PRODUCAO_COLLECTION, ZPP_PARADAS_COLLECTION)
+        try:
+            from zoneinfo import ZoneInfo
+            _TZ = ZoneInfo("America/Sao_Paulo")
+        except Exception:
+            _TZ = None
+
+        def _last_load(col):
+            d = col.find_one({}, {"_id": 1}, sort=[("_id", -1)])
+            if not d:
+                return None
+            g = d["_id"].generation_time
+            return g.astimezone(_TZ) if _TZ else g
+
+        def _last_data(col, field):
+            d = col.find_one({field: {"$ne": None}}, {field: 1, "_id": 0}, sort=[(field, -1)])
+            return d.get(field) if d else None
+
+        prod = get_mongo_connection(ZPP_PRODUCAO_COLLECTION)
+        par = get_mongo_connection(ZPP_PARADAS_COLLECTION)
+        if prod is not None:
+            out["prod_load"], out["prod_data"] = _last_load(prod), _last_data(prod, "ffinnotif")
+        if par is not None:
+            out["par_load"], out["par_data"] = _last_load(par), _last_data(par, "fim_execucao")
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning("home _data_freshness falhou: %s", e)
+    _FRESH_CACHE["data"], _FRESH_CACHE["ts"] = out, _t.time()
+    return out
+
+
+def render_freshness(lang):
+    """Bloco estático de atualização dos dados (substitui o veredito).
+    Mostra, por fonte ZPP, a última coleta (data+hora) e o último dado (data)."""
+    f = _data_freshness()
+
+    def _dt(v):
+        return v.strftime("%d/%m/%Y %H:%M") if v else "—"
+
+    def _d(v):
+        return v.strftime("%d/%m/%Y") if v else "—"
+
+    def _row(icon, label, collected, through):
+        return html.Div(
+            [
+                html.I(className=f"bi {icon} me-2", style={"color": "#0d6efd"}),
+                html.Strong(label, className="home-fresh-label"),
+                html.Span(
+                    [html.I(className="bi bi-cloud-download me-1", style={"color": C_FLAT}),
+                     html.Small(t("fresh_collect", lang) + ": ", className="text-muted"),
+                     html.Small(html.Strong(_dt(collected)))],
+                    className="me-3"),
+                html.Span(
+                    [html.I(className="bi bi-calendar-check me-1", style={"color": C_FLAT}),
+                     html.Small(t("fresh_through", lang) + ": ", className="text-muted"),
+                     html.Small(html.Strong(_d(through)))]),
+            ],
+            className="d-flex align-items-center flex-wrap home-fresh-row",
+        )
+
     return html.Div(
         [
-            html.I(className=f"bi {vicon} me-2", style={"fontSize": "1.2rem", "color": vcolor}),
-            html.Div([
-                html.Strong(t(vkey, lang), style={"fontSize": "0.92rem", "color": vcolor}),
-                html.Div(t("v_detail", lang).format(n=wins, total=total),
-                         className="text-muted", style={"fontSize": "0.74rem"}),
-            ]),
+            html.Div(
+                [html.I(className="bi bi-database-check me-2", style={"color": "#0d6efd"}),
+                 html.Strong(t("fresh_title", lang), style={"fontSize": "0.82rem"})],
+                className="home-fresh-head mb-1",
+            ),
+            _row("bi-activity", t("fresh_prod", lang), f["prod_load"], f["prod_data"]),
+            _row("bi-exclamation-octagon", t("fresh_stops", lang), f["par_load"], f["par_data"]),
         ],
-        className="home-verdict d-flex align-items-center",
-        style={"borderLeft": f"5px solid {vcolor}"},
+        className="home-verdict",
+        style={"borderLeft": "5px solid #0d6efd"},
     )
 
 
