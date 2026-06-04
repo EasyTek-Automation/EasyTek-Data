@@ -97,7 +97,7 @@ def register_home_callbacks(app):
         period = period or "month"
         lang = lang or "pt"
         t = home_page.t
-        psub = home_page.period_meta(period, lang)["psub"]
+        psub = home_page.period_meta(period, lang, today=home_page._data_anchor())["psub"]
         return (
             home_page.render_duels(period, lang),
             home_page.render_verdict(period, lang),

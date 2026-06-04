@@ -287,23 +287,26 @@ def period_meta(period, lang, today=None):
         prev_start, prev_end = _dt(prev_start_d), _excl(prev_end_d)
 
     elif period == "band":
+        BAND = 7  # semana cheia (inclui fim de semana — há hora extra no fds)
         ndays = calendar.monthrange(today.year, today.month)[1]
-        nweeks = max(1, math.ceil(ndays / 7))
-        bsize = math.ceil(ndays / nweeks)
-        bidx = (today.day - 1) // bsize
-        b_start = bidx * bsize + 1
-        b_end = min((bidx + 1) * bsize, ndays)
+        nweeks = max(1, math.ceil(ndays / BAND))
+        bidx = (today.day - 1) // BAND
+        b_start = bidx * BAND + 1
+        b_end_full = min((bidx + 1) * BAND, ndays)      # fim "cheio" da faixa (1-7, 8-14, ...)
+        # Trunca no último dia COM dado (today = âncora): enquanto a faixa não fecha,
+        # compara b_start..dia_atual vs b_start..dia_atual do mês passado (mesmo nº de dias).
+        cur_end_day = min(b_end_full, today.day)
         py, pm = _prev_month(today.year, today.month)
         pdays = calendar.monthrange(py, pm)[1]
-        pb_end = min(b_end, pdays)  # último corte: clampa ao tamanho do mês anterior
-        cur_range = f"{b_start}–{b_end} {mon[today.month - 1]}"
-        prev_range = f"{b_start}–{pb_end} {mon[pm - 1]}"
+        prev_end_day = min(cur_end_day, pdays)          # mesmo dia no mês anterior (clampa)
+        cur_range = f"{b_start}–{cur_end_day} {mon[today.month - 1]}"
+        prev_range = f"{b_start}–{prev_end_day} {mon[pm - 1]}"
         band = (bidx + 1, nweeks)
         psub = t("psub_band", lang).format(a=band[0], b=band[1])
         cur_start = datetime.datetime(today.year, today.month, b_start)
-        cur_end = _excl(datetime.date(today.year, today.month, b_end))
+        cur_end = _excl(datetime.date(today.year, today.month, cur_end_day))
         prev_start = datetime.datetime(py, pm, b_start)
-        prev_end = _excl(datetime.date(py, pm, pb_end))
+        prev_end = _excl(datetime.date(py, pm, prev_end_day))
 
     else:  # month (MTD)
         D = today.day
@@ -527,13 +530,13 @@ def render_stops_split(period, lang, cutoff):
     Não é confronto: o corte (min) é ajustável pelo slider; cores neutras (tom = duração).
     """
     data, _meta = _collect(period, lang)
-    durs = data.get("__durations", [])
+    durs = data.get("__durations", [])  # paradas de AVARIA (manutenção) — mesma base dos KPIs
     cutoff = cutoff or 30
     short = [d for d in durs if d < cutoff]
     long = [d for d in durs if d >= cutoff]
     n_s, n_l = len(short), len(long)
     total = n_s + n_l or 1
-    min_s, min_l = sum(short), sum(long)
+    min_s, min_l = int(round(sum(short))), int(round(sum(long)))
     w_s = n_s / total * 100
     w_l = n_l / total * 100
 
