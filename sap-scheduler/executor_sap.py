@@ -14,6 +14,7 @@ import os
 import random
 import shutil
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -27,6 +28,17 @@ from . import tipos
 from .config import DaemonConfig
 
 logger = logging.getLogger(__name__)
+
+# Bloco K — fases de falha consideradas transientes (glitch momentâneo do SAP GUI
+# Scripting / COM), elegíveis a retry in-run. `export_grid` é idempotente
+# (`_close_popups` + `/n<tx>` re-navega do zero a cada chamada), então re-executar
+# após uma falha transiente é seguro. Fases determinísticas (`salvamento`,
+# `validacao_arquivo`, `kill_excel`, `desconhecido`) NÃO entram — retry não
+# corrige causa estrutural (share sem permissão, arquivo vazio, variant quebrada).
+FASES_TRANSIENTES = frozenset({"conexao_sap", "navegacao", "export_alv"})
+
+# Pausa entre tentativas — dá tempo do SAP GUI se recompor antes do retry.
+RETRY_SLEEP_SEGUNDOS = 5
 
 
 class ExcecaoClassificada(Exception):
@@ -133,10 +145,67 @@ def _mock_export(path_xlsx: str, cfg: DaemonConfig) -> None:
     shutil.copyfile(str(src), path_xlsx)
 
 
+def _executar_sap_com_retry(
+    path_xlsx: str,
+    args_factory,
+    agora_brt: datetime,
+    cfg: DaemonConfig,
+) -> int:
+    """Bloco K — conexão + export SAP com retry in-run em falhas transientes.
+
+    Re-tenta até `cfg.max_tentativas_job` vezes quando a fase falha é transiente
+    (`FASES_TRANSIENTES`), com kill_excel preventivo + `RETRY_SLEEP_SEGUNDOS` de
+    pausa entre tentativas. O job permanece `executando` o tempo todo — sem
+    transição reversa (DS-02 preservado; retry é interno a um claim).
+
+    Falha de fase determinística OU esgotar as tentativas → propaga a última
+    `ExcecaoClassificada` pro chamador (vira `falhou`). Retorna o número da
+    tentativa que teve sucesso (1 = primeira, sem retry).
+    """
+    ultimo_erro: Optional[ExcecaoClassificada] = None
+    for tentativa in range(1, cfg.max_tentativas_job + 1):
+        try:
+            engine, zpp_gridcap_mod = _fase_conexao(cfg.sap_gate_dir)
+            before_pids = kill_excel.pids_atuais()
+            args = args_factory(path_xlsx, agora_brt)
+            _fase_export(zpp_gridcap_mod, engine, args)
+            _fase_kill_pos(before_pids)
+            if tentativa > 1:
+                logger.info(
+                    "[exec] sucesso apos retry | tentativa=%d/%d",
+                    tentativa, cfg.max_tentativas_job,
+                )
+            return tentativa
+        except ExcecaoClassificada as e:
+            ultimo_erro = e
+            pode_retry = e.fase in FASES_TRANSIENTES and tentativa < cfg.max_tentativas_job
+            if not pode_retry:
+                raise
+            logger.warning(
+                "[exec] falha transiente | fase=%s tentativa=%d/%d — retry em %ds | erro=%s",
+                e.fase, tentativa, cfg.max_tentativas_job,
+                RETRY_SLEEP_SEGUNDOS, str(e.original)[:200],
+            )
+            try:
+                kill_excel.kill_preventivo()
+            except Exception:
+                logger.warning("[exec] kill_preventivo no retry falhou (continua)")
+            time.sleep(RETRY_SLEEP_SEGUNDOS)
+
+    # Defesa: loop só sai por return (sucesso) ou raise (acima). Se chegar aqui,
+    # propaga o último erro conhecido pra nunca engolir falha silenciosamente.
+    if ultimo_erro is not None:
+        raise ultimo_erro
+    raise ExcecaoClassificada(
+        "desconhecido", RuntimeError("retry loop terminou sem sucesso nem erro")
+    )
+
+
 def run(job: dict, cfg: DaemonConfig) -> dict:
     """Executa 1 job. Retorna `resultado` dict; levanta `ExcecaoClassificada`.
 
     Modo MOCK_SAP: pula fases SAP, copia .xlsx do Audit Maio.
+    Bloco K: fases SAP transientes são re-tentadas in-run (ver `_executar_sap_com_retry`).
     """
     tipo = job["tipo"]
     if tipo not in tipos.SCRIPT_POR_TIPO:
@@ -151,22 +220,23 @@ def run(job: dict, cfg: DaemonConfig) -> dict:
     _fase_pre_validacao(cfg)
     _fase_kill_pre()
 
+    tentativas = 1
     if cfg.mock_sap:
-        # IM-E6: pula fases SAP, copia .xlsx real do Audit Maio
+        # IM-E6: pula fases SAP, copia .xlsx real do Audit Maio (sem retry — determinístico)
         _mock_export(path_xlsx, cfg)
     else:
-        engine, zpp_gridcap_mod = _fase_conexao(cfg.sap_gate_dir)
-        before_pids = kill_excel.pids_atuais()
-        args = args_factory(path_xlsx, agora_brt)
-        _fase_export(zpp_gridcap_mod, engine, args)
-        _fase_kill_pos(before_pids)
+        tentativas = _executar_sap_com_retry(path_xlsx, args_factory, agora_brt, cfg)
 
     tamanho = _fase_validacao(path_xlsx)
     duracao_s = int((datetime.now(tz=pytz.UTC) - iniciado_em).total_seconds())
-    logger.info("[exec] export ok | tamanho_bytes=%d duracao_s=%d", tamanho, duracao_s)
+    logger.info(
+        "[exec] export ok | tamanho_bytes=%d duracao_s=%d tentativas=%d",
+        tamanho, duracao_s, tentativas,
+    )
 
     return {
         "path_xlsx": path_xlsx,
         "tamanho_bytes": tamanho,
         "duracao_segundos": duracao_s,
+        "tentativas": tentativas,
     }

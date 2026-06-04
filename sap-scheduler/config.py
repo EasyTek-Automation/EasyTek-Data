@@ -44,6 +44,7 @@ class DaemonConfig:
     lockfile_path: Path = field(default_factory=lambda: _root_dir() / "daemon.lock")
     mock_sap: bool = False  # IM-E6 — modo de teste E2E local sem SAP real
     audit_maio_dir: Optional[Path] = None  # IM-E6 — fonte dos .xlsx pra mock copiar
+    max_tentativas_job: int = 3  # Bloco K — retry in-run em falhas transientes (1 = sem retry)
 
 
 def _parse_csv_list(raw: str) -> List[str]:
@@ -107,6 +108,14 @@ def load() -> DaemonConfig:
         raise RuntimeError(f"HEARTBEAT_INTERVAL_SEGUNDOS nao e inteiro: {e}") from e
 
     lockfile = Path(os.getenv("LOCKFILE_PATH", str(_root_dir() / "daemon.lock")))
+
+    try:
+        max_tentativas = int(os.getenv("MAX_TENTATIVAS_JOB", "3"))
+    except ValueError as e:
+        raise RuntimeError(f"MAX_TENTATIVAS_JOB nao e inteiro: {e}") from e
+    if max_tentativas < 1:
+        raise RuntimeError(f"MAX_TENTATIVAS_JOB deve ser >= 1; veio {max_tentativas}")
+
     mock = _parse_bool(os.getenv("MOCK_SAP", "false"))
     audit_dir = os.getenv("AUDIT_MAIO_DIR", "").strip()
     audit_path = Path(audit_dir) if audit_dir else None
@@ -126,4 +135,5 @@ def load() -> DaemonConfig:
         lockfile_path=lockfile,
         mock_sap=mock,
         audit_maio_dir=audit_path,
+        max_tentativas_job=max_tentativas,
     )
