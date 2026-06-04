@@ -48,7 +48,8 @@ METRIC_DEFS = {
     "breakdown": ("%", "down"),
 }
 
-_WIN_CACHE = {}  # (start_iso, end_iso) → métricas da janela (evita refetch cur/prev)
+_WIN_CACHE = {}  # (start_iso, end_iso) → (ts, métricas) — TTL p/ refletir novas ingestões
+_WIN_TTL = 60    # s — frescor vs perf (mesmo TTL da V2); defasagem irrelevante (ingestão diária)
 
 
 def _window_metrics(start, end):
@@ -61,9 +62,11 @@ def _window_metrics(start, end):
     Retorna: {activity, stops, downtime, mtbf, mttr, breakdown, durations}.
     Robusto a Mongo offline / janela vazia → zeros (nunca lança).
     """
+    import time as _t
     key = (start.isoformat(), end.isoformat())
-    if key in _WIN_CACHE:
-        return _WIN_CACHE[key]
+    cached = _WIN_CACHE.get(key)
+    if cached and (_t.time() - cached[0]) < _WIN_TTL:
+        return cached[1]
     out = {"activity": 0.0, "stops": 0, "downtime": 0.0,
            "mtbf": 0.0, "mttr": 0.0, "breakdown": 0.0, "durations": []}
     try:
@@ -94,7 +97,7 @@ def _window_metrics(start, end):
     except Exception as e:  # Mongo offline, etc → zeros (UI não quebra)
         import logging
         logging.getLogger(__name__).warning("home _window_metrics falhou: %s", e)
-    _WIN_CACHE[key] = out
+    _WIN_CACHE[key] = (_t.time(), out)
     return out
 
 
@@ -105,11 +108,11 @@ def _data_anchor():
     """'Hoje' da home = última data COM registro em ZPP_Producao (não o relógio do sistema).
 
     A base ZPP é histórica (pode estar atrás do calendário); ancorar no último dado
-    faz o "período atual" ser sempre o mais recente com dados reais. Cache 5 min.
+    faz o "período atual" ser sempre o mais recente com dados reais. Cache 60s.
     Fallback: datetime.date.today() se Mongo indisponível.
     """
     import time as _t
-    if _ANCHOR_CACHE["date"] and (_t.time() - _ANCHOR_CACHE["ts"]) < 300:
+    if _ANCHOR_CACHE["date"] and (_t.time() - _ANCHOR_CACHE["ts"]) < 60:
         return _ANCHOR_CACHE["date"]
     d = None
     try:
@@ -138,6 +141,7 @@ def _collect(period, lang):
     data = {k: {"cur": cur[k], "prev": prev[k], "unit": u, "good": g}
             for k, (u, g) in METRIC_DEFS.items()}
     data["__durations"] = cur["durations"]
+    data["__durations_prev"] = prev["durations"]
     return data, meta
 
 
@@ -189,6 +193,7 @@ TRANS = {
         "psub_week": "Semana até hoje vs semana anterior (mesmos dias)",
         "psub_band": "Faixa {a}/{b} do mês vs mesma faixa no mês passado",
         "now": "Atual", "prev": "Anterior", "lead": "à frente", "tie": "empate", "avg": "média",
+        "ghost_label": "esperado p/ volume", "ghost_real": "descontando volume",
         "c_activity": "Horas de Atividade", "c_stops": "Paradas",
         "c_downtime": "Tempo de Parada", "c_breakdown": "Taxa de Avaria",
         "c_mtbf": "MTBF", "c_mttr": "MTTR",
@@ -198,6 +203,7 @@ TRANS = {
         "kpi_section": "Indicadores de Manutenção",
         "split_title": "Paradas por duração", "split_short": "Curtas", "split_long": "Longas",
         "split_cut": "Corte", "split_help": "abaixo de {c} min = curta", "split_min": "min",
+        "split_by_count": "por nº de paradas", "split_by_time": "por tempo total (min)",
         "v_up": "Operação melhorando", "v_down": "Requer atenção", "v_flat": "Operação estável",
         "v_detail": "Período atual vence em {n} de {total} indicadores",
     },
@@ -212,6 +218,7 @@ TRANS = {
         "psub_week": "Semana hasta hoy vs semana anterior (mismos días)",
         "psub_band": "Franja {a}/{b} del mes vs misma franja del mes pasado",
         "now": "Actual", "prev": "Anterior", "lead": "adelante", "tie": "empate", "avg": "media",
+        "ghost_label": "esperado p/ volumen", "ghost_real": "descontando volumen",
         "c_activity": "Horas de Actividad", "c_stops": "Paradas",
         "c_downtime": "Tiempo de Parada", "c_breakdown": "Tasa de Avería",
         "c_mtbf": "MTBF", "c_mttr": "MTTR",
@@ -221,6 +228,7 @@ TRANS = {
         "kpi_section": "Indicadores de Mantenimiento",
         "split_title": "Paradas por duración", "split_short": "Cortas", "split_long": "Largas",
         "split_cut": "Corte", "split_help": "por debajo de {c} min = corta", "split_min": "min",
+        "split_by_count": "por nº de paradas", "split_by_time": "por tiempo total (min)",
         "v_up": "Operación mejorando", "v_down": "Requiere atención", "v_flat": "Operación estable",
         "v_detail": "El período actual gana en {n} de {total} indicadores",
     },
@@ -235,6 +243,7 @@ TRANS = {
         "psub_week": "Week-to-date vs previous week (same days)",
         "psub_band": "Band {a}/{b} of month vs same band last month",
         "now": "Current", "prev": "Previous", "lead": "ahead", "tie": "tie", "avg": "avg",
+        "ghost_label": "expected for volume", "ghost_real": "volume-adjusted",
         "c_activity": "Activity Hours", "c_stops": "Stops",
         "c_downtime": "Downtime", "c_breakdown": "Breakdown Rate",
         "c_mtbf": "MTBF", "c_mttr": "MTTR",
@@ -244,6 +253,7 @@ TRANS = {
         "kpi_section": "Maintenance Indicators",
         "split_title": "Stops by duration", "split_short": "Short", "split_long": "Long",
         "split_cut": "Cutoff", "split_help": "below {c} min = short", "split_min": "min",
+        "split_by_count": "by stop count", "split_by_time": "by total time (min)",
         "v_up": "Operation improving", "v_down": "Needs attention", "v_flat": "Operation stable",
         "v_detail": "Current period wins {n} of {total} indicators",
     },
@@ -355,8 +365,33 @@ def _duel(metric):
     return cur, prev, perf_pct, state, color, cur_w
 
 
-def _duel_bar(key, icon, lang, metric, meta):
-    """Barra de cabo de guerra — atual (esq, colorido) vs anterior (dir, cinza)."""
+def _ghost(metric, r):
+    """Marca-fantasma "esperado p/ volume": posição do divisor se a taxa por hora ativa
+    fosse igual à do período anterior (esperado = prev × r, r = h.a.atual / h.a.anterior).
+
+    Retorna (ghost_w, real_pct): ghost_w = posição (%) do fantasma na barra; real_pct =
+    desempenho de atual vs esperado (>0 = ganho real ALÉM do que o volume explica;
+    knob à direita do fantasma). (None, None) quando não dá para normalizar.
+    """
+    prev, good = metric["prev"], metric["good"]
+    if not prev or not r:
+        return None, None
+    expected = prev * r
+    raw_g = (r - 1) * 100.0
+    perf_g = raw_g if good == "up" else -raw_g
+    ghost_w = 50.0 + max(-_PUSH_CLAMP, min(_PUSH_CLAMP, perf_g * _PUSH_SCALE))
+    cur = metric["cur"]
+    raw_real = ((cur - expected) / expected * 100.0) if expected else 0.0
+    real = raw_real if good == "up" else -raw_real
+    return ghost_w, real
+
+
+def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
+    """Barra de cabo de guerra — atual (esq, colorido) vs anterior (dir, cinza).
+
+    ghost_w/real_pct (opcionais, só barras absolutas): marca-fantasma do "esperado p/
+    volume" e o desempenho descontando o volume (ver _ghost).
+    """
     cur, prev, perf_pct, state, color, cur_w = _duel(metric)
     prev_w = 100.0 - cur_w
     arrow = "bi-arrow-up-right" if perf_pct > 0 else ("bi-arrow-down-right" if perf_pct < 0 else "bi-dash")
@@ -368,54 +403,72 @@ def _duel_bar(key, icon, lang, metric, meta):
         caption = f"{winner} {t('lead', lang)} · {abs(perf_pct):.1f}%"
         cap_color = color if perf_pct > 0 else C_FLAT
     cur_grad = f"linear-gradient(90deg, {color}, {color}dd)"
-    return html.Div(
-        [
+
+    track_children = [
+        html.Div(html.Span(_fmt(cur, metric["unit"])),
+                 className="home-duel-seg home-duel-seg-cur",
+                 style={"width": f"{cur_w:.1f}%", "background": cur_grad}),
+        html.Div(html.Span(_fmt(prev, metric["unit"])),
+                 className="home-duel-seg home-duel-seg-prev",
+                 style={"width": f"{prev_w:.1f}%"}),
+        html.Div(className="home-duel-center"),
+        html.Div(html.I(className=f"bi {arrow}"),
+                 className="home-duel-knob",
+                 style={"left": f"{cur_w:.1f}%", "color": color}),
+    ]
+    if ghost_w is not None:
+        track_children.append(
+            html.Div(className="home-duel-ghost", style={"left": f"{ghost_w:.1f}%"},
+                     title=t("ghost_label", lang)))
+
+    rows = [
+        html.Div(
+            [
+                html.Div(
+                    [html.I(className=f"bi {icon} me-2", style={"color": color}),
+                     html.Strong(t(f"c_{key}", lang), style={"fontSize": "0.85rem"}),
+                     html.Small(" · " + t(f"s_{key}", lang), className="text-muted",
+                                style={"fontSize": "0.72rem"})],
+                    className="d-flex align-items-center",
+                ),
+                html.Span([html.I(className=f"bi {arrow} me-1"), caption],
+                          className="home-duel-cap",
+                          style={"color": cap_color, "borderColor": cap_color}),
+            ],
+            className="d-flex justify-content-between align-items-center flex-wrap",
+        ),
+        html.Div(track_children, className="home-duel-track"),
+        # Rótulos com as DATAS reais — relação evidente
+        html.Div(
+            [
+                html.Small([html.I(className="bi bi-caret-left-fill me-1", style={"color": color}),
+                            html.Strong(now_s + " "), meta["cur_range"]],
+                           style={"color": color}),
+                html.Small([meta["prev_range"], html.Strong(" " + prev_s),
+                            html.I(className="bi bi-caret-right-fill ms-1", style={"color": C_FLAT})],
+                           className="text-muted"),
+            ],
+            className="d-flex justify-content-between",
+            style={"fontSize": "0.68rem"},
+        ),
+    ]
+    # Linha "descontando volume": número honesto (atual vs esperado p/ este volume)
+    if real_pct is not None:
+        rcolor = C_GOOD if real_pct > 0.05 else (C_BAD if real_pct < -0.05 else C_FLAT)
+        rows.append(
             html.Div(
                 [
-                    html.Div(
-                        [html.I(className=f"bi {icon} me-2", style={"color": color}),
-                         html.Strong(t(f"c_{key}", lang), style={"fontSize": "0.85rem"}),
-                         html.Small(" · " + t(f"s_{key}", lang), className="text-muted",
-                                    style={"fontSize": "0.72rem"})],
-                        className="d-flex align-items-center",
-                    ),
-                    html.Span([html.I(className=f"bi {arrow} me-1"), caption],
-                              className="home-duel-cap",
-                              style={"color": cap_color, "borderColor": cap_color}),
+                    html.Span(className="home-duel-ghost-swatch"),
+                    html.Small(f"{t('ghost_label', lang)} · {t('ghost_real', lang)}: ",
+                               className="text-muted", style={"fontSize": "0.66rem"}),
+                    html.Small(html.Strong(f"{real_pct:+.1f}%"),
+                               style={"fontSize": "0.66rem", "color": rcolor}),
                 ],
-                className="d-flex justify-content-between align-items-center flex-wrap",
-            ),
-            html.Div(
-                [
-                    html.Div(html.Span(_fmt(cur, metric["unit"])),
-                             className="home-duel-seg home-duel-seg-cur",
-                             style={"width": f"{cur_w:.1f}%", "background": cur_grad}),
-                    html.Div(html.Span(_fmt(prev, metric["unit"])),
-                             className="home-duel-seg home-duel-seg-prev",
-                             style={"width": f"{prev_w:.1f}%"}),
-                    html.Div(className="home-duel-center"),
-                    html.Div(html.I(className=f"bi {arrow}"),
-                             className="home-duel-knob",
-                             style={"left": f"{cur_w:.1f}%", "color": color}),
-                ],
-                className="home-duel-track",
-            ),
-            # Rótulos com as DATAS reais — relação evidente
-            html.Div(
-                [
-                    html.Small([html.I(className="bi bi-caret-left-fill me-1", style={"color": color}),
-                                html.Strong(now_s + " "), meta["cur_range"]],
-                               style={"color": color}),
-                    html.Small([meta["prev_range"], html.Strong(" " + prev_s),
-                                html.I(className="bi bi-caret-right-fill ms-1", style={"color": C_FLAT})],
-                               className="text-muted"),
-                ],
-                className="d-flex justify-content-between",
-                style={"fontSize": "0.68rem"},
-            ),
-        ],
-        className="home-duel-row",
-    )
+                className="d-flex align-items-center mt-1",
+                style={"gap": "4px"},
+            )
+        )
+    return html.Div(rows, className="home-duel-row")
 
 
 def _kpi_mini(key, icon, lang, metric):
@@ -470,7 +523,13 @@ def _kpi_mini(key, icon, lang, metric):
 def render_duels(period, lang):
     """Arena de confronto — operacionais (barras grandes) + bloco KPI 3-em-1. Dados REAIS."""
     data, meta = _collect(period, lang)
-    bars = [_duel_bar(key, icon, lang, data[key], meta) for key, icon in METRICS]
+    # Razão de volume (h.a. atual / h.a. anterior) p/ a marca-fantasma das barras absolutas
+    act = data["activity"]
+    r = (act["cur"] / act["prev"]) if act["prev"] else None
+    bars = []
+    for key, icon in METRICS:
+        gw, real = (_ghost(data[key], r) if (r and key in ("stops", "downtime")) else (None, None))
+        bars.append(_duel_bar(key, icon, lang, data[key], meta, ghost_w=gw, real_pct=real))
     header = html.Div(
         [
             html.I(className="bi bi-calendar-range me-2", style={"color": "#0d6efd"}),
@@ -531,44 +590,68 @@ def render_stops_split(period, lang, cutoff):
 
     Não é confronto: o corte (min) é ajustável pelo slider; cores neutras (tom = duração).
     """
-    data, _meta = _collect(period, lang)
-    durs = data.get("__durations", [])  # paradas de AVARIA (manutenção) — mesma base dos KPIs
     cutoff = cutoff or 30
-    short = [d for d in durs if d < cutoff]
-    long = [d for d in durs if d >= cutoff]
-    n_s, n_l = len(short), len(long)
-    total = n_s + n_l or 1
-    min_s, min_l = int(round(sum(short))), int(round(sum(long)))
-    w_s = n_s / total * 100
-    w_l = n_l / total * 100
+    data, _meta = _collect(period, lang)  # paradas de AVARIA — mesma base dos KPIs
 
-    track = html.Div(
+    def _split(durs):
+        s = [d for d in durs if d < cutoff]
+        l = [d for d in durs if d >= cutoff]
+        return len(s), len(l), int(round(sum(s))), int(round(sum(l)))
+
+    c_ns, c_nl, c_ms, c_ml = _split(data.get("__durations", []))       # período atual
+    p_ns, p_nl, p_ms, p_ml = _split(data.get("__durations_prev", []))  # período anterior
+
+    def _seg(val, w, color, align):
+        # número na borda EXTERNA (curtas→esq, longas→dir) p/ não colidir no divisor
+        just = "flex-start" if align == "left" else "flex-end"
+        pad = {"paddingLeft": "9px"} if align == "left" else {"paddingRight": "9px"}
+        style = {"width": f"{w:.1f}%", "background": color, "justifyContent": just}
+        style.update(pad)
+        return html.Div(html.Span(str(val)) if val else "",
+                        className="home-stops-seg", style=style)
+
+    def _bar(label, s_val, l_val, faded):
+        # curtas à ESQUERDA (C_SHORT) · longas à DIREITA (C_LONG); largura = proporção
+        # DENTRO do próprio período (compara o MIX, não o volume). Anterior esmaecido.
+        tot = (s_val + l_val) or 1
+        ws, wl = s_val / tot * 100, l_val / tot * 100
+        track_style = {"flex": "1 1 auto", "minWidth": "0"}  # estica p/ preencher a linha
+        if faded:
+            track_style["opacity"] = "0.5"
+        track = html.Div([_seg(s_val, ws, C_SHORT, "left"), _seg(l_val, wl, C_LONG, "right")],
+                         className="home-duel-track home-duel-track-sm", style=track_style)
+        return html.Div(
+            [html.Small(label, className="home-stops-rowlabel text-muted"), track],
+            className="d-flex align-items-center", style={"gap": "6px"})
+
+    now_s, prev_s = t("now", lang), t("prev", lang)
+
+    def _group(title, c_s, c_l, p_s, p_l):
+        return html.Div(
+            [
+                html.Small(title, className="text-muted d-block mb-1", style={"fontSize": "0.66rem"}),
+                _bar(now_s, c_s, c_l, False),
+                _bar(prev_s, p_s, p_l, True),
+            ],
+            className="mb-2",
+        )
+
+    # Chave de cor (curtas / longas) — neutra, sem valência
+    color_key = html.Div(
         [
-            html.Div(html.Span(str(n_l)) if n_l else "",
-                     className="home-stops-seg",
-                     style={"width": f"{w_l:.1f}%", "background": C_LONG}),
-            html.Div(html.Span(str(n_s)) if n_s else "",
-                     className="home-stops-seg",
-                     style={"width": f"{w_s:.1f}%", "background": C_SHORT}),
+            html.Small([html.Span(className="home-stops-dot", style={"background": C_SHORT}),
+                        t("split_short", lang)], className="d-flex align-items-center"),
+            html.Small([html.Span(className="home-stops-dot", style={"background": C_LONG}),
+                        t("split_long", lang)], className="d-flex align-items-center"),
         ],
-        className="home-duel-track home-duel-track-sm",
+        className="d-flex mt-1", style={"fontSize": "0.7rem", "gap": "14px"},
     )
-    # Legenda neutra (longas à esq / curtas à dir) com contagem e minutos totais
-    legend = html.Div(
-        [
-            html.Small(
-                [html.Span(className="home-stops-dot", style={"background": C_LONG}),
-                 f"{t('split_long', lang)}: {n_l} · {min_l} {t('split_min', lang)}"],
-                className="d-flex align-items-center"),
-            html.Small(
-                [html.Span(className="home-stops-dot", style={"background": C_SHORT}),
-                 f"{t('split_short', lang)}: {n_s} · {min_s} {t('split_min', lang)}"],
-                className="d-flex align-items-center"),
-        ],
-        className="d-flex justify-content-between mt-1",
-        style={"fontSize": "0.7rem"},
-    )
-    return html.Div([track, legend])
+
+    return html.Div([
+        _group(t("split_by_count", lang), c_ns, c_nl, p_ns, p_nl),
+        _group(t("split_by_time", lang), c_ms, c_ml, p_ms, p_ml),
+        color_key,
+    ])
 
 
 # ============================================================

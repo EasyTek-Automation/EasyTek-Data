@@ -117,6 +117,41 @@
     background: #1a1d20;
 }
 
+/* Marca-fantasma: divisor "esperado p/ volume" (referência ajustada por exposição).
+   Distinta da linha de empate (preta, 50%): laranja tracejada + losango central. */
+.home-duel-ghost {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 0;
+    border-left: 2px dashed #e8590c;
+    transform: translateX(-1px);
+    z-index: 2;
+}
+.home-duel-ghost::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 8px;
+    height: 8px;
+    background: #fff;
+    border: 2px solid #e8590c;
+    border-radius: 2px;
+    transform: translate(-50%, -50%) rotate(45deg);
+}
+[data-bs-theme="dark"] .home-duel-ghost::after {
+    background: #1a1d20;
+}
+/* swatch do rótulo "descontando volume" */
+.home-duel-ghost-swatch {
+    display: inline-block;
+    width: 14px;
+    height: 0;
+    border-top: 2px dashed #e8590c;
+    flex: 0 0 auto;
+}
+
 /* Janela comparada (header da arena) */
 .home-duel-window {
     display: inline-flex;
@@ -199,6 +234,18 @@
     overflow: hidden;
     transition: width 0.5s cubic-bezier(0.22, 1, 0.36, 1);
     text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+}
+/* Rótulo Atual/Anterior à esquerda de cada barra do split (largura fixa = alinhamento) */
+.home-stops-rowlabel {
+    flex: 0 0 56px;
+    width: 56px;
+    font-size: 0.66rem;
+    text-align: right;
+}
+body.home-present-mode .home-stops-rowlabel {
+    flex-basis: 80px;
+    width: 80px;
+    font-size: 0.9rem;
 }
 .home-stops-dot {
     display: inline-block;
