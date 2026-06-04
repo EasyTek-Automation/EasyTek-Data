@@ -164,7 +164,7 @@ def register_home_callbacks(app):
     )
 
     # 6b. Rotação ativa só quando present ON e NÃO pausado.
-    # (O timer de 8s só "vale" após o render: reset_interval reinicia em store-home-rendered.)
+    # (O timer de 15s só "vale" após o render: reset_interval reinicia em store-home-rendered.)
     @app.callback(
         Output("interval-home-present", "disabled"),
         Input("store-home-present", "data"),
@@ -290,7 +290,7 @@ def register_home_callbacks(app):
         State("interval-home-present", "interval"),
     )
     def reset_interval(_rendered, cur):
-        return 8001 if cur == 8000 else 8000
+        return 15001 if cur == 15000 else 15000
 
     # 6l. Transição chique de 1500ms a cada troca de slide (mascara o render real)
     app.clientside_callback(

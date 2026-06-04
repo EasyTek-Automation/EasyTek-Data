@@ -844,7 +844,7 @@ def layout():
             dcc.Store(id="store-rendered-graph", storage_type="memory", data=0),
             dcc.Store(id="store-rendered-cuts", storage_type="memory", data=0),
             # Rotação automática dos cortes no modo apresentação (8s) — desabilitado fora dele
-            dcc.Interval(id="interval-home-present", interval=8000, n_intervals=0, disabled=True),
+            dcc.Interval(id="interval-home-present", interval=15000, n_intervals=0, disabled=True),
 
             # Header
             dbc.Row(

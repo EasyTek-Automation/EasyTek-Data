@@ -290,7 +290,7 @@ body.home-present-mode .home-present-only { display: inline-flex !important; }
     width: 100%;
     background: #0d6efd;
     transform-origin: left center;
-    animation: home-countdown-shrink 8s linear forwards;
+    animation: home-countdown-shrink 15s linear forwards;
 }
 .home-countdown-fill.paused {
     animation-play-state: paused;
