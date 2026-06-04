@@ -24,7 +24,9 @@ import math
 from dash import html, dcc
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
+from flask_login import current_user
 from src.sap_scheduler.rodape_component import build_rodape
+from src.sap_scheduler.manual_trigger import build_rerun_controls
 
 # Ordem do carrossel (present mode): 3 cortes do confronto + a ROW de KPIs da V2
 SLIDES = ["month", "week", "band", "kpis"]
@@ -1014,6 +1016,7 @@ def layout():
             dcc.Store(id="store-home-transition"),
 
             build_rodape(),
+            build_rerun_controls(current_user),
         ],
         fluid=True,
         className="p-3",

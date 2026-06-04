@@ -69,8 +69,9 @@ def executar_job(job: dict, db: Any, cfg: DaemonConfig) -> None:
     try:
         if mongo.update_concluido(db, _id, resultado, cfg.collection):
             logger.info(
-                "[done] job concluido | _id=%s tipo=%s duracao_s=%d tamanho_bytes=%d",
+                "[done] job concluido | _id=%s tipo=%s duracao_s=%d tamanho_bytes=%d tentativas=%d",
                 _id, tipo, resultado["duracao_segundos"], resultado["tamanho_bytes"],
+                resultado.get("tentativas", 1),
             )
         else:
             logger.warning(

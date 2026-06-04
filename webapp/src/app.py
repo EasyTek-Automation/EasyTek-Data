@@ -78,6 +78,7 @@ try:
     from src.sap_scheduler.mongo_helpers import get_db as _sap_get_db, ensure_indexes as _sap_ensure_indexes
     from src.sap_scheduler.storage import bootstrap_config as _sap_bootstrap_config
     from src.sap_scheduler.timestamp_callback import register_callback as _sap_register_rodape_callback
+    from src.sap_scheduler.manual_trigger import register_callback as _sap_register_rerun_callback
 
     _sap_config = _sap_load_config()
     _sap_db = _sap_get_db()
@@ -102,6 +103,8 @@ try:
             "sap_scheduler: Mongo offline no boot — scheduler nao inicia (proximo restart do webapp tenta de novo)"
         )
     _sap_register_rodape_callback(app, _sap_config)
+    # Bloco L — callback do botão "Rodar agora" (disparo manual de coleta SAP)
+    _sap_register_rerun_callback(app, _sap_config)
 except RuntimeError as _sap_e:
     logging.getLogger("sap_scheduler").error("sap_scheduler: config invalida no boot: %s", _sap_e)
     raise
