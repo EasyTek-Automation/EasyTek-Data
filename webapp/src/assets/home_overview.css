@@ -43,9 +43,9 @@ body.home-present-mode .home-fresh-label {
     border-radius: 12px;
 }
 
-/* Linha de uma métrica em confronto */
+/* Linha de uma métrica em confronto — versão minimalista: só o trilho, barras coladinhas */
 .home-duel-row {
-    margin-bottom: 9px;
+    margin-bottom: 2px;
 }
 .home-duel-row:last-child {
     margin-bottom: 0;
@@ -188,8 +188,8 @@ body.home-present-mode .home-fresh-label {
 
 /* Bloco KPI 3-em-1 (MTBF · MTTR · Avaria) */
 .home-kpi-block {
-    margin-top: 9px;
-    padding: 8px 12px;
+    margin-top: 5px;
+    padding: 6px 12px;
     border-radius: 10px;
     background: rgba(13, 110, 253, 0.035);
     border: 1px solid rgba(13, 110, 253, 0.12);
@@ -204,7 +204,7 @@ body.home-present-mode .home-fresh-label {
     font-size: 0.72rem;
 }
 .home-kpi-mini {
-    margin-bottom: 6px;
+    margin-bottom: 2px;
 }
 .home-kpi-mini:last-child {
     margin-bottom: 0;
