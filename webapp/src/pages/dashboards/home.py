@@ -407,37 +407,43 @@ _SCALE_HEADROOM = 1.5  # fim da escala = maior valor × 1.5 → maior barra ocup
 #                        metade, deixando fundo cinza nas pontas (forma divergente evidente)
 
 
-def _div_track(cur, prev, unit, perf_pct, state, sm=False):
-    """Trilho divergente do centro — anterior cresce p/ esquerda, atual p/ direita.
+def _div_track2(left_val, right_val, left_txt, right_txt, left_color, right_color, sm=False):
+    """Trilho divergente genérico — barra esquerda e direita crescem a partir do eixo central.
 
-    Comprimento de cada barra = valor real normalizado ao maior dos dois × _SCALE_HEADROOM
-    (a maior barra ocupa ~66.7% da metade; sobra fundo cinza nas pontas). Cor por valência
-    (_side_colors): lado melhor verde, pior vermelho, empate cinza. Substitui o cabo de guerra.
+    Comprimento = valor normalizado ao maior dos dois × _SCALE_HEADROOM (o maior ocupa
+    ~66.7% da metade; sobra fundo cinza nas pontas). Cores explícitas (sem valência) —
+    usado tanto pelo confronto (anterior×atual) quanto pelo split (curtas×longas).
     """
-    cur_color, prev_color = _side_colors(perf_pct, state)
-    m = (max(cur, prev, 0.0) * _SCALE_HEADROOM) or 1.0
-    cur_len = max(0.0, cur) / m * 100.0
-    prev_len = max(0.0, prev) / m * 100.0
-    cur_grad = f"linear-gradient(90deg, {cur_color}dd, {cur_color})"
-    prev_grad = f"linear-gradient(90deg, {prev_color}, {prev_color}dd)"
+    m = (max(left_val, right_val, 0.0) * _SCALE_HEADROOM) or 1.0
+    lw = max(0.0, left_val) / m * 100.0
+    rw = max(0.0, right_val) / m * 100.0
+    lgrad = f"linear-gradient(90deg, {left_color}, {left_color}dd)"
+    rgrad = f"linear-gradient(90deg, {right_color}dd, {right_color})"
     return html.Div(
         [
             html.Div(
-                html.Div(html.Span(_fmt(prev, unit)),
+                html.Div(html.Span(left_txt),
                          className="home-div-bar home-div-bar-left",
-                         style={"width": f"{prev_len:.1f}%", "background": prev_grad}),
+                         style={"width": f"{lw:.1f}%", "background": lgrad}),
                 className="home-div-half home-div-half-left",
             ),
             html.Div(
-                html.Div(html.Span(_fmt(cur, unit)),
+                html.Div(html.Span(right_txt),
                          className="home-div-bar home-div-bar-right",
-                         style={"width": f"{cur_len:.1f}%", "background": cur_grad}),
+                         style={"width": f"{rw:.1f}%", "background": rgrad}),
                 className="home-div-half home-div-half-right",
             ),
             html.Div(className="home-div-axis"),
         ],
         className="home-div-track" + (" home-div-track-sm" if sm else ""),
     )
+
+
+def _div_track(cur, prev, unit, perf_pct, state, sm=False):
+    """Trilho divergente do confronto — anterior (esq) vs atual (dir), cor por valência."""
+    cur_color, prev_color = _side_colors(perf_pct, state)
+    return _div_track2(prev, cur, _fmt(prev, unit), _fmt(cur, unit),
+                       prev_color, cur_color, sm=sm)
 
 
 def _bar_label(key, icon, lang, sm=False):
@@ -616,28 +622,16 @@ def render_stops_split(period, lang, cutoff):
     c_ns, c_nl, c_ms, c_ml = _split(data.get("__durations", []))       # período atual
     p_ns, p_nl, p_ms, p_ml = _split(data.get("__durations_prev", []))  # período anterior
 
-    def _seg(val, w, color, align):
-        # reusa o visual das barras do confronto (home-div-bar): gradiente, número branco
-        # na borda EXTERNA (curtas→esq, longas→dir), cantos arredondados pro lado de fora.
-        side = "left" if align == "left" else "right"
-        grad = (f"linear-gradient(90deg, {color}, {color}dd)" if align == "left"
-                else f"linear-gradient(90deg, {color}dd, {color})")
-        return html.Div(html.Span(str(val)) if val else "",
-                        className=f"home-div-bar home-div-bar-{side}",
-                        style={"width": f"{w:.1f}%", "background": grad})
-
     def _bar(label, s_val, l_val, faded):
-        # curtas à ESQUERDA (C_SHORT/azul) · longas à DIREITA (C_LONG/laranja); largura =
-        # proporção DENTRO do próprio período (compara o MIX, não o volume). Atual e Anterior
-        # usam EXATAMENTE o mesmo azul/laranja (sem esmaecer) — distinção só pelo rótulo.
-        tot = (s_val + l_val) or 1
-        ws, wl = s_val / tot * 100, l_val / tot * 100
-        track_style = {"flex": "1 1 auto", "minWidth": "0"}  # estica p/ preencher a linha
-        track = html.Div([_seg(s_val, ws, C_SHORT, "left"), _seg(l_val, wl, C_LONG, "right")],
-                         className="home-div-track home-div-track-sm", style=track_style)
+        # "cabo de guerra" curtas × longas DIVERGENTE do centro: curtas (azul) crescem p/ a
+        # ESQUERDA, longas (laranja) p/ a DIREITA; comprimento normalizado ao maior dos dois.
+        # Mesma geometria do confronto. Atual e Anterior usam o mesmo azul/laranja.
+        track = _div_track2(s_val, l_val,
+                            str(s_val) if s_val else "", str(l_val) if l_val else "",
+                            C_SHORT, C_LONG, sm=True)
         return html.Div(
             [html.Small(label, className="home-stops-rowlabel text-muted"), track],
-            className="d-flex align-items-center", style={"gap": "6px"})
+            className="home-bar-line", style={"gap": "8px"})
 
     now_s, prev_s = t("now", lang), t("prev", lang)
 
