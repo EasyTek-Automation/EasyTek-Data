@@ -150,9 +150,9 @@ def _collect(period, lang):
 C_SHORT = "#005687"  # azul AMG — paradas curtas
 C_LONG = "#E96D38"   # laranja AMG — paradas longas
 
-# Cores de marca AMG (logo) no confronto: lado MELHOR = azul Gonvarri, PIOR = laranja ArcelorMittal
-C_GOOD = "#005687"  # azul AMG (era verde #198754) — lado melhor
-C_BAD = "#E96D38"   # laranja AMG (era vermelho #dc3545) — lado pior
+# Cores de marca AMG (logo) no confronto: lado MELHOR = laranja ArcelorMittal, PIOR = azul Gonvarri
+C_GOOD = "#E96D38"  # laranja AMG — lado melhor
+C_BAD = "#005687"   # azul AMG — lado pior
 C_FLAT = "#6c757d"
 
 # Operacionais — barras grandes
