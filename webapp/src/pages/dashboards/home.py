@@ -146,9 +146,9 @@ def _collect(period, lang):
     return data, meta
 
 
-# Cores neutras do split de duração (mesma tinta, tom = duração; SEM valência bem/mal)
-C_SHORT = "#74c0fc"  # azul claro — paradas curtas
-C_LONG = "#1971c2"   # azul escuro — paradas longas
+# Split de duração — cores de marca AMG (logo): curtas = azul Gonvarri, longas = laranja ArcelorMittal
+C_SHORT = "#005687"  # azul AMG — paradas curtas
+C_LONG = "#E96D38"   # laranja AMG — paradas longas
 
 # Cores de marca AMG (logo) no confronto: lado MELHOR = azul Gonvarri, PIOR = laranja ArcelorMittal
 C_GOOD = "#005687"  # azul AMG (era verde #198754) — lado melhor
@@ -617,24 +617,25 @@ def render_stops_split(period, lang, cutoff):
     p_ns, p_nl, p_ms, p_ml = _split(data.get("__durations_prev", []))  # período anterior
 
     def _seg(val, w, color, align):
-        # número na borda EXTERNA (curtas→esq, longas→dir) p/ não colidir no divisor
-        just = "flex-start" if align == "left" else "flex-end"
-        pad = {"paddingLeft": "9px"} if align == "left" else {"paddingRight": "9px"}
-        style = {"width": f"{w:.1f}%", "background": color, "justifyContent": just}
-        style.update(pad)
+        # reusa o visual das barras do confronto (home-div-bar): gradiente, número branco
+        # na borda EXTERNA (curtas→esq, longas→dir), cantos arredondados pro lado de fora.
+        side = "left" if align == "left" else "right"
+        grad = (f"linear-gradient(90deg, {color}, {color}dd)" if align == "left"
+                else f"linear-gradient(90deg, {color}dd, {color})")
         return html.Div(html.Span(str(val)) if val else "",
-                        className="home-stops-seg", style=style)
+                        className=f"home-div-bar home-div-bar-{side}",
+                        style={"width": f"{w:.1f}%", "background": grad})
 
     def _bar(label, s_val, l_val, faded):
-        # curtas à ESQUERDA (C_SHORT) · longas à DIREITA (C_LONG); largura = proporção
-        # DENTRO do próprio período (compara o MIX, não o volume). Anterior esmaecido.
+        # curtas à ESQUERDA (C_SHORT/azul) · longas à DIREITA (C_LONG/laranja); largura =
+        # proporção DENTRO do próprio período (compara o MIX, não o volume). Anterior esmaecido.
         tot = (s_val + l_val) or 1
         ws, wl = s_val / tot * 100, l_val / tot * 100
         track_style = {"flex": "1 1 auto", "minWidth": "0"}  # estica p/ preencher a linha
         if faded:
             track_style["opacity"] = "0.5"
         track = html.Div([_seg(s_val, ws, C_SHORT, "left"), _seg(l_val, wl, C_LONG, "right")],
-                         className="home-duel-track home-duel-track-sm", style=track_style)
+                         className="home-div-track home-div-track-sm", style=track_style)
         return html.Div(
             [html.Small(label, className="home-stops-rowlabel text-muted"), track],
             className="d-flex align-items-center", style={"gap": "6px"})
