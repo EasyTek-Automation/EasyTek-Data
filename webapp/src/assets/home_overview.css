@@ -59,6 +59,41 @@ body.home-present-mode .home-fresh-label {
     min-width: 0;
 }
 
+/* Cabeçalho do confronto — ANTERIOR (esq) vs ATUAL (dir) + período analisado.
+   padding 0 12px = mesmo padding horizontal do box azul (home-kpi-block), p/ o
+   divisor 50/50 cair no mesmo x do eixo das barras. */
+.home-cmp-row {
+    padding: 0 12px;
+    margin-bottom: 6px;
+}
+.home-cmp-head {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+}
+.home-cmp-side {
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.12;
+}
+.home-cmp-period {
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.3px;
+}
+.home-cmp-range {
+    font-size: 0.7rem;
+    color: #6c757d;
+}
+[data-bs-theme="dark"] .home-cmp-range {
+    color: #adb5bd;
+}
+body.home-present-mode .home-cmp-period { font-size: 1.12rem; }
+body.home-present-mode .home-cmp-range { font-size: 0.9rem; }
+
 /* Rótulo de identidade da barra — chip de ícone + título + subtítulo */
 .home-lbl {
     flex: 0 0 218px;

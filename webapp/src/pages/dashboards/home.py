@@ -470,6 +470,36 @@ def _bar_label(key, icon, lang, sm=False):
     return _lbl(icon, t(f"c_{key}", lang), t(f"s_{key}", lang), sm=sm)
 
 
+def _compare_header(meta, lang):
+    """Cabeçalho acima das barras: ANTERIOR (esq) vs ATUAL (dir) + período analisado (datas).
+
+    Reusa a mesma estrutura das barras (espaçador da coluna de rótulo 218px + área flex
+    dividida 50/50) para o divisor central cair EXATAMENTE no eixo das barras abaixo.
+    """
+    now_s, prev_s = t("now", lang), t("prev", lang)
+    return html.Div(
+        [
+            html.Div(className="home-lbl"),  # espaçador = largura da coluna de identidade
+            html.Div(
+                [
+                    html.Div(
+                        [html.Span([html.I(className="bi bi-caret-left-fill me-1"), prev_s.upper()],
+                                   className="home-cmp-period"),
+                         html.Span(meta["prev_range"], className="home-cmp-range")],
+                        className="home-cmp-side"),
+                    html.Div(
+                        [html.Span([now_s.upper(), html.I(className="bi bi-caret-right-fill ms-1")],
+                                   className="home-cmp-period"),
+                         html.Span(meta["cur_range"], className="home-cmp-range")],
+                        className="home-cmp-side"),
+                ],
+                className="home-cmp-head",
+            ),
+        ],
+        className="home-bar-line home-cmp-row",
+    )
+
+
 def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
     """Barra divergente com rótulo de identidade à esquerda (chip+nome+subtítulo) + trilho.
 
@@ -514,7 +544,7 @@ def render_duels(period, lang):
         className="home-kpi-block",
     )
     return dbc.Card(
-        dbc.CardBody([ops_block, kpi_block], className="p-3"),
+        dbc.CardBody([_compare_header(meta, lang), ops_block, kpi_block], className="p-3"),
         className="shadow-sm indicator-v2-card-static home-duel-arena",
         style={"borderTop": "4px solid #0d6efd"},
     )
