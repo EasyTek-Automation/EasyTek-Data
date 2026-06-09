@@ -469,13 +469,14 @@ def render_duels(period, lang):
         gw, real = (_ghost(data[key], r) if (r and key in ("stops", "downtime")) else (None, None))
         bars.append(_duel_bar(key, icon, lang, data[key], meta, ghost_w=gw, real_pct=real))
     # Versão minimalista (2026-06-09): sem linha de janela no topo nem título do bloco KPI.
-    # Reintroduzir gradativamente. O bloco KPI 3-em-1 (MTBF · MTTR · Avaria) só agrupa as 3 mini.
+    # As 3 operacionais ganham o MESMO box azul do bloco KPI (home-kpi-block).
+    ops_block = html.Div(bars, className="home-kpi-block")
     kpi_block = html.Div(
         [_kpi_mini(key, icon, lang, data[key]) for key, icon in KPIS],
         className="home-kpi-block",
     )
     return dbc.Card(
-        dbc.CardBody(bars + [kpi_block], className="p-3"),
+        dbc.CardBody([ops_block, kpi_block], className="p-3"),
         className="shadow-sm indicator-v2-card-static home-duel-arena",
         style={"borderTop": "4px solid #0d6efd"},
     )
