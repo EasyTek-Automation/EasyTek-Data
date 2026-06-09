@@ -628,12 +628,11 @@ def render_stops_split(period, lang, cutoff):
 
     def _bar(label, s_val, l_val, faded):
         # curtas à ESQUERDA (C_SHORT/azul) · longas à DIREITA (C_LONG/laranja); largura =
-        # proporção DENTRO do próprio período (compara o MIX, não o volume). Anterior esmaecido.
+        # proporção DENTRO do próprio período (compara o MIX, não o volume). Atual e Anterior
+        # usam EXATAMENTE o mesmo azul/laranja (sem esmaecer) — distinção só pelo rótulo.
         tot = (s_val + l_val) or 1
         ws, wl = s_val / tot * 100, l_val / tot * 100
         track_style = {"flex": "1 1 auto", "minWidth": "0"}  # estica p/ preencher a linha
-        if faded:
-            track_style["opacity"] = "0.5"
         track = html.Div([_seg(s_val, ws, C_SHORT, "left"), _seg(l_val, wl, C_LONG, "right")],
                          className="home-div-track home-div-track-sm", style=track_style)
         return html.Div(
