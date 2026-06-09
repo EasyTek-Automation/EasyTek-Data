@@ -439,23 +439,47 @@ def _div_track(cur, prev, unit, perf_pct, state, sm=False):
     )
 
 
-def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
-    """Barra divergente do centro — versão minimalista: SÓ o trilho (números dentro da barra).
+def _bar_label(key, icon, lang, sm=False):
+    """Rótulo de identidade à esquerda da barra: chip de ícone + nome + subtítulo.
 
-    Rótulos (nome da métrica, caption "à frente", datas, "descontando volume") foram
-    removidos a pedido do usuário (2026-06-09) para deixar as barras coladinhas — serão
-    reintroduzidos gradativamente. ghost_w/real_pct/meta/icon/key ignorados por ora.
+    Cor neutra/brand (não valência) — o objetivo é dizer O QUE é a barra; o verde/vermelho
+    do confronto fica na própria barra. `sm=True` → variante compacta (bloco KPI 3-em-1).
+    """
+    return html.Div(
+        [
+            html.Div(html.I(className=f"bi {icon}"), className="home-lbl-chip"),
+            html.Div(
+                [html.Span(t(f"c_{key}", lang), className="home-lbl-title"),
+                 html.Span(t(f"s_{key}", lang), className="home-lbl-sub")],
+                className="home-lbl-text",
+            ),
+        ],
+        className="home-lbl" + (" home-lbl-sm" if sm else ""),
+    )
+
+
+def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
+    """Barra divergente com rótulo de identidade à esquerda (chip+nome+subtítulo) + trilho.
+
+    Demais infos (caption "à frente", datas, "descontando volume") seguem fora — a serem
+    reintroduzidas gradativamente. ghost_w/real_pct/meta ignorados por ora.
     """
     cur, prev, perf_pct, state, color, _cur_w = _duel(metric)
-    return html.Div(_div_track(cur, prev, metric["unit"], perf_pct, state),
-                    className="home-duel-row")
+    return html.Div(
+        [_bar_label(key, icon, lang),
+         _div_track(cur, prev, metric["unit"], perf_pct, state)],
+        className="home-duel-row home-bar-line",
+    )
 
 
 def _kpi_mini(key, icon, lang, metric):
-    """Mini barra divergente — versão minimalista: SÓ o trilho (rótulos removidos a pedido)."""
+    """Mini barra divergente com rótulo de identidade compacto à esquerda + trilho."""
     cur, prev, perf_pct, state, color, _cur_w = _duel(metric)
-    return html.Div(_div_track(cur, prev, metric["unit"], perf_pct, state, sm=True),
-                    className="home-kpi-mini")
+    return html.Div(
+        [_bar_label(key, icon, lang, sm=True),
+         _div_track(cur, prev, metric["unit"], perf_pct, state, sm=True)],
+        className="home-kpi-mini home-bar-line",
+    )
 
 
 def render_duels(period, lang):
