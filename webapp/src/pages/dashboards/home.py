@@ -1,9 +1,10 @@
 # src/pages/dashboards/home.py
 #
-# Visão Geral da Manutenção — home de CONFRONTO (cabo de guerra).
-# Cada métrica é uma barra única dividida em duas cores: período atual (esq,
-# colorido) vs período anterior (dir, cinza). O divisor é empurrado para quem
-# está ganhando. Design system reusado da V2 (indicator-v2-card, v2-lang-flag).
+# Visão Geral da Manutenção — home de CONFRONTO (barras divergentes do centro).
+# Cada métrica é um par de barras que crescem a partir de um eixo central:
+# período anterior (esq) vs período atual (dir). Comprimento = valor real
+# (normalizado ao maior dos dois); cor por valência (lado melhor verde, pior
+# vermelho). Design system reusado da V2 (indicator-v2-card, v2-lang-flag).
 #
 # 3 granularidades de comparação (todas "até hoje", janela equivalente):
 #   • month — mês até hoje (dia 1…D) vs mesmo intervalo do mês passado (clampa o dia)
@@ -392,14 +393,61 @@ def _ghost(metric, r):
     return ghost_w, real
 
 
-def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
-    """Barra de cabo de guerra — atual (esq, colorido) vs anterior (dir, cinza).
+def _side_colors(perf_pct, state):
+    """(cur_color, prev_color) p/ o trilho divergente. Melhor=verde, pior=vermelho, empate=cinza."""
+    if state == "flat":
+        return C_FLAT, C_FLAT
+    if perf_pct > 0:            # período atual melhor → atual verde, anterior vermelho
+        return C_GOOD, C_BAD
+    return C_BAD, C_GOOD        # período anterior melhor → invertido
 
-    ghost_w/real_pct (opcionais, só barras absolutas): marca-fantasma do "esperado p/
-    volume" e o desempenho descontando o volume (ver _ghost).
+
+_SCALE_HEADROOM = 1.5  # fim da escala = maior valor × 1.5 → maior barra ocupa ~66.7% da
+#                        metade, deixando fundo cinza nas pontas (forma divergente evidente)
+
+
+def _div_track(cur, prev, unit, perf_pct, state, sm=False):
+    """Trilho divergente do centro — anterior cresce p/ esquerda, atual p/ direita.
+
+    Comprimento de cada barra = valor real normalizado ao maior dos dois × _SCALE_HEADROOM
+    (a maior barra ocupa ~66.7% da metade; sobra fundo cinza nas pontas). Cor por valência
+    (_side_colors): lado melhor verde, pior vermelho, empate cinza. Substitui o cabo de guerra.
     """
-    cur, prev, perf_pct, state, color, cur_w = _duel(metric)
-    prev_w = 100.0 - cur_w
+    cur_color, prev_color = _side_colors(perf_pct, state)
+    m = (max(cur, prev, 0.0) * _SCALE_HEADROOM) or 1.0
+    cur_len = max(0.0, cur) / m * 100.0
+    prev_len = max(0.0, prev) / m * 100.0
+    cur_grad = f"linear-gradient(90deg, {cur_color}dd, {cur_color})"
+    prev_grad = f"linear-gradient(90deg, {prev_color}, {prev_color}dd)"
+    return html.Div(
+        [
+            html.Div(
+                html.Div(html.Span(_fmt(prev, unit)),
+                         className="home-div-bar home-div-bar-left",
+                         style={"width": f"{prev_len:.1f}%", "background": prev_grad}),
+                className="home-div-half home-div-half-left",
+            ),
+            html.Div(
+                html.Div(html.Span(_fmt(cur, unit)),
+                         className="home-div-bar home-div-bar-right",
+                         style={"width": f"{cur_len:.1f}%", "background": cur_grad}),
+                className="home-div-half home-div-half-right",
+            ),
+            html.Div(className="home-div-axis"),
+        ],
+        className="home-div-track" + (" home-div-track-sm" if sm else ""),
+    )
+
+
+def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
+    """Barra divergente do centro — anterior (esq) vs atual (dir); cor = quem está melhor.
+
+    ghost_w é ignorado (era a geometria do divisor único do cabo de guerra, sem
+    equivalente no formato divergente). real_pct (opcional) mantém a linha de texto
+    "descontando volume" — número honesto de atual vs esperado p/ este volume.
+    """
+    cur, prev, perf_pct, state, color, _cur_w = _duel(metric)
+    cur_color, prev_color = _side_colors(perf_pct, state)
     arrow = "bi-arrow-up-right" if perf_pct > 0 else ("bi-arrow-down-right" if perf_pct < 0 else "bi-dash")
     now_s, prev_s = t("now", lang), t("prev", lang)
     if state == "flat":
@@ -408,24 +456,6 @@ def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
         winner = now_s if perf_pct > 0 else prev_s
         caption = f"{winner} {t('lead', lang)} · {abs(perf_pct):.1f}%"
         cap_color = color if perf_pct > 0 else C_FLAT
-    cur_grad = f"linear-gradient(90deg, {color}, {color}dd)"
-
-    track_children = [
-        html.Div(html.Span(_fmt(cur, metric["unit"])),
-                 className="home-duel-seg home-duel-seg-cur",
-                 style={"width": f"{cur_w:.1f}%", "background": cur_grad}),
-        html.Div(html.Span(_fmt(prev, metric["unit"])),
-                 className="home-duel-seg home-duel-seg-prev",
-                 style={"width": f"{prev_w:.1f}%"}),
-        html.Div(className="home-duel-center"),
-        html.Div(html.I(className=f"bi {arrow}"),
-                 className="home-duel-knob",
-                 style={"left": f"{cur_w:.1f}%", "color": color}),
-    ]
-    if ghost_w is not None:
-        track_children.append(
-            html.Div(className="home-duel-ghost", style={"left": f"{ghost_w:.1f}%"},
-                     title=t("ghost_label", lang)))
 
     rows = [
         html.Div(
@@ -443,16 +473,16 @@ def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
             ],
             className="d-flex justify-content-between align-items-center flex-wrap",
         ),
-        html.Div(track_children, className="home-duel-track"),
-        # Rótulos com as DATAS reais — relação evidente
+        _div_track(cur, prev, metric["unit"], perf_pct, state),
+        # Rótulos com as DATAS reais — Anterior à ESQUERDA, Atual à DIREITA (acompanha o layout)
         html.Div(
             [
-                html.Small([html.I(className="bi bi-caret-left-fill me-1", style={"color": color}),
-                            html.Strong(now_s + " "), meta["cur_range"]],
-                           style={"color": color}),
-                html.Small([meta["prev_range"], html.Strong(" " + prev_s),
-                            html.I(className="bi bi-caret-right-fill ms-1", style={"color": C_FLAT})],
-                           className="text-muted"),
+                html.Small([html.I(className="bi bi-caret-left-fill me-1", style={"color": prev_color}),
+                            html.Strong(prev_s + " "), meta["prev_range"]],
+                           style={"color": prev_color}),
+                html.Small([meta["cur_range"], html.Strong(" " + now_s),
+                            html.I(className="bi bi-caret-right-fill ms-1", style={"color": cur_color})],
+                           style={"color": cur_color}),
             ],
             className="d-flex justify-content-between",
             style={"fontSize": "0.68rem"},
@@ -478,9 +508,8 @@ def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
 
 
 def _kpi_mini(key, icon, lang, metric):
-    """Mini cabo de guerra compacto para o bloco KPI 3-em-1 (sem rótulos de data — janela no header)."""
-    cur, prev, perf_pct, state, color, cur_w = _duel(metric)
-    prev_w = 100.0 - cur_w
+    """Mini barra divergente compacta p/ o bloco KPI 3-em-1 (sem rótulos de data — janela no header)."""
+    cur, prev, perf_pct, state, color, _cur_w = _duel(metric)
     arrow = "bi-arrow-up-right" if perf_pct > 0 else ("bi-arrow-down-right" if perf_pct < 0 else "bi-dash")
     if state == "flat":
         caption, cap_color = t("tie", lang), C_FLAT
@@ -488,7 +517,6 @@ def _kpi_mini(key, icon, lang, metric):
         winner = t("now", lang) if perf_pct > 0 else t("prev", lang)
         caption = f"{winner} · {abs(perf_pct):.1f}%"
         cap_color = color if perf_pct > 0 else C_FLAT
-    cur_grad = f"linear-gradient(90deg, {color}, {color}dd)"
     return html.Div(
         [
             html.Div(
@@ -506,21 +534,7 @@ def _kpi_mini(key, icon, lang, metric):
                 ],
                 className="d-flex justify-content-between align-items-center flex-wrap",
             ),
-            html.Div(
-                [
-                    html.Div(html.Span(_fmt(cur, metric["unit"])),
-                             className="home-duel-seg home-duel-seg-cur",
-                             style={"width": f"{cur_w:.1f}%", "background": cur_grad}),
-                    html.Div(html.Span(_fmt(prev, metric["unit"])),
-                             className="home-duel-seg home-duel-seg-prev",
-                             style={"width": f"{prev_w:.1f}%"}),
-                    html.Div(className="home-duel-center"),
-                    html.Div(html.I(className=f"bi {arrow}"),
-                             className="home-duel-knob",
-                             style={"left": f"{cur_w:.1f}%", "color": color}),
-                ],
-                className="home-duel-track home-duel-track-sm",
-            ),
+            _div_track(cur, prev, metric["unit"], perf_pct, state, sm=True),
         ],
         className="home-kpi-mini",
     )
