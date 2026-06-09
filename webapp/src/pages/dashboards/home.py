@@ -1,9 +1,10 @@
 # src/pages/dashboards/home.py
 #
-# Visão Geral da Manutenção — home de CONFRONTO (cabo de guerra).
-# Cada métrica é uma barra única dividida em duas cores: período atual (esq,
-# colorido) vs período anterior (dir, cinza). O divisor é empurrado para quem
-# está ganhando. Design system reusado da V2 (indicator-v2-card, v2-lang-flag).
+# Visão Geral da Manutenção — home de CONFRONTO (barras divergentes do centro).
+# Cada métrica é um par de barras que crescem a partir de um eixo central:
+# período anterior (esq) vs período atual (dir). Comprimento = valor real
+# (normalizado ao maior dos dois); cor por valência (lado melhor verde, pior
+# vermelho). Design system reusado da V2 (indicator-v2-card, v2-lang-flag).
 #
 # 3 granularidades de comparação (todas "até hoje", janela equivalente):
 #   • month — mês até hoje (dia 1…D) vs mesmo intervalo do mês passado (clampa o dia)
@@ -145,12 +146,13 @@ def _collect(period, lang):
     return data, meta
 
 
-# Cores neutras do split de duração (mesma tinta, tom = duração; SEM valência bem/mal)
-C_SHORT = "#74c0fc"  # azul claro — paradas curtas
-C_LONG = "#1971c2"   # azul escuro — paradas longas
+# Split de duração — cores de marca AMG (logo): curtas = azul Gonvarri, longas = laranja ArcelorMittal
+C_SHORT = "#005687"  # azul AMG — paradas curtas
+C_LONG = "#E96D38"   # laranja AMG — paradas longas
 
-C_GOOD = "#198754"
-C_BAD = "#dc3545"
+# Cores de marca AMG (logo) no confronto: lado MELHOR = azul Gonvarri, PIOR = laranja ArcelorMittal
+C_GOOD = "#005687"  # azul AMG (era verde #198754) — lado melhor
+C_BAD = "#E96D38"   # laranja AMG (era vermelho #dc3545) — lado pior
 C_FLAT = "#6c757d"
 
 # Operacionais — barras grandes
@@ -392,137 +394,105 @@ def _ghost(metric, r):
     return ghost_w, real
 
 
-def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
-    """Barra de cabo de guerra — atual (esq, colorido) vs anterior (dir, cinza).
+def _side_colors(perf_pct, state):
+    """(cur_color, prev_color) p/ o trilho divergente. Melhor=verde, pior=vermelho, empate=cinza."""
+    if state == "flat":
+        return C_FLAT, C_FLAT
+    if perf_pct > 0:            # período atual melhor → atual verde, anterior vermelho
+        return C_GOOD, C_BAD
+    return C_BAD, C_GOOD        # período anterior melhor → invertido
 
-    ghost_w/real_pct (opcionais, só barras absolutas): marca-fantasma do "esperado p/
-    volume" e o desempenho descontando o volume (ver _ghost).
+
+_SCALE_HEADROOM = 1.5  # fim da escala = maior valor × 1.5 → maior barra ocupa ~66.7% da
+#                        metade, deixando fundo cinza nas pontas (forma divergente evidente)
+
+
+def _div_track2(left_val, right_val, left_txt, right_txt, left_color, right_color, sm=False):
+    """Trilho divergente genérico — barra esquerda e direita crescem a partir do eixo central.
+
+    Comprimento = valor normalizado ao maior dos dois × _SCALE_HEADROOM (o maior ocupa
+    ~66.7% da metade; sobra fundo cinza nas pontas). Cores explícitas (sem valência) —
+    usado tanto pelo confronto (anterior×atual) quanto pelo split (curtas×longas).
     """
-    cur, prev, perf_pct, state, color, cur_w = _duel(metric)
-    prev_w = 100.0 - cur_w
-    arrow = "bi-arrow-up-right" if perf_pct > 0 else ("bi-arrow-down-right" if perf_pct < 0 else "bi-dash")
-    now_s, prev_s = t("now", lang), t("prev", lang)
-    if state == "flat":
-        caption, cap_color = t("tie", lang), C_FLAT
-    else:
-        winner = now_s if perf_pct > 0 else prev_s
-        caption = f"{winner} {t('lead', lang)} · {abs(perf_pct):.1f}%"
-        cap_color = color if perf_pct > 0 else C_FLAT
-    cur_grad = f"linear-gradient(90deg, {color}, {color}dd)"
-
-    track_children = [
-        html.Div(html.Span(_fmt(cur, metric["unit"])),
-                 className="home-duel-seg home-duel-seg-cur",
-                 style={"width": f"{cur_w:.1f}%", "background": cur_grad}),
-        html.Div(html.Span(_fmt(prev, metric["unit"])),
-                 className="home-duel-seg home-duel-seg-prev",
-                 style={"width": f"{prev_w:.1f}%"}),
-        html.Div(className="home-duel-center"),
-        html.Div(html.I(className=f"bi {arrow}"),
-                 className="home-duel-knob",
-                 style={"left": f"{cur_w:.1f}%", "color": color}),
-    ]
-    if ghost_w is not None:
-        track_children.append(
-            html.Div(className="home-duel-ghost", style={"left": f"{ghost_w:.1f}%"},
-                     title=t("ghost_label", lang)))
-
-    rows = [
-        html.Div(
-            [
-                html.Div(
-                    [html.I(className=f"bi {icon} me-2", style={"color": color}),
-                     html.Strong(t(f"c_{key}", lang), style={"fontSize": "0.85rem"}),
-                     html.Small(" · " + t(f"s_{key}", lang), className="text-muted",
-                                style={"fontSize": "0.72rem"})],
-                    className="d-flex align-items-center",
-                ),
-                html.Span([html.I(className=f"bi {arrow} me-1"), caption],
-                          className="home-duel-cap",
-                          style={"color": cap_color, "borderColor": cap_color}),
-            ],
-            className="d-flex justify-content-between align-items-center flex-wrap",
-        ),
-        html.Div(track_children, className="home-duel-track"),
-        # Rótulos com as DATAS reais — relação evidente
-        html.Div(
-            [
-                html.Small([html.I(className="bi bi-caret-left-fill me-1", style={"color": color}),
-                            html.Strong(now_s + " "), meta["cur_range"]],
-                           style={"color": color}),
-                html.Small([meta["prev_range"], html.Strong(" " + prev_s),
-                            html.I(className="bi bi-caret-right-fill ms-1", style={"color": C_FLAT})],
-                           className="text-muted"),
-            ],
-            className="d-flex justify-content-between",
-            style={"fontSize": "0.68rem"},
-        ),
-    ]
-    # Linha "descontando volume": número honesto (atual vs esperado p/ este volume)
-    if real_pct is not None:
-        rcolor = C_GOOD if real_pct > 0.05 else (C_BAD if real_pct < -0.05 else C_FLAT)
-        rows.append(
-            html.Div(
-                [
-                    html.Span(className="home-duel-ghost-swatch"),
-                    html.Small(f"{t('ghost_label', lang)} · {t('ghost_real', lang)}: ",
-                               className="text-muted", style={"fontSize": "0.66rem"}),
-                    html.Small(html.Strong(f"{real_pct:+.1f}%"),
-                               style={"fontSize": "0.66rem", "color": rcolor}),
-                ],
-                className="d-flex align-items-center mt-1",
-                style={"gap": "4px"},
-            )
-        )
-    return html.Div(rows, className="home-duel-row")
-
-
-def _kpi_mini(key, icon, lang, metric):
-    """Mini cabo de guerra compacto para o bloco KPI 3-em-1 (sem rótulos de data — janela no header)."""
-    cur, prev, perf_pct, state, color, cur_w = _duel(metric)
-    prev_w = 100.0 - cur_w
-    arrow = "bi-arrow-up-right" if perf_pct > 0 else ("bi-arrow-down-right" if perf_pct < 0 else "bi-dash")
-    if state == "flat":
-        caption, cap_color = t("tie", lang), C_FLAT
-    else:
-        winner = t("now", lang) if perf_pct > 0 else t("prev", lang)
-        caption = f"{winner} · {abs(perf_pct):.1f}%"
-        cap_color = color if perf_pct > 0 else C_FLAT
-    cur_grad = f"linear-gradient(90deg, {color}, {color}dd)"
+    m = (max(left_val, right_val, 0.0) * _SCALE_HEADROOM) or 1.0
+    lw = max(0.0, left_val) / m * 100.0
+    rw = max(0.0, right_val) / m * 100.0
+    lgrad = f"linear-gradient(90deg, {left_color}, {left_color}dd)"
+    rgrad = f"linear-gradient(90deg, {right_color}dd, {right_color})"
     return html.Div(
         [
             html.Div(
-                [
-                    html.Div(
-                        [html.I(className=f"bi {icon} me-2", style={"color": color}),
-                         html.Strong(t(f"c_{key}", lang), style={"fontSize": "0.8rem"}),
-                         html.Small(" · " + t(f"s_{key}", lang), className="text-muted",
-                                    style={"fontSize": "0.7rem"})],
-                        className="d-flex align-items-center",
-                    ),
-                    html.Span([html.I(className=f"bi {arrow} me-1"), caption],
-                              className="home-duel-cap home-duel-cap-sm",
-                              style={"color": cap_color, "borderColor": cap_color}),
-                ],
-                className="d-flex justify-content-between align-items-center flex-wrap",
+                html.Div(html.Span(left_txt),
+                         className="home-div-bar home-div-bar-left",
+                         style={"width": f"{lw:.1f}%", "background": lgrad}),
+                className="home-div-half home-div-half-left",
             ),
             html.Div(
-                [
-                    html.Div(html.Span(_fmt(cur, metric["unit"])),
-                             className="home-duel-seg home-duel-seg-cur",
-                             style={"width": f"{cur_w:.1f}%", "background": cur_grad}),
-                    html.Div(html.Span(_fmt(prev, metric["unit"])),
-                             className="home-duel-seg home-duel-seg-prev",
-                             style={"width": f"{prev_w:.1f}%"}),
-                    html.Div(className="home-duel-center"),
-                    html.Div(html.I(className=f"bi {arrow}"),
-                             className="home-duel-knob",
-                             style={"left": f"{cur_w:.1f}%", "color": color}),
-                ],
-                className="home-duel-track home-duel-track-sm",
+                html.Div(html.Span(right_txt),
+                         className="home-div-bar home-div-bar-right",
+                         style={"width": f"{rw:.1f}%", "background": rgrad}),
+                className="home-div-half home-div-half-right",
+            ),
+            html.Div(className="home-div-axis"),
+        ],
+        className="home-div-track" + (" home-div-track-sm" if sm else ""),
+    )
+
+
+def _div_track(cur, prev, unit, perf_pct, state, sm=False):
+    """Trilho divergente do confronto — anterior (esq) vs atual (dir), cor por valência."""
+    cur_color, prev_color = _side_colors(perf_pct, state)
+    return _div_track2(prev, cur, _fmt(prev, unit), _fmt(cur, unit),
+                       prev_color, cur_color, sm=sm)
+
+
+def _lbl(icon, title, sub, sm=False):
+    """Rótulo de identidade genérico (padrão das barras): chip de ícone + título + subtítulo.
+
+    Cor neutra/brand (não valência) — diz O QUE é a barra; o azul/laranja fica na própria
+    barra. Reusado pelo confronto e pelo split (paradas por duração).
+    """
+    return html.Div(
+        [
+            html.Div(html.I(className=f"bi {icon}"), className="home-lbl-chip"),
+            html.Div(
+                [html.Span(title, className="home-lbl-title"),
+                 html.Span(sub, className="home-lbl-sub")],
+                className="home-lbl-text",
             ),
         ],
-        className="home-kpi-mini",
+        className="home-lbl" + (" home-lbl-sm" if sm else ""),
+    )
+
+
+def _bar_label(key, icon, lang, sm=False):
+    """Rótulo de identidade da métrica do confronto (chip + nome + subtítulo)."""
+    return _lbl(icon, t(f"c_{key}", lang), t(f"s_{key}", lang), sm=sm)
+
+
+def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
+    """Barra divergente com rótulo de identidade à esquerda (chip+nome+subtítulo) + trilho.
+
+    Demais infos (caption "à frente", datas, "descontando volume") seguem fora — a serem
+    reintroduzidas gradativamente. ghost_w/real_pct/meta ignorados por ora.
+    """
+    cur, prev, perf_pct, state, color, _cur_w = _duel(metric)
+    return html.Div(
+        [_bar_label(key, icon, lang),
+         _div_track(cur, prev, metric["unit"], perf_pct, state)],
+        className="home-duel-row home-bar-line",
+    )
+
+
+def _kpi_mini(key, icon, lang, metric):
+    """Mini barra divergente com rótulo de identidade compacto à esquerda + trilho."""
+    cur, prev, perf_pct, state, color, _cur_w = _duel(metric)
+    # Rótulo IDÊNTICO ao das barras grandes (mesma largura 188px) → trilhos cinza alinhados
+    # entre os dois boxes e subtítulo não trunca. Só o trilho é compacto (sm=True).
+    return html.Div(
+        [_bar_label(key, icon, lang),
+         _div_track(cur, prev, metric["unit"], perf_pct, state, sm=True)],
+        className="home-kpi-mini home-bar-line",
     )
 
 
@@ -536,30 +506,15 @@ def render_duels(period, lang):
     for key, icon in METRICS:
         gw, real = (_ghost(data[key], r) if (r and key in ("stops", "downtime")) else (None, None))
         bars.append(_duel_bar(key, icon, lang, data[key], meta, ghost_w=gw, real_pct=real))
-    header = html.Div(
-        [
-            html.I(className="bi bi-calendar-range me-2", style={"color": "#0d6efd"}),
-            html.Strong(meta["cur_range"], style={"color": C_GOOD}),
-            html.Span("  vs  ", className="text-muted mx-1"),
-            html.Strong(meta["prev_range"], style={"color": C_FLAT}),
-        ],
-        className="home-duel-window mb-2",
-    )
-    # Bloco KPI 3-em-1 (MTBF · MTTR · Avaria)
+    # Versão minimalista (2026-06-09): sem linha de janela no topo nem título do bloco KPI.
+    # As 3 operacionais ganham o MESMO box azul do bloco KPI (home-kpi-block).
+    ops_block = html.Div(bars, className="home-kpi-block")
     kpi_block = html.Div(
-        [
-            html.Div(
-                [html.I(className="bi bi-graph-up me-2", style={"color": "#0d6efd"}),
-                 html.Strong(t("kpi_section", lang), style={"fontSize": "0.8rem"}),
-                 html.Small(" · PRO017", className="text-muted")],
-                className="home-kpi-block-title mb-1",
-            ),
-            *[_kpi_mini(key, icon, lang, data[key]) for key, icon in KPIS],
-        ],
+        [_kpi_mini(key, icon, lang, data[key]) for key, icon in KPIS],
         className="home-kpi-block",
     )
     return dbc.Card(
-        dbc.CardBody([header] + bars + [kpi_block], className="p-3"),
+        dbc.CardBody([ops_block, kpi_block], className="p-3"),
         className="shadow-sm indicator-v2-card-static home-duel-arena",
         style={"borderTop": "4px solid #0d6efd"},
     )
@@ -671,43 +626,27 @@ def render_stops_split(period, lang, cutoff):
 
     c_ns, c_nl, c_ms, c_ml = _split(data.get("__durations", []))       # período atual
     p_ns, p_nl, p_ms, p_ml = _split(data.get("__durations_prev", []))  # período anterior
-
-    def _seg(val, w, color, align):
-        # número na borda EXTERNA (curtas→esq, longas→dir) p/ não colidir no divisor
-        just = "flex-start" if align == "left" else "flex-end"
-        pad = {"paddingLeft": "9px"} if align == "left" else {"paddingRight": "9px"}
-        style = {"width": f"{w:.1f}%", "background": color, "justifyContent": just}
-        style.update(pad)
-        return html.Div(html.Span(str(val)) if val else "",
-                        className="home-stops-seg", style=style)
-
-    def _bar(label, s_val, l_val, faded):
-        # curtas à ESQUERDA (C_SHORT) · longas à DIREITA (C_LONG); largura = proporção
-        # DENTRO do próprio período (compara o MIX, não o volume). Anterior esmaecido.
-        tot = (s_val + l_val) or 1
-        ws, wl = s_val / tot * 100, l_val / tot * 100
-        track_style = {"flex": "1 1 auto", "minWidth": "0"}  # estica p/ preencher a linha
-        if faded:
-            track_style["opacity"] = "0.5"
-        track = html.Div([_seg(s_val, ws, C_SHORT, "left"), _seg(l_val, wl, C_LONG, "right")],
-                         className="home-duel-track home-duel-track-sm", style=track_style)
-        return html.Div(
-            [html.Small(label, className="home-stops-rowlabel text-muted"), track],
-            className="d-flex align-items-center", style={"gap": "6px"})
-
     now_s, prev_s = t("now", lang), t("prev", lang)
 
-    def _group(title, c_s, c_l, p_s, p_l):
-        return html.Div(
-            [
-                html.Small(title, className="text-muted d-block mb-1", style={"fontSize": "0.66rem"}),
-                _bar(now_s, c_s, c_l, False),
-                _bar(prev_s, p_s, p_l, True),
-            ],
-            className="mb-2",
-        )
+    def _row(icon, period_label, group_sub, s_val, l_val):
+        # MESMO padrão das barras de cima: rótulo de identidade (218px) + trilho divergente.
+        # Título = período (Atual/Anterior); subtítulo = grupo (nº de paradas / tempo total).
+        # curtas (azul) crescem p/ ESQUERDA, longas (laranja) p/ DIREITA do eixo central.
+        track = _div_track2(s_val, l_val,
+                            str(s_val) if s_val else "", str(l_val) if l_val else "",
+                            C_SHORT, C_LONG, sm=True)
+        return html.Div([_lbl(icon, period_label, group_sub), track],
+                        className="home-kpi-mini home-bar-line")
 
-    # Chave de cor (curtas / longas) — neutra, sem valência
+    rows = [
+        _row("bi-hash", now_s, t("split_by_count", lang), c_ns, c_nl),
+        _row("bi-hash", prev_s, t("split_by_count", lang), p_ns, p_nl),
+        _row("bi-stopwatch", now_s, t("split_by_time", lang), c_ms, c_ml),
+        _row("bi-stopwatch", prev_s, t("split_by_time", lang), p_ms, p_ml),
+    ]
+    bars_box = html.Div(rows, className="home-kpi-block")  # mesmo box azul de cima
+
+    # Chave de cor (curtas / longas)
     color_key = html.Div(
         [
             html.Small([html.Span(className="home-stops-dot", style={"background": C_SHORT}),
@@ -715,14 +654,10 @@ def render_stops_split(period, lang, cutoff):
             html.Small([html.Span(className="home-stops-dot", style={"background": C_LONG}),
                         t("split_long", lang)], className="d-flex align-items-center"),
         ],
-        className="d-flex mt-1", style={"fontSize": "0.7rem", "gap": "14px"},
+        className="d-flex mt-2", style={"fontSize": "0.7rem", "gap": "14px"},
     )
 
-    return html.Div([
-        _group(t("split_by_count", lang), c_ns, c_nl, p_ns, p_nl),
-        _group(t("split_by_time", lang), c_ms, c_ml, p_ms, p_ml),
-        color_key,
-    ])
+    return html.Div([bars_box, color_key])
 
 
 # ============================================================
@@ -1154,7 +1089,7 @@ def layout():
                     className="p-3",
                 ),
                 className="shadow-sm home-stops-card mt-3",
-                style={"borderTop": "4px solid #adb5bd"},
+                style={"borderTop": "4px solid #0d6efd"},
             ),
 
             ], id="home-cuts-view"),
