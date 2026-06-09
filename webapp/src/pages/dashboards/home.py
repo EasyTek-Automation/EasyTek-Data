@@ -475,8 +475,10 @@ def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
 def _kpi_mini(key, icon, lang, metric):
     """Mini barra divergente com rótulo de identidade compacto à esquerda + trilho."""
     cur, prev, perf_pct, state, color, _cur_w = _duel(metric)
+    # Rótulo IDÊNTICO ao das barras grandes (mesma largura 188px) → trilhos cinza alinhados
+    # entre os dois boxes e subtítulo não trunca. Só o trilho é compacto (sm=True).
     return html.Div(
-        [_bar_label(key, icon, lang, sm=True),
+        [_bar_label(key, icon, lang),
          _div_track(cur, prev, metric["unit"], perf_pct, state, sm=True)],
         className="home-kpi-mini home-bar-line",
     )
