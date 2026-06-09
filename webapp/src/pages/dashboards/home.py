@@ -446,23 +446,28 @@ def _div_track(cur, prev, unit, perf_pct, state, sm=False):
                        prev_color, cur_color, sm=sm)
 
 
-def _bar_label(key, icon, lang, sm=False):
-    """Rótulo de identidade à esquerda da barra: chip de ícone + nome + subtítulo.
+def _lbl(icon, title, sub, sm=False):
+    """Rótulo de identidade genérico (padrão das barras): chip de ícone + título + subtítulo.
 
-    Cor neutra/brand (não valência) — o objetivo é dizer O QUE é a barra; o verde/vermelho
-    do confronto fica na própria barra. `sm=True` → variante compacta (bloco KPI 3-em-1).
+    Cor neutra/brand (não valência) — diz O QUE é a barra; o azul/laranja fica na própria
+    barra. Reusado pelo confronto e pelo split (paradas por duração).
     """
     return html.Div(
         [
             html.Div(html.I(className=f"bi {icon}"), className="home-lbl-chip"),
             html.Div(
-                [html.Span(t(f"c_{key}", lang), className="home-lbl-title"),
-                 html.Span(t(f"s_{key}", lang), className="home-lbl-sub")],
+                [html.Span(title, className="home-lbl-title"),
+                 html.Span(sub, className="home-lbl-sub")],
                 className="home-lbl-text",
             ),
         ],
         className="home-lbl" + (" home-lbl-sm" if sm else ""),
     )
+
+
+def _bar_label(key, icon, lang, sm=False):
+    """Rótulo de identidade da métrica do confronto (chip + nome + subtítulo)."""
+    return _lbl(icon, t(f"c_{key}", lang), t(f"s_{key}", lang), sm=sm)
 
 
 def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
@@ -621,31 +626,27 @@ def render_stops_split(period, lang, cutoff):
 
     c_ns, c_nl, c_ms, c_ml = _split(data.get("__durations", []))       # período atual
     p_ns, p_nl, p_ms, p_ml = _split(data.get("__durations_prev", []))  # período anterior
+    now_s, prev_s = t("now", lang), t("prev", lang)
 
-    def _bar(label, s_val, l_val, faded):
-        # "cabo de guerra" curtas × longas DIVERGENTE do centro: curtas (azul) crescem p/ a
-        # ESQUERDA, longas (laranja) p/ a DIREITA; comprimento normalizado ao maior dos dois.
-        # Mesma geometria do confronto. Atual e Anterior usam o mesmo azul/laranja.
+    def _row(icon, period_label, group_sub, s_val, l_val):
+        # MESMO padrão das barras de cima: rótulo de identidade (218px) + trilho divergente.
+        # Título = período (Atual/Anterior); subtítulo = grupo (nº de paradas / tempo total).
+        # curtas (azul) crescem p/ ESQUERDA, longas (laranja) p/ DIREITA do eixo central.
         track = _div_track2(s_val, l_val,
                             str(s_val) if s_val else "", str(l_val) if l_val else "",
                             C_SHORT, C_LONG, sm=True)
-        return html.Div(
-            [html.Small(label, className="home-stops-rowlabel text-muted"), track],
-            className="home-bar-line", style={"gap": "8px"})
+        return html.Div([_lbl(icon, period_label, group_sub), track],
+                        className="home-kpi-mini home-bar-line")
 
-    now_s, prev_s = t("now", lang), t("prev", lang)
+    rows = [
+        _row("bi-hash", now_s, t("split_by_count", lang), c_ns, c_nl),
+        _row("bi-hash", prev_s, t("split_by_count", lang), p_ns, p_nl),
+        _row("bi-stopwatch", now_s, t("split_by_time", lang), c_ms, c_ml),
+        _row("bi-stopwatch", prev_s, t("split_by_time", lang), p_ms, p_ml),
+    ]
+    bars_box = html.Div(rows, className="home-kpi-block")  # mesmo box azul de cima
 
-    def _group(title, c_s, c_l, p_s, p_l):
-        return html.Div(
-            [
-                html.Small(title, className="text-muted d-block mb-1", style={"fontSize": "0.66rem"}),
-                _bar(now_s, c_s, c_l, False),
-                _bar(prev_s, p_s, p_l, True),
-            ],
-            className="mb-2",
-        )
-
-    # Chave de cor (curtas / longas) — neutra, sem valência
+    # Chave de cor (curtas / longas)
     color_key = html.Div(
         [
             html.Small([html.Span(className="home-stops-dot", style={"background": C_SHORT}),
@@ -653,14 +654,10 @@ def render_stops_split(period, lang, cutoff):
             html.Small([html.Span(className="home-stops-dot", style={"background": C_LONG}),
                         t("split_long", lang)], className="d-flex align-items-center"),
         ],
-        className="d-flex mt-1", style={"fontSize": "0.7rem", "gap": "14px"},
+        className="d-flex mt-2", style={"fontSize": "0.7rem", "gap": "14px"},
     )
 
-    return html.Div([
-        _group(t("split_by_count", lang), c_ns, c_nl, p_ns, p_nl),
-        _group(t("split_by_time", lang), c_ms, c_ml, p_ms, p_ml),
-        color_key,
-    ])
+    return html.Div([bars_box, color_key])
 
 
 # ============================================================
@@ -1092,7 +1089,7 @@ def layout():
                     className="p-3",
                 ),
                 className="shadow-sm home-stops-card mt-3",
-                style={"borderTop": "4px solid #adb5bd"},
+                style={"borderTop": "4px solid #0d6efd"},
             ),
 
             ], id="home-cuts-view"),
