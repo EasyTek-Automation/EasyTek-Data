@@ -59,6 +59,55 @@ def _load_template() -> DocxTemplate:
         raise TemplateLoadError(path, exc) from exc
 
 
+# Casas decimais por campo — espelha a formatação do PDF (kpi_report_v2_pdf._fmt = casas=1).
+# O template DOCX imprime os valores crus via Jinja ({{ bloco1.kpis_planta.mttr }}), sem filtro,
+# expondo floats como "31.362000000000002". Pré-formatamos aqui para strings pt-BR antes do render.
+_DOCX_CASAS_KPI = {"mtbf": 1, "mttr": 1, "taxa_avaria": 1}
+_DOCX_CASAS_LINHA = {
+    "mtbf": 1, "mttr": 1, "taxa_avaria": 1,
+    "avaria_min": 1, "atividade_h": 1, "uptime_h": 1,
+    "num_ordens": 0, "num_paradas": 0,
+}
+
+
+def _fmt_campos(d: dict | None, casas_por_campo: dict[str, int]) -> None:
+    """Formata in-place os campos numéricos de `d` conforme `casas_por_campo` (pt-BR)."""
+    if not isinstance(d, dict):
+        return
+    for campo, casas in casas_por_campo.items():
+        v = d.get(campo)
+        if isinstance(v, (int, float)) and not isinstance(v, bool):
+            d[campo] = cfg.fmt_numero(v, casas=casas)
+
+
+def _formatar_numeros_docx(dados: dict) -> None:
+    """Pré-formata todos os números expostos ao template DOCX para strings pt-BR.
+
+    Mutação in-place — `montar_docx` é o passo terminal do export DOCX, o dict não é
+    reutilizado depois. Mesmo padrão da mutação de `sunburst_figures` (linha abaixo).
+    """
+    for bkey in ("bloco1", "bloco3"):
+        bloco = dados.get(bkey)
+        if not isinstance(bloco, dict):
+            continue
+        _fmt_campos(bloco.get("kpis_planta"), _DOCX_CASAS_KPI)
+        _fmt_campos(bloco.get("metas"), _DOCX_CASAS_KPI)
+        if isinstance(bloco.get("alert_range"), (int, float)) and not isinstance(bloco.get("alert_range"), bool):
+            bloco["alert_range"] = cfg.fmt_numero(bloco["alert_range"], casas=1)
+
+    bloco4 = dados.get("bloco4")
+    if isinstance(bloco4, dict):
+        for linha in (bloco4.get("linhas") or []):
+            _fmt_campos(linha, _DOCX_CASAS_LINHA)
+        _fmt_campos(bloco4.get("total"), _DOCX_CASAS_LINHA)
+
+    for bkey in ("bloco2", "bloco5"):
+        bloco = dados.get(bkey)
+        if isinstance(bloco, dict):
+            for parada in (bloco.get("paradas") or []):
+                _fmt_campos(parada, {"duracao_min": 0})
+
+
 def _inline_images_from_figures(
     template: DocxTemplate,
     figures_png: dict[str, bytes],
@@ -89,6 +138,10 @@ def montar_docx(dados: dict) -> bytes:
         figs = bloco.get("sunburst_figures")
         if isinstance(figs, dict) and figs and isinstance(next(iter(figs.values())), (bytes, bytearray)):
             bloco["sunburst_figures"] = _inline_images_from_figures(template, figs)
+
+    # Formata números crus (KPIs/metas/linhas/paradas) para strings pt-BR — o template
+    # imprime via Jinja sem filtro, expondo floats como "31.362000000000002" (BR-07).
+    _formatar_numeros_docx(dados)
 
     try:
         template.render(dados, autoescape=True)
