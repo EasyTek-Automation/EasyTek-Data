@@ -110,6 +110,17 @@ def get_mongo_connection(collection_name=None, silent=False):
     return None
 
 
+def get_mongo_client():
+    """Retorna o MongoClient singleton, garantindo conexão ativa.
+
+    Usado por operações que precisam de sessão/transação (ex: reagendamento de
+    plano no Gantt — DS-16). Retorna None se não houver conexão disponível.
+    """
+    if get_mongo_connection() is None:
+        return None
+    return client
+
+
 def reconnect_mongodb():
     """
     Força reconexão ao MongoDB.

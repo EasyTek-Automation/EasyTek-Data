@@ -138,6 +138,35 @@ def _btn(btn_type, index, icon, color="secondary", title=""):
     )
 
 
+def _user_level():
+    """Nível de acesso do usuário atual (1/2/3), tolerante a contexto sem request.
+
+    Import lazy de flask_login para não acoplar este componente ao auth no import
+    (mantém o módulo testável fora do contexto Flask)."""
+    try:
+        from flask_login import current_user
+        return int(getattr(current_user, "level", 0) or 0)
+    except Exception:
+        return 0
+
+
+def _reschedule_controls(proj_id):
+    """Botão isolado de reagendamento na linha do projeto (SP-16 item 1 / DS-17).
+
+    Retornado como lista para splat na linha do projeto. Fica FORA do agrupamento
+    dos 4 botões de ação vigentes (separador visual antes) — preservação de UI.
+    Visível apenas para nível 2+ (esconde para nível 1)."""
+    if _user_level() < 2:
+        return []
+    separator = html.Span(style={
+        "width": "1px", "alignSelf": "stretch", "margin": "5px 5px",
+        "backgroundColor": "var(--bs-border-color)", "flexShrink": "0",
+    })
+    btn = _btn("gantt-reschedule-btn", proj_id, "calendar-range", "info",
+               "Reagendar projeto (deslocar todo o plano)")
+    return [separator, btn]
+
+
 # ---------------------------------------------------------------------------
 # Eixo de tempo
 # ---------------------------------------------------------------------------
@@ -445,11 +474,16 @@ def _build_activity_bar(activity, t_start, t_end, color=None):
     return html.Div(children, style={"position": "relative", "height": "28px", "margin": "2px 0"})
 
 
-def _build_assignment_bar(assignment, t_start, t_end, activity=None, employee_name=""):
+def _build_assignment_bar(assignment, t_start, t_end, activity=None, employee_name="",
+                          is_conflict=False, conflict_proj=""):
     """
     Barra opaca e bem visível da atribuição do funcionário.
     (Removida a faixa translúcida de referência da atividade pai — estava
      gerando confusão visual com a barra real da atribuição.)
+
+    is_conflict: quando True (atribuição em conflito cross-projeto gerado por um
+    reagendamento — SP-16 item 8), a barra recebe a classe `.gantt-conflict`
+    (destaque de alerta via CSS) e ⚠ no tooltip.
     """
     try:
         s = _parse_dt(assignment["data_hora_entrada"])
@@ -464,8 +498,12 @@ def _build_assignment_bar(assignment, t_start, t_end, activity=None, employee_na
         f"Entrada: {s.strftime('%d/%m/%Y %H:%M')}\n"
         f"Saída:   {e.strftime('%d/%m/%Y %H:%M')}"
     )
+    if is_conflict:
+        tooltip += "\n⚠ Conflito de atribuição" + (f" com o projeto: {conflict_proj}" if conflict_proj else "")
 
-    bar = html.Div(title=tooltip, style={
+    bar = html.Div(title=tooltip,
+                   className=("gantt-conflict" if is_conflict else None),
+                   style={
         "position": "absolute", "left": f"{asg_left:.4f}%", "top": "40%",
         "height": "20%", "width": f"{asg_width:.4f}%", "minWidth": "12px",
         "backgroundColor": "#FBC02D", "opacity": "0.95",
@@ -801,7 +839,7 @@ def build_gantt_resource_view(employees, activities, assignments, categories, pr
 def build_gantt_chart(categories, activities, assignments, granularity="dias",
                       expanded_state=None, employees=None, hour_offset=0,
                       activities_state=None, projects=None, projects_state=None,
-                      filter_query=""):
+                      filter_query="", conflict_ids=None):
     """
     Constrói o componente visual do Gantt com botões de ação em cada linha.
 
@@ -814,6 +852,15 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
         expanded_state = {}
     emp_map      = {str(e["_id"]): e["nome"] for e in (employees or [])}
     emp_full_map = {str(e["_id"]): e          for e in (employees or [])}
+
+    # Destaque de conflito de atribuição gerado por reagendamento (SP-16 item 8).
+    # conflict_ids aceita lista de dicts (atribuicao_id + projeto_externo) ou de ids.
+    conflict_map = {}
+    for c in (conflict_ids or []):
+        if isinstance(c, dict):
+            conflict_map[str(c.get("atribuicao_id"))] = c.get("projeto_externo", "")
+        else:
+            conflict_map[str(c)] = ""
 
     if not projects and not categories:
         return html.Div("Nenhum projeto cadastrado.", className="text-muted p-3")
@@ -1066,6 +1113,7 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                 _btn("btn-edit-project",         proj_id, "pencil",  "primary",   "Editar projeto"),
                 _btn("btn-archive-project",      proj_id, "archive", "secondary", "Arquivar projeto"),
                 _btn("btn-delete-project",       proj_id, "trash",   "danger",    "Excluir projeto"),
+                *_reschedule_controls(proj_id),
             ], style={
                 "width": "var(--gantt-left-width, 360px)", "minWidth": "var(--gantt-left-width, 360px)", "flexShrink": "0",
                 "display": "flex", "alignItems": "center", "paddingRight": "6px",
@@ -1221,8 +1269,11 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                         time_range = f"{entrada.strftime('%H:%M')} – {saida.strftime('%H:%M')}"
                     except Exception:
                         time_range = ""
+                    _is_conflict = asg_id in conflict_map
                     asg_bar = _build_assignment_bar(asg, t_start, t_end, activity=act,
-                                                    employee_name=emp_nome)
+                                                    employee_name=emp_nome,
+                                                    is_conflict=_is_conflict,
+                                                    conflict_proj=conflict_map.get(asg_id, ""))
                     emp_doc = emp_full_map.get(str(asg.get("funcionario_id", "")))
 
                     # Avatar grande posicionado no início da barra (pode sobrar da linha — intencional)
@@ -1257,6 +1308,12 @@ def build_gantt_chart(categories, activities, assignments, granularity="dias",
                                 "fontSize": "0.68rem", "color": "var(--bs-secondary)",
                                 "whiteSpace": "nowrap", "paddingRight": "4px", "flexShrink": "0",
                             }),
+                            (html.Span("⚠", className="gantt-conflict-flag",
+                                       title="Conflito de atribuição com outro projeto"
+                                             + (f": {conflict_map.get(asg_id)}" if conflict_map.get(asg_id) else ""),
+                                       style={"color": "#C0392B", "fontSize": "0.8rem",
+                                              "paddingRight": "3px", "flexShrink": "0"})
+                             if _is_conflict else None),
                             _btn("btn-edit-assignment",   asg_id, "pencil", "primary", "Editar atribuição"),
                             _btn("btn-delete-assignment", asg_id, "trash",  "danger",  "Excluir atribuição"),
                         ], style={
