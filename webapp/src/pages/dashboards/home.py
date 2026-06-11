@@ -730,9 +730,9 @@ def render_kpi_skeleton(lang=None):
                                 className="d-flex justify-content-between align-items-center px-2 mb-2",
                                 style={"height": "60px"},
                             ),
-                            html.Div(className="skel-block", style={"height": "234px"}),
+                            html.Div(className="skel-block", style={"height": "222px"}),
                         ],
-                        className="p-2", style={"minHeight": "285px"},
+                        className="p-2", style={"minHeight": "271px"},
                     ),
                 ],
                 className="shadow-sm h-100 indicator-v2-card",
@@ -762,7 +762,7 @@ def render_v2_kpi_row(period, lang):
                         KPI_META[kpi]["color"], KPI_META[kpi]["unit"],
                         target=target, direction=KPI_META[kpi]["direction"],
                         td=td_lang, bar_statuses=statuses)
-        fig.update_layout(height=234)
+        fig.update_layout(height=222)
         return fig
 
     def _ring(kpi, value, target):
@@ -898,9 +898,9 @@ def render_v2_kpi_row(period, lang):
                             ),
                             dcc.Graph(figure=fig,
                                       config={"displayModeBar": False, "staticPlot": True, "responsive": True},
-                                      style={"height": "234px", "width": "100%"}),
+                                      style={"height": "222px", "width": "100%"}),
                         ],
-                        className="p-2", style={"minHeight": "285px"},
+                        className="p-2", style={"minHeight": "271px"},
                     ),
                 ],
                 className="shadow-sm h-100 indicator-v2-card" + pulse,
@@ -1028,7 +1028,7 @@ def render_24h_kpi_row(lang):
         big = values[cur] if 0 <= cur < len(values) else 0.0
         fig = _bar_rich(labels, values, bars_title, color, unit,
                         target=target, direction=meta["direction"], td=td_lang)
-        fig.update_layout(height=234)
+        fig.update_layout(height=222)
         title = td_lang.get("kpi_%s_title" % _short[kpi], meta["label"])
         subtitle = td_lang.get("kpi_%s_sub" % _short[kpi], "")
         pulse = _h24_pulse_class(meta, values, target)
@@ -1075,9 +1075,9 @@ def render_24h_kpi_row(lang):
                             ),
                             dcc.Graph(figure=fig,
                                       config={"displayModeBar": False, "staticPlot": True, "responsive": True},
-                                      style={"height": "234px", "width": "100%"}),
+                                      style={"height": "222px", "width": "100%"}),
                         ],
-                        className="p-2", style={"minHeight": "285px"},
+                        className="p-2", style={"minHeight": "271px"},
                     ),
                 ],
                 className="shadow-sm h-100 indicator-v2-card" + pulse,
