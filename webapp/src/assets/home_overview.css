@@ -673,3 +673,28 @@ body.home-present-mode .home-present-only { display: inline-flex !important; }
     0%   { background-position: 200% 0; }
     100% { background-position: -200% 0; }
 }
+
+/* ===== Recorte 24h (segunda row do slide de KPIs) ===== */
+.home-kpi24h-block {
+    margin-top: 0.5rem;
+}
+.home-kpi24h-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0 0.25rem;
+    margin-bottom: 0.35rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    padding-top: 0.5rem;
+}
+.home-kpi24h-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #212529;
+    letter-spacing: -0.3px;
+}
+.home-kpi24h-sub {
+    font-size: 0.82rem;
+    color: #6c757d;
+    font-weight: 500;
+}

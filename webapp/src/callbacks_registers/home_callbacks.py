@@ -257,8 +257,8 @@ def register_home_callbacks(app):
         from dash import no_update
         if not graph:
             return None, no_update
-        row = home_page.render_v2_kpi_row(period or "month", lang or "pt")
-        return row, (gcount or 0) + 1  # confirma render do gráfico
+        row = home_page.render_kpis_dual(period or "month", lang or "pt")
+        return row, (gcount or 0) + 1  # confirma render do gráfico (anual + 24h)
 
     # 6i-2. Combinador: render concluído (gráfico OU cortes) → bump store-home-rendered
     @app.callback(
