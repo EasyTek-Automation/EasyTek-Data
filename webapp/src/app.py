@@ -116,10 +116,13 @@ except Exception:
 # coleta SAP (Bloco D) gravar direto sem depender de seed/CSV. Webapp continua se falhar.
 try:
     from src.custos.storage import ensure_indexes as _custos_ensure_indexes
+    from src.custos.scheduler import init_custo_scheduler as _custos_init_scheduler
     from src.sap_scheduler.mongo_helpers import get_db as _custos_get_db
     _custos_db = _custos_get_db()
     if _custos_db is not None:
         _custos_ensure_indexes(_custos_db)
+        # Agendamento diário da coleta SAP de custo (isolado do sap-scheduler)
+        _custos_init_scheduler(_custos_db, os.getenv("TZ", "America/Sao_Paulo"))
     else:
         logging.getLogger("custos").warning(
             "custos: Mongo offline no boot — schema garantido no próximo restart"
