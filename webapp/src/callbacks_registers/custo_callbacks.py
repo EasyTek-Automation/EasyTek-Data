@@ -256,19 +256,40 @@ def register_custo_callbacks(app):
         return no_update
 
     @app.callback(
-        Output("btn-custo-rodar-agora", "disabled"),
         Output("custo-rodar-feedback", "children"),
         Input("btn-custo-rodar-agora", "n_clicks"),
         prevent_initial_call=True,
     )
     def _rodar_agora(_n):
-        """Placeholder até o transporte SAP (Bloco D): avisa e não dispara nada."""
-        aviso = dbc.Alert(
-            "A coleta automática do SAP ainda será configurada no cliente (Bloco D). "
-            "Por enquanto os dados vêm da carga de exemplo (seed).",
-            color="info", dismissable=True, className="py-2",
+        """Enfileira as duas coletas de custo (orçado + executado) na fila do SAP (SP-10).
+
+        A execução real roda no coletor do cliente (transporte diferido — Bloco D);
+        localmente o job fica `pendente` até o daemon do cliente processá-lo.
+        """
+        try:
+            from src.sap_scheduler.mongo_helpers import get_db
+            from src.custos.sap_jobs import enqueue_ambos, _LABEL
+        except ImportError:
+            from sap_scheduler.mongo_helpers import get_db  # type: ignore
+            from custos.sap_jobs import enqueue_ambos, _LABEL  # type: ignore
+
+        db = get_db()
+        if db is None:
+            return dbc.Alert("Banco indisponível — não foi possível enfileirar.",
+                             color="danger", dismissable=True, className="py-2")
+        res = enqueue_ambos(db)
+        msg_map = {"inserido": "enfileirada", "ja_em_andamento": "já em andamento",
+                   "dedup": "já enfileirada neste minuto", "erro": "falhou"}
+        linhas = [f"{_LABEL.get(t, t)}: {msg_map.get(s, s)}" for t, s in res.items()]
+        cor = "success" if any(s == "inserido" for s in res.values()) else "info"
+        return dbc.Alert(
+            [html.Div("Coletas SAP solicitadas:", className="fw-bold"),
+             html.Ul([html.Li(x) for x in linhas], className="mb-1"),
+             html.Small("A execução roda no coletor do cliente (transporte diferido); "
+                        "enquanto isso, os dados exibidos vêm da carga de exemplo (seed).",
+                        className="text-muted")],
+            color=cor, dismissable=True, className="py-2",
         )
-        return no_update, aviso
 
     @app.callback(
         Output("custo-card-geral", "children"),
