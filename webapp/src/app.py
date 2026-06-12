@@ -111,6 +111,22 @@ except RuntimeError as _sap_e:
 except Exception:
     logging.getLogger("sap_scheduler").exception("sap_scheduler: erro inesperado no boot (webapp continua)")
 
+# --- Custo de Manutenção: garante schema (coleções + índices) no boot (DS-03) ---
+# Idempotente. Cria AMG_CustoResumo/AMG_CustoLancamentos vazias + índices, para a
+# coleta SAP (Bloco D) gravar direto sem depender de seed/CSV. Webapp continua se falhar.
+try:
+    from src.custos.storage import ensure_indexes as _custos_ensure_indexes
+    from src.sap_scheduler.mongo_helpers import get_db as _custos_get_db
+    _custos_db = _custos_get_db()
+    if _custos_db is not None:
+        _custos_ensure_indexes(_custos_db)
+    else:
+        logging.getLogger("custos").warning(
+            "custos: Mongo offline no boot — schema garantido no próximo restart"
+        )
+except Exception:
+    logging.getLogger("custos").exception("custos: erro ao garantir schema no boot (webapp continua)")
+
 # --- Configuração do Favicon Customizado ---
 app.index_string = '''
 <!DOCTYPE html>
