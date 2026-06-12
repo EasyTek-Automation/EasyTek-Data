@@ -1,10 +1,10 @@
 """Aba 'Custo de Manutencao' — layout autocontido (DS-06).
 
-Navegacao IDENTICA a indicators-v2: cards clicaveis no topo (aqui, os 4 GRUPOS) que
-abrem um **modal drilldown** unico (XL). Dentro do modal: contas -> meses -> dias ->
-lancamentos, com mini-cards clicaveis por nivel (inclusive **cards de mes**),
-breadcrumb pill e botoes Voltar/Fechar. Mesma mecanica, mesmo visual (classes
-`indicator-v2-card`, `#modal-custo` espelha `#modal-v2` via assets/custo.css).
+Navegacao IDENTICA a indicators-v2 (grafico em cima + cards embaixo; tabela no nivel
+final). Entrada = GRAFICO anual (GERAL + todas as contas, modelo do mockup). Clique
+abre um modal drilldown unico: meses (grade de mini-graficos, 1 por mes) -> dias
+(grafico do mes + cards de dia) -> contas do dia (grafico + cards de conta) ->
+lancamentos (tabela). Botoes Voltar/Fechar. `#modal-custo` espelha `#modal-v2`.
 
 Bloco autocontido (IN-05). So le do Mongo (DS-01). Comportamento em
 `callbacks_registers/custo_callbacks.py`.
@@ -15,7 +15,6 @@ import dash_bootstrap_components as dbc
 from dash import dcc, html
 
 ANO_PADRAO = 2026
-_CINZA = "#6c757d"
 
 
 def _label(txt: str) -> html.Label:
@@ -35,14 +34,13 @@ def build_tab() -> dbc.Tab:
         tab_id="tab-v2-custo",
         children=html.Div(
             [
-                # Estado proprio (autocontido) — espelha os stores de drill da v2
+                # Estado proprio (autocontido). Drill por tempo: ano -> mes -> dia -> conta.
                 dcc.Store(id="store-custo-ano", data=ANO_PADRAO),
                 dcc.Store(id="store-custo-centros", data=[]),
                 dcc.Store(id="store-custo-level", data="planta"),
-                dcc.Store(id="store-custo-grupo", data=None),
-                dcc.Store(id="store-custo-conta", data=None),
                 dcc.Store(id="store-custo-mes", data=None),
                 dcc.Store(id="store-custo-dia", data=None),
+                dcc.Store(id="store-custo-conta", data=None),
                 dcc.Interval(id="custo-init", interval=300, max_intervals=1),
 
                 dcc.Loading(
@@ -50,7 +48,7 @@ def build_tab() -> dbc.Tab:
                     color="#0d6efd",
                     children=html.Div(
                         [
-                            # ---- Cabecalho ----
+                            # ---- Cabecalho + toolbar ----
                             html.Div(
                                 [
                                     html.Div(
@@ -64,9 +62,8 @@ def build_tab() -> dbc.Tab:
                                             ),
                                             html.Span(
                                                 "Orçado × Executado da manutenção (GT340) — "
-                                                "clique num grupo para abrir o detalhamento.",
-                                                className="text-muted",
-                                                style={"fontSize": "0.82rem"},
+                                                "clique no gráfico para abrir o detalhamento por mês.",
+                                                className="text-muted", style={"fontSize": "0.82rem"},
                                             ),
                                         ],
                                     ),
@@ -85,8 +82,8 @@ def build_tab() -> dbc.Tab:
                                             html.Div(
                                                 [_label("Centro de custo"),
                                                  dcc.Dropdown(
-                                                     id="custo-centro-filter",
-                                                     options=[], value=[], multi=True,
+                                                     id="custo-centro-filter", options=[],
+                                                     value=[], multi=True,
                                                      placeholder="Todos os centros",
                                                      style={"minWidth": "240px"})],
                                                 className="me-3",
@@ -110,15 +107,30 @@ def build_tab() -> dbc.Tab:
                             html.Div(id="custo-rodar-feedback"),
                             html.Div(id="custo-reconc-banner", className="mb-2"),
 
-                            # ---- Cards KPI do geral (resumo, não-clicável) ----
-                            html.Div(id="custo-card-geral", className="mb-3"),
-
-                            # ---- Cards dos GRUPOS (clicáveis → abrem o modal) ----
-                            html.H6(
-                                "Grupos de manutenção (clique para abrir)",
-                                className="v2-section-h6 text-muted",
+                            # ---- Gráfico de ENTRADA (anual: GERAL + todas as contas) ----
+                            dbc.Card(
+                                [
+                                    dbc.CardHeader(
+                                        html.H6(
+                                            [html.I(className="bi bi-bar-chart-line me-2"),
+                                             "Orçado × Executado por conta (ano) — clique para abrir os meses"],
+                                            className="mb-0 fw-bold",
+                                        ),
+                                        className="py-2",
+                                    ),
+                                    dbc.CardBody(
+                                        dcc.Graph(
+                                            id="custo-graph-entry",
+                                            config={"displayModeBar": False, "responsive": True},
+                                            style={"height": "460px", "width": "100%",
+                                                   "cursor": "pointer"},
+                                        ),
+                                        className="p-2",
+                                    ),
+                                ],
+                                className="shadow-sm indicator-v2-card-md",
+                                style={"borderTop": "4px solid #0d6efd"},
                             ),
-                            html.Div(id="custo-grupos-cards"),
                         ],
                         className="p-3",
                     ),
@@ -127,10 +139,8 @@ def build_tab() -> dbc.Tab:
                 # ---- Modal drilldown (espelha #modal-v2) ----
                 dbc.Modal(
                     [
-                        dbc.ModalHeader(
-                            dbc.ModalTitle(id="modal-custo-title"),
-                            close_button=True,
-                        ),
+                        dbc.ModalHeader(dbc.ModalTitle(id="modal-custo-title"),
+                                        close_button=True),
                         dbc.ModalBody(
                             [
                                 html.Div(id="modal-custo-breadcrumb", className="mb-3"),
@@ -142,19 +152,14 @@ def build_tab() -> dbc.Tab:
                         ),
                         dbc.ModalFooter(
                             [
-                                dbc.Button(
-                                    [html.I(className="bi bi-arrow-left me-1"), "Voltar"],
-                                    id="btn-custo-back", color="secondary", outline=True,
-                                ),
+                                dbc.Button([html.I(className="bi bi-arrow-left me-1"), "Voltar"],
+                                           id="btn-custo-back", color="secondary", outline=True),
                                 dbc.Button("Fechar", id="btn-custo-close",
                                            color="primary", className="ms-auto"),
                             ]
                         ),
                     ],
-                    id="modal-custo",
-                    size="xl",
-                    is_open=False,
-                    scrollable=True,
+                    id="modal-custo", size="xl", is_open=False, scrollable=True,
                     fullscreen="lg-down",
                 ),
             ],

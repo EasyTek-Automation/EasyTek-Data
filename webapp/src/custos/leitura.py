@@ -298,6 +298,107 @@ def fetch_lancamentos(
     return list(cursor)
 
 
+def fetch_contas_geral(ano: int, mes: Optional[str] = None,
+                       centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """GERAL + todas as contas (orçado × executado) da janela — eixo do gráfico.
+
+    Primeira linha = GERAL (rollup GT340); depois cada conta, ordenada por executado
+    desc. `mes=None` → ano inteiro. Cada item tem o contrato do gráfico
+    (label/code/orcado/executado/pct/estouro/sem_orcamento).
+    """
+    cz = _norm_centros(centros)
+
+    def _calc():
+        por_conta = _orcado_executado_por_conta(ano, cz, mes)
+        tot_o = sum(a["orcado"] for a in por_conta.values())
+        tot_e = sum(a["executado"] for a in por_conta.values())
+        geral = {"code": "__GERAL__", "label": "GERAL", "conta_desc": "Manutenção (GT340)",
+                 **calcular_metricas(tot_o, tot_e)}
+        contas = []
+        for a in por_conta.values():
+            contas.append({"code": a["conta"], "label": a["conta"],
+                           "conta_desc": a.get("conta_desc", ""),
+                           **calcular_metricas(a["orcado"], a["executado"])})
+        contas.sort(key=lambda x: x["executado"], reverse=True)
+        return [geral] + contas
+
+    return _memo(("contas_geral", ano, mes, cz), _calc)
+
+
+def meses_com_dados(ano: int) -> list[str]:
+    """Meses 'YYYY-MM' com dados de resumo no ano (ordenados)."""
+    coll = get_mongo_connection(COLL_RESUMO)
+    if coll is None:
+        return []
+    return sorted(coll.distinct("mes_referencia", {"mes_referencia": {"$regex": f"^{ano}-"}}))
+
+
+def fetch_dias_total_mes(ano: int, mes: str,
+                         centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """Executado total por dia no mês (todas as contas somadas) — cards/gráfico de dia."""
+    cz = _norm_centros(centros)
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match: dict = {"mes_referencia": mes}
+        if cz:
+            match["centro_custo"] = {"$in": list(cz)}
+        pipe = [
+            {"$match": match},
+            {"$group": {"_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$data_lancamento"}},
+                        "executado": {"$sum": "$valor"}}},
+            {"$sort": {"_id": 1}},
+        ]
+        return [{"code": d["_id"], "label": d["_id"][-2:], "dia": d["_id"],
+                 "orcado": 0, "executado": round(d["executado"], 2),
+                 "pct": None, "estouro": False, "sem_orcamento": False}
+                for d in coll.aggregate(pipe)]
+
+    return _memo(("dias_total", ano, mes, cz), _calc)
+
+
+def fetch_contas_no_dia(ano: int, dia: str,
+                        centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """GERAL + contas com executado num dia específico ('YYYY-MM-DD'). Só executado."""
+    cz = _norm_centros(centros)
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match: dict = {"mes_referencia": dia[:7]}
+        if cz:
+            match["centro_custo"] = {"$in": list(cz)}
+        pipe = [
+            {"$match": match},
+            {"$addFields": {"_d": {"$dateToString": {"format": "%Y-%m-%d", "date": "$data_lancamento"}}}},
+            {"$match": {"_d": dia}},
+            {"$group": {"_id": "$conta", "executado": {"$sum": "$valor"}}},
+        ]
+        contas = [{"code": d["_id"], "label": d["_id"], "orcado": 0,
+                   "executado": round(d["executado"], 2), "pct": None,
+                   "estouro": False, "sem_orcamento": False}
+                  for d in coll.aggregate(pipe)]
+        contas.sort(key=lambda x: x["executado"], reverse=True)
+        tot = round(sum(c["executado"] for c in contas), 2)
+        geral = {"code": "__GERAL__", "label": "GERAL", "orcado": 0, "executado": tot,
+                 "pct": None, "estouro": False, "sem_orcamento": False}
+        return [geral] + contas
+
+    return _memo(("contas_dia", ano, dia, cz), _calc)
+
+
+def fetch_lancamentos_no_dia(ano: int, dia: str, conta: Optional[str] = None,
+                             centros: Optional[Iterable[str]] = None,
+                             limit: int = 500) -> list[dict]:
+    """Lançamentos de um dia ('YYYY-MM-DD'), opcionalmente de uma conta."""
+    docs = fetch_lancamentos(ano, conta=conta, mes=dia[:7], centros=centros, limit=limit)
+    return [d for d in docs if d.get("data_lancamento")
+            and d["data_lancamento"].strftime("%Y-%m-%d") == dia]
+
+
 def fonte_dos_dados(ano: int) -> Optional[str]:
     """Retorna a origem predominante dos dados do ano ('csv'|'sap') ou None se vazio."""
     coll = get_mongo_connection(COLL_RESUMO)
