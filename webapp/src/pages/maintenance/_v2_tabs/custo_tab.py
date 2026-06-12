@@ -119,11 +119,15 @@ def build_tab() -> dbc.Tab:
                                         className="py-2",
                                     ),
                                     dbc.CardBody(
-                                        dcc.Graph(
-                                            id="custo-graph-entry",
-                                            config={"displayModeBar": False, "responsive": True},
-                                            style={"height": "460px", "width": "100%",
-                                                   "cursor": "pointer"},
+                                        html.Div(
+                                            dcc.Graph(
+                                                id="custo-graph-entry",
+                                                config={"displayModeBar": False,
+                                                        "staticPlot": True, "responsive": True},
+                                                style={"height": "460px", "width": "100%"},
+                                            ),
+                                            id="custo-entry-wrap",
+                                            n_clicks=0, style={"cursor": "pointer"},
                                         ),
                                         className="p-2",
                                     ),

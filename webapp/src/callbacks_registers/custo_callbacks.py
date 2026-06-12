@@ -311,7 +311,7 @@ def register_custo_callbacks(app):
         Output("modal-custo-content", "children", allow_duplicate=True),
         Output("modal-custo-title", "children", allow_duplicate=True),
         Output("modal-custo-breadcrumb", "children", allow_duplicate=True),
-        Input("custo-graph-entry", "clickData"),
+        Input("custo-entry-wrap", "n_clicks"),
         Input({"type": "custo-mes-card", "mes": ALL}, "n_clicks"),
         Input({"type": "custo-dia-card", "dia": ALL}, "n_clicks"),
         Input({"type": "custo-conta-card", "conta": ALL}, "n_clicks"),
@@ -343,10 +343,10 @@ def register_custo_callbacks(app):
                 return (False, "planta", None, None, None) + CLEAR
             return NOOP
 
-        # Clique no gráfico de entrada → abre nível meses
-        if trig == "custo-graph-entry":
+        # Clique no gráfico de entrada (área inteira clicável) → abre nível meses
+        if trig == "custo-entry-wrap":
             tr = dash.callback_context.triggered
-            if not tr or tr[0].get("value") is None:
+            if not tr or not tr[0].get("value"):
                 return NOOP
             return (True, "meses", None, None, None) + CLEAR
 
