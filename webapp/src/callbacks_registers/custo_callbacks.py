@@ -22,8 +22,10 @@ from dash import ALL, Input, Output, State, ctx, dash_table, dcc, html, no_updat
 
 try:
     from src.custos import leitura as L
+    from src.custos.hierarquia import nome_conta
 except ImportError:
     from custos import leitura as L  # type: ignore
+    from custos.hierarquia import nome_conta  # type: ignore
 
 logger = logging.getLogger("custos.callbacks")
 
@@ -98,24 +100,22 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False):
     if not rows:
         return _fig_vazia(h=h)
     codes = [r["code"] for r in rows]
-    if mini:
-        ticks = [r["label"] for r in rows]
-    else:
-        ticks = [f"<b>{r['label']}</b><br><span style='font-size:0.72em;color:#8a929b'>"
-                 f"{_brl0(r['executado'])}</span>" for r in rows]
+    nomes = [r["label"] for r in rows]   # nome legível da conta/dia
+    # eixo X: nome (sem código). Mini esconde rótulos (overview clicável).
+    ticks = nomes
     xs = list(range(len(rows)))
 
     fig = go.Figure()
     if com_orcado:
         fig.add_bar(name="Orçado", x=xs, y=[r["orcado"] for r in rows], width=0.66,
                     marker={"color": _ORCADO_FILL, "line": {"color": "#9ec5fe", "width": 1}},
-                    customdata=codes,
-                    hovertemplate="%{customdata}<br>Orçado: R$ %{y:,.2f}<extra></extra>")
+                    customdata=codes, hovertext=nomes,
+                    hovertemplate="%{hovertext}<br>Orçado: R$ %{y:,.2f}<extra></extra>")
     # GERAL com cor própria (cinza-azulado) p/ destacar do resto
     cores = ["#34568b" if r["code"] == "__GERAL__" else _cor_exec(r) for r in rows]
     fig.add_bar(name="Executado", x=xs, y=[r["executado"] for r in rows], width=0.34,
-                marker={"color": cores}, customdata=codes,
-                hovertemplate="%{customdata}<br>Executado: R$ %{y:,.2f}<extra></extra>")
+                marker={"color": cores}, customdata=codes, hovertext=nomes,
+                hovertemplate="%{hovertext}<br>Executado: R$ %{y:,.2f}<extra></extra>")
 
     anots = []
     if not mini:
@@ -134,15 +134,15 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False):
     fig.update_layout(
         height=h, barmode="overlay",
         plot_bgcolor="rgba(248,250,252,0.6)", paper_bgcolor="rgba(0,0,0,0)",
-        margin={"l": 44, "r": 12, "t": 34 if titulo else 10, "b": 24 if mini else 64},
+        margin={"l": 44, "r": 12, "t": 34 if titulo else 10, "b": 18 if mini else 150},
         title=({"text": titulo, "font": {"size": 13 if not mini else 12, "color": "#343a40"},
                 "x": 0, "xanchor": "left", "y": 0.98} if titulo else None),
         showlegend=not mini,
         legend={"orientation": "h", "y": 1.1, "x": 0, "font": {"size": 11}},
         bargap=0.35, annotations=anots,
         xaxis={"tickmode": "array", "tickvals": xs, "ticktext": ticks,
-               "showgrid": False, "zeroline": False, "tickfont": {"size": 9 if mini else 11},
-               "showticklabels": True},
+               "showgrid": False, "zeroline": False, "tickfont": {"size": 10},
+               "tickangle": -35, "showticklabels": not mini},
         yaxis={"showgrid": True, "gridcolor": _GRID, "zeroline": False,
                "tickprefix": "R$ ", "tickformat": ",.0f", "tickfont": {"size": 9 if mini else 10},
                "rangemode": "tozero", "showticklabels": not mini},
@@ -442,20 +442,21 @@ def register_custo_callbacks(app):
 
         # NÍVEL 4 — lançamentos (tabela)
         if level == "lancamentos" and conta:
+            nome = nome_conta(conta)
             if dia:
                 docs = L.fetch_lancamentos_no_dia(ano, dia, conta=conta, centros=centros)
                 escopo = f"{dia[-2:]}/{_nome_mes(mes)}"
-                crumb = _crumb(ano_lbl, _nome_mes(mes), f"Dia {dia[-2:]}", f"Conta {conta}")
+                crumb = _crumb(ano_lbl, _nome_mes(mes), f"Dia {dia[-2:]}", nome)
             else:
                 docs = L.fetch_lancamentos(ano, conta=conta, mes=mes, centros=centros)
                 escopo = _nome_mes(mes)
-                crumb = _crumb(ano_lbl, _nome_mes(mes), f"Conta {conta}")
+                crumb = _crumb(ano_lbl, _nome_mes(mes), nome)
             content = html.Div([
-                html.H6(f"Lançamentos — conta {conta}, {escopo}",
+                html.H6(f"Lançamentos — {nome} ({conta}), {escopo}",
                         className="v2-section-h6 text-muted"),
                 _tabela_lancamentos(docs),
             ])
-            return content, f"Custo — conta {conta} — {escopo}", crumb, {}
+            return content, f"Custo — {nome} — {escopo}", crumb, {}
 
         return None, "", None, {"display": "none"}
 

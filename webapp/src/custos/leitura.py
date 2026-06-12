@@ -18,11 +18,11 @@ from typing import Iterable, Optional
 
 try:  # contexto do webapp (pacote src.custos)
     from src.database.connection import get_mongo_connection
-    from src.custos.hierarquia import GRUPOS, grupo_da_conta, label_grupo
+    from src.custos.hierarquia import GRUPOS, grupo_da_conta, label_grupo, nome_conta
     from src.custos.storage import COLL_LANCAMENTOS, COLL_RESUMO
 except ImportError:  # contexto de teste/script (cwd = webapp/src)
     from database.connection import get_mongo_connection  # type: ignore
-    from custos.hierarquia import GRUPOS, grupo_da_conta, label_grupo  # type: ignore
+    from custos.hierarquia import GRUPOS, grupo_da_conta, label_grupo, nome_conta  # type: ignore
     from custos.storage import COLL_LANCAMENTOS, COLL_RESUMO  # type: ignore
 
 logger = logging.getLogger("custos.leitura")
@@ -316,7 +316,7 @@ def fetch_contas_geral(ano: int, mes: Optional[str] = None,
                  **calcular_metricas(tot_o, tot_e)}
         contas = []
         for a in por_conta.values():
-            contas.append({"code": a["conta"], "label": a["conta"],
+            contas.append({"code": a["conta"], "label": nome_conta(a["conta"]),
                            "conta_desc": a.get("conta_desc", ""),
                            **calcular_metricas(a["orcado"], a["executado"])})
         contas.sort(key=lambda x: x["executado"], reverse=True)
@@ -377,7 +377,7 @@ def fetch_contas_no_dia(ano: int, dia: str,
             {"$match": {"_d": dia}},
             {"$group": {"_id": "$conta", "executado": {"$sum": "$valor"}}},
         ]
-        contas = [{"code": d["_id"], "label": d["_id"], "orcado": 0,
+        contas = [{"code": d["_id"], "label": nome_conta(d["_id"]), "orcado": 0,
                    "executado": round(d["executado"], 2), "pct": None,
                    "estouro": False, "sem_orcamento": False}
                   for d in coll.aggregate(pipe)]

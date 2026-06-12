@@ -58,6 +58,32 @@ CONTAS: frozenset[str] = frozenset(CONTA_PARA_GRUPO)
 # Aliases historicos de grafia (doc antiga usou letra O: GO343/GO344). Canonico = G034x.
 _ALIAS_GRUPO: dict[str, str] = {"GO343": "G0343", "GO344": "G0344"}
 
+# Nome legivel de cada conta (expansao das descricoes truncadas do SAP, 16 chars).
+# Permite mostrar nome em vez do codigo cru na tela — sem depender do SAP no cliente.
+# As 3 contas zeradas no periodo (sem dado/descricao real) ficam com nome generico.
+CONTA_NOME: dict[str, str] = {
+    "33102100": "Conserto / Manutenção",
+    "33102101": "Consumo de Material de Manutenção",
+    "33102102": "Manutenção de Edifícios",
+    "33102103": "Manutenção (conta 33102103)",
+    "33102105": "Manutenção (conta 33102105)",
+    "33102106": "Manutenção de Móveis / Utensílios",
+    "33102130": "Manutenção de Veículos",
+    "33102211": "Óleo Lubrificante de Manutenção",
+    "33102260": "Manutenção de Máquinas e Equipamentos",
+    "33102261": "Manutenção de Informática",
+    "33102263": "Manutenção de Empilhadeiras",
+    "33102264": "Manutenção (conta 33102264)",
+    "33102265": "Manutenção de Matrizes",
+    "33102382": "Utilidades / Ferramentas de Produção",
+    "33102400": "Despesas com Aferição",
+}
+
+
+def nome_conta(conta: str) -> str:
+    """Nome legivel da conta; ecoa o codigo se desconhecida."""
+    return CONTA_NOME.get(conta, conta)
+
 
 def normalizar_grupo(grupo: str) -> str:
     """Normaliza a grafia de um grupo para a forma canonica `G034x`.
