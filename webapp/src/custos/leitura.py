@@ -16,13 +16,14 @@ import logging
 import time
 from typing import Iterable, Optional
 
-try:  # contexto do webapp (prefixo src.)
+try:  # contexto do webapp (pacote src.custos)
     from src.database.connection import get_mongo_connection
-except ImportError:  # contexto de teste/script
+    from src.custos.hierarquia import GRUPOS, grupo_da_conta, label_grupo
+    from src.custos.storage import COLL_LANCAMENTOS, COLL_RESUMO
+except ImportError:  # contexto de teste/script (cwd = webapp/src)
     from database.connection import get_mongo_connection  # type: ignore
-
-from custos.hierarquia import GRUPOS, grupo_da_conta, label_grupo
-from custos.storage import COLL_LANCAMENTOS, COLL_RESUMO
+    from custos.hierarquia import GRUPOS, grupo_da_conta, label_grupo  # type: ignore
+    from custos.storage import COLL_LANCAMENTOS, COLL_RESUMO  # type: ignore
 
 logger = logging.getLogger("custos.leitura")
 
@@ -271,6 +272,39 @@ def fetch_centros_disponiveis(ano: int) -> list[str]:
         return sorted(c for c in centros if c)
 
     return _memo(("centros", ano), _calc)
+
+
+def fetch_lancamentos(
+    ano: int,
+    conta: Optional[str] = None,
+    mes: Optional[str] = None,
+    centros: Optional[Iterable[str]] = None,
+    limit: int = 500,
+) -> list[dict]:
+    """Lancamentos do recorte acumulado (conta/mes/centro) para a tabela (DS-08).
+
+    Ordena por data. `limit` evita despejar milhares de linhas no nivel planta/grupo.
+    """
+    coll = get_mongo_connection(COLL_LANCAMENTOS)
+    if coll is None:
+        return []
+    cz = _norm_centros(centros)
+    match: dict = {"mes_referencia": mes} if mes else {"mes_referencia": {"$regex": f"^{ano}-"}}
+    if conta:
+        match["conta"] = conta
+    if cz:
+        match["centro_custo"] = {"$in": list(cz)}
+    cursor = coll.find(match).sort([("data_lancamento", 1)]).limit(limit)
+    return list(cursor)
+
+
+def fonte_dos_dados(ano: int) -> Optional[str]:
+    """Retorna a origem predominante dos dados do ano ('csv'|'sap') ou None se vazio."""
+    coll = get_mongo_connection(COLL_RESUMO)
+    if coll is None:
+        return None
+    doc = coll.find_one({"mes_referencia": {"$regex": f"^{ano}-"}}, {"fonte": 1})
+    return doc.get("fonte") if doc else None
 
 
 def reconciliacao(ano: int, mes: Optional[str] = None) -> dict:

@@ -14,6 +14,11 @@ from dash import html, dcc
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 
+try:  # aba autocontida de Custo de Manutenção (SDD CostsManagement, IN-05)
+    from src.pages.maintenance._v2_tabs.custo_tab import build_tab as _build_custo_tab
+except ImportError:
+    from pages.maintenance._v2_tabs.custo_tab import build_tab as _build_custo_tab
+
 
 def _blank_fig(color="#0d6efd", height=280):
     """Figure placeholder limpa (sem 'No data' default Plotly). Mostra só fundo branco
@@ -1082,6 +1087,7 @@ def layout():
                             ],
                         ),
                     ),
+                    _build_custo_tab(),
                     dbc.Tab(
                         label="📅 Relatório",
                         id="tab-v2-report-component",
