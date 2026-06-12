@@ -1,10 +1,10 @@
 """Aba 'Custo de Manutencao' — layout autocontido (DS-06).
 
-Bloco destacavel (IN-05): stores, ids e graficos proprios, acoplamento minimo as
-demais abas. So le do Mongo (DS-01). Drill-down grupo -> conta -> mes -> dia, com
-filtro lateral de centro de custo, card do geral, tarja de reconciliacao, selo de
-seed e botao "Rodar agora" isolado (SP-10). O comportamento vive em
-`callbacks_registers/custo_callbacks.py`.
+Replica o padrao visual sofisticado da indicators-v2: cards com borda superior
+colorida (`indicator-v2-card`), valor grande, toolbar com labels uppercase, grafico
+com altura FIXA (style explicito no `dcc.Graph` — evita o autosize crescer infinito).
+Bloco destacavel (IN-05): stores, ids e graficos proprios. So le do Mongo (DS-01).
+Comportamento em `callbacks_registers/custo_callbacks.py`.
 """
 from __future__ import annotations
 
@@ -12,6 +12,17 @@ import dash_bootstrap_components as dbc
 from dash import dcc, html
 
 ANO_PADRAO = 2026
+
+_CINZA = "#6c757d"
+
+
+def _label(txt: str) -> html.Label:
+    """Label de toolbar no padrao indicators-v2 (uppercase, espacado, muted)."""
+    return html.Label(
+        txt,
+        className="text-muted fw-semibold d-block mb-1",
+        style={"fontSize": "0.72rem", "letterSpacing": "0.4px", "textTransform": "uppercase"},
+    )
 
 
 def build_tab() -> dbc.Tab:
@@ -22,7 +33,7 @@ def build_tab() -> dbc.Tab:
         tab_id="tab-v2-custo",
         children=html.Div(
             [
-                # Estado proprio da aba (autocontido)
+                # Estado proprio (autocontido)
                 dcc.Store(id="store-custo-ano", data=ANO_PADRAO),
                 dcc.Store(id="store-custo-drill", data={"nivel": "planta"}),
                 dcc.Store(id="store-custo-centros", data=[]),
@@ -33,56 +44,64 @@ def build_tab() -> dbc.Tab:
                     color="#0d6efd",
                     children=html.Div(
                         [
-                            # Cabecalho: titulo + ano + botao Rodar agora
+                            # ---- Cabecalho ----
                             html.Div(
                                 [
                                     html.Div(
                                         [
-                                            html.H5(
-                                                [html.I(className="bi bi-cash-coin me-2"),
+                                            html.H4(
+                                                [html.I(className="bi bi-cash-coin me-2",
+                                                        style={"color": "#0d6efd"}),
                                                  "Custo de Manutenção"],
-                                                className="mb-0",
+                                                className="mb-0 fw-bold",
+                                                style={"letterSpacing": "-0.3px"},
                                             ),
-                                            html.Small(
+                                            html.Span(
                                                 "Orçado × Executado da manutenção (GT340) — "
-                                                "clique para detalhar grupo → conta → mês → dia.",
+                                                "clique numa barra para detalhar grupo → conta → mês → dia.",
                                                 className="text-muted",
+                                                style={"fontSize": "0.82rem"},
                                             ),
                                         ],
                                     ),
                                     html.Div(
                                         [
-                                            html.Label("Ano:", className="me-2 small text-muted"),
-                                            dcc.Dropdown(
-                                                id="custo-ano-select",
-                                                options=[{"label": str(ANO_PADRAO), "value": ANO_PADRAO}],
-                                                value=ANO_PADRAO,
-                                                clearable=False,
-                                                style={"width": "120px"},
+                                            html.Div(
+                                                [_label("Ano"),
+                                                 dcc.Dropdown(
+                                                     id="custo-ano-select",
+                                                     options=[{"label": str(ANO_PADRAO), "value": ANO_PADRAO}],
+                                                     value=ANO_PADRAO, clearable=False,
+                                                     style={"width": "110px"},
+                                                 )],
+                                                className="me-3",
                                             ),
-                                            dbc.Button(
-                                                [html.I(className="bi bi-arrow-repeat me-2"),
-                                                 "Rodar agora"],
-                                                id="btn-custo-rodar-agora",
-                                                color="outline-primary",
-                                                size="sm",
-                                                className="ms-3",
+                                            html.Div(
+                                                [_label("Coleta"),
+                                                 dbc.Button(
+                                                     [html.I(className="bi bi-arrow-repeat me-2"),
+                                                      "Rodar agora"],
+                                                     id="btn-custo-rodar-agora",
+                                                     color="primary", outline=True, size="sm",
+                                                 )],
                                             ),
                                         ],
-                                        className="d-flex align-items-center",
+                                        className="d-flex align-items-end",
                                     ),
                                 ],
-                                className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2",
+                                className="d-flex justify-content-between align-items-end mb-3 flex-wrap gap-3",
                             ),
 
-                            # Selo de seed + feedback do botao + tarja de reconciliacao
                             html.Div(id="custo-seed-selo", className="mb-2"),
                             html.Div(id="custo-rodar-feedback"),
                             html.Div(id="custo-reconc-banner", className="mb-2"),
 
+                            # ---- Cards KPI do geral ----
+                            html.Div(id="custo-card-geral", className="mb-3"),
+
+                            # ---- Corpo: filtro lateral + grafico ----
                             dbc.Row(
                                 [
-                                    # Lateral: filtro de centro de custo
                                     dbc.Col(
                                         dbc.Card(
                                             dbc.CardBody(
@@ -90,7 +109,7 @@ def build_tab() -> dbc.Tab:
                                                     html.H6(
                                                         [html.I(className="bi bi-funnel me-2"),
                                                          "Centro de custo"],
-                                                        className="mb-2",
+                                                        className="mb-2 fw-bold",
                                                     ),
                                                     html.Small(
                                                         "Filtra apenas o executado; o orçado "
@@ -99,35 +118,57 @@ def build_tab() -> dbc.Tab:
                                                     ),
                                                     dcc.Dropdown(
                                                         id="custo-centro-filter",
-                                                        options=[],
-                                                        value=[],
-                                                        multi=True,
+                                                        options=[], value=[], multi=True,
                                                         placeholder="Todos os centros",
                                                     ),
                                                 ]
                                             ),
-                                            className="mb-3",
+                                            className="shadow-sm h-100 indicator-v2-card-static",
+                                            style={"borderTop": f"4px solid {_CINZA}"},
                                         ),
-                                        md=3,
+                                        md=3, className="mb-3",
                                     ),
-                                    # Corpo: card geral + breadcrumb + grafico
                                     dbc.Col(
-                                        [
-                                            html.Div(id="custo-card-geral", className="mb-3"),
-                                            html.Div(id="custo-breadcrumb", className="mb-2"),
-                                            dcc.Graph(id="custo-graph", config={"displayModeBar": False}),
-                                        ],
-                                        md=9,
+                                        dbc.Card(
+                                            [
+                                                dbc.CardHeader(
+                                                    html.Div(id="custo-breadcrumb"),
+                                                    className="py-2",
+                                                ),
+                                                dbc.CardBody(
+                                                    dcc.Graph(
+                                                        id="custo-graph",
+                                                        config={"displayModeBar": False,
+                                                                "responsive": True},
+                                                        style={"height": "440px", "width": "100%"},
+                                                    ),
+                                                    className="p-2",
+                                                ),
+                                            ],
+                                            className="shadow-sm h-100 indicator-v2-card-md",
+                                            style={"borderTop": "4px solid #0d6efd"},
+                                        ),
+                                        md=9, className="mb-3",
                                     ),
                                 ],
                             ),
 
-                            # Rodape: tabela de lancamentos do recorte
-                            html.H6(
-                                [html.I(className="bi bi-table me-2"), "Lançamentos do recorte"],
-                                className="mt-4 mb-2",
+                            # ---- Tabela de lancamentos ----
+                            dbc.Card(
+                                [
+                                    dbc.CardHeader(
+                                        html.H6(
+                                            [html.I(className="bi bi-table me-2"),
+                                             "Lançamentos do recorte"],
+                                            className="mb-0 fw-bold",
+                                        ),
+                                        className="py-2",
+                                    ),
+                                    dbc.CardBody(html.Div(id="custo-tabela"), className="p-2"),
+                                ],
+                                className="shadow-sm indicator-v2-card-static",
+                                style={"borderTop": f"4px solid {_CINZA}"},
                             ),
-                            html.Div(id="custo-tabela"),
                         ],
                         className="p-3",
                     ),
