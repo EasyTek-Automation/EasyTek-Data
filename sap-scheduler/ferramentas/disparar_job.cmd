@@ -12,16 +12,22 @@ echo   SAP Job Scheduler - Disparo Manual de Job
 echo  ==================================================
 echo.
 echo  Tipos disponiveis:
-echo    1) zppprd       (apontamentos / producao)
-echo    2) zpp_nt0001   (paradas / breakdowns)
+echo    1) zppprd        (apontamentos / producao)
+echo    2) zpp_nt0001    (paradas / breakdowns)
+echo    3) custo_exec    (lancamentos manutencao)
+echo    4) custo_orcado  (orcado manutencao)
 echo.
 
-set /p escolha="Tipo (1 ou 2): "
+set /p escolha="Tipo (1 a 4): "
 
 if "%escolha%"=="1" (
     set "tipo=zppprd"
 ) else if "%escolha%"=="2" (
     set "tipo=zpp_nt0001"
+) else if "%escolha%"=="3" (
+    set "tipo=custo_exec"
+) else if "%escolha%"=="4" (
+    set "tipo=custo_orcado"
 ) else (
     echo.
     echo  ERRO: opcao invalida.

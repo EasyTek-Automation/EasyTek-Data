@@ -1,0 +1,8 @@
+# Local-only (NUNCA versionar) — ver README e RECUPERACAO
+.venv/
+logs/
+.env
+daemon.lock
+old/
+__pycache__/
+*.pyc
