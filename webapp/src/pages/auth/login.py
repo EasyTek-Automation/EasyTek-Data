@@ -73,14 +73,16 @@ def render_layout():
 @app.callback(
     [Output('url', 'pathname', allow_duplicate=True),
      Output('login-error-message', 'children')],
-    Input('login_button', 'n_clicks'),
+    [Input('login_button', 'n_clicks'),
+     Input('email_login', 'n_submit'),
+     Input('pwd_login', 'n_submit')],
     [
         State('email_login', 'value'),
         State('pwd_login', 'value')
     ],
     prevent_initial_call=True
 )
-def successful_login(n_clicks, email, password):
+def successful_login(n_clicks, email_submit, pwd_submit, email, password):
     # Only require email (password can be blank for first-time users)
     if not email:
         raise PreventUpdate
