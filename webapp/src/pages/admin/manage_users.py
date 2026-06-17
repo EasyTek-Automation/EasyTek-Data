@@ -43,6 +43,7 @@ def layout(user):
         # ============================================
         dcc.Store(id="manage-admin-user-level", data=user.level),
         dcc.Store(id="manage-admin-user-perfil", data=user.perfil),
+        dcc.Store(id="manage-admin-user-id", data=user.id),  # Admin's own id (self-edit guard)
         dcc.Store(id="edit-user-data", data=None),  # Store data of user being edited
         dcc.Interval(id="refresh-users-table", interval=5000, n_intervals=0),  # Auto-refresh every 5s
 
@@ -147,6 +148,18 @@ def layout(user):
                     placeholder="email@exemplo.com",
                     className="mb-3"
                 ),
+
+                # Access level field (controle novo — regras espelhadas do create_user)
+                html.Label("Nível de Acesso:", className="fw-bold mb-1"),
+                dcc.Dropdown(
+                    id="edit-level-input",
+                    options=[],  # Populated by callback on modal open
+                    placeholder="Selecione o nível",
+                    clearable=False,
+                    searchable=False,
+                    className="mb-1"
+                ),
+                html.Small(id="edit-level-note", className="text-muted d-block mb-3"),
 
                 # Alert for errors in modal
                 html.Div(id="edit-user-modal-alert"),
