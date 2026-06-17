@@ -141,7 +141,9 @@ def collect_lancamentos(s, ini, fim, classes=None):
     def setv(eid, v):
         try: s.findById("wnd[0]/usr/" + eid).Text = v
         except Exception: pass
-    setv("ctxtP_KOKRS", "BR01"); setv("ctxtKSTGR", "BR01CUSTO"); setv("ctxtKOAGR", "")
+    # KOKRS=BR01 é a ÁREA CONTÁBIL; o grupo de centro de custo é BR02CUSTO (planta do Max —
+    # reproduz a planilha oficial GT340; com BR01CUSTO o REAL dava ~metade). Ver SDD BR-11/DS-10.
+    setv("ctxtP_KOKRS", "BR01"); setv("ctxtKSTGR", "BR02CUSTO"); setv("ctxtKOAGR", "")
     setv("ctxtKSTAR-LOW", ""); setv("ctxtKSTAR-HIGH", "")
     setv("ctxtKOSTL-LOW", ""); setv("ctxtKOSTL-HIGH", "")
     setv("ctxtR_BUDAT-LOW", _ddmm(ini)); setv("ctxtR_BUDAT-HIGH", _ddmm(fim))
@@ -182,7 +184,8 @@ def _scrape_zbrco019_periodo(s, ano, periodo):
     s.findById("wnd[0]/tbar[0]/okcd").Text = "/nZBRCO019"
     s.findById("wnd[0]").sendVKey(0); time.sleep(1.2)
     setv("txt$1GJAHLJ", str(ano)); setv("ctxt$1PERIV", str(periodo)); setv("ctxt$1PERIB", str(periodo))
-    setv("ctxt$1KOSET", "BR01CUSTO"); setv("ctxt$1KSTAR", "DESP_COCKP")
+    # $1KOSET = grupo de centro de custo BR02CUSTO (planta do Max — reproduz a planilha oficial). Ver SDD BR-11/DS-10.
+    setv("ctxt$1KOSET", "BR02CUSTO"); setv("ctxt$1KSTAR", "DESP_COCKP")
     s.findById("wnd[0]").sendVKey(8); time.sleep(2.3)
     if _has_popup(s):
         s.findById("wnd[1]").sendVKey(0); time.sleep(1.2)
