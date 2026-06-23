@@ -213,7 +213,7 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     # Destaque do GERAL no medidor (modo pct): como todas as barras agora têm o mesmo peso
     # visual, separamos o GERAL (total) das contas que o compõem por um gap + divisória +
     # faixa de fundo, e o deixamos mais largo. Sem recolorir (mantém azul/cinza/laranja).
-    geral_destaque = (not mini and modo_pct and rows and rows[0]["code"] == "__GERAL__")
+    geral_destaque = bool(rows) and rows[0]["code"] == "__GERAL__"
     if geral_destaque:
         # GERAL largo-ish; contas BEM finas e juntas (cluster de componentes). GERAL no eixo
         # primário e contas no secundário (mais altas-proporcionais), em faixas de tom distintas.
@@ -283,44 +283,54 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
         else:
             _add_medidor(contas_idx, "y", True)
     else:
+        # Modo valor (R$) — usado no nível 'contas-dia' (sem orçado diário → sem %). Mantém a
+        # família visual: azul AMG (não verde), barras finas e faixa quando há GERAL.
+        larg_exec = larguras if larguras is not None else 0.34
         if com_orcado:
-            fig.add_bar(name="Orçado", x=xs, y=[r["orcado"] for r in rows], width=0.66,
+            fig.add_bar(name="Orçado", x=xs, y=[r["orcado"] for r in rows],
+                        width=(larguras if larguras is not None else 0.66),
                         marker={"color": _ORCADO_FILL, "line": {"color": "#9ec5fe", "width": 1}},
                         customdata=codes, hovertext=hovers,
                         hovertemplate="%{hovertext}<extra></extra>")
-        # GERAL com cor própria (cinza-azulado) p/ destacar do resto
-        cores = ["#34568b" if r["code"] == "__GERAL__" else _cor_exec(r) for r in rows]
-        fig.add_bar(name="Executado", x=xs, y=[r["executado"] for r in rows], width=0.34,
+        cores = ["#34568b" if r["code"] == "__GERAL__" else _AMG_AZUL for r in rows]
+        fig.add_bar(name="Executado", x=xs, y=[r["executado"] for r in rows], width=larg_exec,
                     marker={"color": cores}, customdata=codes, hovertext=hovers,
                     hovertemplate="%{hovertext}<extra></extra>")
         topo_max = max((max(r.get("orcado", 0) or 0, r["executado"] or 0) for r in rows), default=0)
         bar_top = [max(r.get("orcado", 0) or 0, r["executado"] or 0) for r in rows]
 
     anots = []
-    if not mini:
-        for i, (x, r) in enumerate(zip(xs, rows)):
-            orc = r.get("orcado", 0) or 0
-            ex = r["executado"] or 0
-            topo = bar_top[i]
-            # cada rótulo segue o eixo da sua barra (GERAL no primário, contas no secundário)
-            yr = "y2" if (geral_destaque and i != 0) else "y"
-            cor_ex = _AMG_AZUL if modo_pct else ("#34568b" if r["code"] == "__GERAL__" else _cor_exec(r))
-            # Rótulos de dados empilhados ACIMA da barra. De baixo p/ cima: Executado, Orçado, %.
-            if ex:
-                anots.append(dict(x=x, y=topo, yref=yr, text=_brl_abrev(ex), showarrow=False,
-                                  yshift=9, font={"size": 9, "color": cor_ex, "weight": "bold"}))
-            if orc > 0:
-                anots.append(dict(x=x, y=topo, yref=yr, text=_brl_abrev(orc), showarrow=False,
-                                  yshift=20, font={"size": 8, "color": _CINZA}))
-            if r.get("sem_orcamento"):
-                txt, cor = "s/orç", (_AMG_LARANJA if modo_pct else _LARANJA)
-            elif r.get("pct") is None:
-                txt, cor = "", "#8a929b"
-            else:
-                txt, cor = _pct(r["pct"]), (_VERMELHO if r.get("estouro") else "#495057")
-            if txt:
-                anots.append(dict(x=x, y=topo, yref=yr, text=txt, showarrow=False, yshift=31,
-                                  font={"size": 9, "color": cor, "weight": "bold"}))
+    for i, (x, r) in enumerate(zip(xs, rows)):
+        orc = r.get("orcado", 0) or 0
+        ex = r["executado"] or 0
+        topo = bar_top[i]
+        # rótulo segue o eixo da sua barra — só há y2 no medidor (pct); valor/contas-dia usa y
+        yr = "y2" if (geral_destaque and modo_pct and i != 0) else "y"
+        cor_ex = _AMG_AZUL if r["code"] != "__GERAL__" else "#34568b"
+        # texto do % (ou s/orç) — comportamento/cor preservado
+        if r.get("sem_orcamento"):
+            txt_pct, cor_pct = "s/orç", (_AMG_LARANJA if modo_pct else _LARANJA)
+        elif r.get("pct") is None:
+            txt_pct, cor_pct = "", "#8a929b"
+        else:
+            txt_pct, cor_pct = _pct(r["pct"]), (_VERMELHO if r.get("estouro") else "#495057")
+        if mini:
+            # mini (200px): um rótulo só por barra — % quando há, senão R$ abreviado
+            t = txt_pct or (_brl_abrev(ex) if ex else "")
+            if t:
+                anots.append(dict(x=x, y=topo, yref=yr, text=t, showarrow=False, yshift=5,
+                                  font={"size": 7, "color": (cor_pct if txt_pct else cor_ex)}))
+            continue
+        # gráficos grandes: pilha Executado (R$) / Orçado (R$) / % acima da barra
+        if ex:
+            anots.append(dict(x=x, y=topo, yref=yr, text=_brl_abrev(ex), showarrow=False,
+                              yshift=9, font={"size": 9, "color": cor_ex, "weight": "bold"}))
+        if orc > 0:
+            anots.append(dict(x=x, y=topo, yref=yr, text=_brl_abrev(orc), showarrow=False,
+                              yshift=20, font={"size": 8, "color": _CINZA}))
+        if txt_pct:
+            anots.append(dict(x=x, y=topo, yref=yr, text=txt_pct, showarrow=False, yshift=31,
+                              font={"size": 9, "color": cor_pct, "weight": "bold"}))
 
     def _pct_ticks(ate):
         rs = sorted(set(list(range(0, int(ate) + 51, 50)) + [100]))
@@ -749,7 +759,7 @@ def register_custo_callbacks(app):
                 html.H6("Clique num mês para ver os dias:", className="v2-section-h6 text-muted"),
                 dbc.Row(cards, className="g-3"),
             ])
-            return content, "Custo — meses (orçado × executado)", _crumb(ano_lbl), {}
+            return content, "Custo — meses (realizado, % do orçado)", _crumb(ano_lbl), {}
 
         # NÍVEL 2 — dias (gráfico do mês + cards de dia)
         if level == "dias" and mes:
