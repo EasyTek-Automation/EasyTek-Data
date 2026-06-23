@@ -202,12 +202,11 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     # faixa de fundo, e o deixamos mais largo. Sem recolorir (mantém azul/cinza/laranja).
     geral_destaque = (not mini and modo_pct and rows and rows[0]["code"] == "__GERAL__")
     if geral_destaque:
-        # GERAL na largura normal; contas mais estreitas e mais juntas (cluster de
-        # componentes) — muda a perspectiva sem alargar o GERAL.
-        _STEP = 0.66
-        xs = [0] + [1.15 + k * _STEP for k in range(len(rows) - 1)]
-        larguras = [0.62] + [0.42] * (len(rows) - 1)
-        x_div = (0.31 + (1.15 - 0.21)) / 2                   # meio do vão GERAL↔1ª conta
+        # GERAL e contas estreitos; contas mais juntas (cluster de componentes). O total e
+        # os componentes ficam em faixas de cor distintas (escura no GERAL, clara nas contas).
+        _STEP = 0.5
+        xs = [0] + [1.0 + k * _STEP for k in range(len(rows) - 1)]
+        larguras = [0.5] + [0.32] * (len(rows) - 1)
     else:
         xs = list(range(len(rows)))
         larguras = 0.62 if modo_pct else None
@@ -318,14 +317,16 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     else:
         yaxis.update({"tickprefix": "R$ ", "tickformat": ",.0f"})
 
-    # Destaque do GERAL: faixa de fundo na coluna do total + divisória até as contas.
+    # Destaque do GERAL: duas faixas de fundo — escura no total, clara nos componentes.
+    # A própria mudança de tom divide o GERAL das contas (sem precisar de linha).
     shapes = []
     if geral_destaque:
+        x_fim = xs[-1] + 0.3
         shapes = [
-            dict(type="rect", xref="x", yref="paper", x0=-0.5, x1=0.5, y0=0, y1=1,
-                 fillcolor="rgba(0,86,135,0.06)", line={"width": 0}, layer="below"),
-            dict(type="line", xref="x", yref="paper", x0=x_div, x1=x_div, y0=0, y1=1,
-                 line={"color": "#ced4da", "width": 1, "dash": "dot"}, layer="below"),
+            dict(type="rect", xref="x", yref="paper", x0=-0.4, x1=0.5, y0=0, y1=1,
+                 fillcolor="rgba(0,86,135,0.11)", line={"width": 0}, layer="below"),
+            dict(type="rect", xref="x", yref="paper", x0=0.5, x1=x_fim, y0=0, y1=1,
+                 fillcolor="rgba(0,86,135,0.035)", line={"width": 0}, layer="below"),
         ]
 
     fig.update_layout(
