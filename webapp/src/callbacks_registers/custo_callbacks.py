@@ -202,9 +202,12 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     # faixa de fundo, e o deixamos mais largo. Sem recolorir (mantém azul/cinza/laranja).
     geral_destaque = (not mini and modo_pct and rows and rows[0]["code"] == "__GERAL__")
     if geral_destaque:
-        xs = [0] + [1.6 + k for k in range(len(rows) - 1)]   # gap extra após o GERAL
-        larguras = [0.84] + [0.62] * (len(rows) - 1)
-        x_div = (0.42 + (1.6 - 0.31)) / 2                     # meio do vão GERAL↔1ª conta
+        # GERAL na largura normal; contas mais estreitas e mais juntas (cluster de
+        # componentes) — muda a perspectiva sem alargar o GERAL.
+        _STEP = 0.66
+        xs = [0] + [1.15 + k * _STEP for k in range(len(rows) - 1)]
+        larguras = [0.62] + [0.42] * (len(rows) - 1)
+        x_div = (0.31 + (1.15 - 0.21)) / 2                   # meio do vão GERAL↔1ª conta
     else:
         xs = list(range(len(rows)))
         larguras = 0.62 if modo_pct else None
@@ -212,7 +215,9 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     # Hover rico (mesmo texto p/ as barras): nome + orçado + executado + %.
     # Vai em `hovertext` de propósito — `customdata` segue carregando só o code (clique de drill).
     def _hover_rico(r):
-        linhas = [f"<b>{r['label']}</b>"]
+        # Custo identificado por código + descrição (GERAL não tem código de conta)
+        rotulo = r["label"] if r["code"] == "__GERAL__" else f"{r['code']} — {r['label']}"
+        linhas = [f"<b>{rotulo}</b>"]
         if r.get("orcado") or 0:
             linhas.append(f"Orçado: {_brl(r['orcado'])}")
         linhas.append(f"Executado: {_brl(r['executado'])}")
@@ -317,7 +322,7 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     shapes = []
     if geral_destaque:
         shapes = [
-            dict(type="rect", xref="x", yref="paper", x0=-0.62, x1=0.62, y0=0, y1=1,
+            dict(type="rect", xref="x", yref="paper", x0=-0.5, x1=0.5, y0=0, y1=1,
                  fillcolor="rgba(0,86,135,0.06)", line={"width": 0}, layer="below"),
             dict(type="line", xref="x", yref="paper", x0=x_div, x1=x_div, y0=0, y1=1,
                  line={"color": "#ced4da", "width": 1, "dash": "dot"}, layer="below"),
