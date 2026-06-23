@@ -118,19 +118,17 @@ def nome_centro(centro: str) -> str:
     return CENTRO_NOME.get(centro, centro)
 
 
-# De/para centro de custo (KOSTL, planta BR02 = grupo BR02CUSTO) → nome do EQUIPAMENTO,
-# para o gráfico de rosca "custo por equipamento" (igual aos KPIs: Decapado, LCT-08, …).
-# Os códigos BR02 são 2xxxxx e NÃO têm nome na coleta (o KSB1 só traz o KOSTL). Preencher
-# o nome de cada centro abaixo; enquanto vazio, a rosca cai no fallback (mostra o código).
+# De/para MANUAL centro de custo (KOSTL) → nome do EQUIPAMENTO, para a rosca "custo por
+# equipamento". Override opcional: quando preenchido, vence a derivação automática abaixo —
+# use p/ nomes no padrão dos KPIs (ex: "LCT-08", "Decapado") ou p/ agrupar centros num
+# rótulo comum (ex: vários 209xxx → "Apoio/Admin" pra caírem juntos).
 #
-# >>> TODO Rodolfo: confirmar/preencher os nomes. Centros sem entrada aqui aparecem com o
-#     código. Os de apoio/admin (gerência, serviços, armazéns…) podem mapear p/ um rótulo
-#     comum (ex: "Apoio/Admin") para caírem juntos.
+# >>> Rodolfo: preencher só o que quiser renomear/agrupar. O resto resolve sozinho pelo
+#     CENTRO_NOME (os códigos BR02 2xxxxx = BR01 1xxxxx). Centros sem nome em lugar nenhum
+#     aparecem com o código KOSTL.
 CENTRO_EQUIP: dict[str, str] = {
     # "206001": "LCT-08",
-    # "205001": "LCL-...",
-    # "209710": "Armazéns e Translado",
-    # ...
+    # "201300": "Decapado",
 }
 
 # Rótulo usado p/ agrupar a cauda de centros pequenos no gráfico de rosca.
@@ -138,9 +136,16 @@ EQUIP_OUTROS = "Outros"
 
 
 def nome_equipamento(centro: str) -> str:
-    """Nome do equipamento de um centro de custo (de/para `CENTRO_EQUIP`); ecoa o código
-    se ainda não mapeado."""
-    return CENTRO_EQUIP.get(centro, centro)
+    """Nome do equipamento de um centro de custo. Ordem: (1) de/para manual `CENTRO_EQUIP`;
+    (2) `CENTRO_NOME` do equivalente BR01 (os códigos BR02 `2xxxxx` espelham os `1xxxxx`);
+    (3) o próprio código, se não houver nome."""
+    if centro in CENTRO_EQUIP:
+        return CENTRO_EQUIP[centro]
+    if centro.startswith("2"):
+        nome = CENTRO_NOME.get("1" + centro[1:])
+        if nome:
+            return nome
+    return CENTRO_NOME.get(centro, centro)
 
 
 def normalizar_grupo(grupo: str) -> str:
