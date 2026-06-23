@@ -356,8 +356,8 @@ def fetch_contas_geral(ano: int, mes: Optional[str] = None,
                        centros: Optional[Iterable[str]] = None) -> list[dict]:
     """GERAL + todas as contas (orçado × executado) da janela — eixo do gráfico.
 
-    Primeira linha = GERAL (rollup GT340); depois cada conta, ordenada por executado
-    desc. `mes=None` → ano inteiro. Cada item tem o contrato do gráfico
+    Primeira linha = GERAL (rollup GT340); depois cada conta, ordenada por ORÇADO
+    desc (desempate executado). `mes=None` → ano inteiro. Cada item tem o contrato do gráfico
     (label/code/orcado/executado/pct/estouro/sem_orcamento).
     """
     cz = _norm_centros(centros)
@@ -373,7 +373,8 @@ def fetch_contas_geral(ano: int, mes: Optional[str] = None,
             contas.append({"code": a["conta"], "label": nome_conta(a["conta"]),
                            "conta_desc": a.get("conta_desc", ""),
                            **calcular_metricas(a["orcado"], a["executado"])})
-        contas.sort(key=lambda x: x["executado"], reverse=True)
+        # ordem das barras (esq→dir) por ORÇADO desc; desempate por executado
+        contas.sort(key=lambda x: (x["orcado"], x["executado"]), reverse=True)
         return [geral] + contas
 
     return _memo(("contas_geral", ano, mes, cz), _calc)
