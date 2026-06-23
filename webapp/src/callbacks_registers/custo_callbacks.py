@@ -387,9 +387,9 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     return fig
 
 
-def _graph_click(rows, graph_id, com_orcado, titulo, h=360):
-    """Gráfico grande clicável (clique na barra dispara drill)."""
-    return dcc.Graph(id=graph_id, figure=_fig_barras(rows, com_orcado, titulo, h=h),
+def _graph_click(rows, graph_id, com_orcado, titulo, h=360, modo="valor"):
+    """Gráfico grande clicável (clique na barra dispara drill). `modo='pct'` usa o medidor."""
+    return dcc.Graph(id=graph_id, figure=_fig_barras(rows, com_orcado, titulo, h=h, modo=modo),
                      config={"displayModeBar": False, "responsive": True},
                      style={"height": f"{h}px", "cursor": "pointer"})
 
@@ -410,7 +410,7 @@ def _mini_graph_card(mes, rows):
                         # orçado/executado/%). O clique no card segue funcionando: o clique
                         # no DOM do gráfico borbulha pro Div pai (n_clicks). doubleClick/drag
                         # desligados p/ não capturar o gesto.
-                        dcc.Graph(figure=_fig_barras(rows, True, "", h=200, mini=True),
+                        dcc.Graph(figure=_fig_barras(rows, True, "", h=200, mini=True, modo="pct"),
                                   config={"displayModeBar": False, "responsive": True,
                                           "doubleClick": False, "scrollZoom": False},
                                   style={"height": "200px", "pointerEvents": "auto"}),
@@ -760,7 +760,8 @@ def register_custo_callbacks(app):
                                  {"type": "custo-dia-card", "dia": d["code"]}) for d in dias]
             content = html.Div([
                 _graph_click(rows, {"type": "custo-bar", "nivel": "mes-contas"}, True,
-                             f"{_nome_mes(mes)} — orçado × executado por conta"),
+                             f"{_nome_mes(mes)} — realizado por conta (% do orçado)",
+                             modo="pct"),
                 html.Hr(),
                 html.H6("Clique num dia (card) para ver as contas do dia, ou numa barra "
                         "de conta para os lançamentos:", className="v2-section-h6 text-muted"),
