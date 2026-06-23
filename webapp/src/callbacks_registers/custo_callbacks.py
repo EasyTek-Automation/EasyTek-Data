@@ -202,11 +202,11 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     # faixa de fundo, e o deixamos mais largo. Sem recolorir (mantém azul/cinza/laranja).
     geral_destaque = (not mini and modo_pct and rows and rows[0]["code"] == "__GERAL__")
     if geral_destaque:
-        # GERAL e contas estreitos; contas mais juntas (cluster de componentes). O total e
-        # os componentes ficam em faixas de cor distintas (escura no GERAL, clara nas contas).
-        _STEP = 0.5
-        xs = [0] + [1.0 + k * _STEP for k in range(len(rows) - 1)]
-        larguras = [0.5] + [0.32] * (len(rows) - 1)
+        # GERAL largo-ish; contas BEM finas e juntas (cluster de componentes). GERAL no eixo
+        # primário e contas no secundário (mais altas-proporcionais), em faixas de tom distintas.
+        _STEP = 0.42
+        xs = [0] + [0.95 + k * _STEP for k in range(len(rows) - 1)]
+        larguras = [0.5] + [0.2] * (len(rows) - 1)
     else:
         xs = list(range(len(rows)))
         larguras = 0.62 if modo_pct else None
@@ -233,36 +233,42 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
 
     fig = go.Figure()
     if modo_pct:
-        # Barra-medidor empilhada (sem linha de 100% — o cinza/laranja já dá a referência):
-        #   azul AMG  = executado dentro do orçado (0→100%)
-        #   cinza     = saldo do orçado não usado (até 100%)
-        #   laranja AMG = excedente acima de 100% (escala comprimida via _comp_pct)
-        # Conta sem orçado = divisão por zero (% infinito) → gasto 100% fora do orçado:
-        # barra inteira laranja (excedente puro), marcada 's/orç'.
-        azul_h, cinza_h, laranja_h, cinza_cor = [], [], [], []
-        for r in rows:
+        # Barra-medidor empilhada: azul = executado dentro do orçado; cinza = saldo do orçado
+        # (até 100%); laranja = excedente acima de 100% (comprimido por _comp_pct). Conta sem
+        # orçado (÷0) = barra inteira laranja, marcada 's/orç'.
+        # Eixo duplo: GERAL no primário (y) e contas no secundário (y2), com ranges diferentes
+        # p/ a barra do total parecer ~40% mais alta que as contas no mesmo %.
+        def _segs(r):
             if _sem_orc(r):
-                azul_h.append(0); cinza_h.append(0); laranja_h.append(100)
-                cinza_cor.append(_CINZA_ORC)
-                continue
+                return 0.0, 0.0, 100.0
             p = r["pct"] or 0
-            azul_h.append(min(p, 100))
-            cinza_h.append(max(0, 100 - p))
-            laranja_h.append(max(0, (p - 100) * _FATOR_EXC))
-            cinza_cor.append(_CINZA_ORC)
-        fig.add_bar(name="Executado", x=xs, y=azul_h, width=larguras,
-                    marker={"color": _AMG_AZUL}, customdata=codes, hovertext=hovers,
-                    hovertemplate="%{hovertext}<extra></extra>")
-        fig.add_bar(name="Orçado", x=xs, y=cinza_h, width=larguras,
-                    marker={"color": cinza_cor}, customdata=codes, hovertext=hovers,
-                    hovertemplate="%{hovertext}<extra></extra>")
-        fig.add_bar(name="Excedente", x=xs, y=laranja_h, width=larguras,
-                    marker={"color": _AMG_LARANJA}, customdata=codes, hovertext=hovers,
-                    hovertemplate="%{hovertext}<extra></extra>")
-        topo_pct = max((max(r["pct"], 100) for r in rows
-                        if not _sem_orc(r) and r.get("pct") is not None), default=100)
-        topo_max = _comp_pct(topo_pct)
-        bar_top = [a + c + l for a, c, l in zip(azul_h, cinza_h, laranja_h)]
+            return min(p, 100), max(0, 100 - p), max(0, (p - 100) * _FATOR_EXC)
+        seg = [_segs(r) for r in rows]
+        azul_h = [s[0] for s in seg]
+        cinza_h = [s[1] for s in seg]
+        laranja_h = [s[2] for s in seg]
+        bar_top = [a + c + l for a, c, l in seg]
+
+        def _add_medidor(idxs, eixo, legenda):
+            larg = [larguras[i] for i in idxs] if isinstance(larguras, list) else larguras
+            for nome, cor, alt in (("Executado", _AMG_AZUL, azul_h),
+                                   ("Orçado", _CINZA_ORC, cinza_h),
+                                   ("Excedente", _AMG_LARANJA, laranja_h)):
+                fig.add_bar(name=nome, legendgroup=nome, showlegend=legenda, yaxis=eixo,
+                            x=[xs[i] for i in idxs], y=[alt[i] for i in idxs], width=larg,
+                            marker={"color": cor}, customdata=[codes[i] for i in idxs],
+                            hovertext=[hovers[i] for i in idxs],
+                            hovertemplate="%{hovertext}<extra></extra>")
+
+        contas_idx = list(range(1, len(rows))) if geral_destaque else list(range(len(rows)))
+        topo_pct = max((max(rows[i]["pct"], 100) for i in contas_idx
+                        if not _sem_orc(rows[i]) and rows[i].get("pct") is not None), default=100)
+        topo_max = _comp_pct(topo_pct)            # teto das contas (escala secundária)
+        if geral_destaque:
+            _add_medidor([0], "y", False)         # GERAL → eixo primário
+            _add_medidor(contas_idx, "y2", True)  # contas → eixo secundário
+        else:
+            _add_medidor(contas_idx, "y", True)
     else:
         if com_orcado:
             fig.add_bar(name="Orçado", x=xs, y=[r["orcado"] for r in rows], width=0.66,
@@ -283,14 +289,16 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
             orc = r.get("orcado", 0) or 0
             ex = r["executado"] or 0
             topo = bar_top[i]
+            # cada rótulo segue o eixo da sua barra (GERAL no primário, contas no secundário)
+            yr = "y2" if (geral_destaque and i != 0) else "y"
             cor_ex = _AMG_AZUL if modo_pct else ("#34568b" if r["code"] == "__GERAL__" else _cor_exec(r))
             # Rótulos de dados empilhados ACIMA da barra. De baixo p/ cima: Executado, Orçado, %.
             if ex:
-                anots.append(dict(x=x, y=topo, text=_brl_abrev(ex), showarrow=False, yshift=9,
-                                  font={"size": 9, "color": cor_ex, "weight": "bold"}))
+                anots.append(dict(x=x, y=topo, yref=yr, text=_brl_abrev(ex), showarrow=False,
+                                  yshift=9, font={"size": 9, "color": cor_ex, "weight": "bold"}))
             if orc > 0:
-                anots.append(dict(x=x, y=topo, text=_brl_abrev(orc), showarrow=False, yshift=20,
-                                  font={"size": 8, "color": _CINZA}))
+                anots.append(dict(x=x, y=topo, yref=yr, text=_brl_abrev(orc), showarrow=False,
+                                  yshift=20, font={"size": 8, "color": _CINZA}))
             if r.get("sem_orcamento"):
                 txt, cor = "s/orç", (_AMG_LARANJA if modo_pct else _LARANJA)
             elif r.get("pct") is None:
@@ -298,24 +306,39 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
             else:
                 txt, cor = _pct(r["pct"]), (_VERMELHO if r.get("estouro") else "#495057")
             if txt:
-                anots.append(dict(x=x, y=topo, text=txt, showarrow=False, yshift=31,
+                anots.append(dict(x=x, y=topo, yref=yr, text=txt, showarrow=False, yshift=31,
                                   font={"size": 9, "color": cor, "weight": "bold"}))
 
-    yaxis = {"showgrid": True, "gridcolor": _GRID, "zeroline": False,
+    def _pct_ticks(ate):
+        rs = sorted(set(list(range(0, int(ate) + 51, 50)) + [100]))
+        rs = [t for t in rs if t <= ate + 1]
+        return [_comp_pct(t) for t in rs], [f"{t} %" for t in rs]
+
+    yaxis = {"showgrid": not geral_destaque, "gridcolor": _GRID, "zeroline": False,
              "tickfont": {"size": 9 if mini else 10}, "rangemode": "tozero",
-             "showticklabels": not mini,
-             # headroom p/ os rótulos empilhados acima da barra mais alta (só nos grandes)
-             **({"range": [0, topo_max * 1.18]} if (not mini and topo_max > 0) else {})}
-    if modo_pct:
-        # ticks reais (0,50,100,150,...) posicionados na escala comprimida
-        reais = sorted(set(list(range(0, int(topo_pct) + 51, 50)) + [100]))
-        reais = [t for t in reais if t <= topo_pct + 1]
-        yaxis.update({"tickmode": "array",
-                      "tickvals": [_comp_pct(t) for t in reais],
-                      "ticktext": [f"{t} %" for t in reais],
-                      "tickformat": ",.0f"})
+             "showticklabels": not mini}
+    yaxis2 = None
+    if modo_pct and geral_destaque:
+        # GERAL no eixo primário com range MENOR → mesma barra parece ~40% mais alta que as
+        # contas (que ficam no secundário, range maior). topo_max = teto comprimido das contas.
+        r_g = bar_top[0] * 1.18                       # GERAL ocupa ~85% do próprio eixo
+        r_c = max(r_g * 1.40, topo_max * 1.10)        # contas: 40% "mais baixas" no mesmo %
+        g_top = 100 if bar_top[0] <= 100 else topo_pct
+        tvg, ttg = _pct_ticks(g_top)
+        tvc, ttc = _pct_ticks(topo_pct)
+        yaxis.update({"range": [0, r_g], "tickmode": "array", "tickvals": tvg,
+                      "ticktext": ttg, "tickformat": ",.0f"})
+        yaxis2 = {"showgrid": False, "zeroline": False, "rangemode": "tozero",
+                  "range": [0, r_c], "overlaying": "y", "side": "right",
+                  "tickmode": "array", "tickvals": tvc, "ticktext": ttc, "tickformat": ",.0f",
+                  "tickfont": {"size": 9 if mini else 10}, "showticklabels": not mini}
+    elif modo_pct:
+        tv, tt = _pct_ticks(topo_pct)
+        yaxis.update({"range": [0, topo_max * 1.18] if (not mini and topo_max > 0) else None,
+                      "tickmode": "array", "tickvals": tv, "ticktext": tt, "tickformat": ",.0f"})
     else:
-        yaxis.update({"tickprefix": "R$ ", "tickformat": ",.0f"})
+        yaxis.update({"tickprefix": "R$ ", "tickformat": ",.0f",
+                      **({"range": [0, topo_max * 1.18]} if (not mini and topo_max > 0) else {})})
 
     # Destaque do GERAL: duas faixas de fundo — escura no total, clara nos componentes.
     # A própria mudança de tom divide o GERAL das contas (sem precisar de linha).
@@ -326,7 +349,7 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
             dict(type="rect", xref="x", yref="paper", x0=-0.4, x1=0.5, y0=0, y1=1,
                  fillcolor="rgba(0,86,135,0.11)", line={"width": 0}, layer="below"),
             dict(type="rect", xref="x", yref="paper", x0=0.5, x1=x_fim, y0=0, y1=1,
-                 fillcolor="rgba(0,86,135,0.035)", line={"width": 0}, layer="below"),
+                 fillcolor="rgba(0,86,135,0.07)", line={"width": 0}, layer="below"),
         ]
 
     fig.update_layout(
@@ -345,6 +368,7 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
                "showgrid": False, "zeroline": False, "tickfont": {"size": 10},
                "tickangle": -35, "showticklabels": not mini},
         yaxis=yaxis,
+        **({"yaxis2": yaxis2} if yaxis2 else {}),
         hoverlabel={"bgcolor": "white", "font_size": 12},
     )
     return fig
