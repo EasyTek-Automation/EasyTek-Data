@@ -20,6 +20,7 @@ import dash
 import dash_bootstrap_components as dbc
 import plotly.graph_objects as go
 from dash import ALL, Input, Output, State, ctx, dash_table, dcc, html, no_update
+from dash.dash_table.Format import Format, Group, Scheme, Symbol
 
 try:
     from src.custos import leitura as L
@@ -97,21 +98,34 @@ def _max_conta_exec(rows) -> float:
     return max((r["executado"] or 0 for r in rows if r["code"] != "__GERAL__"), default=0.0)
 
 
-def _slider_cfg(rows):
-    """(min, max, value, marks, step) do RangeSlider a partir do teto de executado.
+# piso log do slider (log10(100) = R$100). No piso, o filtro trata como 0 (inclui tudo,
+# até contas zeradas). Escala LOG dá controle fino no low-end: dá p/ cortar uma conta de
+# R$1k sem levar as de R$50k junto (o problema dos cortes agressivos do slider linear).
+_SLIDER_LOG_PISO = 2.0
 
-    min=0; max arredondado p/ um número redondo (1/2/2,5/5×10ⁿ); value=faixa cheia;
-    marcas em 0/25/50/75/100% (R$ abreviado). Vista sem contas → escala trivial.
-    """
+
+def _slider_cfg(rows):
+    """Config do RangeSlider em escala LOG (R$): (min, max, value, marks, step) em log10(R$).
+    A conversão p/ R$ é feita em `_faixa_rs`. Marcas já vêm em R$ (100, 1k, 10k, 100k, 1M…)."""
     teto = _max_conta_exec(rows)
     if teto <= 0:
-        return 0, 1, [0, 1], {0: "R$ 0", 1: "R$ 1"}, 1
-    mag = 10 ** math.floor(math.log10(teto))
-    topo = next(m * mag for m in (1, 2, 2.5, 5, 10) if m * mag >= teto)
-    marks = {int(round(topo * f)): _brl_abrev(round(topo * f))
-             for f in (0, 0.25, 0.5, 0.75, 1.0)}
-    step = max(1, round(topo / 100))
-    return 0, int(topo), [0, int(topo)], marks, step
+        m = _SLIDER_LOG_PISO
+        return m, m + 1, [m, m + 1], {m: "R$ 0"}, 0.01
+    hi = math.ceil(math.log10(teto) * 10) / 10
+    lo = _SLIDER_LOG_PISO
+    nices = [100, 500, 1e3, 5e3, 1e4, 5e4, 1e5, 5e5, 1e6, 5e6, 1e7, 5e7]
+    marks = {round(math.log10(v), 4): _brl_abrev(v) for v in nices if lo <= math.log10(v) <= hi}
+    marks[round(hi, 4)] = _brl_abrev(round(teto))
+    return lo, round(hi, 4), [lo, round(hi, 4)], marks, 0.01
+
+
+def _faixa_rs(faixa):
+    """Converte a faixa do slider (log10 R$) p/ R$ [lo, hi]. faixa[0] no piso → lo=0 (inclui
+    tudo, inclusive contas zeradas). Faixa inválida → None (sem filtro)."""
+    if not faixa or len(faixa) != 2:
+        return None
+    lo = 0 if faixa[0] <= _SLIDER_LOG_PISO + 1e-6 else 10 ** faixa[0]
+    return [lo, 10 ** faixa[1]]
 
 
 def _filtra_por_exec(rows, faixa):
@@ -485,9 +499,11 @@ def _value_card(titulo, valor_txt, cor, cid, sub=None):
         body.append(html.Div(sub, style={"fontSize": "0.7rem", "color": cor}))
     return dbc.Col(
         html.Div(
-            dbc.Card(dbc.CardBody(body, className="text-center py-2"),
-                     className="shadow-sm h-100", style={"borderTop": f"3px solid {cor}"}),
-            id=cid, n_clicks=0, style={"cursor": "pointer"},
+            dbc.Card(
+                dbc.CardBody(body, className="text-center py-2 d-flex flex-column "
+                                             "justify-content-center"),
+                className="shadow-sm", style={"borderTop": f"3px solid {cor}", "height": "92px"}),
+            id=cid, n_clicks=0, style={"cursor": "pointer", "height": "92px"},
         ),
         xs=6, sm=4, md=3, lg=2, className="mb-2",
     )
@@ -502,14 +518,17 @@ def _tabela_lancamentos(docs):
         rows.append({
             "data": dt.strftime("%d/%m/%Y") if dt else "",
             "conta": d.get("conta", ""), "centro": d.get("centro_custo", ""),
-            "valor": _brl(d.get("valor")),
+            "valor": round(d.get("valor") or 0, 2),   # número cru → sort numérico
             "descritor": d.get("descritor", "") or "(sem descrição)",
             "tipo": d.get("tipo_doc", ""), "documento": d.get("no_documento", ""),
         })
+    _fmt_brl = Format(group=Group.yes, group_delimiter=".", decimal_delimiter=",",
+                      precision=2, scheme=Scheme.fixed, symbol=Symbol.yes, symbol_prefix="R$ ")
     return dash_table.DataTable(
         data=rows,
         columns=[{"name": "Data", "id": "data"}, {"name": "Conta", "id": "conta"},
-                 {"name": "Centro", "id": "centro"}, {"name": "Valor", "id": "valor"},
+                 {"name": "Centro", "id": "centro"},
+                 {"name": "Valor", "id": "valor", "type": "numeric", "format": _fmt_brl},
                  {"name": "Descrição", "id": "descritor"}, {"name": "Tipo", "id": "tipo"},
                  {"name": "Documento", "id": "documento"}],
         page_size=12, sort_action="native", style_as_list_view=True,
@@ -643,7 +662,7 @@ def register_custo_callbacks(app):
             faixa = None
         rows = L.fetch_contas_geral(ano, None, None)   # todos os centros (sem escopo de centro)
         rows = _filtra_por_contas(rows, contas_sel or None)   # filtro das BARRAS (contas)
-        rows = _filtra_por_exec(rows, faixa)
+        rows = _filtra_por_exec(rows, _faixa_rs(faixa))
         # Anual usa a vista por % realizado (altura = executado÷orçado) — evita barras
         # minúsculas de contas de baixo R$. Modal segue em R$ (modo padrão).
         fig = _fig_barras(rows, True, "", h=460, modo="pct")
@@ -798,7 +817,7 @@ def register_custo_callbacks(app):
             faixa = None
 
         def _prep(rows):  # filtro de contas (barras) + filtro de valor
-            return _filtra_por_exec(_filtra_por_contas(rows, sel), faixa)
+            return _filtra_por_exec(_filtra_por_contas(rows, sel), _faixa_rs(faixa))
 
         # NÍVEL 1 — meses (grade de mini-gráficos, 1 por mês)
         if level == "meses":
