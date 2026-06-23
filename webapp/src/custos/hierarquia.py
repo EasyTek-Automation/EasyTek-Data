@@ -118,30 +118,29 @@ def nome_centro(centro: str) -> str:
     return CENTRO_NOME.get(centro, centro)
 
 
-# Famílias de equipamento (para o gráfico de rosca "custo por equipamento"): agrupa os
-# centros de custo de produção pelas linhas/equipamentos principais; o restante (gerência,
-# serviços, manutenção da planta, armazéns, qualidade…) cai em "Outros".
-FAMILIA_OUTROS = "Outros"
-# ordem de exibição das fatias principais (Outros sempre por último)
-FAMILIAS_EQUIP = ["LCLs (Longitudinais)", "LCTs (Transversais)", "Prensas", "Laser"]
+# De/para centro de custo (KOSTL, planta BR02 = grupo BR02CUSTO) → nome do EQUIPAMENTO,
+# para o gráfico de rosca "custo por equipamento" (igual aos KPIs: Decapado, LCT-08, …).
+# Os códigos BR02 são 2xxxxx e NÃO têm nome na coleta (o KSB1 só traz o KOSTL). Preencher
+# o nome de cada centro abaixo; enquanto vazio, a rosca cai no fallback (mostra o código).
+#
+# >>> TODO Rodolfo: confirmar/preencher os nomes. Centros sem entrada aqui aparecem com o
+#     código. Os de apoio/admin (gerência, serviços, armazéns…) podem mapear p/ um rótulo
+#     comum (ex: "Apoio/Admin") para caírem juntos.
+CENTRO_EQUIP: dict[str, str] = {
+    # "206001": "LCT-08",
+    # "205001": "LCL-...",
+    # "209710": "Armazéns e Translado",
+    # ...
+}
+
+# Rótulo usado p/ agrupar a cauda de centros pequenos no gráfico de rosca.
+EQUIP_OUTROS = "Outros"
 
 
-def familia_equipamento(centro: str) -> str:
-    """Família de equipamento de um centro de custo, pelo nome (CENTRO_NOME).
-
-    LCLs = linhas de corte longitudinal; LCTs = transversal; + Prensas e Laser. Centros
-    administrativos/apoio → 'Outros'.
-    """
-    u = nome_centro(centro).upper()
-    if "LASER" in u:
-        return "Laser"
-    if "LONGIDUDINAL" in u or "LONGITUDINAL" in u:
-        return "LCLs (Longitudinais)"
-    if "TRANSVERS" in u:
-        return "LCTs (Transversais)"
-    if "PRENSA" in u:
-        return "Prensas"
-    return FAMILIA_OUTROS
+def nome_equipamento(centro: str) -> str:
+    """Nome do equipamento de um centro de custo (de/para `CENTRO_EQUIP`); ecoa o código
+    se ainda não mapeado."""
+    return CENTRO_EQUIP.get(centro, centro)
 
 
 def normalizar_grupo(grupo: str) -> str:

@@ -18,13 +18,13 @@ from typing import Iterable, Optional
 
 try:  # contexto do webapp (pacote src.custos)
     from src.database.connection import get_mongo_connection
-    from src.custos.hierarquia import (FAMILIA_OUTROS, FAMILIAS_EQUIP, GRUPOS,
-                                       familia_equipamento, grupo_da_conta, label_grupo, nome_conta)
+    from src.custos.hierarquia import (EQUIP_OUTROS, GRUPOS, grupo_da_conta, label_grupo,
+                                       nome_conta, nome_equipamento)
     from src.custos.storage import COLL_LANCAMENTOS, COLL_RESUMO
 except ImportError:  # contexto de teste/script (cwd = webapp/src)
     from database.connection import get_mongo_connection  # type: ignore
-    from custos.hierarquia import (FAMILIA_OUTROS, FAMILIAS_EQUIP, GRUPOS,  # type: ignore
-                                   familia_equipamento, grupo_da_conta, label_grupo, nome_conta)
+    from custos.hierarquia import (EQUIP_OUTROS, GRUPOS, grupo_da_conta,  # type: ignore
+                                   label_grupo, nome_conta, nome_equipamento)
     from custos.storage import COLL_LANCAMENTOS, COLL_RESUMO  # type: ignore
 
 logger = logging.getLogger("custos.leitura")
@@ -276,12 +276,14 @@ def fetch_centros_disponiveis(ano: int) -> list[str]:
     return _memo(("centros", ano), _calc)
 
 
-def fetch_por_equipamento(ano: int, centros: Optional[Iterable[str]] = None) -> list[dict]:
-    """Executado do ano por família de equipamento (centro de custo) — gráfico de rosca.
+def fetch_por_equipamento(ano: int, centros: Optional[Iterable[str]] = None,
+                          top: int = 10) -> list[dict]:
+    """Executado do ano por EQUIPAMENTO (centro de custo) — gráfico de rosca.
 
-    Soma o executado de cada centro e agrupa pelas famílias (LCLs/LCTs/Prensas/Laser),
-    jogando o restante em 'Outros'. Retorna `[{familia, executado}]` ordenado pelas famílias
-    principais e com 'Outros' por último (só inclui famílias com valor > 0).
+    Soma o executado de cada `centro_custo`, nomeia pelo de/para (`nome_equipamento`,
+    fallback = código) e mostra os `top` maiores como fatias; a cauda vai p/ 'Outros'.
+    Centros já mapeados ao MESMO nome no de/para somam juntos (ex: várias linhas de uma
+    família). Retorna `[{equip, executado, centros}]` ordenado desc, com 'Outros' por último.
     """
     cz = _norm_centros(centros)
 
@@ -294,15 +296,24 @@ def fetch_por_equipamento(ano: int, centros: Optional[Iterable[str]] = None) -> 
             match["centro_custo"] = {"$in": list(cz)}
         pipe = [{"$match": match},
                 {"$group": {"_id": "$centro_custo", "executado": {"$sum": "$valor"}}}]
+        # agrega por nome de equipamento (de/para); guarda os centros que compõem cada um
         acc: dict[str, float] = {}
+        membros: dict[str, list] = {}
         for d in coll.aggregate(pipe):
-            fam = familia_equipamento(d["_id"])
-            acc[fam] = acc.get(fam, 0.0) + (d["executado"] or 0.0)
-        ordem = FAMILIAS_EQUIP + [FAMILIA_OUTROS]
-        return [{"familia": f, "executado": round(acc[f], 2)}
-                for f in ordem if acc.get(f, 0) > 0]
+            nome = nome_equipamento(d["_id"])
+            acc[nome] = acc.get(nome, 0.0) + (d["executado"] or 0.0)
+            membros.setdefault(nome, []).append(d["_id"])
+        ordenado = sorted(acc.items(), key=lambda kv: kv[1], reverse=True)
+        principais = ordenado[:top]
+        cauda = ordenado[top:]
+        out = [{"equip": nome, "executado": round(v, 2), "centros": membros[nome]}
+               for nome, v in principais]
+        if cauda:
+            out.append({"equip": EQUIP_OUTROS, "executado": round(sum(v for _, v in cauda), 2),
+                        "centros": [c for nome, _ in cauda for c in membros[nome]]})
+        return out
 
-    return _memo(("equip", ano, cz), _calc)
+    return _memo(("equip", ano, cz, top), _calc)
 
 
 def fetch_lancamentos(

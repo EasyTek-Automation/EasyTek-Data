@@ -397,26 +397,24 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     return fig
 
 
-_ROSCA_CORES = {
-    "LCLs (Longitudinais)": "#005687",   # azul AMG
-    "LCTs (Transversais)": "#2f6fb0",
-    "Prensas": "#5b8def",
-    "Laser": "#9ec5fe",
-    "Outros": "#adb5bd",                  # cinza p/ o restante (apoio/admin)
-}
+# paleta sequencial p/ as fatias da rosca (tons AMG); 'Outros' sempre cinza
+_ROSCA_SEQ = ["#005687", "#1f6aa5", "#2f8fc0", "#5b8def", "#7bb0e8", "#9ec5fe",
+              "#b9d4f2", "#c9a227", "#e0b84e", "#6c8ea4"]
 
 
 def _fig_rosca(dados, h=460):
-    """Rosca: distribuição do executado do ano por família de equipamento (centro de custo).
+    """Rosca: distribuição do executado do ano por EQUIPAMENTO (centro de custo).
 
-    Fatias = LCLs/LCTs/Prensas/Laser; o restante (apoio/admin) em 'Outros' (cinza). Centro
-    mostra o total. Não dispara drill — é leitura complementar às barras (que são por conta).
+    Cada fatia = um equipamento (nome via de/para `CENTRO_EQUIP`, fallback = código); a
+    cauda de centros menores em 'Outros' (cinza). Centro mostra o total. Não dispara drill —
+    leitura complementar às barras (que são por conta).
     """
     if not dados:
         return _fig_vazia(h=h)
-    labels = [d["familia"] for d in dados]
+    labels = [d["equip"] for d in dados]
     values = [d["executado"] for d in dados]
-    cores = [_ROSCA_CORES.get(f, "#ced4da") for f in labels]
+    cores = ["#adb5bd" if lab == "Outros" else _ROSCA_SEQ[i % len(_ROSCA_SEQ)]
+             for i, lab in enumerate(labels)]
     total = sum(values)
     fig = go.Figure(go.Pie(
         labels=labels, values=values, hole=0.58, sort=False, direction="clockwise",
