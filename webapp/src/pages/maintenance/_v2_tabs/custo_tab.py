@@ -172,6 +172,26 @@ def build_tab() -> dbc.Tab:
                         dbc.ModalBody(
                             [
                                 html.Div(id="modal-custo-breadcrumb", className="mb-3"),
+                                # Filtro por valor (slider duplo) do drill — escondido nos níveis
+                                # sem barras (lançamentos). Mesma mecânica do slider do anual.
+                                html.Div(
+                                    [
+                                        html.Label(
+                                            "Filtrar contas por valor executado (R$)",
+                                            className="text-muted small mb-2 d-block",
+                                        ),
+                                        dcc.RangeSlider(
+                                            id="custo-slider-modal",
+                                            min=0, max=1, value=[0, 1], step=1,
+                                            allowCross=False,
+                                            tooltip={"placement": "bottom",
+                                                     "always_visible": False},
+                                        ),
+                                    ],
+                                    id="custo-slider-modal-wrap",
+                                    className="px-3 mb-3",
+                                    style={"display": "none"},
+                                ),
                                 dcc.Loading(
                                     type="circle", color="#0d6efd", delay_show=120,
                                     children=html.Div(id="modal-custo-content"),

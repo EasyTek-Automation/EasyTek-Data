@@ -468,7 +468,11 @@ def register_custo_callbacks(app):
         trig = ctx.triggered_id
         level, mes, dia, conta = args[-4], args[-3], args[-2], args[-1]
         CLEAR = (None, "", None)
-        NOOP = (no_update,) * 5 + CLEAR
+        # NOOP precisa ser no-op DE VERDADE: não tocar content/title/breadcrumb. Antes era
+        # (no_update,)*5 + CLEAR, que ZERAVA o conteúdo. Isso quebrava quando o slider do modal
+        # reconstrói os cards: o set ALL (cards/barras) muda → este callback dispara sem clique
+        # real → caía em NOOP e apagava o que o _render_modal acabara de pintar.
+        NOOP = (no_update,) * 8
 
         if trig == "btn-custo-close":
             return (False, "planta", None, None, None) + CLEAR
@@ -515,6 +519,41 @@ def register_custo_callbacks(app):
                     return (True, "lancamentos", mes, dia, code) + CLEAR
         return NOOP
 
+    # Escala + visibilidade do slider do modal — ajusta ao dado do nível e reseta faixa.
+    # Escondido nos níveis sem barras (lançamentos / planta).
+    @app.callback(
+        Output("custo-slider-modal", "min"),
+        Output("custo-slider-modal", "max"),
+        Output("custo-slider-modal", "value"),
+        Output("custo-slider-modal", "marks"),
+        Output("custo-slider-modal", "step"),
+        Output("custo-slider-modal-wrap", "style"),
+        Input("store-custo-level", "data"),
+        Input("store-custo-mes", "data"),
+        Input("store-custo-dia", "data"),
+        State("store-custo-centros", "data"),
+        State("store-custo-ano", "data"),
+        prevent_initial_call=True,
+    )
+    def _slider_modal_range(level, mes, dia, centros, ano):
+        ano = int(ano or 2026)
+        centros = _centros_efetivos(centros, ano)
+        oculto = {"display": "none"}
+        if level == "meses":
+            # teto = maior conta entre todos os meses (mesmo limiar aplicado a cada mini)
+            allrows = []
+            for m in L.meses_com_dados(ano):
+                allrows += L.fetch_contas_geral(ano, m, centros)
+            rows = allrows
+        elif level == "dias" and mes:
+            rows = L.fetch_contas_geral(ano, mes, centros)
+        elif level == "contas-dia" and dia:
+            rows = L.fetch_contas_no_dia(ano, dia, centros)
+        else:  # lançamentos / planta — sem barras, esconde o slider
+            return 0, 1, [0, 1], {}, 1, oculto
+        mn, mx, val, marks, step = _slider_cfg(rows)
+        return mn, mx, val, marks, step, {"display": "block"}
+
     # Render do conteúdo do modal por nível (espelha render_modal da v2)
     @app.callback(
         Output("modal-custo-content", "children", allow_duplicate=True),
@@ -525,21 +564,27 @@ def register_custo_callbacks(app):
         Input("store-custo-mes", "data"),
         Input("store-custo-dia", "data"),
         Input("store-custo-conta", "data"),
+        Input("custo-slider-modal", "value"),
         State("store-custo-centros", "data"),
         State("store-custo-ano", "data"),
         prevent_initial_call=True,
     )
-    def _render_modal(level, mes, dia, conta, centros, ano):
+    def _render_modal(level, mes, dia, conta, faixa, centros, ano):
         if not level or level == "planta":
             return None, "", None, {"display": "none"}
         ano = int(ano or 2026)
         centros = _centros_efetivos(centros, ano)
         ano_lbl = f"{ano}"
+        # Só o arrasto do slider aplica filtro; navegação de nível renderiza cheio (o reset
+        # do slider re-renderiza com a faixa nova) — evita filtrar com faixa de outro nível.
+        if ctx.triggered_id != "custo-slider-modal":
+            faixa = None
 
         # NÍVEL 1 — meses (grade de mini-gráficos, 1 por mês)
         if level == "meses":
             meses = L.meses_com_dados(ano)
-            cards = [_mini_graph_card(m, L.fetch_contas_geral(ano, m, centros)) for m in meses]
+            cards = [_mini_graph_card(m, _filtra_por_exec(L.fetch_contas_geral(ano, m, centros), faixa))
+                     for m in meses]
             content = html.Div([
                 html.H6("Clique num mês para ver os dias:", className="v2-section-h6 text-muted"),
                 dbc.Row(cards, className="g-3"),
@@ -548,7 +593,8 @@ def register_custo_callbacks(app):
 
         # NÍVEL 2 — dias (gráfico do mês + cards de dia)
         if level == "dias" and mes:
-            rows = L.fetch_contas_geral(ano, mes, centros)
+            # filtro vale só p/ as barras de conta; os cards de DIA são outra dimensão (total/dia)
+            rows = _filtra_por_exec(L.fetch_contas_geral(ano, mes, centros), faixa)
             dias = L.fetch_dias_total_mes(ano, mes, centros)
             cards = [_value_card(d["label"], _brl0(d["executado"]), _AZUL,
                                  {"type": "custo-dia-card", "dia": d["code"]}) for d in dias]
@@ -565,7 +611,8 @@ def register_custo_callbacks(app):
 
         # NÍVEL 3 — contas do dia (gráfico das contas do dia + cards de conta)
         if level == "contas-dia" and dia:
-            rows = L.fetch_contas_no_dia(ano, dia, centros)
+            # aqui barras e cards são a MESMA dimensão (conta) → filtra os dois p/ casar
+            rows = _filtra_por_exec(L.fetch_contas_no_dia(ano, dia, centros), faixa)
             cards = [_value_card(r["label"], _brl0(r["executado"]), _AZUL,
                                  {"type": "custo-conta-card", "conta": r["code"]})
                      for r in rows if r["code"] != "__GERAL__"]
