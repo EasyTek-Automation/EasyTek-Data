@@ -311,6 +311,18 @@ def fetch_por_equipamento(ano: int, centros: Optional[Iterable[str]] = None,
         if cauda:
             out.append({"equip": EQUIP_OUTROS, "executado": round(sum(v for _, v in cauda), 2),
                         "centros": [c for nome, _ in cauda for c in membros[nome]]})
+        # Reconcilia com o GERAL das barras (resumo ZBRCO019): os lançamentos (KSB1) podem
+        # somar menos que o executado oficial — no mês corrente, provisões/itens pós-D-1 não
+        # têm centro, logo não entram por equipamento. O resto vira "Não atribuído".
+        rcoll = get_mongo_connection(COLL_RESUMO)
+        if rcoll is not None:
+            rmatch = {"mes_referencia": {"$regex": f"^{ano}-"}}
+            g = list(rcoll.aggregate([{"$match": rmatch},
+                                      {"$group": {"_id": None, "v": {"$sum": "$executado"}}}]))
+            total_oficial = g[0]["v"] if g else 0
+            gap = round(total_oficial - sum(acc.values()), 2)
+            if gap > 1:
+                out.append({"equip": "Não atribuído", "executado": gap, "centros": []})
         return out
 
     return _memo(("equip", ano, cz, top), _calc)
