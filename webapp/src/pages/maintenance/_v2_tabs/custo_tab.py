@@ -82,12 +82,25 @@ def build_tab() -> dbc.Tab:
                                             ),
                                             html.Div(
                                                 [_label("Centro de custo"),
-                                                 dcc.Dropdown(
-                                                     id="custo-centro-filter", options=[],
-                                                     value=[], multi=True,
-                                                     placeholder="Todos os centros",
-                                                     style={"minWidth": "240px"})],
-                                                className="me-3",
+                                                 # Botão que colapsa/expande a lista de centros
+                                                 # (a multiseleção de chips era um paredão feio
+                                                 # sempre aberto). Fechado por padrão.
+                                                 dbc.Button(
+                                                     "Todos os centros",
+                                                     id="custo-centros-toggle",
+                                                     color="light", size="sm",
+                                                     className="border d-flex align-items-center "
+                                                               "justify-content-between",
+                                                     style={"minWidth": "240px"}),
+                                                 dbc.Collapse(
+                                                     dcc.Dropdown(
+                                                         id="custo-centro-filter", options=[],
+                                                         value=[], multi=True,
+                                                         placeholder="Todos os centros",
+                                                         className="mt-1",
+                                                         style={"minWidth": "240px"}),
+                                                     id="custo-centros-collapse", is_open=False)],
+                                                className="me-3 d-flex flex-column",
                                             ),
                                             html.Div(
                                                 [_label("Coleta"),

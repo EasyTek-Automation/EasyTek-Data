@@ -484,6 +484,33 @@ def register_custo_callbacks(app):
     def _set_ano(value):
         return value
 
+    # Colapsar/expandir a lista de centros de custo (paredão de chips fica escondido)
+    @app.callback(
+        Output("custo-centros-collapse", "is_open"),
+        Input("custo-centros-toggle", "n_clicks"),
+        State("custo-centros-collapse", "is_open"),
+        prevent_initial_call=True,
+    )
+    def _toggle_centros(_n, aberto):
+        return not aberto
+
+    # Rótulo do botão: quantos centros selecionados + chevron (sobe/desce)
+    @app.callback(
+        Output("custo-centros-toggle", "children"),
+        Input("custo-centro-filter", "value"),
+        Input("custo-centros-collapse", "is_open"),
+        State("custo-centro-filter", "options"),
+    )
+    def _label_centros(value, aberto, options):
+        total = len(options or [])
+        n = len(value or [])
+        if n == 0 or (total and n >= total):
+            txt = "Todos os centros" + (f" ({total})" if total else "")
+        else:
+            txt = f"{n} de {total} centros"
+        chev = "bi-chevron-up" if aberto else "bi-chevron-down"
+        return [html.Span(txt), html.I(className=f"bi {chev} ms-2")]
+
     # Gráfico de entrada (anual) + selo + tarja
     # Escala do slider do anual — ajusta mín/máx/marcas ao dado e reseta p/ faixa cheia
     @app.callback(
