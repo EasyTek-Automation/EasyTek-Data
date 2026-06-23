@@ -206,7 +206,7 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
         # primário e contas no secundário (mais altas-proporcionais), em faixas de tom distintas.
         _STEP = 0.42
         xs = [0] + [0.95 + k * _STEP for k in range(len(rows) - 1)]
-        larguras = [0.5] + [0.2] * (len(rows) - 1)
+        larguras = [0.25] + [0.2] * (len(rows) - 1)
     else:
         xs = list(range(len(rows)))
         larguras = 0.62 if modo_pct else None
@@ -346,9 +346,9 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     if geral_destaque:
         x_fim = xs[-1] + 0.3
         shapes = [
-            dict(type="rect", xref="x", yref="paper", x0=-0.4, x1=0.5, y0=0, y1=1,
+            dict(type="rect", xref="x", yref="paper", x0=-0.32, x1=0.42, y0=0, y1=1,
                  fillcolor="rgba(0,86,135,0.11)", line={"width": 0}, layer="below"),
-            dict(type="rect", xref="x", yref="paper", x0=0.5, x1=x_fim, y0=0, y1=1,
+            dict(type="rect", xref="x", yref="paper", x0=0.42, x1=x_fim, y0=0, y1=1,
                  fillcolor="rgba(0,86,135,0.07)", line={"width": 0}, layer="below"),
         ]
 
