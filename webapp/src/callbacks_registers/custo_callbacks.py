@@ -22,10 +22,10 @@ from dash import ALL, Input, Output, State, ctx, dash_table, dcc, html, no_updat
 
 try:
     from src.custos import leitura as L
-    from src.custos.hierarquia import nome_conta
+    from src.custos.hierarquia import nome_centro, nome_conta
 except ImportError:
     from custos import leitura as L  # type: ignore
-    from custos.hierarquia import nome_conta  # type: ignore
+    from custos.hierarquia import nome_centro, nome_conta  # type: ignore
 
 logger = logging.getLogger("custos.callbacks")
 
@@ -56,10 +56,49 @@ def _brl0(v) -> str:
     return "R$ " + f"{v:,.0f}".replace(",", ".")
 
 
+def _brl_abrev(v) -> str:
+    """Valor monetário compacto p/ rótulo de barra: 462816 → 'R$ 463k'; 3065639 → 'R$ 3,1M'.
+
+    Abreviação cabe em 16 barras estreitas; valor cheio fica no hover (_hover_rico).
+    """
+    if v is None:
+        return ""
+    v = float(v)
+    if v == 0:
+        return "R$ 0"
+    a = abs(v)
+    if a >= 1_000_000:
+        return "R$ " + f"{v / 1_000_000:.1f}".replace(".", ",") + "M"
+    if a >= 1_000:
+        return f"R$ {round(v / 1_000):.0f}k"
+    return f"R$ {v:.0f}"
+
+
 def _pct(v) -> str:
     if v is None:
         return "—"
     return f"{v:.1f}".replace(".", ",") + "%"
+
+
+def _centro_label(c: str) -> str:
+    """Rótulo do filtro: 'código — NOME' quando há descrição; só o código quando não."""
+    nome = nome_centro(c)
+    return f"{c} — {nome}" if nome != c else c
+
+
+def _centros_efetivos(selected, ano):
+    """Centros a aplicar no filtro de leitura, ou None (= sem filtro → número oficial).
+
+    'Todos selecionados' (ou nenhum) == None: usa o executado reconciliado do resumo
+    (BR-12), preservando a reconciliação 46/46. Só recorta dos lançamentos quando há
+    um subconjunto de centros marcado.
+    """
+    if not selected:
+        return None
+    todos = set(L.fetch_centros_disponiveis(int(ano or 2026)))
+    if todos and set(selected) >= todos:
+        return None
+    return selected
 
 
 def _nome_mes(mes: str) -> str:
@@ -105,22 +144,52 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False):
     ticks = nomes
     xs = list(range(len(rows)))
 
+    # Hover rico (mesmo texto p/ as duas barras): nome + orçado + executado + %.
+    # Vai em `hovertext` de propósito — `customdata` segue carregando só o code (clique de drill).
+    def _hover_rico(r):
+        linhas = [f"<b>{r['label']}</b>"]
+        if com_orcado and (r.get("orcado") or 0):
+            linhas.append(f"Orçado: {_brl(r['orcado'])}")
+        linhas.append(f"Executado: {_brl(r['executado'])}")
+        if r.get("sem_orcamento"):
+            linhas.append("sem orçamento")
+        elif r.get("pct") is not None:
+            linhas.append(f"Realizado: {_pct(r['pct'])}")
+        return "<br>".join(linhas)
+
+    hovers = [_hover_rico(r) for r in rows]
+
     fig = go.Figure()
     if com_orcado:
         fig.add_bar(name="Orçado", x=xs, y=[r["orcado"] for r in rows], width=0.66,
                     marker={"color": _ORCADO_FILL, "line": {"color": "#9ec5fe", "width": 1}},
-                    customdata=codes, hovertext=nomes,
-                    hovertemplate="%{hovertext}<br>Orçado: R$ %{y:,.2f}<extra></extra>")
+                    customdata=codes, hovertext=hovers,
+                    hovertemplate="%{hovertext}<extra></extra>")
     # GERAL com cor própria (cinza-azulado) p/ destacar do resto
     cores = ["#34568b" if r["code"] == "__GERAL__" else _cor_exec(r) for r in rows]
     fig.add_bar(name="Executado", x=xs, y=[r["executado"] for r in rows], width=0.34,
-                marker={"color": cores}, customdata=codes, hovertext=nomes,
-                hovertemplate="%{hovertext}<br>Executado: R$ %{y:,.2f}<extra></extra>")
+                marker={"color": cores}, customdata=codes, hovertext=hovers,
+                hovertemplate="%{hovertext}<extra></extra>")
 
     anots = []
+    topo_max = max((max(r.get("orcado", 0) or 0, r["executado"] or 0) for r in rows), default=0)
     if not mini:
         for x, r in zip(xs, rows):
-            topo = max(r.get("orcado", 0) or 0, r["executado"])
+            orc = r.get("orcado", 0) or 0
+            ex = r["executado"] or 0
+            topo = max(orc, ex)
+            cor_ex = "#34568b" if r["code"] == "__GERAL__" else _cor_exec(r)
+            # Rótulos de dados empilhados ACIMA da barra (altura díspar das 16 barras impede
+            # rótulo interno legível). De baixo p/ cima: Executado, Orçado, % (realizado).
+            # Executado (negrito, cor do status) — encostado na barra
+            if ex:
+                anots.append(dict(x=x, y=topo, text=_brl_abrev(ex), showarrow=False, yshift=9,
+                                  font={"size": 9, "color": cor_ex, "weight": "bold"}))
+            # Orçado (cinza) — logo acima; valor cheio sempre no hover
+            if com_orcado and orc > 0:
+                anots.append(dict(x=x, y=topo, text=_brl_abrev(orc), showarrow=False, yshift=20,
+                                  font={"size": 8, "color": _CINZA}))
+            # % (realizado) no topo da pilha — comportamento/cor original preservado
             if r.get("sem_orcamento"):
                 txt, cor = "s/orç", _LARANJA
             elif r.get("pct") is None:
@@ -128,8 +197,8 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False):
             else:
                 txt, cor = _pct(r["pct"]), (_VERMELHO if r.get("estouro") else "#495057")
             if txt:
-                anots.append(dict(x=x, y=topo, text=txt, showarrow=False, yshift=11,
-                                  font={"size": 10, "color": cor, "weight": "bold"}))
+                anots.append(dict(x=x, y=topo, text=txt, showarrow=False, yshift=31,
+                                  font={"size": 9, "color": cor, "weight": "bold"}))
 
     fig.update_layout(
         height=h, barmode="overlay",
@@ -138,14 +207,17 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False):
         title=({"text": titulo, "font": {"size": 13 if not mini else 12, "color": "#343a40"},
                 "x": 0, "xanchor": "left", "y": 0.98} if titulo else None),
         showlegend=not mini,
-        legend={"orientation": "h", "y": 1.1, "x": 0, "font": {"size": 11}},
+        # legenda à direita p/ não cobrir a pilha de rótulos da 1ª barra (GERAL)
+        legend={"orientation": "h", "y": 1.1, "x": 1, "xanchor": "right", "font": {"size": 11}},
         bargap=0.35, annotations=anots,
         xaxis={"tickmode": "array", "tickvals": xs, "ticktext": ticks,
                "showgrid": False, "zeroline": False, "tickfont": {"size": 10},
                "tickangle": -35, "showticklabels": not mini},
         yaxis={"showgrid": True, "gridcolor": _GRID, "zeroline": False,
                "tickprefix": "R$ ", "tickformat": ",.0f", "tickfont": {"size": 9 if mini else 10},
-               "rangemode": "tozero", "showticklabels": not mini},
+               "rangemode": "tozero", "showticklabels": not mini,
+               # headroom p/ os rótulos empilhados acima da barra mais alta (só nos grandes)
+               **({"range": [0, topo_max * 1.18]} if (not mini and topo_max > 0) else {})},
         hoverlabel={"bgcolor": "white", "font_size": 12},
     )
     return fig
@@ -170,10 +242,14 @@ def _mini_graph_card(mes, rows):
                     dbc.CardHeader(html.Strong(_nome_mes(mes), style={"fontSize": "0.85rem"}),
                                    className="py-1"),
                     dbc.CardBody(
+                        # staticPlot removido p/ liberar o tooltip das barras (hover mostra
+                        # orçado/executado/%). O clique no card segue funcionando: o clique
+                        # no DOM do gráfico borbulha pro Div pai (n_clicks). doubleClick/drag
+                        # desligados p/ não capturar o gesto.
                         dcc.Graph(figure=_fig_barras(rows, True, "", h=200, mini=True),
-                                  config={"displayModeBar": False, "staticPlot": True,
-                                          "responsive": True},
-                                  style={"height": "200px"}),
+                                  config={"displayModeBar": False, "responsive": True,
+                                          "doubleClick": False, "scrollZoom": False},
+                                  style={"height": "200px", "pointerEvents": "auto"}),
                         className="p-1",
                     ),
                 ],
@@ -252,11 +328,18 @@ def register_custo_callbacks(app):
 
     @app.callback(
         Output("custo-centro-filter", "options"),
+        Output("custo-centro-filter", "value"),
         Input("custo-init", "n_intervals"),
         State("store-custo-ano", "data"),
+        State("store-custo-centros", "data"),
     )
-    def _popular_centros(_n, ano):
-        return [{"label": c, "value": c} for c in L.fetch_centros_disponiveis(int(ano or 2026))]
+    def _popular_centros(_n, ano, salvos):
+        centros = L.fetch_centros_disponiveis(int(ano or 2026))
+        options = [{"label": _centro_label(c), "value": c} for c in centros]
+        # Padrão: todos os centros marcados. Respeita um filtro salvo na sessão
+        # (subconjunto escolhido antes); só cai no "todos" na 1ª visita / sessão limpa.
+        value = salvos if salvos else centros
+        return options, value
 
     @app.callback(
         Output("store-custo-centros", "data"),
@@ -285,7 +368,7 @@ def register_custo_callbacks(app):
     )
     def _render_entry(centros, ano, _n):
         ano = int(ano or 2026)
-        centros = centros or None
+        centros = _centros_efetivos(centros, ano)
         fig = _fig_barras(L.fetch_contas_geral(ano, None, centros), True,
                           "", h=460)
         rc = L.reconciliacao(ano)
@@ -393,7 +476,7 @@ def register_custo_callbacks(app):
         if not level or level == "planta":
             return None, "", None, {"display": "none"}
         ano = int(ano or 2026)
-        centros = centros or None
+        centros = _centros_efetivos(centros, ano)
         ano_lbl = f"{ano}"
 
         # NÍVEL 1 — meses (grade de mini-gráficos, 1 por mês)

@@ -35,8 +35,9 @@ def build_tab() -> dbc.Tab:
         children=html.Div(
             [
                 # Estado proprio (autocontido). Drill por tempo: ano -> mes -> dia -> conta.
-                dcc.Store(id="store-custo-ano", data=ANO_PADRAO),
-                dcc.Store(id="store-custo-centros", data=[]),
+                # Filtros persistem na sessão do navegador (sobrevivem a reload/navegação).
+                dcc.Store(id="store-custo-ano", data=ANO_PADRAO, storage_type="session"),
+                dcc.Store(id="store-custo-centros", data=[], storage_type="session"),
                 dcc.Store(id="store-custo-level", data="planta"),
                 dcc.Store(id="store-custo-mes", data=None),
                 dcc.Store(id="store-custo-dia", data=None),
@@ -122,8 +123,11 @@ def build_tab() -> dbc.Tab:
                                         html.Div(
                                             dcc.Graph(
                                                 id="custo-graph-entry",
-                                                config={"displayModeBar": False,
-                                                        "staticPlot": True, "responsive": True},
+                                                # sem staticPlot p/ liberar o tooltip das barras
+                                                # (incl. GERAL); o clique borbulha p/ custo-entry-wrap
+                                                # e abre o modal. doubleClick/scrollZoom off.
+                                                config={"displayModeBar": False, "responsive": True,
+                                                        "doubleClick": False, "scrollZoom": False},
                                                 style={"height": "460px", "width": "100%"},
                                             ),
                                             id="custo-entry-wrap",
