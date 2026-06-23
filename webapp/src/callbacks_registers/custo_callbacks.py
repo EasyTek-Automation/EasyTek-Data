@@ -166,24 +166,30 @@ def _fig_vazia(msg="Sem dados", h=380):
     return fig
 
 
-def _fig_barras(rows, com_orcado, titulo, h=380, mini=False):
-    """Barras sobrepostas (mockup): orçado pálido container + executado sólido dentro.
+def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
+    """Barras orçado×executado. `modo`:
 
-    GERAL (code '__GERAL__') destacado. `mini`=True compacta para a grade de meses.
+    - 'valor' (default): altura = R$; orçado pálido (container) + executado sólido sobreposto.
+    - 'pct': altura = realizado (executado÷orçado); escala 0 → maior %; orçado vira a linha
+      de referência 100%; conta sem orçado fica cinza no topo (não há % a calcular).
+
+    Em ambos os modos os rótulos de dados (R$ exec/orç + %) e o hover rico são iguais — só a
+    altura/escala muda. GERAL ('__GERAL__') destacado. `mini`=True compacta p/ a grade de meses.
     """
     if not rows:
         return _fig_vazia(h=h)
+    modo_pct = (modo == "pct")
     codes = [r["code"] for r in rows]
     nomes = [r["label"] for r in rows]   # nome legível da conta/dia
     # eixo X: nome (sem código). Mini esconde rótulos (overview clicável).
     ticks = nomes
     xs = list(range(len(rows)))
 
-    # Hover rico (mesmo texto p/ as duas barras): nome + orçado + executado + %.
+    # Hover rico (mesmo texto p/ as barras): nome + orçado + executado + %.
     # Vai em `hovertext` de propósito — `customdata` segue carregando só o code (clique de drill).
     def _hover_rico(r):
         linhas = [f"<b>{r['label']}</b>"]
-        if com_orcado and (r.get("orcado") or 0):
+        if r.get("orcado") or 0:
             linhas.append(f"Orçado: {_brl(r['orcado'])}")
         linhas.append(f"Executado: {_brl(r['executado'])}")
         if r.get("sem_orcamento"):
@@ -194,37 +200,54 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False):
 
     hovers = [_hover_rico(r) for r in rows]
 
+    def _sem_orc(r):
+        return r.get("sem_orcamento") or r.get("pct") is None
+
     fig = go.Figure()
-    if com_orcado:
-        fig.add_bar(name="Orçado", x=xs, y=[r["orcado"] for r in rows], width=0.66,
-                    marker={"color": _ORCADO_FILL, "line": {"color": "#9ec5fe", "width": 1}},
-                    customdata=codes, hovertext=hovers,
+    if modo_pct:
+        # Escala = maior % (mín. 100), arredondado p/ a dezena acima. Conta s/orç vai ao topo.
+        pcts = [r["pct"] for r in rows if r.get("pct") is not None and not r.get("sem_orcamento")]
+        topo_pct = max(100, math.ceil(max(pcts, default=100) / 10) * 10)
+        alturas = [topo_pct if _sem_orc(r) else r["pct"] for r in rows]
+        cores = [_CINZA if _sem_orc(r)
+                 else ("#34568b" if r["code"] == "__GERAL__" else _cor_exec(r)) for r in rows]
+        fig.add_bar(name="Realizado", x=xs, y=alturas, width=0.6,
+                    marker={"color": cores}, customdata=codes, hovertext=hovers,
                     hovertemplate="%{hovertext}<extra></extra>")
-    # GERAL com cor própria (cinza-azulado) p/ destacar do resto
-    cores = ["#34568b" if r["code"] == "__GERAL__" else _cor_exec(r) for r in rows]
-    fig.add_bar(name="Executado", x=xs, y=[r["executado"] for r in rows], width=0.34,
-                marker={"color": cores}, customdata=codes, hovertext=hovers,
-                hovertemplate="%{hovertext}<extra></extra>")
+        # Orçado = referência 100%
+        fig.add_hline(y=100, line={"dash": "dash", "color": "#5b8def", "width": 1.5},
+                      annotation_text="orçado (100%)", annotation_position="top right",
+                      annotation_font={"size": 9, "color": _CINZA})
+        topo_max = topo_pct
+        bar_top = alturas
+    else:
+        if com_orcado:
+            fig.add_bar(name="Orçado", x=xs, y=[r["orcado"] for r in rows], width=0.66,
+                        marker={"color": _ORCADO_FILL, "line": {"color": "#9ec5fe", "width": 1}},
+                        customdata=codes, hovertext=hovers,
+                        hovertemplate="%{hovertext}<extra></extra>")
+        # GERAL com cor própria (cinza-azulado) p/ destacar do resto
+        cores = ["#34568b" if r["code"] == "__GERAL__" else _cor_exec(r) for r in rows]
+        fig.add_bar(name="Executado", x=xs, y=[r["executado"] for r in rows], width=0.34,
+                    marker={"color": cores}, customdata=codes, hovertext=hovers,
+                    hovertemplate="%{hovertext}<extra></extra>")
+        topo_max = max((max(r.get("orcado", 0) or 0, r["executado"] or 0) for r in rows), default=0)
+        bar_top = [max(r.get("orcado", 0) or 0, r["executado"] or 0) for r in rows]
 
     anots = []
-    topo_max = max((max(r.get("orcado", 0) or 0, r["executado"] or 0) for r in rows), default=0)
     if not mini:
-        for x, r in zip(xs, rows):
+        for i, (x, r) in enumerate(zip(xs, rows)):
             orc = r.get("orcado", 0) or 0
             ex = r["executado"] or 0
-            topo = max(orc, ex)
+            topo = bar_top[i]
             cor_ex = "#34568b" if r["code"] == "__GERAL__" else _cor_exec(r)
-            # Rótulos de dados empilhados ACIMA da barra (altura díspar das 16 barras impede
-            # rótulo interno legível). De baixo p/ cima: Executado, Orçado, % (realizado).
-            # Executado (negrito, cor do status) — encostado na barra
+            # Rótulos de dados empilhados ACIMA da barra. De baixo p/ cima: Executado, Orçado, %.
             if ex:
                 anots.append(dict(x=x, y=topo, text=_brl_abrev(ex), showarrow=False, yshift=9,
                                   font={"size": 9, "color": cor_ex, "weight": "bold"}))
-            # Orçado (cinza) — logo acima; valor cheio sempre no hover
-            if com_orcado and orc > 0:
+            if orc > 0:
                 anots.append(dict(x=x, y=topo, text=_brl_abrev(orc), showarrow=False, yshift=20,
                                   font={"size": 8, "color": _CINZA}))
-            # % (realizado) no topo da pilha — comportamento/cor original preservado
             if r.get("sem_orcamento"):
                 txt, cor = "s/orç", _LARANJA
             elif r.get("pct") is None:
@@ -235,24 +258,31 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False):
                 anots.append(dict(x=x, y=topo, text=txt, showarrow=False, yshift=31,
                                   font={"size": 9, "color": cor, "weight": "bold"}))
 
+    yaxis = {"showgrid": True, "gridcolor": _GRID, "zeroline": False,
+             "tickfont": {"size": 9 if mini else 10}, "rangemode": "tozero",
+             "showticklabels": not mini,
+             # headroom p/ os rótulos empilhados acima da barra mais alta (só nos grandes)
+             **({"range": [0, topo_max * 1.18]} if (not mini and topo_max > 0) else {})}
+    if modo_pct:
+        yaxis.update({"ticksuffix": " %", "tickformat": ",.0f"})
+    else:
+        yaxis.update({"tickprefix": "R$ ", "tickformat": ",.0f"})
+
     fig.update_layout(
         height=h, barmode="overlay",
         plot_bgcolor="rgba(248,250,252,0.6)", paper_bgcolor="rgba(0,0,0,0)",
         margin={"l": 44, "r": 12, "t": 34 if titulo else 10, "b": 18 if mini else 150},
         title=({"text": titulo, "font": {"size": 13 if not mini else 12, "color": "#343a40"},
                 "x": 0, "xanchor": "left", "y": 0.98} if titulo else None),
-        showlegend=not mini,
-        # legenda à direita p/ não cobrir a pilha de rótulos da 1ª barra (GERAL)
+        # legenda Orçado/Executado só no modo valor (no pct há série única); à direita
+        # p/ não cobrir a pilha de rótulos da 1ª barra (GERAL)
+        showlegend=(not mini and not modo_pct),
         legend={"orientation": "h", "y": 1.1, "x": 1, "xanchor": "right", "font": {"size": 11}},
         bargap=0.35, annotations=anots,
         xaxis={"tickmode": "array", "tickvals": xs, "ticktext": ticks,
                "showgrid": False, "zeroline": False, "tickfont": {"size": 10},
                "tickangle": -35, "showticklabels": not mini},
-        yaxis={"showgrid": True, "gridcolor": _GRID, "zeroline": False,
-               "tickprefix": "R$ ", "tickformat": ",.0f", "tickfont": {"size": 9 if mini else 10},
-               "rangemode": "tozero", "showticklabels": not mini,
-               # headroom p/ os rótulos empilhados acima da barra mais alta (só nos grandes)
-               **({"range": [0, topo_max * 1.18]} if (not mini and topo_max > 0) else {})},
+        yaxis=yaxis,
         hoverlabel={"bgcolor": "white", "font_size": 12},
     )
     return fig
@@ -427,7 +457,9 @@ def register_custo_callbacks(app):
         if ctx.triggered_id != "custo-slider-geral":
             faixa = None
         rows = _filtra_por_exec(L.fetch_contas_geral(ano, None, centros), faixa)
-        fig = _fig_barras(rows, True, "", h=460)
+        # Anual usa a vista por % realizado (altura = executado÷orçado) — evita barras
+        # minúsculas de contas de baixo R$. Modal segue em R$ (modo padrão).
+        fig = _fig_barras(rows, True, "", h=460, modo="pct")
         rc = L.reconciliacao(ano)
         banner = None
         if rc.get("por_mes") and not rc["bate"]:

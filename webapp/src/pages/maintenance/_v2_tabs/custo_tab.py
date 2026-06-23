@@ -114,7 +114,7 @@ def build_tab() -> dbc.Tab:
                                     dbc.CardHeader(
                                         html.H6(
                                             [html.I(className="bi bi-bar-chart-line me-2"),
-                                             "Orçado × Executado por conta (ano) — clique para abrir os meses"],
+                                             "Realizado por conta (% do orçado, ano) — clique para abrir os meses"],
                                             className="mb-0 fw-bold",
                                         ),
                                         className="py-2",
