@@ -197,7 +197,17 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     nomes = [r["label"] for r in rows]   # nome legível da conta/dia
     # eixo X: nome (sem código). Mini esconde rótulos (overview clicável).
     ticks = nomes
-    xs = list(range(len(rows)))
+    # Destaque do GERAL no medidor (modo pct): como todas as barras agora têm o mesmo peso
+    # visual, separamos o GERAL (total) das contas que o compõem por um gap + divisória +
+    # faixa de fundo, e o deixamos mais largo. Sem recolorir (mantém azul/cinza/laranja).
+    geral_destaque = (not mini and modo_pct and rows and rows[0]["code"] == "__GERAL__")
+    if geral_destaque:
+        xs = [0] + [1.6 + k for k in range(len(rows) - 1)]   # gap extra após o GERAL
+        larguras = [0.84] + [0.62] * (len(rows) - 1)
+        x_div = (0.42 + (1.6 - 0.31)) / 2                     # meio do vão GERAL↔1ª conta
+    else:
+        xs = list(range(len(rows)))
+        larguras = 0.62 if modo_pct else None
 
     # Hover rico (mesmo texto p/ as barras): nome + orçado + executado + %.
     # Vai em `hovertext` de propósito — `customdata` segue carregando só o code (clique de drill).
@@ -236,13 +246,13 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
             cinza_h.append(max(0, 100 - p))
             laranja_h.append(max(0, (p - 100) * _FATOR_EXC))
             cinza_cor.append(_CINZA_ORC)
-        fig.add_bar(name="Executado", x=xs, y=azul_h, width=0.62,
+        fig.add_bar(name="Executado", x=xs, y=azul_h, width=larguras,
                     marker={"color": _AMG_AZUL}, customdata=codes, hovertext=hovers,
                     hovertemplate="%{hovertext}<extra></extra>")
-        fig.add_bar(name="Orçado", x=xs, y=cinza_h, width=0.62,
+        fig.add_bar(name="Orçado", x=xs, y=cinza_h, width=larguras,
                     marker={"color": cinza_cor}, customdata=codes, hovertext=hovers,
                     hovertemplate="%{hovertext}<extra></extra>")
-        fig.add_bar(name="Excedente", x=xs, y=laranja_h, width=0.62,
+        fig.add_bar(name="Excedente", x=xs, y=laranja_h, width=larguras,
                     marker={"color": _AMG_LARANJA}, customdata=codes, hovertext=hovers,
                     hovertemplate="%{hovertext}<extra></extra>")
         topo_pct = max((max(r["pct"], 100) for r in rows
@@ -303,8 +313,19 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     else:
         yaxis.update({"tickprefix": "R$ ", "tickformat": ",.0f"})
 
+    # Destaque do GERAL: faixa de fundo na coluna do total + divisória até as contas.
+    shapes = []
+    if geral_destaque:
+        shapes = [
+            dict(type="rect", xref="x", yref="paper", x0=-0.62, x1=0.62, y0=0, y1=1,
+                 fillcolor="rgba(0,86,135,0.06)", line={"width": 0}, layer="below"),
+            dict(type="line", xref="x", yref="paper", x0=x_div, x1=x_div, y0=0, y1=1,
+                 line={"color": "#ced4da", "width": 1, "dash": "dot"}, layer="below"),
+        ]
+
     fig.update_layout(
         height=h, barmode=("stack" if modo_pct else "overlay"),
+        shapes=shapes,
         plot_bgcolor="rgba(248,250,252,0.6)", paper_bgcolor="rgba(0,0,0,0)",
         margin={"l": 44, "r": 12, "t": 34 if titulo else 10, "b": 18 if mini else 150},
         title=({"text": titulo, "font": {"size": 13 if not mini else 12, "color": "#343a40"},
