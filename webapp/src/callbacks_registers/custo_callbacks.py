@@ -40,7 +40,8 @@ _GRID = "rgba(0,0,0,0.06)"
 # Cores da marca AMG (mesmas da home — home.py C_SHORT/C_LONG)
 _AMG_AZUL = "#005687"      # executado dentro do orçado
 _AMG_LARANJA = "#E96D38"   # excedente acima do orçado
-_CINZA_ORC = "#dee2e6"     # container do orçado (saldo não usado)
+_CINZA_ORC = "#dee2e6"        # container do orçado (saldo não usado) — barras das contas
+_CINZA_ORC_GERAL = "#c2ccd6"  # idem no GERAL: + escuro p/ não apagar sobre a faixa escura
 # Compressão da escala acima de 100%: cada 1% de estouro vale FATOR unidade visual,
 # p/ o estouro não esticar o eixo e achatar o container de 100% (ex: 224% → ~143%).
 _FATOR_EXC = 0.35
@@ -261,10 +262,10 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
         laranja_h = [s[2] for s in seg]
         bar_top = [a + c + l for a, c, l in seg]
 
-        def _add_medidor(idxs, eixo, legenda):
+        def _add_medidor(idxs, eixo, legenda, cinza=_CINZA_ORC):
             larg = [larguras[i] for i in idxs] if isinstance(larguras, list) else larguras
             for nome, cor, alt in (("Executado", _AMG_AZUL, azul_h),
-                                   ("Orçado", _CINZA_ORC, cinza_h),
+                                   ("Orçado", cinza, cinza_h),
                                    ("Excedente", _AMG_LARANJA, laranja_h)):
                 fig.add_bar(name=nome, legendgroup=nome, showlegend=legenda, yaxis=eixo,
                             x=[xs[i] for i in idxs], y=[alt[i] for i in idxs], width=larg,
@@ -277,8 +278,8 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
                         if not _sem_orc(rows[i]) and rows[i].get("pct") is not None), default=100)
         topo_max = _comp_pct(topo_pct)            # teto das contas (escala secundária)
         if geral_destaque:
-            _add_medidor([0], "y", False)         # GERAL → eixo primário
-            _add_medidor(contas_idx, "y2", True)  # contas → eixo secundário
+            _add_medidor([0], "y", False, cinza=_CINZA_ORC_GERAL)  # GERAL → eixo primário
+            _add_medidor(contas_idx, "y2", True)                   # contas → eixo secundário
         else:
             _add_medidor(contas_idx, "y", True)
     else:
