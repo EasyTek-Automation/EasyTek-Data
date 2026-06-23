@@ -134,18 +134,39 @@ def build_tab() -> dbc.Tab:
                                     ),
                                     dbc.CardBody(
                                         [
-                                            html.Div(
-                                                dcc.Graph(
-                                                    id="custo-graph-entry",
-                                                    # sem staticPlot p/ liberar o tooltip das barras
-                                                    # (incl. GERAL); o clique borbulha p/ custo-entry-wrap
-                                                    # e abre o modal. doubleClick/scrollZoom off.
-                                                    config={"displayModeBar": False, "responsive": True,
-                                                            "doubleClick": False, "scrollZoom": False},
-                                                    style={"height": "460px", "width": "100%"},
-                                                ),
-                                                id="custo-entry-wrap",
-                                                n_clicks=0, style={"cursor": "pointer"},
+                                            dbc.Row(
+                                                [
+                                                    # Rosca (esquerda): distribuição por equipamento
+                                                    dbc.Col(
+                                                        dcc.Graph(
+                                                            id="custo-graph-rosca",
+                                                            config={"displayModeBar": False,
+                                                                    "responsive": True},
+                                                            style={"height": "460px",
+                                                                   "width": "100%"},
+                                                        ),
+                                                        xs=12, md=4,
+                                                    ),
+                                                    # Barras (direita): realizado por conta
+                                                    dbc.Col(
+                                                        html.Div(
+                                                            dcc.Graph(
+                                                                id="custo-graph-entry",
+                                                                config={"displayModeBar": False,
+                                                                        "responsive": True,
+                                                                        "doubleClick": False,
+                                                                        "scrollZoom": False},
+                                                                style={"height": "460px",
+                                                                       "width": "100%"},
+                                                            ),
+                                                            id="custo-entry-wrap",
+                                                            n_clicks=0,
+                                                            style={"cursor": "pointer"},
+                                                        ),
+                                                        xs=12, md=8,
+                                                    ),
+                                                ],
+                                                className="g-2 align-items-center",
                                             ),
                                             # Filtro por valor (slider duplo) — linha nova, fora do
                                             # wrapper clicável p/ não disparar o modal ao arrastar.

@@ -80,9 +80,68 @@ CONTA_NOME: dict[str, str] = {
 }
 
 
+# Nome legivel de cada centro de custo (grafia do SAP — KOSTL -> texto da KSB1).
+# Em linguagem simples: traduz o codigo do centro (ex: "108401") para o nome que o
+# gestor reconhece (ex: "PRENSA FAGOR"), so para exibir no filtro — o dado gravado
+# no Mongo continua sendo o codigo. Mapa estatico (igual a CONTA_NOME): nao depende
+# do SAP no cliente. Centros sem nome conhecido aparecem so com o codigo.
+CENTRO_NOME: dict[str, str] = {
+    "102001": "LINHA LASER",
+    "102004": "LINHA LASER II",
+    "105001": "LINHA LONGIDUDINAL-Q",
+    "105002": "LINHA LONGIDUDINAL-F",
+    "106001": "LINHA TRANSVERSAL-F",
+    "106002": "LINHA TRANSVERS.-QTE",
+    "108401": "PRENSA FAGOR",
+    "108402": "PRENSA SCHULLER 500",
+    "108403": "PRENSA SCHULLER 630",
+    "109000": "GERENTE INDUSTRIAL",
+    "109002": "SERVIÇOS GERAIS -ADM",
+    "109008": "ESTRUT CNTL COML PR",
+    "109012": "EST CENTRAL SUP PR",
+    "109100": "MANUTENÇÃO DA PLANTA",
+    "109710": "ARMAZENS E TRANSLADO",
+    "109800": "QUALIDADE PROD PR",
+    "109900": "SERVIÇOS GERAIS-PROD",
+    "109902": "ADMIN. PRODUÇÃO - PR",
+    "109903": "FERRAMENTARIA",
+}
+
+
 def nome_conta(conta: str) -> str:
     """Nome legivel da conta; ecoa o codigo se desconhecida."""
     return CONTA_NOME.get(conta, conta)
+
+
+def nome_centro(centro: str) -> str:
+    """Nome legivel do centro de custo; ecoa o codigo se desconhecido."""
+    return CENTRO_NOME.get(centro, centro)
+
+
+# Famílias de equipamento (para o gráfico de rosca "custo por equipamento"): agrupa os
+# centros de custo de produção pelas linhas/equipamentos principais; o restante (gerência,
+# serviços, manutenção da planta, armazéns, qualidade…) cai em "Outros".
+FAMILIA_OUTROS = "Outros"
+# ordem de exibição das fatias principais (Outros sempre por último)
+FAMILIAS_EQUIP = ["LCLs (Longitudinais)", "LCTs (Transversais)", "Prensas", "Laser"]
+
+
+def familia_equipamento(centro: str) -> str:
+    """Família de equipamento de um centro de custo, pelo nome (CENTRO_NOME).
+
+    LCLs = linhas de corte longitudinal; LCTs = transversal; + Prensas e Laser. Centros
+    administrativos/apoio → 'Outros'.
+    """
+    u = nome_centro(centro).upper()
+    if "LASER" in u:
+        return "Laser"
+    if "LONGIDUDINAL" in u or "LONGITUDINAL" in u:
+        return "LCLs (Longitudinais)"
+    if "TRANSVERS" in u:
+        return "LCTs (Transversais)"
+    if "PRENSA" in u:
+        return "Prensas"
+    return FAMILIA_OUTROS
 
 
 def normalizar_grupo(grupo: str) -> str:

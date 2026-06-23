@@ -397,6 +397,48 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     return fig
 
 
+_ROSCA_CORES = {
+    "LCLs (Longitudinais)": "#005687",   # azul AMG
+    "LCTs (Transversais)": "#2f6fb0",
+    "Prensas": "#5b8def",
+    "Laser": "#9ec5fe",
+    "Outros": "#adb5bd",                  # cinza p/ o restante (apoio/admin)
+}
+
+
+def _fig_rosca(dados, h=460):
+    """Rosca: distribuição do executado do ano por família de equipamento (centro de custo).
+
+    Fatias = LCLs/LCTs/Prensas/Laser; o restante (apoio/admin) em 'Outros' (cinza). Centro
+    mostra o total. Não dispara drill — é leitura complementar às barras (que são por conta).
+    """
+    if not dados:
+        return _fig_vazia(h=h)
+    labels = [d["familia"] for d in dados]
+    values = [d["executado"] for d in dados]
+    cores = [_ROSCA_CORES.get(f, "#ced4da") for f in labels]
+    total = sum(values)
+    fig = go.Figure(go.Pie(
+        labels=labels, values=values, hole=0.58, sort=False, direction="clockwise",
+        marker={"colors": cores, "line": {"color": "white", "width": 1.5}},
+        customdata=[_brl(v) for v in values],
+        texttemplate="%{percent:.0%}", textposition="outside",
+        textfont={"size": 10},
+        hovertemplate="<b>%{label}</b><br>%{customdata} · %{percent}<extra></extra>"))
+    fig.update_layout(
+        height=h, margin={"l": 8, "r": 8, "t": 34, "b": 8},
+        title={"text": "Custo por equipamento (ano)", "x": 0, "xanchor": "left", "y": 0.98,
+               "font": {"size": 13, "color": "#343a40"}},
+        paper_bgcolor="rgba(0,0,0,0)",
+        showlegend=True,
+        legend={"orientation": "h", "y": -0.05, "x": 0.5, "xanchor": "center",
+                "font": {"size": 9}},
+        annotations=[dict(text=f"<b>{_brl_abrev(total)}</b><br><span style='font-size:9px'>total</span>",
+                          x=0.5, y=0.5, showarrow=False, font={"size": 14, "color": "#34568b"})],
+    )
+    return fig
+
+
 def _graph_click(rows, graph_id, com_orcado, titulo, h=360, modo="valor"):
     """Gráfico grande clicável (clique na barra dispara drill). `modo='pct'` usa o medidor."""
     return dcc.Graph(id=graph_id, figure=_fig_barras(rows, com_orcado, titulo, h=h, modo=modo),
@@ -576,6 +618,15 @@ def register_custo_callbacks(app):
     def _slider_geral_range(ano, _n):
         # escala do slider baseada em TODAS as contas (não no recorte do filtro) — estável
         return _slider_cfg(L.fetch_contas_geral(int(ano or 2026), None, None))
+
+    # Rosca: distribuição do executado por equipamento (independe do filtro de conta)
+    @app.callback(
+        Output("custo-graph-rosca", "figure"),
+        Input("store-custo-ano", "data"),
+        Input("custo-init", "n_intervals"),
+    )
+    def _render_rosca(ano, _n):
+        return _fig_rosca(L.fetch_por_equipamento(int(ano or 2026), None))
 
     @app.callback(
         Output("custo-graph-entry", "figure"),

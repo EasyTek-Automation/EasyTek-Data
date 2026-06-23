@@ -18,11 +18,13 @@ from typing import Iterable, Optional
 
 try:  # contexto do webapp (pacote src.custos)
     from src.database.connection import get_mongo_connection
-    from src.custos.hierarquia import GRUPOS, grupo_da_conta, label_grupo, nome_conta
+    from src.custos.hierarquia import (FAMILIA_OUTROS, FAMILIAS_EQUIP, GRUPOS,
+                                       familia_equipamento, grupo_da_conta, label_grupo, nome_conta)
     from src.custos.storage import COLL_LANCAMENTOS, COLL_RESUMO
 except ImportError:  # contexto de teste/script (cwd = webapp/src)
     from database.connection import get_mongo_connection  # type: ignore
-    from custos.hierarquia import GRUPOS, grupo_da_conta, label_grupo, nome_conta  # type: ignore
+    from custos.hierarquia import (FAMILIA_OUTROS, FAMILIAS_EQUIP, GRUPOS,  # type: ignore
+                                   familia_equipamento, grupo_da_conta, label_grupo, nome_conta)
     from custos.storage import COLL_LANCAMENTOS, COLL_RESUMO  # type: ignore
 
 logger = logging.getLogger("custos.leitura")
@@ -272,6 +274,35 @@ def fetch_centros_disponiveis(ano: int) -> list[str]:
         return sorted(c for c in centros if c)
 
     return _memo(("centros", ano), _calc)
+
+
+def fetch_por_equipamento(ano: int, centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """Executado do ano por família de equipamento (centro de custo) — gráfico de rosca.
+
+    Soma o executado de cada centro e agrupa pelas famílias (LCLs/LCTs/Prensas/Laser),
+    jogando o restante em 'Outros'. Retorna `[{familia, executado}]` ordenado pelas famílias
+    principais e com 'Outros' por último (só inclui famílias com valor > 0).
+    """
+    cz = _norm_centros(centros)
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match: dict = {"mes_referencia": {"$regex": f"^{ano}-"}}
+        if cz:
+            match["centro_custo"] = {"$in": list(cz)}
+        pipe = [{"$match": match},
+                {"$group": {"_id": "$centro_custo", "executado": {"$sum": "$valor"}}}]
+        acc: dict[str, float] = {}
+        for d in coll.aggregate(pipe):
+            fam = familia_equipamento(d["_id"])
+            acc[fam] = acc.get(fam, 0.0) + (d["executado"] or 0.0)
+        ordem = FAMILIAS_EQUIP + [FAMILIA_OUTROS]
+        return [{"familia": f, "executado": round(acc[f], 2)}
+                for f in ordem if acc.get(f, 0) > 0]
+
+    return _memo(("equip", ano, cz), _calc)
 
 
 def fetch_lancamentos(
