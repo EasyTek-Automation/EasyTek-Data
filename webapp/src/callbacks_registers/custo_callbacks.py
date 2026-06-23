@@ -41,7 +41,6 @@ _GRID = "rgba(0,0,0,0.06)"
 _AMG_AZUL = "#005687"      # executado dentro do orçado
 _AMG_LARANJA = "#E96D38"   # excedente acima do orçado
 _CINZA_ORC = "#dee2e6"     # container do orçado (saldo não usado)
-_CINZA_SORC = "#adb5bd"    # conta sem orçado (sem referência de %)
 # Compressão da escala acima de 100%: cada 1% de estouro vale FATOR unidade visual,
 # p/ o estouro não esticar o eixo e achatar o container de 100% (ex: 224% → ~143%).
 _FATOR_EXC = 0.35
@@ -224,12 +223,13 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
         #   azul AMG  = executado dentro do orçado (0→100%)
         #   cinza     = saldo do orçado não usado (até 100%)
         #   laranja AMG = excedente acima de 100% (escala comprimida via _comp_pct)
-        # Conta sem orçado (sem % a calcular) = barra cinza neutra cheia, marcada 's/orç'.
+        # Conta sem orçado = divisão por zero (% infinito) → gasto 100% fora do orçado:
+        # barra inteira laranja (excedente puro), marcada 's/orç'.
         azul_h, cinza_h, laranja_h, cinza_cor = [], [], [], []
         for r in rows:
             if _sem_orc(r):
-                azul_h.append(0); cinza_h.append(100); laranja_h.append(0)
-                cinza_cor.append(_CINZA_SORC)
+                azul_h.append(0); cinza_h.append(0); laranja_h.append(100)
+                cinza_cor.append(_CINZA_ORC)
                 continue
             p = r["pct"] or 0
             azul_h.append(min(p, 100))
@@ -278,7 +278,7 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
                 anots.append(dict(x=x, y=topo, text=_brl_abrev(orc), showarrow=False, yshift=20,
                                   font={"size": 8, "color": _CINZA}))
             if r.get("sem_orcamento"):
-                txt, cor = "s/orç", _LARANJA
+                txt, cor = "s/orç", (_AMG_LARANJA if modo_pct else _LARANJA)
             elif r.get("pct") is None:
                 txt, cor = "", "#8a929b"
             else:
