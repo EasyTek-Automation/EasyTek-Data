@@ -37,7 +37,7 @@ def build_tab() -> dbc.Tab:
                 # Estado proprio (autocontido). Drill por tempo: ano -> mes -> dia -> conta.
                 # Filtros persistem na sessão do navegador (sobrevivem a reload/navegação).
                 dcc.Store(id="store-custo-ano", data=ANO_PADRAO, storage_type="session"),
-                dcc.Store(id="store-custo-centros", data=[], storage_type="session"),
+                dcc.Store(id="store-custo-contas-sel", data=[], storage_type="session"),
                 dcc.Store(id="store-custo-level", data="planta"),
                 dcc.Store(id="store-custo-mes", data=None),
                 dcc.Store(id="store-custo-dia", data=None),
@@ -81,25 +81,25 @@ def build_tab() -> dbc.Tab:
                                                 className="me-3",
                                             ),
                                             html.Div(
-                                                [_label("Centro de custo"),
-                                                 # Botão que colapsa/expande a lista de centros
-                                                 # (a multiseleção de chips era um paredão feio
-                                                 # sempre aberto). Fechado por padrão.
+                                                [_label("Contas (barras)"),
+                                                 # Filtro das BARRAS (contas/classes de custo) —
+                                                 # desmarque uma conta p/ tirá-la do gráfico.
+                                                 # Colapsável, fechado por padrão.
                                                  dbc.Button(
-                                                     "Todos os centros",
-                                                     id="custo-centros-toggle",
+                                                     "Todas as contas",
+                                                     id="custo-contas-toggle",
                                                      color="light", size="sm",
                                                      className="border d-flex align-items-center "
                                                                "justify-content-between",
-                                                     style={"minWidth": "240px"}),
+                                                     style={"minWidth": "260px"}),
                                                  dbc.Collapse(
                                                      dcc.Dropdown(
-                                                         id="custo-centro-filter", options=[],
+                                                         id="custo-conta-filter", options=[],
                                                          value=[], multi=True,
-                                                         placeholder="Todos os centros",
+                                                         placeholder="Todas as contas",
                                                          className="mt-1",
-                                                         style={"minWidth": "240px"}),
-                                                     id="custo-centros-collapse", is_open=False)],
+                                                         style={"minWidth": "260px"}),
+                                                     id="custo-contas-collapse", is_open=False)],
                                                 className="me-3 d-flex flex-column",
                                             ),
                                             html.Div(

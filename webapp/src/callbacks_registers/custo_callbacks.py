@@ -122,6 +122,18 @@ def _filtra_por_exec(rows, faixa):
             if r["code"] == "__GERAL__" or lo <= (r["executado"] or 0) <= hi]
 
 
+def _filtra_por_contas(rows, sel):
+    """Mantém GERAL sempre; mantém só as contas cujo código está em `sel`. sel None → tudo.
+
+    É o filtro das BARRAS (contas/classes de custo) — não confundir com centro de custo
+    (onde o gasto ocorreu). GERAL é o total e nunca some.
+    """
+    if sel is None:
+        return rows
+    alvo = set(sel)
+    return [r for r in rows if r["code"] == "__GERAL__" or r["code"] in alvo]
+
+
 def _centro_label(c: str) -> str:
     """Rótulo do filtro: 'código — NOME' quando há descrição; só o código quando não."""
     nome = nome_centro(c)
@@ -206,7 +218,7 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
         # primário e contas no secundário (mais altas-proporcionais), em faixas de tom distintas.
         _STEP = 0.42
         xs = [0] + [0.95 + k * _STEP for k in range(len(rows) - 1)]
-        larguras = [0.25] + [0.2] * (len(rows) - 1)
+        larguras = [0.25] + [0.14] * (len(rows) - 1)
     else:
         xs = list(range(len(rows)))
         larguras = 0.62 if modo_pct else None
@@ -322,7 +334,7 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
         # GERAL no eixo primário com range MENOR → mesma barra parece ~40% mais alta que as
         # contas (que ficam no secundário, range maior). topo_max = teto comprimido das contas.
         r_g = bar_top[0] * 1.18                       # GERAL ocupa ~85% do próprio eixo
-        r_c = max(r_g * 1.40, topo_max * 1.10)        # contas: 40% "mais baixas" no mesmo %
+        r_c = max(r_g * 1.68, topo_max * 1.10)        # contas ~68% "mais baixas" no mesmo %
         g_top = 100 if bar_top[0] <= 100 else topo_pct
         tvg, ttg = _pct_ticks(g_top)
         tvc, ttc = _pct_ticks(topo_pct)
@@ -347,7 +359,7 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
         x_fim = xs[-1] + 0.3
         shapes = [
             dict(type="rect", xref="x", yref="paper", x0=-0.32, x1=0.42, y0=0, y1=1,
-                 fillcolor="rgba(0,86,135,0.11)", line={"width": 0}, layer="below"),
+                 fillcolor="rgba(0,86,135,0.15)", line={"width": 0}, layer="below"),
             dict(type="rect", xref="x", yref="paper", x0=0.42, x1=x_fim, y0=0, y1=1,
                  fillcolor="rgba(0,86,135,0.07)", line={"width": 0}, layer="below"),
         ]
@@ -477,27 +489,29 @@ def _crumb(*partes):
 def register_custo_callbacks(app):
     """Registra todos os callbacks da aba de custo."""
 
+    # Popula o filtro de CONTAS (as barras). Repopula ao trocar o ano.
     @app.callback(
-        Output("custo-centro-filter", "options"),
-        Output("custo-centro-filter", "value"),
+        Output("custo-conta-filter", "options"),
+        Output("custo-conta-filter", "value"),
         Input("custo-init", "n_intervals"),
-        State("store-custo-ano", "data"),
-        State("store-custo-centros", "data"),
+        Input("store-custo-ano", "data"),
+        State("store-custo-contas-sel", "data"),
     )
-    def _popular_centros(_n, ano, salvos):
-        centros = L.fetch_centros_disponiveis(int(ano or 2026))
-        options = [{"label": _centro_label(c), "value": c} for c in centros]
-        # Padrão: todos os centros marcados. Respeita um filtro salvo na sessão
-        # (subconjunto escolhido antes); só cai no "todos" na 1ª visita / sessão limpa.
-        value = salvos if salvos else centros
+    def _popular_contas(_n, ano, salvos):
+        rows = L.fetch_contas_geral(int(ano or 2026), None, None)
+        contas = [r for r in rows if r["code"] != "__GERAL__"]
+        options = [{"label": f'{r["code"]} — {r["label"]}', "value": r["code"]} for r in contas]
+        codes = [r["code"] for r in contas]
+        # Padrão: todas marcadas. Respeita seleção salva na sessão se ainda válida.
+        value = [c for c in (salvos or []) if c in codes] or codes
         return options, value
 
     @app.callback(
-        Output("store-custo-centros", "data"),
-        Input("custo-centro-filter", "value"),
+        Output("store-custo-contas-sel", "data"),
+        Input("custo-conta-filter", "value"),
         prevent_initial_call=True,
     )
-    def _set_centros(value):
+    def _set_contas(value):
         return value or []
 
     @app.callback(
@@ -508,30 +522,32 @@ def register_custo_callbacks(app):
     def _set_ano(value):
         return value
 
-    # Colapsar/expandir a lista de centros de custo (paredão de chips fica escondido)
+    # Colapsar/expandir a lista de contas (paredão de chips fica escondido)
     @app.callback(
-        Output("custo-centros-collapse", "is_open"),
-        Input("custo-centros-toggle", "n_clicks"),
-        State("custo-centros-collapse", "is_open"),
+        Output("custo-contas-collapse", "is_open"),
+        Input("custo-contas-toggle", "n_clicks"),
+        State("custo-contas-collapse", "is_open"),
         prevent_initial_call=True,
     )
-    def _toggle_centros(_n, aberto):
+    def _toggle_contas(_n, aberto):
         return not aberto
 
-    # Rótulo do botão: quantos centros selecionados + chevron (sobe/desce)
+    # Rótulo do botão: quantas contas selecionadas + chevron (sobe/desce)
     @app.callback(
-        Output("custo-centros-toggle", "children"),
-        Input("custo-centro-filter", "value"),
-        Input("custo-centros-collapse", "is_open"),
-        State("custo-centro-filter", "options"),
+        Output("custo-contas-toggle", "children"),
+        Input("custo-conta-filter", "value"),
+        Input("custo-contas-collapse", "is_open"),
+        State("custo-conta-filter", "options"),
     )
-    def _label_centros(value, aberto, options):
+    def _label_contas(value, aberto, options):
         total = len(options or [])
         n = len(value or [])
-        if n == 0 or (total and n >= total):
-            txt = "Todos os centros" + (f" ({total})" if total else "")
+        if total and n >= total:
+            txt = f"Todas as contas ({total})"
+        elif n == 0:
+            txt = "Nenhuma conta"
         else:
-            txt = f"{n} de {total} centros"
+            txt = f"{n} de {total} contas"
         chev = "bi-chevron-up" if aberto else "bi-chevron-down"
         return [html.Span(txt), html.I(className=f"bi {chev} ms-2")]
 
@@ -543,33 +559,30 @@ def register_custo_callbacks(app):
         Output("custo-slider-geral", "value"),
         Output("custo-slider-geral", "marks"),
         Output("custo-slider-geral", "step"),
-        Input("store-custo-centros", "data"),
         Input("store-custo-ano", "data"),
         Input("custo-init", "n_intervals"),
     )
-    def _slider_geral_range(centros, ano, _n):
-        ano = int(ano or 2026)
-        centros = _centros_efetivos(centros, ano)
-        return _slider_cfg(L.fetch_contas_geral(ano, None, centros))
+    def _slider_geral_range(ano, _n):
+        # escala do slider baseada em TODAS as contas (não no recorte do filtro) — estável
+        return _slider_cfg(L.fetch_contas_geral(int(ano or 2026), None, None))
 
     @app.callback(
         Output("custo-graph-entry", "figure"),
         Output("custo-seed-selo", "children"),
         Output("custo-reconc-banner", "children"),
-        Input("store-custo-centros", "data"),
+        Input("store-custo-contas-sel", "data"),
         Input("store-custo-ano", "data"),
         Input("custo-init", "n_intervals"),
         Input("custo-slider-geral", "value"),
     )
-    def _render_entry(centros, ano, _n, faixa):
+    def _render_entry(contas_sel, ano, _n, faixa):
         ano = int(ano or 2026)
-        centros = _centros_efetivos(centros, ano)
-        # Mudança de dado (ano/centros/init) renderiza cheio; o reset do slider re-renderiza
-        # logo em seguida (já com a faixa nova). Só o arrasto do slider aplica filtro — evita
-        # filtrar com faixa obsoleta de outro ano.
+        # Só o arrasto do slider aplica o filtro de valor; outras mudanças renderizam cheio.
         if ctx.triggered_id != "custo-slider-geral":
             faixa = None
-        rows = _filtra_por_exec(L.fetch_contas_geral(ano, None, centros), faixa)
+        rows = L.fetch_contas_geral(ano, None, None)   # todos os centros (sem escopo de centro)
+        rows = _filtra_por_contas(rows, contas_sel or None)   # filtro das BARRAS (contas)
+        rows = _filtra_por_exec(rows, faixa)
         # Anual usa a vista por % realizado (altura = executado÷orçado) — evita barras
         # minúsculas de contas de baixo R$. Modal segue em R$ (modo padrão).
         fig = _fig_barras(rows, True, "", h=460, modo="pct")
@@ -676,24 +689,22 @@ def register_custo_callbacks(app):
         Input("store-custo-level", "data"),
         Input("store-custo-mes", "data"),
         Input("store-custo-dia", "data"),
-        State("store-custo-centros", "data"),
         State("store-custo-ano", "data"),
         prevent_initial_call=True,
     )
-    def _slider_modal_range(level, mes, dia, centros, ano):
+    def _slider_modal_range(level, mes, dia, ano):
         ano = int(ano or 2026)
-        centros = _centros_efetivos(centros, ano)
         oculto = {"display": "none"}
         if level == "meses":
             # teto = maior conta entre todos os meses (mesmo limiar aplicado a cada mini)
             allrows = []
             for m in L.meses_com_dados(ano):
-                allrows += L.fetch_contas_geral(ano, m, centros)
+                allrows += L.fetch_contas_geral(ano, m, None)
             rows = allrows
         elif level == "dias" and mes:
-            rows = L.fetch_contas_geral(ano, mes, centros)
+            rows = L.fetch_contas_geral(ano, mes, None)
         elif level == "contas-dia" and dia:
-            rows = L.fetch_contas_no_dia(ano, dia, centros)
+            rows = L.fetch_contas_no_dia(ano, dia, None)
         else:  # lançamentos / planta — sem barras, esconde o slider
             return 0, 1, [0, 1], {}, 1, oculto
         mn, mx, val, marks, step = _slider_cfg(rows)
@@ -710,25 +721,28 @@ def register_custo_callbacks(app):
         Input("store-custo-dia", "data"),
         Input("store-custo-conta", "data"),
         Input("custo-slider-modal", "value"),
-        State("store-custo-centros", "data"),
+        State("store-custo-contas-sel", "data"),
         State("store-custo-ano", "data"),
         prevent_initial_call=True,
     )
-    def _render_modal(level, mes, dia, conta, faixa, centros, ano):
+    def _render_modal(level, mes, dia, conta, faixa, contas_sel, ano):
         if not level or level == "planta":
             return None, "", None, {"display": "none"}
         ano = int(ano or 2026)
-        centros = _centros_efetivos(centros, ano)
+        sel = contas_sel or None
         ano_lbl = f"{ano}"
         # Só o arrasto do slider aplica filtro; navegação de nível renderiza cheio (o reset
         # do slider re-renderiza com a faixa nova) — evita filtrar com faixa de outro nível.
         if ctx.triggered_id != "custo-slider-modal":
             faixa = None
 
+        def _prep(rows):  # filtro de contas (barras) + filtro de valor
+            return _filtra_por_exec(_filtra_por_contas(rows, sel), faixa)
+
         # NÍVEL 1 — meses (grade de mini-gráficos, 1 por mês)
         if level == "meses":
             meses = L.meses_com_dados(ano)
-            cards = [_mini_graph_card(m, _filtra_por_exec(L.fetch_contas_geral(ano, m, centros), faixa))
+            cards = [_mini_graph_card(m, _prep(L.fetch_contas_geral(ano, m, None)))
                      for m in meses]
             content = html.Div([
                 html.H6("Clique num mês para ver os dias:", className="v2-section-h6 text-muted"),
@@ -739,8 +753,8 @@ def register_custo_callbacks(app):
         # NÍVEL 2 — dias (gráfico do mês + cards de dia)
         if level == "dias" and mes:
             # filtro vale só p/ as barras de conta; os cards de DIA são outra dimensão (total/dia)
-            rows = _filtra_por_exec(L.fetch_contas_geral(ano, mes, centros), faixa)
-            dias = L.fetch_dias_total_mes(ano, mes, centros)
+            rows = _prep(L.fetch_contas_geral(ano, mes, None))
+            dias = L.fetch_dias_total_mes(ano, mes, None)
             cards = [_value_card(d["label"], _brl0(d["executado"]), _AZUL,
                                  {"type": "custo-dia-card", "dia": d["code"]}) for d in dias]
             content = html.Div([
@@ -757,7 +771,7 @@ def register_custo_callbacks(app):
         # NÍVEL 3 — contas do dia (gráfico das contas do dia + cards de conta)
         if level == "contas-dia" and dia:
             # aqui barras e cards são a MESMA dimensão (conta) → filtra os dois p/ casar
-            rows = _filtra_por_exec(L.fetch_contas_no_dia(ano, dia, centros), faixa)
+            rows = _prep(L.fetch_contas_no_dia(ano, dia, None))
             cards = [_value_card(r["label"], _brl0(r["executado"]), _AZUL,
                                  {"type": "custo-conta-card", "conta": r["code"]})
                      for r in rows if r["code"] != "__GERAL__"]
@@ -776,11 +790,11 @@ def register_custo_callbacks(app):
         if level == "lancamentos" and conta:
             nome = nome_conta(conta)
             if dia:
-                docs = L.fetch_lancamentos_no_dia(ano, dia, conta=conta, centros=centros)
+                docs = L.fetch_lancamentos_no_dia(ano, dia, conta=conta, centros=None)
                 escopo = f"{dia[-2:]}/{_nome_mes(mes)}"
                 crumb = _crumb(ano_lbl, _nome_mes(mes), f"Dia {dia[-2:]}", nome)
             else:
-                docs = L.fetch_lancamentos(ano, conta=conta, mes=mes, centros=centros)
+                docs = L.fetch_lancamentos(ano, conta=conta, mes=mes, centros=None)
                 escopo = _nome_mes(mes)
                 crumb = _crumb(ano_lbl, _nome_mes(mes), nome)
             content = html.Div([
