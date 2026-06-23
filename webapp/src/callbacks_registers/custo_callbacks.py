@@ -14,6 +14,7 @@ ao Div (mesmo truque do v2).
 from __future__ import annotations
 
 import logging
+import math
 
 import dash
 import dash_bootstrap_components as dbc
@@ -22,10 +23,10 @@ from dash import ALL, Input, Output, State, ctx, dash_table, dcc, html, no_updat
 
 try:
     from src.custos import leitura as L
-    from src.custos.hierarquia import nome_conta
+    from src.custos.hierarquia import nome_centro, nome_conta
 except ImportError:
     from custos import leitura as L  # type: ignore
-    from custos.hierarquia import nome_conta  # type: ignore
+    from custos.hierarquia import nome_centro, nome_conta  # type: ignore
 
 logger = logging.getLogger("custos.callbacks")
 
@@ -36,6 +37,14 @@ _LARANJA = "#fd7e14"
 _CINZA = "#6c757d"
 _ORCADO_FILL = "#cfe2ff"
 _GRID = "rgba(0,0,0,0.06)"
+# Cores da marca AMG (mesmas da home — home.py C_SHORT/C_LONG)
+_AMG_AZUL = "#005687"      # executado dentro do orçado
+_AMG_LARANJA = "#E96D38"   # excedente acima do orçado
+_CINZA_ORC = "#dee2e6"        # container do orçado (saldo não usado) — barras das contas
+_CINZA_ORC_GERAL = "#c2ccd6"  # idem no GERAL: + escuro p/ não apagar sobre a faixa escura
+# Compressão da escala acima de 100%: cada 1% de estouro vale FATOR unidade visual,
+# p/ o estouro não esticar o eixo e achatar o container de 100% (ex: 224% → ~143%).
+_FATOR_EXC = 0.35
 _MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
           "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
 
@@ -56,10 +65,95 @@ def _brl0(v) -> str:
     return "R$ " + f"{v:,.0f}".replace(",", ".")
 
 
+def _brl_abrev(v) -> str:
+    """Valor monetário compacto p/ rótulo de barra: 462816 → 'R$ 463k'; 3065639 → 'R$ 3,1M'.
+
+    Abreviação cabe em 16 barras estreitas; valor cheio fica no hover (_hover_rico).
+    """
+    if v is None:
+        return ""
+    v = float(v)
+    if v == 0:
+        return "R$ 0"
+    a = abs(v)
+    if a >= 1_000_000:
+        return "R$ " + f"{v / 1_000_000:.1f}".replace(".", ",") + "M"
+    if a >= 1_000:
+        return f"R$ {round(v / 1_000):.0f}k"
+    return f"R$ {v:.0f}"
+
+
 def _pct(v) -> str:
     if v is None:
         return "—"
     return f"{v:.1f}".replace(".", ",") + "%"
+
+
+# --------------------------------------------------------------------------- #
+# Filtro por valor (slider duplo) — filtra contas por executado; GERAL fica fixa
+# --------------------------------------------------------------------------- #
+def _max_conta_exec(rows) -> float:
+    """Maior executado entre as contas (exclui GERAL) — teto da escala do slider."""
+    return max((r["executado"] or 0 for r in rows if r["code"] != "__GERAL__"), default=0.0)
+
+
+def _slider_cfg(rows):
+    """(min, max, value, marks, step) do RangeSlider a partir do teto de executado.
+
+    min=0; max arredondado p/ um número redondo (1/2/2,5/5×10ⁿ); value=faixa cheia;
+    marcas em 0/25/50/75/100% (R$ abreviado). Vista sem contas → escala trivial.
+    """
+    teto = _max_conta_exec(rows)
+    if teto <= 0:
+        return 0, 1, [0, 1], {0: "R$ 0", 1: "R$ 1"}, 1
+    mag = 10 ** math.floor(math.log10(teto))
+    topo = next(m * mag for m in (1, 2, 2.5, 5, 10) if m * mag >= teto)
+    marks = {int(round(topo * f)): _brl_abrev(round(topo * f))
+             for f in (0, 0.25, 0.5, 0.75, 1.0)}
+    step = max(1, round(topo / 100))
+    return 0, int(topo), [0, int(topo)], marks, step
+
+
+def _filtra_por_exec(rows, faixa):
+    """Mantém GERAL sempre; mantém contas com executado em [lo, hi]. faixa inválida → tudo."""
+    if not faixa or len(faixa) != 2:
+        return rows
+    lo, hi = faixa
+    return [r for r in rows
+            if r["code"] == "__GERAL__" or lo <= (r["executado"] or 0) <= hi]
+
+
+def _filtra_por_contas(rows, sel):
+    """Mantém GERAL sempre; mantém só as contas cujo código está em `sel`. sel None → tudo.
+
+    É o filtro das BARRAS (contas/classes de custo) — não confundir com centro de custo
+    (onde o gasto ocorreu). GERAL é o total e nunca some.
+    """
+    if sel is None:
+        return rows
+    alvo = set(sel)
+    return [r for r in rows if r["code"] == "__GERAL__" or r["code"] in alvo]
+
+
+def _centro_label(c: str) -> str:
+    """Rótulo do filtro: 'código — NOME' quando há descrição; só o código quando não."""
+    nome = nome_centro(c)
+    return f"{c} — {nome}" if nome != c else c
+
+
+def _centros_efetivos(selected, ano):
+    """Centros a aplicar no filtro de leitura, ou None (= sem filtro → número oficial).
+
+    'Todos selecionados' (ou nenhum) == None: usa o executado reconciliado do resumo
+    (BR-12), preservando a reconciliação 46/46. Só recorta dos lançamentos quando há
+    um subconjunto de centros marcado.
+    """
+    if not selected:
+        return None
+    todos = set(L.fetch_centros_disponiveis(int(ano or 2026)))
+    if todos and set(selected) >= todos:
+        return None
+    return selected
 
 
 def _nome_mes(mes: str) -> str:
@@ -82,6 +176,13 @@ def _cor_exec(r: dict) -> str:
 # --------------------------------------------------------------------------- #
 # Graficos
 # --------------------------------------------------------------------------- #
+def _comp_pct(p):
+    """Escala comprimida do modo pct: abaixo de 100% é linear; o estouro acima de 100%
+    vale `_FATOR_EXC` por ponto (ex.: 224% → 100 + 124·0,35 ≈ 143%). Mantém o container
+    de 100% (cinza) expressivo mesmo com contas muito estouradas."""
+    return p if p <= 100 else 100 + (p - 100) * _FATOR_EXC
+
+
 def _fig_vazia(msg="Sem dados", h=380):
     fig = go.Figure()
     fig.add_annotation(text=msg, showarrow=False, x=0.5, y=0.5, xref="paper", yref="paper",
@@ -92,68 +193,254 @@ def _fig_vazia(msg="Sem dados", h=380):
     return fig
 
 
-def _fig_barras(rows, com_orcado, titulo, h=380, mini=False):
-    """Barras sobrepostas (mockup): orçado pálido container + executado sólido dentro.
+def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
+    """Barras orçado×executado. `modo`:
 
-    GERAL (code '__GERAL__') destacado. `mini`=True compacta para a grade de meses.
+    - 'valor' (default): altura = R$; orçado pálido (container) + executado sólido sobreposto.
+    - 'pct': altura = realizado (executado÷orçado); escala 0 → maior %; orçado vira a linha
+      de referência 100%; conta sem orçado fica cinza no topo (não há % a calcular).
+
+    Em ambos os modos os rótulos de dados (R$ exec/orç + %) e o hover rico são iguais — só a
+    altura/escala muda. GERAL ('__GERAL__') destacado. `mini`=True compacta p/ a grade de meses.
     """
     if not rows:
         return _fig_vazia(h=h)
+    modo_pct = (modo == "pct")
     codes = [r["code"] for r in rows]
     nomes = [r["label"] for r in rows]   # nome legível da conta/dia
     # eixo X: nome (sem código). Mini esconde rótulos (overview clicável).
     ticks = nomes
-    xs = list(range(len(rows)))
+    # Destaque do GERAL no medidor (modo pct): como todas as barras agora têm o mesmo peso
+    # visual, separamos o GERAL (total) das contas que o compõem por um gap + divisória +
+    # faixa de fundo, e o deixamos mais largo. Sem recolorir (mantém azul/cinza/laranja).
+    geral_destaque = bool(rows) and rows[0]["code"] == "__GERAL__"
+    if geral_destaque:
+        # GERAL largo-ish; contas BEM finas e juntas (cluster de componentes). GERAL no eixo
+        # primário e contas no secundário (mais altas-proporcionais), em faixas de tom distintas.
+        _STEP = 0.42
+        xs = [0] + [0.95 + k * _STEP for k in range(len(rows) - 1)]
+        larguras = [0.25] + [0.14] * (len(rows) - 1)
+    else:
+        xs = list(range(len(rows)))
+        larguras = 0.62 if modo_pct else None
+
+    # Hover rico (mesmo texto p/ as barras): nome + orçado + executado + %.
+    # Vai em `hovertext` de propósito — `customdata` segue carregando só o code (clique de drill).
+    def _hover_rico(r):
+        # Custo identificado por código + descrição (GERAL não tem código de conta)
+        rotulo = r["label"] if r["code"] == "__GERAL__" else f"{r['code']} — {r['label']}"
+        linhas = [f"<b>{rotulo}</b>"]
+        if r.get("orcado") or 0:
+            linhas.append(f"Orçado: {_brl(r['orcado'])}")
+        linhas.append(f"Executado: {_brl(r['executado'])}")
+        if r.get("sem_orcamento"):
+            linhas.append("sem orçamento")
+        elif r.get("pct") is not None:
+            linhas.append(f"Realizado: {_pct(r['pct'])}")
+        return "<br>".join(linhas)
+
+    hovers = [_hover_rico(r) for r in rows]
+
+    def _sem_orc(r):
+        return r.get("sem_orcamento") or r.get("pct") is None
 
     fig = go.Figure()
-    if com_orcado:
-        fig.add_bar(name="Orçado", x=xs, y=[r["orcado"] for r in rows], width=0.66,
-                    marker={"color": _ORCADO_FILL, "line": {"color": "#9ec5fe", "width": 1}},
-                    customdata=codes, hovertext=nomes,
-                    hovertemplate="%{hovertext}<br>Orçado: R$ %{y:,.2f}<extra></extra>")
-    # GERAL com cor própria (cinza-azulado) p/ destacar do resto
-    cores = ["#34568b" if r["code"] == "__GERAL__" else _cor_exec(r) for r in rows]
-    fig.add_bar(name="Executado", x=xs, y=[r["executado"] for r in rows], width=0.34,
-                marker={"color": cores}, customdata=codes, hovertext=nomes,
-                hovertemplate="%{hovertext}<br>Executado: R$ %{y:,.2f}<extra></extra>")
+    if modo_pct:
+        # Barra-medidor empilhada: azul = executado dentro do orçado; cinza = saldo do orçado
+        # (até 100%); laranja = excedente acima de 100% (comprimido por _comp_pct). Conta sem
+        # orçado (÷0) = barra inteira laranja, marcada 's/orç'.
+        # Eixo duplo: GERAL no primário (y) e contas no secundário (y2), com ranges diferentes
+        # p/ a barra do total parecer ~40% mais alta que as contas no mesmo %.
+        def _segs(r):
+            if _sem_orc(r):
+                return 0.0, 0.0, 100.0
+            p = r["pct"] or 0
+            return min(p, 100), max(0, 100 - p), max(0, (p - 100) * _FATOR_EXC)
+        seg = [_segs(r) for r in rows]
+        azul_h = [s[0] for s in seg]
+        cinza_h = [s[1] for s in seg]
+        laranja_h = [s[2] for s in seg]
+        bar_top = [a + c + l for a, c, l in seg]
+
+        def _add_medidor(idxs, eixo, legenda, cinza=_CINZA_ORC):
+            larg = [larguras[i] for i in idxs] if isinstance(larguras, list) else larguras
+            for nome, cor, alt in (("Executado", _AMG_AZUL, azul_h),
+                                   ("Orçado", cinza, cinza_h),
+                                   ("Excedente", _AMG_LARANJA, laranja_h)):
+                fig.add_bar(name=nome, legendgroup=nome, showlegend=legenda, yaxis=eixo,
+                            x=[xs[i] for i in idxs], y=[alt[i] for i in idxs], width=larg,
+                            marker={"color": cor}, customdata=[codes[i] for i in idxs],
+                            hovertext=[hovers[i] for i in idxs],
+                            hovertemplate="%{hovertext}<extra></extra>")
+
+        contas_idx = list(range(1, len(rows))) if geral_destaque else list(range(len(rows)))
+        topo_pct = max((max(rows[i]["pct"], 100) for i in contas_idx
+                        if not _sem_orc(rows[i]) and rows[i].get("pct") is not None), default=100)
+        topo_max = _comp_pct(topo_pct)            # teto das contas (escala secundária)
+        if geral_destaque:
+            _add_medidor([0], "y", False, cinza=_CINZA_ORC_GERAL)  # GERAL → eixo primário
+            _add_medidor(contas_idx, "y2", True)                   # contas → eixo secundário
+        else:
+            _add_medidor(contas_idx, "y", True)
+    else:
+        # Modo valor (R$) — usado no nível 'contas-dia' (sem orçado diário → sem %). Mantém a
+        # família visual: azul AMG (não verde), barras finas e faixa quando há GERAL.
+        larg_exec = larguras if larguras is not None else 0.34
+        if com_orcado:
+            fig.add_bar(name="Orçado", x=xs, y=[r["orcado"] for r in rows],
+                        width=(larguras if larguras is not None else 0.66),
+                        marker={"color": _ORCADO_FILL, "line": {"color": "#9ec5fe", "width": 1}},
+                        customdata=codes, hovertext=hovers,
+                        hovertemplate="%{hovertext}<extra></extra>")
+        cores = ["#34568b" if r["code"] == "__GERAL__" else _AMG_AZUL for r in rows]
+        fig.add_bar(name="Executado", x=xs, y=[r["executado"] for r in rows], width=larg_exec,
+                    marker={"color": cores}, customdata=codes, hovertext=hovers,
+                    hovertemplate="%{hovertext}<extra></extra>")
+        topo_max = max((max(r.get("orcado", 0) or 0, r["executado"] or 0) for r in rows), default=0)
+        bar_top = [max(r.get("orcado", 0) or 0, r["executado"] or 0) for r in rows]
 
     anots = []
-    if not mini:
-        for x, r in zip(xs, rows):
-            topo = max(r.get("orcado", 0) or 0, r["executado"])
-            if r.get("sem_orcamento"):
-                txt, cor = "s/orç", _LARANJA
-            elif r.get("pct") is None:
-                txt, cor = "", "#8a929b"
-            else:
-                txt, cor = _pct(r["pct"]), (_VERMELHO if r.get("estouro") else "#495057")
-            if txt:
-                anots.append(dict(x=x, y=topo, text=txt, showarrow=False, yshift=11,
-                                  font={"size": 10, "color": cor, "weight": "bold"}))
+    for i, (x, r) in enumerate(zip(xs, rows)):
+        orc = r.get("orcado", 0) or 0
+        ex = r["executado"] or 0
+        topo = bar_top[i]
+        # rótulo segue o eixo da sua barra — só há y2 no medidor (pct); valor/contas-dia usa y
+        yr = "y2" if (geral_destaque and modo_pct and i != 0) else "y"
+        cor_ex = _AMG_AZUL if r["code"] != "__GERAL__" else "#34568b"
+        # texto do % (ou s/orç) — comportamento/cor preservado
+        if r.get("sem_orcamento"):
+            txt_pct, cor_pct = "s/orç", (_AMG_LARANJA if modo_pct else _LARANJA)
+        elif r.get("pct") is None:
+            txt_pct, cor_pct = "", "#8a929b"
+        else:
+            txt_pct, cor_pct = _pct(r["pct"]), (_VERMELHO if r.get("estouro") else "#495057")
+        if mini:
+            # mini (200px): um rótulo só por barra — % quando há, senão R$ abreviado
+            t = txt_pct or (_brl_abrev(ex) if ex else "")
+            if t:
+                anots.append(dict(x=x, y=topo, yref=yr, text=t, showarrow=False, yshift=5,
+                                  font={"size": 7, "color": (cor_pct if txt_pct else cor_ex)}))
+            continue
+        # gráficos grandes: pilha Executado (R$) / Orçado (R$) / % acima da barra
+        if ex:
+            anots.append(dict(x=x, y=topo, yref=yr, text=_brl_abrev(ex), showarrow=False,
+                              yshift=9, font={"size": 9, "color": cor_ex, "weight": "bold"}))
+        if orc > 0:
+            anots.append(dict(x=x, y=topo, yref=yr, text=_brl_abrev(orc), showarrow=False,
+                              yshift=20, font={"size": 8, "color": _CINZA}))
+        if txt_pct:
+            anots.append(dict(x=x, y=topo, yref=yr, text=txt_pct, showarrow=False, yshift=31,
+                              font={"size": 9, "color": cor_pct, "weight": "bold"}))
+
+    def _pct_ticks(ate):
+        rs = sorted(set(list(range(0, int(ate) + 51, 50)) + [100]))
+        rs = [t for t in rs if t <= ate + 1]
+        return [_comp_pct(t) for t in rs], [f"{t} %" for t in rs]
+
+    yaxis = {"showgrid": not geral_destaque, "gridcolor": _GRID, "zeroline": False,
+             "tickfont": {"size": 9 if mini else 10}, "rangemode": "tozero",
+             "showticklabels": not mini}
+    yaxis2 = None
+    if modo_pct and geral_destaque:
+        # GERAL no eixo primário com range MENOR → mesma barra parece ~40% mais alta que as
+        # contas (que ficam no secundário, range maior). topo_max = teto comprimido das contas.
+        r_g = bar_top[0] * 1.18                       # GERAL ocupa ~85% do próprio eixo
+        r_c = max(r_g * 1.68, topo_max * 1.10)        # contas ~68% "mais baixas" no mesmo %
+        g_top = 100 if bar_top[0] <= 100 else topo_pct
+        tvg, ttg = _pct_ticks(g_top)
+        tvc, ttc = _pct_ticks(topo_pct)
+        yaxis.update({"range": [0, r_g], "tickmode": "array", "tickvals": tvg,
+                      "ticktext": ttg, "tickformat": ",.0f"})
+        yaxis2 = {"showgrid": False, "zeroline": False, "rangemode": "tozero",
+                  "range": [0, r_c], "overlaying": "y", "side": "right",
+                  "tickmode": "array", "tickvals": tvc, "ticktext": ttc, "tickformat": ",.0f",
+                  "tickfont": {"size": 9 if mini else 10}, "showticklabels": not mini}
+    elif modo_pct:
+        tv, tt = _pct_ticks(topo_pct)
+        yaxis.update({"range": [0, topo_max * 1.18] if (not mini and topo_max > 0) else None,
+                      "tickmode": "array", "tickvals": tv, "ticktext": tt, "tickformat": ",.0f"})
+    else:
+        yaxis.update({"tickprefix": "R$ ", "tickformat": ",.0f",
+                      **({"range": [0, topo_max * 1.18]} if (not mini and topo_max > 0) else {})})
+
+    # Destaque do GERAL: duas faixas de fundo — escura no total, clara nos componentes.
+    # A própria mudança de tom divide o GERAL das contas (sem precisar de linha).
+    shapes = []
+    if geral_destaque:
+        x_fim = xs[-1] + 0.3
+        shapes = [
+            dict(type="rect", xref="x", yref="paper", x0=-0.32, x1=0.42, y0=0, y1=1,
+                 fillcolor="rgba(0,86,135,0.15)", line={"width": 0}, layer="below"),
+            dict(type="rect", xref="x", yref="paper", x0=0.42, x1=x_fim, y0=0, y1=1,
+                 fillcolor="rgba(0,86,135,0.07)", line={"width": 0}, layer="below"),
+        ]
 
     fig.update_layout(
-        height=h, barmode="overlay",
+        height=h, barmode=("stack" if modo_pct else "overlay"),
+        shapes=shapes,
         plot_bgcolor="rgba(248,250,252,0.6)", paper_bgcolor="rgba(0,0,0,0)",
         margin={"l": 44, "r": 12, "t": 34 if titulo else 10, "b": 18 if mini else 150},
         title=({"text": titulo, "font": {"size": 13 if not mini else 12, "color": "#343a40"},
                 "x": 0, "xanchor": "left", "y": 0.98} if titulo else None),
+        # legenda à direita p/ não cobrir a pilha de rótulos da 1ª barra (GERAL).
+        # valor: Orçado/Executado. pct: Executado/Orçado/Excedente (explica o medidor).
         showlegend=not mini,
-        legend={"orientation": "h", "y": 1.1, "x": 0, "font": {"size": 11}},
+        legend={"orientation": "h", "y": 1.1, "x": 1, "xanchor": "right", "font": {"size": 11}},
         bargap=0.35, annotations=anots,
         xaxis={"tickmode": "array", "tickvals": xs, "ticktext": ticks,
                "showgrid": False, "zeroline": False, "tickfont": {"size": 10},
                "tickangle": -35, "showticklabels": not mini},
-        yaxis={"showgrid": True, "gridcolor": _GRID, "zeroline": False,
-               "tickprefix": "R$ ", "tickformat": ",.0f", "tickfont": {"size": 9 if mini else 10},
-               "rangemode": "tozero", "showticklabels": not mini},
+        yaxis=yaxis,
+        **({"yaxis2": yaxis2} if yaxis2 else {}),
         hoverlabel={"bgcolor": "white", "font_size": 12},
     )
     return fig
 
 
-def _graph_click(rows, graph_id, com_orcado, titulo, h=360):
-    """Gráfico grande clicável (clique na barra dispara drill)."""
-    return dcc.Graph(id=graph_id, figure=_fig_barras(rows, com_orcado, titulo, h=h),
+# paleta sequencial p/ as fatias da rosca (tons AMG); 'Outros' sempre cinza
+_ROSCA_SEQ = ["#005687", "#1f6aa5", "#2f8fc0", "#5b8def", "#7bb0e8", "#9ec5fe",
+              "#b9d4f2", "#c9a227", "#e0b84e", "#6c8ea4"]
+
+
+def _fig_rosca(dados, h=460):
+    """Rosca: distribuição do executado do ano por EQUIPAMENTO (centro de custo).
+
+    Cada fatia = um equipamento (nome via de/para `CENTRO_EQUIP`, fallback = código); a
+    cauda de centros menores em 'Outros' (cinza). Centro mostra o total. Não dispara drill —
+    leitura complementar às barras (que são por conta).
+    """
+    if not dados:
+        return _fig_vazia(h=h)
+    labels = [d["equip"] for d in dados]
+    values = [d["executado"] for d in dados]
+    _CINZAS = {"Outros": "#adb5bd", "Apoio/Admin": "#adb5bd", "Não atribuído": "#ced4da"}
+    cores = [_CINZAS.get(lab) or _ROSCA_SEQ[i % len(_ROSCA_SEQ)]
+             for i, lab in enumerate(labels)]
+    total = sum(values)
+    fig = go.Figure(go.Pie(
+        labels=labels, values=values, hole=0.58, sort=False, direction="clockwise",
+        marker={"colors": cores, "line": {"color": "white", "width": 1.5}},
+        customdata=[_brl(v) for v in values],
+        texttemplate="%{percent:.0%}", textposition="outside",
+        textfont={"size": 10},
+        hovertemplate="<b>%{label}</b><br>%{customdata} · %{percent}<extra></extra>"))
+    fig.update_layout(
+        height=h, margin={"l": 8, "r": 8, "t": 34, "b": 8},
+        title={"text": "Custo por equipamento (ano)", "x": 0, "xanchor": "left", "y": 0.98,
+               "font": {"size": 13, "color": "#343a40"}},
+        paper_bgcolor="rgba(0,0,0,0)",
+        showlegend=True,
+        legend={"orientation": "h", "y": -0.05, "x": 0.5, "xanchor": "center",
+                "font": {"size": 9}},
+        annotations=[dict(text=f"<b>{_brl_abrev(total)}</b><br><span style='font-size:9px'>total</span>",
+                          x=0.5, y=0.5, showarrow=False, font={"size": 14, "color": "#34568b"})],
+    )
+    return fig
+
+
+def _graph_click(rows, graph_id, com_orcado, titulo, h=360, modo="valor"):
+    """Gráfico grande clicável (clique na barra dispara drill). `modo='pct'` usa o medidor."""
+    return dcc.Graph(id=graph_id, figure=_fig_barras(rows, com_orcado, titulo, h=h, modo=modo),
                      config={"displayModeBar": False, "responsive": True},
                      style={"height": f"{h}px", "cursor": "pointer"})
 
@@ -170,10 +457,14 @@ def _mini_graph_card(mes, rows):
                     dbc.CardHeader(html.Strong(_nome_mes(mes), style={"fontSize": "0.85rem"}),
                                    className="py-1"),
                     dbc.CardBody(
-                        dcc.Graph(figure=_fig_barras(rows, True, "", h=200, mini=True),
-                                  config={"displayModeBar": False, "staticPlot": True,
-                                          "responsive": True},
-                                  style={"height": "200px"}),
+                        # staticPlot removido p/ liberar o tooltip das barras (hover mostra
+                        # orçado/executado/%). O clique no card segue funcionando: o clique
+                        # no DOM do gráfico borbulha pro Div pai (n_clicks). doubleClick/drag
+                        # desligados p/ não capturar o gesto.
+                        dcc.Graph(figure=_fig_barras(rows, True, "", h=200, mini=True, modo="pct"),
+                                  config={"displayModeBar": False, "responsive": True,
+                                          "doubleClick": False, "scrollZoom": False},
+                                  style={"height": "200px", "pointerEvents": "auto"}),
                         className="p-1",
                     ),
                 ],
@@ -250,20 +541,29 @@ def _crumb(*partes):
 def register_custo_callbacks(app):
     """Registra todos os callbacks da aba de custo."""
 
+    # Popula o filtro de CONTAS (as barras). Repopula ao trocar o ano.
     @app.callback(
-        Output("custo-centro-filter", "options"),
+        Output("custo-conta-filter", "options"),
+        Output("custo-conta-filter", "value"),
         Input("custo-init", "n_intervals"),
-        State("store-custo-ano", "data"),
+        Input("store-custo-ano", "data"),
+        State("store-custo-contas-sel", "data"),
     )
-    def _popular_centros(_n, ano):
-        return [{"label": c, "value": c} for c in L.fetch_centros_disponiveis(int(ano or 2026))]
+    def _popular_contas(_n, ano, salvos):
+        rows = L.fetch_contas_geral(int(ano or 2026), None, None)
+        contas = [r for r in rows if r["code"] != "__GERAL__"]
+        options = [{"label": f'{r["code"]} — {r["label"]}', "value": r["code"]} for r in contas]
+        codes = [r["code"] for r in contas]
+        # Padrão: todas marcadas. Respeita seleção salva na sessão se ainda válida.
+        value = [c for c in (salvos or []) if c in codes] or codes
+        return options, value
 
     @app.callback(
-        Output("store-custo-centros", "data"),
-        Input("custo-centro-filter", "value"),
+        Output("store-custo-contas-sel", "data"),
+        Input("custo-conta-filter", "value"),
         prevent_initial_call=True,
     )
-    def _set_centros(value):
+    def _set_contas(value):
         return value or []
 
     @app.callback(
@@ -274,20 +574,79 @@ def register_custo_callbacks(app):
     def _set_ano(value):
         return value
 
+    # Colapsar/expandir a lista de contas (paredão de chips fica escondido)
+    @app.callback(
+        Output("custo-contas-collapse", "is_open"),
+        Input("custo-contas-toggle", "n_clicks"),
+        State("custo-contas-collapse", "is_open"),
+        prevent_initial_call=True,
+    )
+    def _toggle_contas(_n, aberto):
+        return not aberto
+
+    # Rótulo do botão: quantas contas selecionadas + chevron (sobe/desce)
+    @app.callback(
+        Output("custo-contas-toggle", "children"),
+        Input("custo-conta-filter", "value"),
+        Input("custo-contas-collapse", "is_open"),
+        State("custo-conta-filter", "options"),
+    )
+    def _label_contas(value, aberto, options):
+        total = len(options or [])
+        n = len(value or [])
+        if total and n >= total:
+            txt = f"Todas as contas ({total})"
+        elif n == 0:
+            txt = "Nenhuma conta"
+        else:
+            txt = f"{n} de {total} contas"
+        chev = "bi-chevron-up" if aberto else "bi-chevron-down"
+        return [html.Span(txt), html.I(className=f"bi {chev} ms-2")]
+
     # Gráfico de entrada (anual) + selo + tarja
+    # Escala do slider do anual — ajusta mín/máx/marcas ao dado e reseta p/ faixa cheia
+    @app.callback(
+        Output("custo-slider-geral", "min"),
+        Output("custo-slider-geral", "max"),
+        Output("custo-slider-geral", "value"),
+        Output("custo-slider-geral", "marks"),
+        Output("custo-slider-geral", "step"),
+        Input("store-custo-ano", "data"),
+        Input("custo-init", "n_intervals"),
+    )
+    def _slider_geral_range(ano, _n):
+        # escala do slider baseada em TODAS as contas (não no recorte do filtro) — estável
+        return _slider_cfg(L.fetch_contas_geral(int(ano or 2026), None, None))
+
+    # Rosca: distribuição do executado por equipamento (independe do filtro de conta)
+    @app.callback(
+        Output("custo-graph-rosca", "figure"),
+        Input("store-custo-ano", "data"),
+        Input("custo-init", "n_intervals"),
+    )
+    def _render_rosca(ano, _n):
+        return _fig_rosca(L.fetch_por_equipamento(int(ano or 2026), None))
+
     @app.callback(
         Output("custo-graph-entry", "figure"),
         Output("custo-seed-selo", "children"),
         Output("custo-reconc-banner", "children"),
-        Input("store-custo-centros", "data"),
+        Input("store-custo-contas-sel", "data"),
         Input("store-custo-ano", "data"),
         Input("custo-init", "n_intervals"),
+        Input("custo-slider-geral", "value"),
     )
-    def _render_entry(centros, ano, _n):
+    def _render_entry(contas_sel, ano, _n, faixa):
         ano = int(ano or 2026)
-        centros = centros or None
-        fig = _fig_barras(L.fetch_contas_geral(ano, None, centros), True,
-                          "", h=460)
+        # Só o arrasto do slider aplica o filtro de valor; outras mudanças renderizam cheio.
+        if ctx.triggered_id != "custo-slider-geral":
+            faixa = None
+        rows = L.fetch_contas_geral(ano, None, None)   # todos os centros (sem escopo de centro)
+        rows = _filtra_por_contas(rows, contas_sel or None)   # filtro das BARRAS (contas)
+        rows = _filtra_por_exec(rows, faixa)
+        # Anual usa a vista por % realizado (altura = executado÷orçado) — evita barras
+        # minúsculas de contas de baixo R$. Modal segue em R$ (modo padrão).
+        fig = _fig_barras(rows, True, "", h=460, modo="pct")
         rc = L.reconciliacao(ano)
         banner = None
         if rc.get("por_mes") and not rc["bate"]:
@@ -328,7 +687,11 @@ def register_custo_callbacks(app):
         trig = ctx.triggered_id
         level, mes, dia, conta = args[-4], args[-3], args[-2], args[-1]
         CLEAR = (None, "", None)
-        NOOP = (no_update,) * 5 + CLEAR
+        # NOOP precisa ser no-op DE VERDADE: não tocar content/title/breadcrumb. Antes era
+        # (no_update,)*5 + CLEAR, que ZERAVA o conteúdo. Isso quebrava quando o slider do modal
+        # reconstrói os cards: o set ALL (cards/barras) muda → este callback dispara sem clique
+        # real → caía em NOOP e apagava o que o _render_modal acabara de pintar.
+        NOOP = (no_update,) * 8
 
         if trig == "btn-custo-close":
             return (False, "planta", None, None, None) + CLEAR
@@ -375,6 +738,39 @@ def register_custo_callbacks(app):
                     return (True, "lancamentos", mes, dia, code) + CLEAR
         return NOOP
 
+    # Escala + visibilidade do slider do modal — ajusta ao dado do nível e reseta faixa.
+    # Escondido nos níveis sem barras (lançamentos / planta).
+    @app.callback(
+        Output("custo-slider-modal", "min"),
+        Output("custo-slider-modal", "max"),
+        Output("custo-slider-modal", "value"),
+        Output("custo-slider-modal", "marks"),
+        Output("custo-slider-modal", "step"),
+        Output("custo-slider-modal-wrap", "style"),
+        Input("store-custo-level", "data"),
+        Input("store-custo-mes", "data"),
+        Input("store-custo-dia", "data"),
+        State("store-custo-ano", "data"),
+        prevent_initial_call=True,
+    )
+    def _slider_modal_range(level, mes, dia, ano):
+        ano = int(ano or 2026)
+        oculto = {"display": "none"}
+        if level == "meses":
+            # teto = maior conta entre todos os meses (mesmo limiar aplicado a cada mini)
+            allrows = []
+            for m in L.meses_com_dados(ano):
+                allrows += L.fetch_contas_geral(ano, m, None)
+            rows = allrows
+        elif level == "dias" and mes:
+            rows = L.fetch_contas_geral(ano, mes, None)
+        elif level == "contas-dia" and dia:
+            rows = L.fetch_contas_no_dia(ano, dia, None)
+        else:  # lançamentos / planta — sem barras, esconde o slider
+            return 0, 1, [0, 1], {}, 1, oculto
+        mn, mx, val, marks, step = _slider_cfg(rows)
+        return mn, mx, val, marks, step, {"display": "block"}
+
     # Render do conteúdo do modal por nível (espelha render_modal da v2)
     @app.callback(
         Output("modal-custo-content", "children", allow_duplicate=True),
@@ -385,36 +781,47 @@ def register_custo_callbacks(app):
         Input("store-custo-mes", "data"),
         Input("store-custo-dia", "data"),
         Input("store-custo-conta", "data"),
-        State("store-custo-centros", "data"),
+        Input("custo-slider-modal", "value"),
+        State("store-custo-contas-sel", "data"),
         State("store-custo-ano", "data"),
         prevent_initial_call=True,
     )
-    def _render_modal(level, mes, dia, conta, centros, ano):
+    def _render_modal(level, mes, dia, conta, faixa, contas_sel, ano):
         if not level or level == "planta":
             return None, "", None, {"display": "none"}
         ano = int(ano or 2026)
-        centros = centros or None
+        sel = contas_sel or None
         ano_lbl = f"{ano}"
+        # Só o arrasto do slider aplica filtro; navegação de nível renderiza cheio (o reset
+        # do slider re-renderiza com a faixa nova) — evita filtrar com faixa de outro nível.
+        if ctx.triggered_id != "custo-slider-modal":
+            faixa = None
+
+        def _prep(rows):  # filtro de contas (barras) + filtro de valor
+            return _filtra_por_exec(_filtra_por_contas(rows, sel), faixa)
 
         # NÍVEL 1 — meses (grade de mini-gráficos, 1 por mês)
         if level == "meses":
             meses = L.meses_com_dados(ano)
-            cards = [_mini_graph_card(m, L.fetch_contas_geral(ano, m, centros)) for m in meses]
+            cards = [_mini_graph_card(m, _prep(L.fetch_contas_geral(ano, m, None)))
+                     for m in meses]
             content = html.Div([
                 html.H6("Clique num mês para ver os dias:", className="v2-section-h6 text-muted"),
                 dbc.Row(cards, className="g-3"),
             ])
-            return content, "Custo — meses (orçado × executado)", _crumb(ano_lbl), {}
+            return content, "Custo — meses (realizado, % do orçado)", _crumb(ano_lbl), {}
 
         # NÍVEL 2 — dias (gráfico do mês + cards de dia)
         if level == "dias" and mes:
-            rows = L.fetch_contas_geral(ano, mes, centros)
-            dias = L.fetch_dias_total_mes(ano, mes, centros)
+            # filtro vale só p/ as barras de conta; os cards de DIA são outra dimensão (total/dia)
+            rows = _prep(L.fetch_contas_geral(ano, mes, None))
+            dias = L.fetch_dias_total_mes(ano, mes, None)
             cards = [_value_card(d["label"], _brl0(d["executado"]), _AZUL,
                                  {"type": "custo-dia-card", "dia": d["code"]}) for d in dias]
             content = html.Div([
                 _graph_click(rows, {"type": "custo-bar", "nivel": "mes-contas"}, True,
-                             f"{_nome_mes(mes)} — orçado × executado por conta"),
+                             f"{_nome_mes(mes)} — realizado por conta (% do orçado)",
+                             modo="pct"),
                 html.Hr(),
                 html.H6("Clique num dia (card) para ver as contas do dia, ou numa barra "
                         "de conta para os lançamentos:", className="v2-section-h6 text-muted"),
@@ -425,7 +832,8 @@ def register_custo_callbacks(app):
 
         # NÍVEL 3 — contas do dia (gráfico das contas do dia + cards de conta)
         if level == "contas-dia" and dia:
-            rows = L.fetch_contas_no_dia(ano, dia, centros)
+            # aqui barras e cards são a MESMA dimensão (conta) → filtra os dois p/ casar
+            rows = _prep(L.fetch_contas_no_dia(ano, dia, None))
             cards = [_value_card(r["label"], _brl0(r["executado"]), _AZUL,
                                  {"type": "custo-conta-card", "conta": r["code"]})
                      for r in rows if r["code"] != "__GERAL__"]
@@ -444,11 +852,11 @@ def register_custo_callbacks(app):
         if level == "lancamentos" and conta:
             nome = nome_conta(conta)
             if dia:
-                docs = L.fetch_lancamentos_no_dia(ano, dia, conta=conta, centros=centros)
+                docs = L.fetch_lancamentos_no_dia(ano, dia, conta=conta, centros=None)
                 escopo = f"{dia[-2:]}/{_nome_mes(mes)}"
                 crumb = _crumb(ano_lbl, _nome_mes(mes), f"Dia {dia[-2:]}", nome)
             else:
-                docs = L.fetch_lancamentos(ano, conta=conta, mes=mes, centros=centros)
+                docs = L.fetch_lancamentos(ano, conta=conta, mes=mes, centros=None)
                 escopo = _nome_mes(mes)
                 crumb = _crumb(ano_lbl, _nome_mes(mes), nome)
             content = html.Div([

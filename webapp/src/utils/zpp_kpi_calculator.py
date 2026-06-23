@@ -119,6 +119,21 @@ EQUIPMENT_CATEGORY_PREFIXES = {
     "Transversais": ["TRANS"]
 }
 
+# Nomes amigáveis dos equipamentos por ARBPL (posto de trabalho) — FONTE ÚNICA do projeto.
+# Reusado pela rosca de custo (via ponte KOSTL→ARBPL em custos.hierarquia). Renomear aqui
+# propaga p/ KPIs e custo.
+EQUIPAMENTO_NOMES = {
+    "LONGI001": "LCL-08",
+    "LONGI002": "LCL-4,5",
+    "PRENS001": "PRENSA-01",
+    "PRENS002": "PRENSA-02",
+    "TRANS001": "LCT-08",
+    "TRANS002": "LCT-16",
+    "TRANS003": "LCT-2,5",
+    "DECAP001": "Decapado",
+    "SOLDA001": "LWB",
+}
+
 # ==================== FILTRO DE VIRADA DE MÊS ====================
 # IMPORTANTE: Define como tratar registros que cruzam a virada do mês
 #
@@ -951,20 +966,9 @@ def get_zpp_equipment_names() -> Dict[str, str]:
     Returns:
         dict: {"LONGI001": "Longitudinal 001", ...}
     """
-    # Mapeamento manual de nomes customizados (opcional)
-    # Se um equipamento estiver neste dicionário, usa o nome customizado
-    # Caso contrário, gera automaticamente baseado no prefixo
-    CUSTOM_NAMES = {
-        "LONGI001": "LCL-08",
-        "LONGI002": "LCL-4,5",
-        "PRENS001": "PRENSA-01",
-        "PRENS002": "PRENSA-02",
-        "TRANS001": "LCT-08",
-        "TRANS002": "LCT-16",
-        "TRANS003": "LCT-2,5",
-        "DECAP001": "Decapado",
-        "SOLDA001": "LWB",
-        }
+    # Nomes customizados — agora na constante de módulo EQUIPAMENTO_NOMES (fonte única,
+    # reusada pela rosca de custo).
+    CUSTOM_NAMES = EQUIPAMENTO_NOMES
 
     try:
         equipment_list = fetch_zpp_equipment_list()

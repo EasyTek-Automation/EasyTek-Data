@@ -80,9 +80,73 @@ CONTA_NOME: dict[str, str] = {
 }
 
 
+# Nome legivel de cada centro de custo (grafia do SAP — KOSTL -> texto da KSB1).
+# Em linguagem simples: traduz o codigo do centro (ex: "108401") para o nome que o
+# gestor reconhece (ex: "PRENSA FAGOR"), so para exibir no filtro — o dado gravado
+# no Mongo continua sendo o codigo. Mapa estatico (igual a CONTA_NOME): nao depende
+# do SAP no cliente. Centros sem nome conhecido aparecem so com o codigo.
+CENTRO_NOME: dict[str, str] = {
+    "102001": "LINHA LASER",
+    "102004": "LINHA LASER II",
+    "105001": "LINHA LONGIDUDINAL-Q",
+    "105002": "LINHA LONGIDUDINAL-F",
+    "106001": "LINHA TRANSVERSAL-F",
+    "106002": "LINHA TRANSVERS.-QTE",
+    "108401": "PRENSA FAGOR",
+    "108402": "PRENSA SCHULLER 500",
+    "108403": "PRENSA SCHULLER 630",
+    "109000": "GERENTE INDUSTRIAL",
+    "109002": "SERVIÇOS GERAIS -ADM",
+    "109008": "ESTRUT CNTL COML PR",
+    "109012": "EST CENTRAL SUP PR",
+    "109100": "MANUTENÇÃO DA PLANTA",
+    "109710": "ARMAZENS E TRANSLADO",
+    "109800": "QUALIDADE PROD PR",
+    "109900": "SERVIÇOS GERAIS-PROD",
+    "109902": "ADMIN. PRODUÇÃO - PR",
+    "109903": "FERRAMENTARIA",
+}
+
+
 def nome_conta(conta: str) -> str:
     """Nome legivel da conta; ecoa o codigo se desconhecida."""
     return CONTA_NOME.get(conta, conta)
+
+
+def nome_centro(centro: str) -> str:
+    """Nome legivel do centro de custo; ecoa o codigo se desconhecido."""
+    return CENTRO_NOME.get(centro, centro)
+
+
+# Ponte centro de custo (KOSTL) → posto de trabalho (ARBPL) das LINHAS de produção. O nome
+# de exibição NÃO mora aqui — vem da FONTE ÚNICA `EQUIPAMENTO_NOMES` (KPIs), reusada via essa
+# ponte. Identidade tirada do descritor das ordens de manutenção (ex: 206001 = "LCT8" = TRANS001).
+# Centros fora desta ponte (apoio/admin: 209xxx, 201xxx, 203xxx, 207xxx) caem em "Apoio/Admin".
+CENTRO_ARBPL: dict[str, str] = {
+    "206001": "TRANS001",   # LCT-08
+    "206002": "TRANS002",   # LCT-16
+    "206003": "TRANS003",   # LCT-2,5
+    "205001": "LONGI001",   # LCL-08
+    "205002": "LONGI002",   # LCL-4,5
+    "208401": "PRENS001",   # PRENSA-01
+    "208402": "PRENS002",   # PRENSA-02
+}
+
+EQUIP_OUTROS = "Outros"          # cauda de fatias pequenas (não usado quando há ponte completa)
+EQUIP_APOIO = "Apoio/Admin"      # centros sem linha (predial, ferramentaria, serviços, TI…)
+
+
+def nome_equipamento(centro: str) -> str:
+    """Nome do equipamento de um centro de custo: ponte KOSTL→ARBPL → `EQUIPAMENTO_NOMES`
+    (fonte única dos KPIs). Centro sem linha mapeada → 'Apoio/Admin'."""
+    arbpl = CENTRO_ARBPL.get(centro)
+    if not arbpl:
+        return EQUIP_APOIO
+    try:
+        from src.utils.zpp_kpi_calculator import EQUIPAMENTO_NOMES
+    except ImportError:  # pragma: no cover
+        from utils.zpp_kpi_calculator import EQUIPAMENTO_NOMES  # type: ignore
+    return EQUIPAMENTO_NOMES.get(arbpl, arbpl)
 
 
 def normalizar_grupo(grupo: str) -> str:

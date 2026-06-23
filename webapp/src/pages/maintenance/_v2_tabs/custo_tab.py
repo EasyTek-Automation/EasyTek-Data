@@ -35,8 +35,9 @@ def build_tab() -> dbc.Tab:
         children=html.Div(
             [
                 # Estado proprio (autocontido). Drill por tempo: ano -> mes -> dia -> conta.
-                dcc.Store(id="store-custo-ano", data=ANO_PADRAO),
-                dcc.Store(id="store-custo-centros", data=[]),
+                # Filtros persistem na sessão do navegador (sobrevivem a reload/navegação).
+                dcc.Store(id="store-custo-ano", data=ANO_PADRAO, storage_type="session"),
+                dcc.Store(id="store-custo-contas-sel", data=[], storage_type="session"),
                 dcc.Store(id="store-custo-level", data="planta"),
                 dcc.Store(id="store-custo-mes", data=None),
                 dcc.Store(id="store-custo-dia", data=None),
@@ -80,13 +81,26 @@ def build_tab() -> dbc.Tab:
                                                 className="me-3",
                                             ),
                                             html.Div(
-                                                [_label("Centro de custo"),
-                                                 dcc.Dropdown(
-                                                     id="custo-centro-filter", options=[],
-                                                     value=[], multi=True,
-                                                     placeholder="Todos os centros",
-                                                     style={"minWidth": "240px"})],
-                                                className="me-3",
+                                                [_label("Contas (barras)"),
+                                                 # Filtro das BARRAS (contas/classes de custo) —
+                                                 # desmarque uma conta p/ tirá-la do gráfico.
+                                                 # Colapsável, fechado por padrão.
+                                                 dbc.Button(
+                                                     "Todas as contas",
+                                                     id="custo-contas-toggle",
+                                                     color="light", size="sm",
+                                                     className="border d-flex align-items-center "
+                                                               "justify-content-between",
+                                                     style={"minWidth": "260px"}),
+                                                 dbc.Collapse(
+                                                     dcc.Dropdown(
+                                                         id="custo-conta-filter", options=[],
+                                                         value=[], multi=True,
+                                                         placeholder="Todas as contas",
+                                                         className="mt-1",
+                                                         style={"minWidth": "260px"}),
+                                                     id="custo-contas-collapse", is_open=False)],
+                                                className="me-3 d-flex flex-column",
                                             ),
                                             html.Div(
                                                 [_label("Coleta"),
@@ -113,22 +127,66 @@ def build_tab() -> dbc.Tab:
                                     dbc.CardHeader(
                                         html.H6(
                                             [html.I(className="bi bi-bar-chart-line me-2"),
-                                             "Orçado × Executado por conta (ano) — clique para abrir os meses"],
+                                             "Realizado por conta (% do orçado, ano) — clique para abrir os meses"],
                                             className="mb-0 fw-bold",
                                         ),
                                         className="py-2",
                                     ),
                                     dbc.CardBody(
-                                        html.Div(
-                                            dcc.Graph(
-                                                id="custo-graph-entry",
-                                                config={"displayModeBar": False,
-                                                        "staticPlot": True, "responsive": True},
-                                                style={"height": "460px", "width": "100%"},
+                                        [
+                                            dbc.Row(
+                                                [
+                                                    # Rosca (esquerda): distribuição por equipamento
+                                                    dbc.Col(
+                                                        dcc.Graph(
+                                                            id="custo-graph-rosca",
+                                                            config={"displayModeBar": False,
+                                                                    "responsive": True},
+                                                            style={"height": "460px",
+                                                                   "width": "100%"},
+                                                        ),
+                                                        xs=12, md=4,
+                                                    ),
+                                                    # Barras (direita): realizado por conta
+                                                    dbc.Col(
+                                                        html.Div(
+                                                            dcc.Graph(
+                                                                id="custo-graph-entry",
+                                                                config={"displayModeBar": False,
+                                                                        "responsive": True,
+                                                                        "doubleClick": False,
+                                                                        "scrollZoom": False},
+                                                                style={"height": "460px",
+                                                                       "width": "100%"},
+                                                            ),
+                                                            id="custo-entry-wrap",
+                                                            n_clicks=0,
+                                                            style={"cursor": "pointer"},
+                                                        ),
+                                                        xs=12, md=8,
+                                                    ),
+                                                ],
+                                                className="g-2 align-items-center",
                                             ),
-                                            id="custo-entry-wrap",
-                                            n_clicks=0, style={"cursor": "pointer"},
-                                        ),
+                                            # Filtro por valor (slider duplo) — linha nova, fora do
+                                            # wrapper clicável p/ não disparar o modal ao arrastar.
+                                            html.Div(
+                                                [
+                                                    html.Label(
+                                                        "Filtrar contas por valor executado (R$)",
+                                                        className="text-muted small mb-2 d-block",
+                                                    ),
+                                                    dcc.RangeSlider(
+                                                        id="custo-slider-geral",
+                                                        min=0, max=1, value=[0, 1], step=1,
+                                                        allowCross=False,
+                                                        tooltip={"placement": "bottom",
+                                                                 "always_visible": False},
+                                                    ),
+                                                ],
+                                                className="px-3 pt-2 pb-1",
+                                            ),
+                                        ],
                                         className="p-2",
                                     ),
                                 ],
@@ -148,6 +206,26 @@ def build_tab() -> dbc.Tab:
                         dbc.ModalBody(
                             [
                                 html.Div(id="modal-custo-breadcrumb", className="mb-3"),
+                                # Filtro por valor (slider duplo) do drill — escondido nos níveis
+                                # sem barras (lançamentos). Mesma mecânica do slider do anual.
+                                html.Div(
+                                    [
+                                        html.Label(
+                                            "Filtrar contas por valor executado (R$)",
+                                            className="text-muted small mb-2 d-block",
+                                        ),
+                                        dcc.RangeSlider(
+                                            id="custo-slider-modal",
+                                            min=0, max=1, value=[0, 1], step=1,
+                                            allowCross=False,
+                                            tooltip={"placement": "bottom",
+                                                     "always_visible": False},
+                                        ),
+                                    ],
+                                    id="custo-slider-modal-wrap",
+                                    className="px-3 mb-3",
+                                    style={"display": "none"},
+                                ),
                                 dcc.Loading(
                                     type="circle", color="#0d6efd", delay_show=120,
                                     children=html.Div(id="modal-custo-content"),

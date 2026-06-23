@@ -18,11 +18,13 @@ from typing import Iterable, Optional
 
 try:  # contexto do webapp (pacote src.custos)
     from src.database.connection import get_mongo_connection
-    from src.custos.hierarquia import GRUPOS, grupo_da_conta, label_grupo, nome_conta
+    from src.custos.hierarquia import (EQUIP_OUTROS, GRUPOS, grupo_da_conta, label_grupo,
+                                       nome_conta, nome_equipamento)
     from src.custos.storage import COLL_LANCAMENTOS, COLL_RESUMO
 except ImportError:  # contexto de teste/script (cwd = webapp/src)
     from database.connection import get_mongo_connection  # type: ignore
-    from custos.hierarquia import GRUPOS, grupo_da_conta, label_grupo, nome_conta  # type: ignore
+    from custos.hierarquia import (EQUIP_OUTROS, GRUPOS, grupo_da_conta,  # type: ignore
+                                   label_grupo, nome_conta, nome_equipamento)
     from custos.storage import COLL_LANCAMENTOS, COLL_RESUMO  # type: ignore
 
 logger = logging.getLogger("custos.leitura")
@@ -272,6 +274,58 @@ def fetch_centros_disponiveis(ano: int) -> list[str]:
         return sorted(c for c in centros if c)
 
     return _memo(("centros", ano), _calc)
+
+
+def fetch_por_equipamento(ano: int, centros: Optional[Iterable[str]] = None,
+                          top: int = 10) -> list[dict]:
+    """Executado do ano por EQUIPAMENTO (centro de custo) — gráfico de rosca.
+
+    Soma o executado de cada `centro_custo`, nomeia pelo de/para (`nome_equipamento`,
+    fallback = código) e mostra os `top` maiores como fatias; a cauda vai p/ 'Outros'.
+    Centros já mapeados ao MESMO nome no de/para somam juntos (ex: várias linhas de uma
+    família). Retorna `[{equip, executado, centros}]` ordenado desc, com 'Outros' por último.
+    """
+    cz = _norm_centros(centros)
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match: dict = {"mes_referencia": {"$regex": f"^{ano}-"}}
+        if cz:
+            match["centro_custo"] = {"$in": list(cz)}
+        pipe = [{"$match": match},
+                {"$group": {"_id": "$centro_custo", "executado": {"$sum": "$valor"}}}]
+        # agrega por nome de equipamento (de/para); guarda os centros que compõem cada um
+        acc: dict[str, float] = {}
+        membros: dict[str, list] = {}
+        for d in coll.aggregate(pipe):
+            nome = nome_equipamento(d["_id"])
+            acc[nome] = acc.get(nome, 0.0) + (d["executado"] or 0.0)
+            membros.setdefault(nome, []).append(d["_id"])
+        ordenado = sorted(acc.items(), key=lambda kv: kv[1], reverse=True)
+        principais = ordenado[:top]
+        cauda = ordenado[top:]
+        out = [{"equip": nome, "executado": round(v, 2), "centros": membros[nome]}
+               for nome, v in principais]
+        if cauda:
+            out.append({"equip": EQUIP_OUTROS, "executado": round(sum(v for _, v in cauda), 2),
+                        "centros": [c for nome, _ in cauda for c in membros[nome]]})
+        # Reconcilia com o GERAL das barras (resumo ZBRCO019): os lançamentos (KSB1) podem
+        # somar menos que o executado oficial — no mês corrente, provisões/itens pós-D-1 não
+        # têm centro, logo não entram por equipamento. O resto vira "Não atribuído".
+        rcoll = get_mongo_connection(COLL_RESUMO)
+        if rcoll is not None:
+            rmatch = {"mes_referencia": {"$regex": f"^{ano}-"}}
+            g = list(rcoll.aggregate([{"$match": rmatch},
+                                      {"$group": {"_id": None, "v": {"$sum": "$executado"}}}]))
+            total_oficial = g[0]["v"] if g else 0
+            gap = round(total_oficial - sum(acc.values()), 2)
+            if gap > 1:
+                out.append({"equip": "Não atribuído", "executado": gap, "centros": []})
+        return out
+
+    return _memo(("equip", ano, cz, top), _calc)
 
 
 def fetch_lancamentos(
