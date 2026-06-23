@@ -413,7 +413,7 @@ def _fig_rosca(dados, h=460):
         return _fig_vazia(h=h)
     labels = [d["equip"] for d in dados]
     values = [d["executado"] for d in dados]
-    cores = ["#adb5bd" if lab == "Outros" else _ROSCA_SEQ[i % len(_ROSCA_SEQ)]
+    cores = ["#adb5bd" if lab in ("Outros", "Apoio/Admin") else _ROSCA_SEQ[i % len(_ROSCA_SEQ)]
              for i, lab in enumerate(labels)]
     total = sum(values)
     fig = go.Figure(go.Pie(

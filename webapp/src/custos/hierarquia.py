@@ -118,34 +118,35 @@ def nome_centro(centro: str) -> str:
     return CENTRO_NOME.get(centro, centro)
 
 
-# De/para MANUAL centro de custo (KOSTL) → nome do EQUIPAMENTO, para a rosca "custo por
-# equipamento". Override opcional: quando preenchido, vence a derivação automática abaixo —
-# use p/ nomes no padrão dos KPIs (ex: "LCT-08", "Decapado") ou p/ agrupar centros num
-# rótulo comum (ex: vários 209xxx → "Apoio/Admin" pra caírem juntos).
-#
-# >>> Rodolfo: preencher só o que quiser renomear/agrupar. O resto resolve sozinho pelo
-#     CENTRO_NOME (os códigos BR02 2xxxxx = BR01 1xxxxx). Centros sem nome em lugar nenhum
-#     aparecem com o código KOSTL.
-CENTRO_EQUIP: dict[str, str] = {
-    # "206001": "LCT-08",
-    # "201300": "Decapado",
+# Ponte centro de custo (KOSTL) → posto de trabalho (ARBPL) das LINHAS de produção. O nome
+# de exibição NÃO mora aqui — vem da FONTE ÚNICA `EQUIPAMENTO_NOMES` (KPIs), reusada via essa
+# ponte. Identidade tirada do descritor das ordens de manutenção (ex: 206001 = "LCT8" = TRANS001).
+# Centros fora desta ponte (apoio/admin: 209xxx, 201xxx, 203xxx, 207xxx) caem em "Apoio/Admin".
+CENTRO_ARBPL: dict[str, str] = {
+    "206001": "TRANS001",   # LCT-08
+    "206002": "TRANS002",   # LCT-16
+    "206003": "TRANS003",   # LCT-2,5
+    "205001": "LONGI001",   # LCL-08
+    "205002": "LONGI002",   # LCL-4,5
+    "208401": "PRENS001",   # PRENSA-01
+    "208402": "PRENS002",   # PRENSA-02
 }
 
-# Rótulo usado p/ agrupar a cauda de centros pequenos no gráfico de rosca.
-EQUIP_OUTROS = "Outros"
+EQUIP_OUTROS = "Outros"          # cauda de fatias pequenas (não usado quando há ponte completa)
+EQUIP_APOIO = "Apoio/Admin"      # centros sem linha (predial, ferramentaria, serviços, TI…)
 
 
 def nome_equipamento(centro: str) -> str:
-    """Nome do equipamento de um centro de custo. Ordem: (1) de/para manual `CENTRO_EQUIP`;
-    (2) `CENTRO_NOME` do equivalente BR01 (os códigos BR02 `2xxxxx` espelham os `1xxxxx`);
-    (3) o próprio código, se não houver nome."""
-    if centro in CENTRO_EQUIP:
-        return CENTRO_EQUIP[centro]
-    if centro.startswith("2"):
-        nome = CENTRO_NOME.get("1" + centro[1:])
-        if nome:
-            return nome
-    return CENTRO_NOME.get(centro, centro)
+    """Nome do equipamento de um centro de custo: ponte KOSTL→ARBPL → `EQUIPAMENTO_NOMES`
+    (fonte única dos KPIs). Centro sem linha mapeada → 'Apoio/Admin'."""
+    arbpl = CENTRO_ARBPL.get(centro)
+    if not arbpl:
+        return EQUIP_APOIO
+    try:
+        from src.utils.zpp_kpi_calculator import EQUIPAMENTO_NOMES
+    except ImportError:  # pragma: no cover
+        from utils.zpp_kpi_calculator import EQUIPAMENTO_NOMES  # type: ignore
+    return EQUIPAMENTO_NOMES.get(arbpl, arbpl)
 
 
 def normalizar_grupo(grupo: str) -> str:
