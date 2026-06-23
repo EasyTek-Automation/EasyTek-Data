@@ -37,6 +37,14 @@ _LARANJA = "#fd7e14"
 _CINZA = "#6c757d"
 _ORCADO_FILL = "#cfe2ff"
 _GRID = "rgba(0,0,0,0.06)"
+# Cores da marca AMG (mesmas da home — home.py C_SHORT/C_LONG)
+_AMG_AZUL = "#005687"      # executado dentro do orçado
+_AMG_LARANJA = "#E96D38"   # excedente acima do orçado
+_CINZA_ORC = "#dee2e6"     # container do orçado (saldo não usado)
+_CINZA_SORC = "#adb5bd"    # conta sem orçado (sem referência de %)
+# Compressão da escala acima de 100%: cada 1% de estouro vale FATOR unidade visual,
+# p/ o estouro não esticar o eixo e achatar o container de 100% (ex: 224% → ~143%).
+_FATOR_EXC = 0.35
 _MESES = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
           "Jul", "Ago", "Set", "Out", "Nov", "Dez"]
 
@@ -156,6 +164,13 @@ def _cor_exec(r: dict) -> str:
 # --------------------------------------------------------------------------- #
 # Graficos
 # --------------------------------------------------------------------------- #
+def _comp_pct(p):
+    """Escala comprimida do modo pct: abaixo de 100% é linear; o estouro acima de 100%
+    vale `_FATOR_EXC` por ponto (ex.: 224% → 100 + 124·0,35 ≈ 143%). Mantém o container
+    de 100% (cinza) expressivo mesmo com contas muito estouradas."""
+    return p if p <= 100 else 100 + (p - 100) * _FATOR_EXC
+
+
 def _fig_vazia(msg="Sem dados", h=380):
     fig = go.Figure()
     fig.add_annotation(text=msg, showarrow=False, x=0.5, y=0.5, xref="paper", yref="paper",
@@ -205,21 +220,35 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
 
     fig = go.Figure()
     if modo_pct:
-        # Escala = maior % (mín. 100), arredondado p/ a dezena acima. Conta s/orç vai ao topo.
-        pcts = [r["pct"] for r in rows if r.get("pct") is not None and not r.get("sem_orcamento")]
-        topo_pct = max(100, math.ceil(max(pcts, default=100) / 10) * 10)
-        alturas = [topo_pct if _sem_orc(r) else r["pct"] for r in rows]
-        cores = [_CINZA if _sem_orc(r)
-                 else ("#34568b" if r["code"] == "__GERAL__" else _cor_exec(r)) for r in rows]
-        fig.add_bar(name="Realizado", x=xs, y=alturas, width=0.6,
-                    marker={"color": cores}, customdata=codes, hovertext=hovers,
+        # Barra-medidor empilhada (sem linha de 100% — o cinza/laranja já dá a referência):
+        #   azul AMG  = executado dentro do orçado (0→100%)
+        #   cinza     = saldo do orçado não usado (até 100%)
+        #   laranja AMG = excedente acima de 100% (escala comprimida via _comp_pct)
+        # Conta sem orçado (sem % a calcular) = barra cinza neutra cheia, marcada 's/orç'.
+        azul_h, cinza_h, laranja_h, cinza_cor = [], [], [], []
+        for r in rows:
+            if _sem_orc(r):
+                azul_h.append(0); cinza_h.append(100); laranja_h.append(0)
+                cinza_cor.append(_CINZA_SORC)
+                continue
+            p = r["pct"] or 0
+            azul_h.append(min(p, 100))
+            cinza_h.append(max(0, 100 - p))
+            laranja_h.append(max(0, (p - 100) * _FATOR_EXC))
+            cinza_cor.append(_CINZA_ORC)
+        fig.add_bar(name="Executado", x=xs, y=azul_h, width=0.62,
+                    marker={"color": _AMG_AZUL}, customdata=codes, hovertext=hovers,
                     hovertemplate="%{hovertext}<extra></extra>")
-        # Orçado = referência 100%
-        fig.add_hline(y=100, line={"dash": "dash", "color": "#5b8def", "width": 1.5},
-                      annotation_text="orçado (100%)", annotation_position="top right",
-                      annotation_font={"size": 9, "color": _CINZA})
-        topo_max = topo_pct
-        bar_top = alturas
+        fig.add_bar(name="Orçado", x=xs, y=cinza_h, width=0.62,
+                    marker={"color": cinza_cor}, customdata=codes, hovertext=hovers,
+                    hovertemplate="%{hovertext}<extra></extra>")
+        fig.add_bar(name="Excedente", x=xs, y=laranja_h, width=0.62,
+                    marker={"color": _AMG_LARANJA}, customdata=codes, hovertext=hovers,
+                    hovertemplate="%{hovertext}<extra></extra>")
+        topo_pct = max((max(r["pct"], 100) for r in rows
+                        if not _sem_orc(r) and r.get("pct") is not None), default=100)
+        topo_max = _comp_pct(topo_pct)
+        bar_top = [a + c + l for a, c, l in zip(azul_h, cinza_h, laranja_h)]
     else:
         if com_orcado:
             fig.add_bar(name="Orçado", x=xs, y=[r["orcado"] for r in rows], width=0.66,
@@ -240,7 +269,7 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
             orc = r.get("orcado", 0) or 0
             ex = r["executado"] or 0
             topo = bar_top[i]
-            cor_ex = "#34568b" if r["code"] == "__GERAL__" else _cor_exec(r)
+            cor_ex = _AMG_AZUL if modo_pct else ("#34568b" if r["code"] == "__GERAL__" else _cor_exec(r))
             # Rótulos de dados empilhados ACIMA da barra. De baixo p/ cima: Executado, Orçado, %.
             if ex:
                 anots.append(dict(x=x, y=topo, text=_brl_abrev(ex), showarrow=False, yshift=9,
@@ -264,19 +293,25 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
              # headroom p/ os rótulos empilhados acima da barra mais alta (só nos grandes)
              **({"range": [0, topo_max * 1.18]} if (not mini and topo_max > 0) else {})}
     if modo_pct:
-        yaxis.update({"ticksuffix": " %", "tickformat": ",.0f"})
+        # ticks reais (0,50,100,150,...) posicionados na escala comprimida
+        reais = sorted(set(list(range(0, int(topo_pct) + 51, 50)) + [100]))
+        reais = [t for t in reais if t <= topo_pct + 1]
+        yaxis.update({"tickmode": "array",
+                      "tickvals": [_comp_pct(t) for t in reais],
+                      "ticktext": [f"{t} %" for t in reais],
+                      "tickformat": ",.0f"})
     else:
         yaxis.update({"tickprefix": "R$ ", "tickformat": ",.0f"})
 
     fig.update_layout(
-        height=h, barmode="overlay",
+        height=h, barmode=("stack" if modo_pct else "overlay"),
         plot_bgcolor="rgba(248,250,252,0.6)", paper_bgcolor="rgba(0,0,0,0)",
         margin={"l": 44, "r": 12, "t": 34 if titulo else 10, "b": 18 if mini else 150},
         title=({"text": titulo, "font": {"size": 13 if not mini else 12, "color": "#343a40"},
                 "x": 0, "xanchor": "left", "y": 0.98} if titulo else None),
-        # legenda Orçado/Executado só no modo valor (no pct há série única); à direita
-        # p/ não cobrir a pilha de rótulos da 1ª barra (GERAL)
-        showlegend=(not mini and not modo_pct),
+        # legenda à direita p/ não cobrir a pilha de rótulos da 1ª barra (GERAL).
+        # valor: Orçado/Executado. pct: Executado/Orçado/Excedente (explica o medidor).
+        showlegend=not mini,
         legend={"orientation": "h", "y": 1.1, "x": 1, "xanchor": "right", "font": {"size": 11}},
         bargap=0.35, annotations=anots,
         xaxis={"tickmode": "array", "tickvals": xs, "ticktext": ticks,
