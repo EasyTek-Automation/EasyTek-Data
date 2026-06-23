@@ -352,6 +352,62 @@ def fetch_lancamentos(
     return list(cursor)
 
 
+def _row_lanc(d: dict) -> dict:
+    """Linha de lançamento pronta p/ tabela (relatório DOCX): nome de conta e equipamento
+    já resolvidos a partir dos códigos."""
+    centro = (d.get("centro_custo") or "").strip()
+    conta = (d.get("conta") or "").strip()
+    return {
+        "data": d.get("data_lancamento"),                 # datetime (o relatório formata)
+        "conta": conta,
+        "conta_nome": nome_conta(conta),
+        "centro_custo": centro,
+        "equipamento": nome_equipamento(centro),          # LCT-08, PRENSA-01… (de/para KPIs)
+        "descritor": (d.get("descritor") or "").strip(),
+        "tipo_doc": (d.get("tipo_doc") or "").strip(),
+        "no_documento": (d.get("no_documento") or "").strip(),
+        "valor": round(d.get("valor", 0) or 0, 2),        # float (sort/format no relatório)
+    }
+
+
+def fetch_lancamentos_recentes(ano: int, mes: Optional[str] = None, limit: int = 10,
+                               centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """Os `limit` lançamentos mais RECENTES (data desc) — tabela 'últimos custos' do relatório.
+    `mes='YYYY-MM'` → mês; `mes=None` → ano. Linhas via `_row_lanc` (nome de conta/equipamento)."""
+    cz = _norm_centros(centros)
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match = _filtro_ano(ano, mes)
+        if cz:
+            match["centro_custo"] = {"$in": list(cz)}
+        cur = coll.find(match).sort([("data_lancamento", -1), ("valor", -1)]).limit(limit)
+        return [_row_lanc(d) for d in cur]
+
+    return _memo(("lanc_recentes", ano, mes, cz, limit), _calc)
+
+
+def fetch_lancamentos_maiores(ano: int, mes: Optional[str] = None, limit: int = 5,
+                              centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """Os `limit` MAIORES lançamentos (valor desc) — tabela 'top maiores' do relatório.
+    Ordena por valor desc (estornos negativos caem no fim). Linhas via `_row_lanc`."""
+    cz = _norm_centros(centros)
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match = _filtro_ano(ano, mes)
+        if cz:
+            match["centro_custo"] = {"$in": list(cz)}
+        cur = coll.find(match).sort([("valor", -1)]).limit(limit)
+        return [_row_lanc(d) for d in cur]
+
+    return _memo(("lanc_maiores", ano, mes, cz, limit), _calc)
+
+
 def fetch_contas_geral(ano: int, mes: Optional[str] = None,
                        centros: Optional[Iterable[str]] = None) -> list[dict]:
     """GERAL + todas as contas (orçado × executado) da janela — eixo do gráfico.

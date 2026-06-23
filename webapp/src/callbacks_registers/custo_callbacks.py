@@ -190,11 +190,29 @@ def _cor_exec(r: dict) -> str:
 # --------------------------------------------------------------------------- #
 # Graficos
 # --------------------------------------------------------------------------- #
-def _comp_pct(p):
-    """Escala comprimida do modo pct: abaixo de 100% é linear; o estouro acima de 100%
-    vale `_FATOR_EXC` por ponto (ex.: 224% → 100 + 124·0,35 ≈ 143%). Mantém o container
-    de 100% (cinza) expressivo mesmo com contas muito estouradas."""
-    return p if p <= 100 else 100 + (p - 100) * _FATOR_EXC
+_OVERFLOW_BAND = 45.0  # altura visual FIXA do excedente acima de 100% (0-100% ocupa 100/145≈69%)
+
+
+def _comp_pct(p, topo=None):
+    """Escala do modo pct: abaixo de 100% é linear; o excedente acima de 100% é mapeado em LOG
+    numa banda de altura FIXA (`_OVERFLOW_BAND`), independente do máximo. Assim 130% e 4000%
+    cabem na mesma faixa e o 0-100% nunca achata. `topo` = maior % da vista (vai ao topo da banda)."""
+    if p <= 100:
+        return p
+    if not topo or topo <= 100:
+        return 100 + _OVERFLOW_BAND
+    return 100 + _OVERFLOW_BAND * (math.log10(p / 100) / math.log10(topo / 100))
+
+
+def _nice(v):
+    """Arredonda p/ cima a um número 'redondo' (1/1,5/2/3/5/8 × 10ⁿ) — rótulos de tick limpos."""
+    if v <= 0:
+        return 0
+    mag = 10 ** math.floor(math.log10(v))
+    for m in (1, 1.5, 2, 3, 5, 8, 10):
+        if m * mag >= v:
+            return int(m * mag)
+    return int(10 * mag)
 
 
 def _fig_vazia(msg="Sem dados", h=380):
@@ -265,11 +283,16 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
         # orçado (÷0) = barra inteira laranja, marcada 's/orç'.
         # Eixo duplo: GERAL no primário (y) e contas no secundário (y2), com ranges diferentes
         # p/ a barra do total parecer ~40% mais alta que as contas no mesmo %.
+        contas_idx = list(range(1, len(rows))) if geral_destaque else list(range(len(rows)))
+        topo_pct = max((max(rows[i]["pct"], 100) for i in contas_idx
+                        if not _sem_orc(rows[i]) and rows[i].get("pct") is not None), default=100)
+
         def _segs(r):
             if _sem_orc(r):
                 return 0.0, 0.0, 100.0
             p = r["pct"] or 0
-            return min(p, 100), max(0, 100 - p), max(0, (p - 100) * _FATOR_EXC)
+            # excedente acima de 100% → banda log de altura fixa (não achata o 0-100%)
+            return min(p, 100), max(0, 100 - p), max(0, _comp_pct(p, topo_pct) - 100)
         seg = [_segs(r) for r in rows]
         azul_h = [s[0] for s in seg]
         cinza_h = [s[1] for s in seg]
@@ -287,10 +310,7 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
                             hovertext=[hovers[i] for i in idxs],
                             hovertemplate="%{hovertext}<extra></extra>")
 
-        contas_idx = list(range(1, len(rows))) if geral_destaque else list(range(len(rows)))
-        topo_pct = max((max(rows[i]["pct"], 100) for i in contas_idx
-                        if not _sem_orc(rows[i]) and rows[i].get("pct") is not None), default=100)
-        topo_max = _comp_pct(topo_pct)            # teto das contas (escala secundária)
+        topo_max = _comp_pct(topo_pct, topo_pct)   # = 100 + _OVERFLOW_BAND (teto fixo da banda)
         if geral_destaque:
             _add_medidor([0], "y", False, cinza=_CINZA_ORC_GERAL)  # GERAL → eixo primário
             _add_medidor(contas_idx, "y2", True)                   # contas → eixo secundário
@@ -346,10 +366,14 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
             anots.append(dict(x=x, y=topo, yref=yr, text=txt_pct, showarrow=False, yshift=31,
                               font={"size": 9, "color": cor_pct, "weight": "bold"}))
 
-    def _pct_ticks(ate):
-        rs = sorted(set(list(range(0, int(ate) + 51, 50)) + [100]))
-        rs = [t for t in rs if t <= ate + 1]
-        return [_comp_pct(t) for t in rs], [f"{t} %" for t in rs]
+    def _pct_ticks(ate, topo):
+        rs = [t for t in (0, 50, 100) if t <= ate + 1]
+        if ate > 100:
+            # no máx 4 ticks acima de 100%, log-espaçados e arredondados (não achata o 0-100)
+            d = math.log10(ate / 100)
+            rs += [v for v in sorted({_nice(100 * 10 ** (d * k / 4)) for k in range(1, 5)}) if v > 100]
+        rs = sorted(set(rs))
+        return [_comp_pct(t, topo) for t in rs], [f"{t} %" for t in rs]
 
     yaxis = {"showgrid": not geral_destaque, "gridcolor": _GRID, "zeroline": False,
              "tickfont": {"size": 9 if mini else 10}, "rangemode": "tozero",
@@ -361,8 +385,8 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
         r_g = bar_top[0] * 1.18                       # GERAL ocupa ~85% do próprio eixo
         r_c = max(r_g * 1.68, topo_max * 1.10)        # contas ~68% "mais baixas" no mesmo %
         g_top = 100 if bar_top[0] <= 100 else topo_pct
-        tvg, ttg = _pct_ticks(g_top)
-        tvc, ttc = _pct_ticks(topo_pct)
+        tvg, ttg = _pct_ticks(g_top, topo_pct)
+        tvc, ttc = _pct_ticks(topo_pct, topo_pct)
         yaxis.update({"range": [0, r_g], "tickmode": "array", "tickvals": tvg,
                       "ticktext": ttg, "tickformat": ",.0f"})
         yaxis2 = {"showgrid": False, "zeroline": False, "rangemode": "tozero",
@@ -370,7 +394,7 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
                   "tickmode": "array", "tickvals": tvc, "ticktext": ttc, "tickformat": ",.0f",
                   "tickfont": {"size": 9 if mini else 10}, "showticklabels": not mini}
     elif modo_pct:
-        tv, tt = _pct_ticks(topo_pct)
+        tv, tt = _pct_ticks(topo_pct, topo_pct)
         yaxis.update({"range": [0, topo_max * 1.18] if (not mini and topo_max > 0) else None,
                       "tickmode": "array", "tickvals": tv, "ticktext": tt, "tickformat": ",.0f"})
     else:
