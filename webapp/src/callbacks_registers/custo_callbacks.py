@@ -14,6 +14,7 @@ ao Div (mesmo truque do v2).
 from __future__ import annotations
 
 import logging
+import math
 
 import dash
 import dash_bootstrap_components as dbc
@@ -78,6 +79,40 @@ def _pct(v) -> str:
     if v is None:
         return "—"
     return f"{v:.1f}".replace(".", ",") + "%"
+
+
+# --------------------------------------------------------------------------- #
+# Filtro por valor (slider duplo) — filtra contas por executado; GERAL fica fixa
+# --------------------------------------------------------------------------- #
+def _max_conta_exec(rows) -> float:
+    """Maior executado entre as contas (exclui GERAL) — teto da escala do slider."""
+    return max((r["executado"] or 0 for r in rows if r["code"] != "__GERAL__"), default=0.0)
+
+
+def _slider_cfg(rows):
+    """(min, max, value, marks, step) do RangeSlider a partir do teto de executado.
+
+    min=0; max arredondado p/ um número redondo (1/2/2,5/5×10ⁿ); value=faixa cheia;
+    marcas em 0/25/50/75/100% (R$ abreviado). Vista sem contas → escala trivial.
+    """
+    teto = _max_conta_exec(rows)
+    if teto <= 0:
+        return 0, 1, [0, 1], {0: "R$ 0", 1: "R$ 1"}, 1
+    mag = 10 ** math.floor(math.log10(teto))
+    topo = next(m * mag for m in (1, 2, 2.5, 5, 10) if m * mag >= teto)
+    marks = {int(round(topo * f)): _brl_abrev(round(topo * f))
+             for f in (0, 0.25, 0.5, 0.75, 1.0)}
+    step = max(1, round(topo / 100))
+    return 0, int(topo), [0, int(topo)], marks, step
+
+
+def _filtra_por_exec(rows, faixa):
+    """Mantém GERAL sempre; mantém contas com executado em [lo, hi]. faixa inválida → tudo."""
+    if not faixa or len(faixa) != 2:
+        return rows
+    lo, hi = faixa
+    return [r for r in rows
+            if r["code"] == "__GERAL__" or lo <= (r["executado"] or 0) <= hi]
 
 
 def _centro_label(c: str) -> str:
@@ -358,6 +393,22 @@ def register_custo_callbacks(app):
         return value
 
     # Gráfico de entrada (anual) + selo + tarja
+    # Escala do slider do anual — ajusta mín/máx/marcas ao dado e reseta p/ faixa cheia
+    @app.callback(
+        Output("custo-slider-geral", "min"),
+        Output("custo-slider-geral", "max"),
+        Output("custo-slider-geral", "value"),
+        Output("custo-slider-geral", "marks"),
+        Output("custo-slider-geral", "step"),
+        Input("store-custo-centros", "data"),
+        Input("store-custo-ano", "data"),
+        Input("custo-init", "n_intervals"),
+    )
+    def _slider_geral_range(centros, ano, _n):
+        ano = int(ano or 2026)
+        centros = _centros_efetivos(centros, ano)
+        return _slider_cfg(L.fetch_contas_geral(ano, None, centros))
+
     @app.callback(
         Output("custo-graph-entry", "figure"),
         Output("custo-seed-selo", "children"),
@@ -365,12 +416,18 @@ def register_custo_callbacks(app):
         Input("store-custo-centros", "data"),
         Input("store-custo-ano", "data"),
         Input("custo-init", "n_intervals"),
+        Input("custo-slider-geral", "value"),
     )
-    def _render_entry(centros, ano, _n):
+    def _render_entry(centros, ano, _n, faixa):
         ano = int(ano or 2026)
         centros = _centros_efetivos(centros, ano)
-        fig = _fig_barras(L.fetch_contas_geral(ano, None, centros), True,
-                          "", h=460)
+        # Mudança de dado (ano/centros/init) renderiza cheio; o reset do slider re-renderiza
+        # logo em seguida (já com a faixa nova). Só o arrasto do slider aplica filtro — evita
+        # filtrar com faixa obsoleta de outro ano.
+        if ctx.triggered_id != "custo-slider-geral":
+            faixa = None
+        rows = _filtra_por_exec(L.fetch_contas_geral(ano, None, centros), faixa)
+        fig = _fig_barras(rows, True, "", h=460)
         rc = L.reconciliacao(ano)
         banner = None
         if rc.get("por_mes") and not rc["bate"]:

@@ -120,19 +120,39 @@ def build_tab() -> dbc.Tab:
                                         className="py-2",
                                     ),
                                     dbc.CardBody(
-                                        html.Div(
-                                            dcc.Graph(
-                                                id="custo-graph-entry",
-                                                # sem staticPlot p/ liberar o tooltip das barras
-                                                # (incl. GERAL); o clique borbulha p/ custo-entry-wrap
-                                                # e abre o modal. doubleClick/scrollZoom off.
-                                                config={"displayModeBar": False, "responsive": True,
-                                                        "doubleClick": False, "scrollZoom": False},
-                                                style={"height": "460px", "width": "100%"},
+                                        [
+                                            html.Div(
+                                                dcc.Graph(
+                                                    id="custo-graph-entry",
+                                                    # sem staticPlot p/ liberar o tooltip das barras
+                                                    # (incl. GERAL); o clique borbulha p/ custo-entry-wrap
+                                                    # e abre o modal. doubleClick/scrollZoom off.
+                                                    config={"displayModeBar": False, "responsive": True,
+                                                            "doubleClick": False, "scrollZoom": False},
+                                                    style={"height": "460px", "width": "100%"},
+                                                ),
+                                                id="custo-entry-wrap",
+                                                n_clicks=0, style={"cursor": "pointer"},
                                             ),
-                                            id="custo-entry-wrap",
-                                            n_clicks=0, style={"cursor": "pointer"},
-                                        ),
+                                            # Filtro por valor (slider duplo) — linha nova, fora do
+                                            # wrapper clicável p/ não disparar o modal ao arrastar.
+                                            html.Div(
+                                                [
+                                                    html.Label(
+                                                        "Filtrar contas por valor executado (R$)",
+                                                        className="text-muted small mb-2 d-block",
+                                                    ),
+                                                    dcc.RangeSlider(
+                                                        id="custo-slider-geral",
+                                                        min=0, max=1, value=[0, 1], step=1,
+                                                        allowCross=False,
+                                                        tooltip={"placement": "bottom",
+                                                                 "always_visible": False},
+                                                    ),
+                                                ],
+                                                className="px-3 pt-2 pb-1",
+                                            ),
+                                        ],
                                         className="p-2",
                                     ),
                                 ],
