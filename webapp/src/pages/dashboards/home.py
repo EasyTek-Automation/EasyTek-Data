@@ -29,9 +29,9 @@ from flask_login import current_user
 from src.sap_scheduler.rodape_component import build_rodape
 from src.sap_scheduler.manual_trigger import build_rerun_controls
 
-# Ordem do carrossel (present mode): 3 cortes do confronto + a ROW de KPIs da V2
-SLIDES = ["month", "week", "band", "kpis"]
-GRAPH_SLIDES = {"kpis"}
+# Ordem do carrossel (present mode): 3 cortes do confronto + ROW de KPIs da V2 + Custos do mês
+SLIDES = ["month", "week", "band", "kpis", "custos"]
+GRAPH_SLIDES = {"kpis", "custos"}
 
 
 # ============================================================
@@ -213,6 +213,8 @@ TRANS = {
         "kpi24h_section": "Indicadores — últimas 24h",
         "kpi24h_lastprod": "Último dia com produção: {d}",
         "kpi24h_bars": "Planta — últimos {n} dias",
+        "costs_section": "Custo de Manutenção", "costs_month": "Mês de referência: {m}",
+        "costs_rosca": "Custo por equipamento (mês)", "costs_bars": "Realizado por conta (% do orçado, mês)",
     },
     "es": {
         "title": "Visión General del Mantenimiento",
@@ -243,6 +245,8 @@ TRANS = {
         "kpi24h_section": "Indicadores — últimas 24h",
         "kpi24h_lastprod": "Último día con producción: {d}",
         "kpi24h_bars": "Planta — últimos {n} días",
+        "costs_section": "Costo de Mantenimiento", "costs_month": "Mes de referencia: {m}",
+        "costs_rosca": "Costo por equipo (mes)", "costs_bars": "Realizado por cuenta (% del presupuesto, mes)",
     },
     "en": {
         "title": "Maintenance Overview",
@@ -273,6 +277,8 @@ TRANS = {
         "kpi24h_section": "Indicators — last 24h",
         "kpi24h_lastprod": "Last day with production: {d}",
         "kpi24h_bars": "Plant — last {n} days",
+        "costs_section": "Maintenance Cost", "costs_month": "Reference month: {m}",
+        "costs_rosca": "Cost by equipment (month)", "costs_bars": "Actual by account (% of budget, month)",
     },
 }
 
@@ -1105,6 +1111,72 @@ def render_kpis_dual(period, lang):
         render_v2_kpi_row(period, lang),
         render_24h_kpi_row(lang),
     ])
+
+
+# ============================================================
+# Slide do carrossel: Custo de Manutenção do MÊS corrente (BR-14 / DS-12)
+# Réplica ESTÁTICA da "geral de custos" (aba de custos da V2): rosca por equipamento
+# (esq) + barras orçado×executado por conta (dir). Importa as figuras de custo e a
+# leitura por dentro da função (import lazy) — mesmo padrão de reuso de render_v2_kpi_row,
+# evita import circular no topo do módulo. Sem clique/slider/modal (telão = leitura).
+# ============================================================
+def render_costs_slide(lang):
+    """Slide de custos do mês corrente: rosca (equipamento) + barras (% por conta), estático."""
+    lang = lang or "pt"
+    try:
+        from src.callbacks_registers.custo_callbacks import _fig_rosca, _fig_barras
+        from src.custos import leitura as L
+        from src.utils.kpi_report_config import _now_in_report_timezone
+        now = _now_in_report_timezone()
+        ano, mm = now.year, now.month
+        mes = f"{ano}-{mm:02d}"  # BR-14: mês do relógio; executado já cortado em ≤ D-1 na coleta
+        rosca = _fig_rosca(L.fetch_por_equipamento(ano, None, mes=mes))
+        rosca.update_layout(title_text=t("costs_rosca", lang))  # figura diz "(ano)"; aqui é mês
+        barras = _fig_barras(L.fetch_contas_geral(ano, mes=mes), True,
+                             t("costs_bars", lang), h=460, modo="pct")
+        cfg = {"displayModeBar": False, "staticPlot": True, "responsive": True}
+        row = dbc.Row(
+            [
+                dbc.Col(dcc.Graph(figure=rosca, config=cfg,
+                                  style={"height": "460px", "width": "100%"}), xs=12, md=4),
+                dbc.Col(dcc.Graph(figure=barras, config=cfg,
+                                  style={"height": "460px", "width": "100%"}), xs=12, md=8),
+            ],
+            className="g-2 align-items-center",
+        )
+        mes_lbl = f"{_MON[lang][mm - 1]}/{ano}"
+        section = html.Div(
+            [
+                html.Span(t("costs_section", lang), className="home-kpi24h-title"),
+                html.Span(t("costs_month", lang).format(m=mes_lbl), className="home-kpi24h-sub"),
+            ],
+            className="home-kpi24h-header",
+        )
+        return html.Div([section, row], className="home-costs-slide")
+    except Exception as e:  # custos offline / sem dados do mês → cabeçalho + aviso (UI não quebra)
+        import logging
+        logging.getLogger(__name__).warning("home render_costs_slide falhou: %s", e)
+        return html.Div(
+            html.Span(t("costs_section", lang), className="home-kpi24h-title"),
+            className="home-costs-slide",
+        )
+
+
+def render_costs_skeleton():
+    """Empty-state (shimmer) do slide de Custos — círculo (rosca) + bloco (barras), mesma grade."""
+    return html.Div(
+        dbc.Row(
+            [
+                dbc.Col(html.Div(className="skel-circle",
+                                 style={"width": "260px", "height": "260px",
+                                        "borderRadius": "50%", "margin": "40px auto"}),
+                        xs=12, md=4),
+                dbc.Col(html.Div(className="skel-block", style={"height": "420px"}), xs=12, md=8),
+            ],
+            className="g-2 align-items-center",
+        ),
+        className="home-costs-slide",
+    )
 
 
 # ============================================================

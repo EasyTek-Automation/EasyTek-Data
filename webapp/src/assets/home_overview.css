@@ -698,3 +698,19 @@ body.home-present-mode .home-present-only { display: inline-flex !important; }
     color: #6c757d;
     font-weight: 500;
 }
+
+/* Slide de Custos (DS-12) — réplica estática da geral de custos no carrossel.
+   Reusa .home-kpi24h-header/-title/-sub p/ o cabeçalho. Classe isolada: não toca
+   nos slides existentes (preservação de UI). */
+.home-costs-slide {
+    margin-top: 0.5rem;
+}
+body.home-present-mode .home-costs-slide {
+    padding: 0 1.5rem;
+}
+body.home-present-mode .home-costs-slide .home-kpi24h-title {
+    font-size: 1.4rem;
+}
+body.home-present-mode .home-costs-slide .home-kpi24h-sub {
+    font-size: 1.05rem;
+}

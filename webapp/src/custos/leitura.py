@@ -277,21 +277,25 @@ def fetch_centros_disponiveis(ano: int) -> list[str]:
 
 
 def fetch_por_equipamento(ano: int, centros: Optional[Iterable[str]] = None,
-                          top: int = 10) -> list[dict]:
-    """Executado do ano por EQUIPAMENTO (centro de custo) — gráfico de rosca.
+                          top: int = 10, mes: Optional[str] = None) -> list[dict]:
+    """Executado por EQUIPAMENTO (centro de custo) — gráfico de rosca.
 
     Soma o executado de cada `centro_custo`, nomeia pelo de/para (`nome_equipamento`,
     fallback = código) e mostra os `top` maiores como fatias; a cauda vai p/ 'Outros'.
     Centros já mapeados ao MESMO nome no de/para somam juntos (ex: várias linhas de uma
     família). Retorna `[{equip, executado, centros}]` ordenado desc, com 'Outros' por último.
+
+    `mes='YYYY-MM'` restringe a janela ao mês exato (slide de Custos da home — BR-14);
+    `mes=None` (default) = ano inteiro, comportamento da aba de custos (retrocompatível).
     """
     cz = _norm_centros(centros)
+    janela = mes if mes else {"$regex": f"^{ano}-"}  # mês exato OU ano todo
 
     def _calc():
         coll = get_mongo_connection(COLL_LANCAMENTOS)
         if coll is None:
             return []
-        match: dict = {"mes_referencia": {"$regex": f"^{ano}-"}}
+        match: dict = {"mes_referencia": janela}
         if cz:
             match["centro_custo"] = {"$in": list(cz)}
         pipe = [{"$match": match},
@@ -316,7 +320,7 @@ def fetch_por_equipamento(ano: int, centros: Optional[Iterable[str]] = None,
         # têm centro, logo não entram por equipamento. O resto vira "Não atribuído".
         rcoll = get_mongo_connection(COLL_RESUMO)
         if rcoll is not None:
-            rmatch = {"mes_referencia": {"$regex": f"^{ano}-"}}
+            rmatch = {"mes_referencia": janela}
             g = list(rcoll.aggregate([{"$match": rmatch},
                                       {"$group": {"_id": None, "v": {"$sum": "$executado"}}}]))
             total_oficial = g[0]["v"] if g else 0
@@ -325,7 +329,7 @@ def fetch_por_equipamento(ano: int, centros: Optional[Iterable[str]] = None,
                 out.append({"equip": "Não atribuído", "executado": gap, "centros": []})
         return out
 
-    return _memo(("equip", ano, cz, top), _calc)
+    return _memo(("equip", ano, cz, top, mes), _calc)
 
 
 def fetch_lancamentos(
