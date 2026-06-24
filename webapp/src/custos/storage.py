@@ -19,6 +19,8 @@ logger = logging.getLogger(__name__)
 # Nomes fixos das coleches (nao mudam com o ano — padrao do projeto).
 COLL_RESUMO = "AMG_CustoResumo"
 COLL_LANCAMENTOS = "AMG_CustoLancamentos"
+# Config leve da feature (doc unico por chave) — ex: contas fixadas no slide da home.
+COLL_CONFIG = "AMG_CustoConfig"
 
 
 def ensure_indexes(db) -> None:

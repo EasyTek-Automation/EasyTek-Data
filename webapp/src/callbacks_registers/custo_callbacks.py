@@ -609,6 +609,25 @@ def register_custo_callbacks(app):
     def _set_contas(value):
         return value or []
 
+    # "Fixar no telão": persiste a seleção atual de contas no Mongo para o slide de
+    # Custos do modo apresentação da home herdar (não altera nada mais na aba).
+    @app.callback(
+        Output("custo-fixar-telao-feedback", "children"),
+        Input("btn-custo-fixar-telao", "n_clicks"),
+        State("custo-conta-filter", "value"),
+        State("custo-conta-filter", "options"),
+        prevent_initial_call=True,
+    )
+    def _fixar_telao(_n, sel, options):
+        total = len(options or [])
+        sel = sel or []
+        ok = L.salvar_slide_contas(sel)
+        if not ok:
+            return [html.I(className="bi bi-x-circle me-1 text-danger"), "falha ao salvar"]
+        rotulo = "todas" if (total and len(sel) >= total) else f"{len(sel)} de {total}"
+        return [html.I(className="bi bi-check-circle me-1 text-success"),
+                f"fixado no telão: {rotulo} contas"]
+
     @app.callback(
         Output("store-custo-ano", "data"),
         Input("custo-ano-select", "value"),

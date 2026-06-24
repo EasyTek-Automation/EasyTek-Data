@@ -110,6 +110,20 @@ def build_tab() -> dbc.Tab:
                                                      id="btn-custo-rodar-agora",
                                                      color="primary", outline=True, size="sm")],
                                             ),
+                                            # Controle isolado (não toca nos grupos acima): fixa a
+                                            # seleção atual de contas para o slide de Custos do telão
+                                            # (modo apresentação da home). Persiste no Mongo.
+                                            html.Div(
+                                                [_label("Telão"),
+                                                 dbc.Button(
+                                                     [html.I(className="bi bi-pin-angle me-2"),
+                                                      "Fixar no telão"],
+                                                     id="btn-custo-fixar-telao",
+                                                     color="secondary", outline=True, size="sm"),
+                                                 html.Small(id="custo-fixar-telao-feedback",
+                                                            className="text-muted ms-2")],
+                                                className="d-flex align-items-end",
+                                            ),
                                         ],
                                         className="d-flex align-items-end flex-wrap gap-2",
                                     ),

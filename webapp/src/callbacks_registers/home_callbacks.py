@@ -242,7 +242,11 @@ def register_home_callbacks(app):
     def show_skeleton(idx):
         from dash import no_update
         slide = home_page.SLIDES[(idx or 0) % len(home_page.SLIDES)]
-        return home_page.render_kpi_skeleton() if slide in home_page.GRAPH_SLIDES else no_update
+        if slide == "custos":
+            return home_page.render_costs_skeleton()
+        if slide in home_page.GRAPH_SLIDES:
+            return home_page.render_kpi_skeleton()
+        return no_update
 
     # 6i. Slide de gráfico ativo → renderiza o chart REAL (lento) e emite sinal de render concluído.
     @app.callback(
@@ -257,8 +261,12 @@ def register_home_callbacks(app):
         from dash import no_update
         if not graph:
             return None, no_update
-        row = home_page.render_kpis_dual(period or "month", lang or "pt")
-        return row, (gcount or 0) + 1  # confirma render do gráfico (anual + 24h)
+        lang = lang or "pt"
+        if graph == "custos":
+            content = home_page.render_costs_slide(lang)
+        else:
+            content = home_page.render_kpis_dual(period or "month", lang)
+        return content, (gcount or 0) + 1  # confirma render do gráfico
 
     # 6i-2. Combinador: render concluído (gráfico OU cortes) → bump store-home-rendered
     @app.callback(
