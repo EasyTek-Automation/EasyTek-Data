@@ -20,12 +20,12 @@ try:  # contexto do webapp (pacote src.custos)
     from src.database.connection import get_mongo_connection
     from src.custos.hierarquia import (EQUIP_OUTROS, GRUPOS, grupo_da_conta, label_grupo,
                                        nome_conta, nome_equipamento)
-    from src.custos.storage import COLL_LANCAMENTOS, COLL_RESUMO
+    from src.custos.storage import COLL_CONFIG, COLL_LANCAMENTOS, COLL_RESUMO
 except ImportError:  # contexto de teste/script (cwd = webapp/src)
     from database.connection import get_mongo_connection  # type: ignore
     from custos.hierarquia import (EQUIP_OUTROS, GRUPOS, grupo_da_conta,  # type: ignore
                                    label_grupo, nome_conta, nome_equipamento)
-    from custos.storage import COLL_LANCAMENTOS, COLL_RESUMO  # type: ignore
+    from custos.storage import COLL_CONFIG, COLL_LANCAMENTOS, COLL_RESUMO  # type: ignore
 
 logger = logging.getLogger("custos.leitura")
 
@@ -50,6 +50,46 @@ def _memo(chave: tuple, produtor):
     valor = produtor()
     _cache[chave] = (agora, valor)
     return valor
+
+
+# --------------------------------------------------------------------------- #
+# Config leve da feature — contas fixadas no slide de Custos da home (server-side,
+# pra o slide do telao herdar a selecao feita na aba via botao "Fixar no telao").
+# --------------------------------------------------------------------------- #
+_SLIDE_CONTAS_ID = "home_slide_contas"
+
+
+def salvar_slide_contas(contas: Optional[Iterable[str]]) -> bool:
+    """Grava no Mongo a lista de contas fixadas para o slide de Custos. Retorna sucesso.
+
+    Lista vazia/None = sem filtro (slide mostra todas). Doc unico em COLL_CONFIG.
+    Robusto a Mongo offline -> False (UI avisa, nao quebra).
+    """
+    coll = get_mongo_connection(COLL_CONFIG)
+    if coll is None:
+        return False
+    codes = [c for c in (contas or []) if c]
+    try:
+        coll.update_one({"_id": _SLIDE_CONTAS_ID},
+                        {"$set": {"contas": codes}}, upsert=True)
+        return True
+    except Exception as e:
+        logger.warning("custos: salvar_slide_contas falhou: %s", e)
+        return False
+
+
+def ler_slide_contas() -> list[str]:
+    """Le as contas fixadas para o slide (lista de codigos). Vazia = sem filtro (todas).
+    Robusto a Mongo offline -> []."""
+    coll = get_mongo_connection(COLL_CONFIG)
+    if coll is None:
+        return []
+    try:
+        doc = coll.find_one({"_id": _SLIDE_CONTAS_ID}, {"contas": 1, "_id": 0})
+        return list(doc.get("contas", [])) if doc else []
+    except Exception as e:
+        logger.warning("custos: ler_slide_contas falhou: %s", e)
+        return []
 
 
 def _norm_centros(centros: Optional[Iterable[str]]) -> Optional[tuple[str, ...]]:

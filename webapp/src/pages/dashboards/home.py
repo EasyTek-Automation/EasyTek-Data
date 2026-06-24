@@ -1124,16 +1124,18 @@ def render_costs_slide(lang):
     """Slide de custos do mês corrente: rosca (equipamento) + barras (% por conta), estático."""
     lang = lang or "pt"
     try:
-        from src.callbacks_registers.custo_callbacks import _fig_rosca, _fig_barras
+        from src.callbacks_registers.custo_callbacks import (
+            _fig_rosca, _fig_barras, _filtra_por_contas)
         from src.custos import leitura as L
         from src.utils.kpi_report_config import _now_in_report_timezone
         now = _now_in_report_timezone()
         ano, mm = now.year, now.month
         mes = f"{ano}-{mm:02d}"  # BR-14: mês do relógio; executado já cortado em ≤ D-1 na coleta
-        rosca = _fig_rosca(L.fetch_por_equipamento(ano, None, mes=mes))
+        rosca = _fig_rosca(L.fetch_por_equipamento(ano, None, mes=mes))  # rosca = todas (igual à aba)
         rosca.update_layout(title_text=t("costs_rosca", lang))  # figura diz "(ano)"; aqui é mês
-        barras = _fig_barras(L.fetch_contas_geral(ano, mes=mes), True,
-                             t("costs_bars", lang), h=460, modo="pct")
+        # Barras herdam as contas fixadas na aba via "Fixar no telão" (vazio = todas).
+        rows = _filtra_por_contas(L.fetch_contas_geral(ano, mes=mes), L.ler_slide_contas() or None)
+        barras = _fig_barras(rows, True, t("costs_bars", lang), h=460, modo="pct")
         cfg = {"displayModeBar": False, "staticPlot": True, "responsive": True}
         row = dbc.Row(
             [
