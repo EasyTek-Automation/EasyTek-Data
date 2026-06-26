@@ -845,7 +845,6 @@ def register_custo_callbacks(app):
         ano = int(ano or 2026)
         alvo, total = _rosca_slice_info(ano, equip)
         if alvo is None:
-            msg = html.Small("Fatia não encontrada nesta coleta.", className="text-muted")
             return (True, equip, None, None, None, [], [], [], [], "",
                     0, 1, [0, 1], {}, False, False, _CHEV_DOWN, _CHEV_DOWN)
         valor = alvo.get("executado") or 0
@@ -865,6 +864,17 @@ def register_custo_callbacks(app):
         return (True, title, centros, resumo_conta, resumo_centro,
                 opt_conta, [], opt_centro, [], "",
                 0, mx, [0, mx], marks, False, False, _CHEV_DOWN, _CHEV_DOWN)
+
+    # Reabrir a MESMA fatia: o Plotly só re-dispara clickData quando o ponto MUDA. Ao fechar
+    # o modal, zeramos o clickData (callback separado — fora do que tem clickData como Input)
+    # p/ que o próximo clique, mesmo na mesma fatia, conte como mudança e reabra.
+    @app.callback(
+        Output("custo-graph-rosca", "clickData", allow_duplicate=True),
+        Input("modal-rosca", "is_open"),
+        prevent_initial_call=True,
+    )
+    def _reset_rosca_click(is_open):
+        return None if not is_open else no_update
 
     # Tabela de lançamentos da fatia — reage ao store da fatia e aos 4 filtros.
     @app.callback(

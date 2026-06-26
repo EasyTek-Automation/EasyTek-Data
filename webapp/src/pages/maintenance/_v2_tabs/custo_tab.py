@@ -319,7 +319,7 @@ def build_tab() -> dbc.Tab:
                                              dcc.Dropdown(id="rosca-f-conta", multi=True,
                                                           options=[], value=[],
                                                           placeholder="Todas")],
-                                            xs=12, md=3),
+                                            xs=12, md=5),
                                         dbc.Col(
                                             [_label("Centro"),
                                              dcc.Dropdown(id="rosca-f-centro", multi=True,
@@ -332,7 +332,7 @@ def build_tab() -> dbc.Tab:
                                                        debounce=True, value="",
                                                        placeholder="ex: inversor",
                                                        className="form-control")],
-                                            xs=12, md=3),
+                                            xs=12, md=2),
                                         dbc.Col(
                                             [_label("Valor (R$)"),
                                              dcc.RangeSlider(id="rosca-f-valor",
@@ -340,7 +340,7 @@ def build_tab() -> dbc.Tab:
                                                              step=1, allowCross=False,
                                                              tooltip={"placement": "top",
                                                                       "always_visible": False})],
-                                            xs=12, md=3),
+                                            xs=12, md=2),
                                     ],
                                     className="g-2 align-items-start mb-3",
                                 ),

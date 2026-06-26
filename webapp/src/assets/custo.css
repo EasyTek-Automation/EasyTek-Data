@@ -42,9 +42,9 @@
         max-width: 90vw;
         width: 90vw;
     }
-    /* modal da rosca ("o que compõe a fatia") — mais largo p/ a tabela + filtros */
+    /* modal da rosca ("o que compõe a fatia") — quase tela cheia p/ tabela + filtros */
     #modal-rosca.modal-dialog {
-        max-width: 95vw;
-        width: 95vw;
+        max-width: 98vw;
+        width: 98vw;
     }
 }
