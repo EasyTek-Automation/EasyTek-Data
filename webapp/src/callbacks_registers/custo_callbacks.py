@@ -569,6 +569,81 @@ def _tabela_lancamentos(docs):
     )
 
 
+def _tabela_resumo(resumo, total_fatia, header):
+    """Quebra "o que compõe esta fatia" por um eixo (conta ou centro): nome + R$ + % da fatia.
+
+    Cada linha = `{code, nome, executado}`. O código só aparece entre parênteses quando o
+    de/para tem nome próprio (nome != código) — evita o redundante "209710 (209710)".
+    """
+    if not resumo:
+        return None
+    linhas = []
+    for r in resumo:
+        v = r.get("executado") or 0
+        pct = (v / total_fatia) if total_fatia else 0
+        code = r.get("code") or ""
+        nome = r.get("nome") or code
+        rotulo = [html.Span(nome, className="fw-semibold")]
+        if nome != code:
+            rotulo.append(html.Span(f"  ({code})", className="text-muted small ms-1"))
+        linhas.append(html.Tr([
+            html.Td(rotulo),
+            html.Td(_brl(v), className="text-end fw-semibold", style={"whiteSpace": "nowrap"}),
+            html.Td(f"{pct:.0%}", className="text-end text-muted", style={"width": "60px"}),
+        ]))
+    return dbc.Table(
+        [html.Thead(html.Tr([
+            html.Th(header), html.Th("Valor", className="text-end"),
+            html.Th("%", className="text-end")])),
+         html.Tbody(linhas)],
+        hover=True, size="sm", className="mb-0", style={"fontSize": "1.0rem"},
+    )
+
+
+def _rosca_modal_content(ano, equip):
+    """Conteúdo do modal da rosca: título + resumo por centro + tabela de lançamentos da fatia.
+
+    Retorna `(title, body)`. Para 'Não atribuído' (gap de provisões/itens sem centro de
+    custo, BR-10) não há lançamentos por centro — explica em vez de tabela vazia.
+    """
+    dados = L.fetch_por_equipamento(ano, None)
+    alvo = next((d for d in dados if d.get("equip") == equip), None)
+    if alvo is None:
+        return equip, html.Small("Fatia não encontrada nesta coleta.", className="text-muted")
+    valor = alvo.get("executado") or 0
+    total = sum((d.get("executado") or 0) for d in dados) or 1
+    title = f"{equip} — {_brl(valor)} ({valor / total:.0%} do ano)"
+    centros = alvo.get("centros") or []
+    if not centros:
+        # 'Não atribuído': diferença entre o oficial (resumo) e a soma dos lançamentos com
+        # centro — provisões/itens pós-D-1 que ainda não têm centro de custo (BR-10).
+        body = dbc.Alert(
+            [html.I(className="bi bi-info-circle me-2"),
+             "Esta fatia é a diferença entre o total oficial do SAP e a soma dos lançamentos "
+             "que já têm centro de custo — provisões e itens recentes ainda sem centro "
+             "atribuído. Não há lançamentos detalhados para listar."],
+            color="secondary", className="mb-0")
+        return title, body
+    por_conta = L.fetch_contas_resumo(ano, centros)     # eixo com nome amigável
+    por_centro = L.fetch_centros_resumo(ano, centros)   # eixo por código (centro)
+    docs = L.fetch_lancamentos(ano, centros=centros, limit=500)
+    body = html.Div([
+        html.H6([html.I(className="bi bi-tags me-2"), "Por conta"],
+                className="fw-bold mb-2"),
+        _tabela_resumo(por_conta, valor, "Conta"),
+        html.Hr(className="my-3"),
+        html.H6([html.I(className="bi bi-diagram-3 me-2"), "Por centro de custo"],
+                className="fw-bold mb-2"),
+        _tabela_resumo(por_centro, valor, "Centro de custo"),
+        html.Hr(className="my-3"),
+        html.H6([html.I(className="bi bi-list-ul me-2"),
+                 f"Lançamentos ({len(docs)}{'+' if len(docs) >= 500 else ''})"],
+                className="fw-bold mb-2"),
+        _tabela_lancamentos(docs),
+    ])
+    return title, body
+
+
 def _crumb(*partes):
     itens = []
     for i, p in enumerate(partes):
@@ -688,6 +763,29 @@ def register_custo_callbacks(app):
     )
     def _render_rosca(ano, _n):
         return _fig_rosca(L.fetch_por_equipamento(int(ano or 2026), None))
+
+    # Clique numa fatia da rosca → modal com o que compõe aquele equipamento
+    # (resumo por centro de custo + lançamentos). Isolado do drill das contas.
+    @app.callback(
+        Output("modal-rosca", "is_open"),
+        Output("modal-rosca-title", "children"),
+        Output("modal-rosca-content", "children"),
+        Input("custo-graph-rosca", "clickData"),
+        Input("btn-rosca-close", "n_clicks"),
+        State("store-custo-ano", "data"),
+        prevent_initial_call=True,
+    )
+    def _modal_rosca(click, _close, ano):
+        if ctx.triggered_id == "btn-rosca-close":
+            return False, no_update, no_update
+        pts = (click or {}).get("points") or []
+        if not pts:
+            return no_update, no_update, no_update
+        equip = pts[0].get("label")
+        if not equip:
+            return no_update, no_update, no_update
+        title, body = _rosca_modal_content(int(ano or 2026), equip)
+        return True, title, body
 
     @app.callback(
         Output("custo-graph-entry", "figure"),

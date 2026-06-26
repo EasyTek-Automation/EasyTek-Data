@@ -19,12 +19,12 @@ from typing import Iterable, Optional
 try:  # contexto do webapp (pacote src.custos)
     from src.database.connection import get_mongo_connection
     from src.custos.hierarquia import (EQUIP_OUTROS, GRUPOS, grupo_da_conta, label_grupo,
-                                       nome_conta, nome_equipamento)
+                                       nome_centro, nome_conta, nome_equipamento)
     from src.custos.storage import COLL_CONFIG, COLL_LANCAMENTOS, COLL_RESUMO
 except ImportError:  # contexto de teste/script (cwd = webapp/src)
     from database.connection import get_mongo_connection  # type: ignore
     from custos.hierarquia import (EQUIP_OUTROS, GRUPOS, grupo_da_conta,  # type: ignore
-                                   label_grupo, nome_conta, nome_equipamento)
+                                   label_grupo, nome_centro, nome_conta, nome_equipamento)
     from custos.storage import COLL_CONFIG, COLL_LANCAMENTOS, COLL_RESUMO  # type: ignore
 
 logger = logging.getLogger("custos.leitura")
@@ -370,6 +370,64 @@ def fetch_por_equipamento(ano: int, centros: Optional[Iterable[str]] = None,
         return out
 
     return _memo(("equip", ano, cz, top, mes), _calc)
+
+
+def fetch_centros_resumo(ano: int, centros: Iterable[str],
+                         mes: Optional[str] = None) -> list[dict]:
+    """Executado por CENTRO DE CUSTO dentro de um conjunto de centros — quebra de uma
+    fatia da rosca. Soma real (sem limite) p/ o resumo "o que compõe esta fatia".
+
+    Recebe os `centros` que formam a fatia clicada (ex: todos os centros de 'Apoio/Admin')
+    e devolve `[{centro, nome, executado}]` ordenado desc, nomeando cada um pelo de/para
+    (`nome_centro`, fallback = código). `mes='YYYY-MM'` restringe ao mês; `mes=None` = ano.
+    """
+    cz = _norm_centros(centros)
+    if not cz:
+        return []
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match = _filtro_ano(ano, mes)
+        match["centro_custo"] = {"$in": list(cz)}
+        pipe = [{"$match": match},
+                {"$group": {"_id": "$centro_custo", "executado": {"$sum": "$valor"}}}]
+        rows = [{"code": d["_id"], "nome": nome_centro(d["_id"]),
+                 "executado": round(d["executado"] or 0.0, 2)}
+                for d in coll.aggregate(pipe)]
+        return sorted(rows, key=lambda r: r["executado"], reverse=True)
+
+    return _memo(("centros_resumo", ano, cz, mes), _calc)
+
+
+def fetch_contas_resumo(ano: int, centros: Iterable[str],
+                        mes: Optional[str] = None) -> list[dict]:
+    """Executado por CONTA contábil dentro de um conjunto de centros — quebra de uma fatia
+    da rosca pelo eixo que TEM nome amigável (de/para de conta resolve; o de centro não).
+
+    Recebe os `centros` que formam a fatia clicada e devolve `[{code, nome, executado}]`
+    ordenado desc, nomeando cada conta via `nome_conta` (ex: 'Manutenção de Máquinas e
+    Equipamentos'). `mes='YYYY-MM'` restringe ao mês; `mes=None` = ano.
+    """
+    cz = _norm_centros(centros)
+    if not cz:
+        return []
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match = _filtro_ano(ano, mes)
+        match["centro_custo"] = {"$in": list(cz)}
+        pipe = [{"$match": match},
+                {"$group": {"_id": "$conta", "executado": {"$sum": "$valor"}}}]
+        rows = [{"code": d["_id"], "nome": nome_conta(d["_id"]),
+                 "executado": round(d["executado"] or 0.0, 2)}
+                for d in coll.aggregate(pipe)]
+        return sorted(rows, key=lambda r: r["executado"], reverse=True)
+
+    return _memo(("contas_resumo", ano, cz, mes), _calc)
 
 
 def fetch_lancamentos(

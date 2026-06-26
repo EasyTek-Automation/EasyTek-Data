@@ -157,7 +157,8 @@ def build_tab() -> dbc.Tab:
                                                             config={"displayModeBar": False,
                                                                     "responsive": True},
                                                             style={"height": "460px",
-                                                                   "width": "100%"},
+                                                                   "width": "100%",
+                                                                   "cursor": "pointer"},
                                                         ),
                                                         xs=12, md=4,
                                                     ),
@@ -258,6 +259,28 @@ def build_tab() -> dbc.Tab:
                         ),
                     ],
                     id="modal-custo", size="xl", is_open=False, scrollable=True,
+                    fullscreen="lg-down",
+                ),
+
+                # ---- Modal da rosca (clique numa fatia → o que compõe o equipamento) ----
+                # Isolado do #modal-custo (drill das contas) — dimensão diferente (centro
+                # de custo, não conta). Resumo por centro + tabela de lançamentos da fatia.
+                dbc.Modal(
+                    [
+                        dbc.ModalHeader(dbc.ModalTitle(id="modal-rosca-title"),
+                                        close_button=True),
+                        dbc.ModalBody(
+                            dcc.Loading(
+                                type="circle", color="#34568b", delay_show=120,
+                                children=html.Div(id="modal-rosca-content"),
+                            )
+                        ),
+                        dbc.ModalFooter(
+                            dbc.Button("Fechar", id="btn-rosca-close",
+                                       color="primary", className="ms-auto"),
+                        ),
+                    ],
+                    id="modal-rosca", size="xl", is_open=False, scrollable=True,
                     fullscreen="lg-down",
                 ),
             ],
