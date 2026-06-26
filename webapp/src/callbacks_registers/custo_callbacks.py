@@ -537,19 +537,32 @@ def _tabela_lancamentos(docs):
     if not docs:
         return html.Small("Nenhum lançamento neste recorte.", className="text-muted")
     rows = []
+    tooltips = []   # hover no código (conta/centro) mostra a descrição — só quando há de/para
     for d in docs:
         dt = d.get("data_lancamento")
+        conta = d.get("conta", "") or ""
+        centro = d.get("centro_custo", "") or ""
         rows.append({
             "data": dt.strftime("%d/%m/%Y") if dt else "",
-            "conta": d.get("conta", ""), "centro": d.get("centro_custo", ""),
+            "conta": conta, "centro": centro,
             "valor": round(d.get("valor") or 0, 2),   # número cru → sort numérico
             "descritor": d.get("descritor", "") or "(sem descrição)",
             "tipo": d.get("tipo_doc", ""), "documento": d.get("no_documento", ""),
         })
+        tip = {}
+        nc = nome_conta(conta)
+        if nc and nc != conta:
+            tip["conta"] = {"value": nc, "type": "text"}
+        ncen = nome_centro(centro)
+        if ncen and ncen != centro:
+            tip["centro"] = {"value": ncen, "type": "text"}
+        tooltips.append(tip)
     _fmt_brl = Format(group=Group.yes, group_delimiter=".", decimal_delimiter=",",
                       precision=2, scheme=Scheme.fixed, symbol=Symbol.yes, symbol_prefix="R$ ")
     return dash_table.DataTable(
         data=rows,
+        tooltip_data=tooltips,
+        tooltip_duration=None,   # fica visível enquanto o mouse está sobre a célula
         columns=[{"name": "Data", "id": "data"}, {"name": "Conta", "id": "conta"},
                  {"name": "Centro", "id": "centro"},
                  {"name": "Valor", "id": "valor", "type": "numeric", "format": _fmt_brl},
