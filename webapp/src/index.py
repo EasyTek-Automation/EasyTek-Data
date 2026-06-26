@@ -128,6 +128,7 @@ ROUTES = {
     "/maintenance/work-orders": lambda: under_development.maintenance_development(),
     "/maintenance/schedule": lambda: under_development.maintenance_development(),
     "/maintenance/history": lambda: under_development.maintenance_development(),
+    "/maintenance/backlog": lambda: under_development.maintenance_development(),
     "/maintenance/indicators": indicators.layout,
     "/maintenance/indicators-v2": indicators_v2.layout,
     "/maintenance/kpi-report-v2": kpi_report_v2.layout,

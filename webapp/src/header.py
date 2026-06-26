@@ -94,7 +94,27 @@ def create_header(pathname, user):
         )
     )
     
-    # 🔧 MANUTENÇÃO
+    # 🔧 MANUTENÇÃO - MEGA MENU
+    def _mtn_item(icon, label, href, active=False, disabled=False):
+        """Item padronizado do mega-menu de Manutenção (estilo idêntico ao de Utilidades)."""
+        item_style = {"fontSize": "0.85rem", "paddingLeft": "0.5rem"}
+        if disabled:
+            item_style["opacity"] = "0.5"
+        return dbc.DropdownMenuItem(
+            html.Div([
+                html.Span(icon, style={"marginRight": "8px", "display": "inline-flex"}),
+                label
+            ], className="d-flex align-items-center"),
+            href=href, active=active, disabled=disabled, style=item_style
+        )
+
+    def _mtn_section_header(icon, title, color):
+        """Cabeçalho de coluna do mega-menu de Manutenção."""
+        return html.Div([
+            html.Span(icon, style={"marginRight": "6px", "display": "inline-flex"}),
+            html.Span(title, style={"fontWeight": "600", "fontSize": "0.9rem"})
+        ], className="d-flex align-items-center mb-2 px-2", style={"color": color})
+
     maintenance_dropdown = dbc.DropdownMenu(
         label=html.Div([
             html.Span(maintenance_icon(), style={"marginRight": "8px"}),
@@ -102,86 +122,47 @@ def create_header(pathname, user):
         ], className="d-flex align-items-center"),
         children=[
             html.Div([
-                dbc.DropdownMenuItem(
-                    html.Div([html.Span(clipboard_icon(), style={"marginRight": "8px"}), "Ordens de Serviço"], className="d-flex align-items-center"),
-                    href="/maintenance/work-orders", disabled=True, style={"opacity": "0.5"}
-                ),
-                dbc.DropdownMenuItem(
-                    html.Div([html.Span(calendar_icon(), style={"marginRight": "8px"}), "Plano de Manutenção"], className="d-flex align-items-center"),
-                    href="/maintenance/schedule", disabled=True, style={"opacity": "0.5"}
-                ),
-                dbc.DropdownMenuItem(divider=True),
-                dbc.DropdownMenuItem(
-                    html.Div([html.Span(alarm_icon(), style={"marginRight": "8px"}), "Alarmes"], className="d-flex align-items-center"),
-                    href="/maintenance/alarms", active=(pathname == "/maintenance/alarms"),
-                ),
-                dbc.DropdownMenuItem(
-                    html.Div([html.Span(clipboard_icon(), style={"marginRight": "8px"}), "Procedimentos"], className="d-flex align-items-center"),
-                    href="/maintenance/procedures", active=(pathname == "/maintenance/procedures"),
-                ),
-                dbc.DropdownMenuItem(
-                    html.Div([
-                        html.Span(html.I(className="bi bi-file-earmark-spreadsheet me-2")),
-                        "Processamento ZPP"
-                    ], className="d-flex align-items-center"),
-                    href="/maintenance/zpp-processor",
-                    active=(pathname == "/maintenance/zpp-processor")
-                ),
-                dbc.DropdownMenuItem(
-                    html.Div([html.Span(calendar_icon(), style={"marginRight": "8px"}), "Planejamento Gantt"], className="d-flex align-items-center"),
-                    href="/maintenance/gantt", active=(pathname == "/maintenance/gantt"),
-                ),
-                dbc.DropdownMenuItem(divider=True),
-                dbc.DropdownMenuItem(
-                    html.Div([html.Span(history_icon(), style={"marginRight": "8px"}), "Histórico de Intervenções"], className="d-flex align-items-center"),
-                    href="/maintenance/history", disabled=True, style={"opacity": "0.5"}
-                ),
+                dbc.Row([
+                    # COLUNA 1: OPERAÇÃO
+                    dbc.Col([
+                        html.Div([
+                            _mtn_section_header(maintenance_icon(), "Operação", "var(--bs-primary)"),
+                            _mtn_item(alarm_icon(), "Alarmes", "/maintenance/alarms", active=(pathname == "/maintenance/alarms")),
+                            _mtn_item(clipboard_icon(), "Procedimentos", "/maintenance/procedures", active=(pathname == "/maintenance/procedures")),
+                            _mtn_item(workflow_icon(), "AMG WorkFlow", "/workflow/dashboard", active=(pathname == "/workflow/dashboard")),
+                            _mtn_item(checklist_icon(), "Backlog de Manutenção", "/maintenance/backlog", active=(pathname == "/maintenance/backlog")),
+                        ], style={"minHeight": "190px"})
+                    ], width=4, className="border-end"),
 
-                # Submenu: Indicadores de Manutenção
-                dbc.DropdownMenuItem(
-                    html.Div([
-                        html.Span(graph_icon(), style={"marginRight": "8px"}),
-                        "Indicadores de Manutenção",
-                        html.Span(html.I(className="bi bi-chevron-right ms-2"), style={"marginLeft": "auto"})
-                    ], className="d-flex align-items-center justify-content-between"),
-                    header=True,
-                    className="dropdown-submenu-header"
-                ),
-                dbc.DropdownMenuItem(
-                    html.Div([
-                        html.Span(html.I(className="bi bi-speedometer2 me-2")),
-                        "Dashboard"
-                    ], className="d-flex align-items-center ps-4"),
-                    href="/maintenance/indicators-v2",
-                    active=(pathname == "/maintenance/indicators-v2")
-                ),
-                dbc.DropdownMenuItem(
-                    html.Div([
-                        html.Span(html.I(className="bi bi-sliders me-2")),
-                        "Configurar Metas"
-                    ], className="d-flex align-items-center ps-4"),
-                    href="/maintenance/config",
-                    active=(pathname == "/maintenance/config")
-                ),
+                    # COLUNA 2: INDICADORES
+                    dbc.Col([
+                        html.Div([
+                            _mtn_section_header(graph_icon(), "Indicadores", "#0dcaf0"),
+                            _mtn_item(speedometer_icon(), "Dashboard", "/maintenance/indicators-v2", active=(pathname == "/maintenance/indicators-v2")),
+                            _mtn_item(sliders_icon(), "Configurar Metas", "/maintenance/config", active=(pathname == "/maintenance/config")),
+                            _mtn_item(html.I(className="bi bi-file-earmark-spreadsheet"), "Processamento ZPP", "/maintenance/zpp-processor", active=(pathname == "/maintenance/zpp-processor")),
+                        ], style={"minHeight": "190px"})
+                    ], width=4, className="border-end"),
 
-                dbc.DropdownMenuItem(divider=True),
-
-                # Workflow - AMG WorkFlow
-                dbc.DropdownMenuItem(
-                    html.Div([
-                        html.Span(workflow_icon(), style={"marginRight": "8px"}),
-                        "AMG WorkFlow"
-                    ], className="d-flex align-items-center"),
-                    href="/workflow/dashboard",
-                    active=(pathname == "/workflow/dashboard")
-                ),
+                    # COLUNA 3: PLANEJAMENTO
+                    dbc.Col([
+                        html.Div([
+                            _mtn_section_header(calendar_icon(), "Planejamento", "#fd7e14"),
+                            _mtn_item(calendar_icon(), "Planejamento Gantt", "/maintenance/gantt", active=(pathname == "/maintenance/gantt")),
+                            _mtn_item(calendar_icon(), "Plano de Manutenção", "/maintenance/schedule", disabled=True),
+                            _mtn_item(clipboard_icon(), "Ordens de Serviço", "/maintenance/work-orders", disabled=True),
+                            _mtn_item(history_icon(), "Histórico de Intervenções", "/maintenance/history", disabled=True),
+                        ], style={"minHeight": "190px"})
+                    ], width=4),
+                ], className="g-0"),
 
                 # Footer "Powered By"
                 create_dropdown_footer()
-            ], className="simple-dropdown-menu dropdown-menu-with-footer")
+            ], style={"padding": "15px", "minWidth": "640px"})
         ],
         nav=True, in_navbar=True,
-        toggle_style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "fontWeight": "600"}
+        toggle_style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "fontWeight": "600"},
+        direction="down",
     )
     
     # 🏭 PRODUÇÃO

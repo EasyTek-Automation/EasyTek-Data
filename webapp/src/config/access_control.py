@@ -108,6 +108,12 @@ ROUTE_ACCESS = {
         "min_level": 1,
         "description": "Histórico de Intervenções"
     },
+    "/maintenance/backlog": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 1,
+        "description": "Backlog de Manutenção"
+    },
     "/maintenance/indicators": {
         "shared": False,
         "perfis": ["manutencao"],
