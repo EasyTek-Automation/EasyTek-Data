@@ -81,30 +81,33 @@ CONTA_NOME: dict[str, str] = {
 
 
 # Nome legivel de cada centro de custo (grafia do SAP — KOSTL -> texto da KSB1).
-# Em linguagem simples: traduz o codigo do centro (ex: "108401") para o nome que o
-# gestor reconhece (ex: "PRENSA FAGOR"), so para exibir no filtro — o dado gravado
-# no Mongo continua sendo o codigo. Mapa estatico (igual a CONTA_NOME): nao depende
-# do SAP no cliente. Centros sem nome conhecido aparecem so com o codigo.
+# Em linguagem simples: traduz o codigo do centro (ex: "208401") para o nome que o
+# gestor reconhece (ex: "PRENSA FAGOR"), para exibir no filtro/tooltip/resumo — o dado
+# gravado no Mongo continua sendo o codigo. Mapa estatico (igual a CONTA_NOME): nao
+# depende do SAP no cliente. Centros sem nome conhecido aparecem so com o codigo.
+# IMPORTANTE: os centros do SAP desta planta usam prefixo "2" (2xxxxx) — mesmo prefixo
+# da ponte CENTRO_ARBPL. (Versao anterior usava "1xxxxx" por engano, e por isso nenhum
+# nome casava com os lancamentos reais.)
 CENTRO_NOME: dict[str, str] = {
-    "102001": "LINHA LASER",
-    "102004": "LINHA LASER II",
-    "105001": "LINHA LONGIDUDINAL-Q",
-    "105002": "LINHA LONGIDUDINAL-F",
-    "106001": "LINHA TRANSVERSAL-F",
-    "106002": "LINHA TRANSVERS.-QTE",
-    "108401": "PRENSA FAGOR",
-    "108402": "PRENSA SCHULLER 500",
-    "108403": "PRENSA SCHULLER 630",
-    "109000": "GERENTE INDUSTRIAL",
-    "109002": "SERVIÇOS GERAIS -ADM",
-    "109008": "ESTRUT CNTL COML PR",
-    "109012": "EST CENTRAL SUP PR",
-    "109100": "MANUTENÇÃO DA PLANTA",
-    "109710": "ARMAZENS E TRANSLADO",
-    "109800": "QUALIDADE PROD PR",
-    "109900": "SERVIÇOS GERAIS-PROD",
-    "109902": "ADMIN. PRODUÇÃO - PR",
-    "109903": "FERRAMENTARIA",
+    "202001": "LINHA LASER",
+    "202004": "LINHA LASER II",
+    "205001": "LINHA LONGIDUDINAL-Q",
+    "205002": "LINHA LONGIDUDINAL-F",
+    "206001": "LINHA TRANSVERSAL-F",
+    "206002": "LINHA TRANSVERS.-QTE",
+    "208401": "PRENSA FAGOR",
+    "208402": "PRENSA SCHULLER 500",
+    "208403": "PRENSA SCHULLER 630",
+    "209000": "GERENTE INDUSTRIAL",
+    "209002": "SERVIÇOS GERAIS -ADM",
+    "209008": "ESTRUT CNTL COML PR",
+    "209012": "EST CENTRAL SUP PR",
+    "209100": "MANUTENÇÃO DA PLANTA",
+    "209710": "ARMAZENS E TRANSLADO",
+    "209800": "QUALIDADE PROD PR",
+    "209900": "SERVIÇOS GERAIS-PROD",
+    "209902": "ADMIN. PRODUÇÃO - PR",
+    "209903": "FERRAMENTARIA",
 }
 
 
