@@ -24,7 +24,10 @@ GRID = "wnd[0]/usr/cntlGRID1/shellcont/shell/shellcont[1]/shell"
 # colunas ricas a adicionar no layout da KSB1 (texto do pool -> normalizado)
 _RICH = ["No documento","Centro custo","Data do documento","Data de lancamento","Nome do usuario",
          "No doc.de referencia","Tipo de documento","estornado","Cod.debito/credito",
-         "Documento de compras","Item","Texto do pedido","Texto breve de material","Centro","Material"]
+         "Documento de compras","Item","Texto do pedido","Texto breve de material","Centro","Material",
+         # de/para de nome (KSB1): OBJ_TXT = nome do centro de custo; CEL_LTXT = nome da conta.
+         # Alimentam as coleções AMG_CustoCentros/AMG_CustoContas (nome auto, sem dict manual).
+         "Denominação de objeto","Descr.classe custo"]
 
 
 def _norm(x):
@@ -165,7 +168,9 @@ def collect_lancamentos(s, ini, fim, classes=None):
             "mes_referencia": mes_ref,
             "data_lancamento": dt,   # datetime (BSON Date) — convenção do banco
             "conta": conta,
+            "conta_nome": (r.get("CEL_LTXT") or "").strip(),     # nome da conta (KSB1)
             "centro_custo": (r.get("KOSTL") or "").strip(),
+            "centro_nome": (r.get("OBJ_TXT") or "").strip(),     # nome do centro (KSB1)
             "valor": parse_valor_br(r.get("WRGBTR")),
             "descritor": (r.get("EBTXT") or r.get("MAT_TXT") or "").strip(),
             "tipo_doc": (r.get("BLART") or "").strip(),
@@ -174,6 +179,26 @@ def collect_lancamentos(s, ini, fim, classes=None):
             "fonte": "sap",
         })
     return docs
+
+
+def depara_de_docs(docs):
+    """De/para código→nome extraído dos lançamentos (OBJ_TXT/CEL_LTXT da KSB1).
+
+    Retorna `(centros, contas)` — dois dicts `{código: nome}`. O 1º nome não-vazio por
+    código vence. Alimenta o upsert das coleções AMG_CustoCentros/AMG_CustoContas, então
+    um rename no SAP é refletido na próxima coleta (sem dict manual no código).
+    """
+    centros, contas = {}, {}
+    for d in docs:
+        c = (d.get("centro_custo") or "").strip()
+        cn = (d.get("centro_nome") or "").strip()
+        if c and cn:
+            centros.setdefault(c, cn)
+        a = (d.get("conta") or "").strip()
+        an = (d.get("conta_nome") or "").strip()
+        if a and an:
+            contas.setdefault(a, an)
+    return centros, contas
 
 
 def _scrape_zbrco019_periodo(s, ano, periodo):

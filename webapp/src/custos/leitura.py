@@ -18,14 +18,18 @@ from typing import Iterable, Optional
 
 try:  # contexto do webapp (pacote src.custos)
     from src.database.connection import get_mongo_connection
+    from src.custos import hierarquia as _H
     from src.custos.hierarquia import (EQUIP_OUTROS, GRUPOS, grupo_da_conta, label_grupo,
                                        nome_centro, nome_conta, nome_equipamento)
-    from src.custos.storage import COLL_CONFIG, COLL_LANCAMENTOS, COLL_RESUMO
+    from src.custos.storage import (COLL_CENTROS, COLL_CONFIG, COLL_CONTAS,
+                                    COLL_LANCAMENTOS, COLL_RESUMO)
 except ImportError:  # contexto de teste/script (cwd = webapp/src)
     from database.connection import get_mongo_connection  # type: ignore
+    from custos import hierarquia as _H  # type: ignore
     from custos.hierarquia import (EQUIP_OUTROS, GRUPOS, grupo_da_conta,  # type: ignore
                                    label_grupo, nome_centro, nome_conta, nome_equipamento)
-    from custos.storage import COLL_CONFIG, COLL_LANCAMENTOS, COLL_RESUMO  # type: ignore
+    from custos.storage import (COLL_CENTROS, COLL_CONFIG, COLL_CONTAS,  # type: ignore
+                                COLL_LANCAMENTOS, COLL_RESUMO)
 
 logger = logging.getLogger("custos.leitura")
 
@@ -50,6 +54,33 @@ def _memo(chave: tuple, produtor):
     valor = produtor()
     _cache[chave] = (agora, valor)
     return valor
+
+
+def carregar_depara() -> None:
+    """Carrega o de/para de nome (centro/conta) do Mongo e injeta no `hierarquia`.
+
+    Fonte: coleções `AMG_CustoCentros`/`AMG_CustoContas` populadas pelo daemon (OBJ_TXT/
+    CEL_LTXT da KSB1). Memoizado (TTL) — barato chamar no início de cada fetch que usa nome.
+    Robusto a Mongo offline / coleções ausentes (override fica vazio → fallback estático).
+    """
+    def _calc():
+        cen, con = {}, {}
+        c = get_mongo_connection(COLL_CENTROS)
+        if c is not None:
+            try:
+                cen = {d["_id"]: d.get("nome", "") for d in c.find({}, {"nome": 1})}
+            except Exception as e:
+                logger.warning("custos: carregar de/para centros falhou: %s", e)
+        k = get_mongo_connection(COLL_CONTAS)
+        if k is not None:
+            try:
+                con = {d["_id"]: d.get("nome", "") for d in k.find({}, {"nome": 1})}
+            except Exception as e:
+                logger.warning("custos: carregar de/para contas falhou: %s", e)
+        _H.set_overrides(centros=cen, contas=con)
+        return True
+
+    _memo(("depara_nome",), _calc)
 
 
 # --------------------------------------------------------------------------- #
@@ -381,6 +412,7 @@ def fetch_centros_resumo(ano: int, centros: Iterable[str],
     e devolve `[{centro, nome, executado}]` ordenado desc, nomeando cada um pelo de/para
     (`nome_centro`, fallback = código). `mes='YYYY-MM'` restringe ao mês; `mes=None` = ano.
     """
+    carregar_depara()
     cz = _norm_centros(centros)
     if not cz:
         return []
@@ -410,6 +442,7 @@ def fetch_contas_resumo(ano: int, centros: Iterable[str],
     ordenado desc, nomeando cada conta via `nome_conta` (ex: 'Manutenção de Máquinas e
     Equipamentos'). `mes='YYYY-MM'` restringe ao mês; `mes=None` = ano.
     """
+    carregar_depara()
     cz = _norm_centros(centros)
     if not cz:
         return []
@@ -441,6 +474,7 @@ def fetch_lancamentos(
 
     Ordena por data. `limit` evita despejar milhares de linhas no nivel planta/grupo.
     """
+    carregar_depara()   # garante o de/para de nome (centro/conta) p/ tooltips/filtros
     coll = get_mongo_connection(COLL_LANCAMENTOS)
     if coll is None:
         return []

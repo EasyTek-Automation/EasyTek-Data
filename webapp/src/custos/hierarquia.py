@@ -111,14 +111,35 @@ CENTRO_NOME: dict[str, str] = {
 }
 
 
+# Override vindo do SAP (coleções AMG_CustoCentros/AMG_CustoContas, populadas pelo daemon
+# via OBJ_TXT/CEL_LTXT da KSB1). A camada de leitura carrega do Mongo e injeta aqui via
+# `set_overrides` — assim um rename no SAP reflete na tela sem mexer no código. Vazio =
+# cai nos mapas estáticos abaixo (fallback offline / antes da 1ª coleta).
+_CENTRO_OVERRIDE: dict[str, str] = {}
+_CONTA_OVERRIDE: dict[str, str] = {}
+
+
+def set_overrides(centros: dict | None = None, contas: dict | None = None) -> None:
+    """Injeta o de/para de nome vindo do SAP (Mongo). Chamado pela camada de leitura."""
+    if centros is not None:
+        _CENTRO_OVERRIDE.clear()
+        _CENTRO_OVERRIDE.update(centros)
+    if contas is not None:
+        _CONTA_OVERRIDE.clear()
+        _CONTA_OVERRIDE.update(contas)
+
+
 def nome_conta(conta: str) -> str:
-    """Nome legivel da conta; ecoa o codigo se desconhecida."""
-    return CONTA_NOME.get(conta, conta)
+    """Nome legivel da conta. Prioridade: mapa curado (CONTA_NOME, nomes completos) ->
+    nome do SAP (override) -> codigo. As 15 contas do GT340 têm nome curado bonito."""
+    return CONTA_NOME.get(conta) or _CONTA_OVERRIDE.get(conta) or conta
 
 
 def nome_centro(centro: str) -> str:
-    """Nome legivel do centro de custo; ecoa o codigo se desconhecido."""
-    return CENTRO_NOME.get(centro, centro)
+    """Nome legivel do centro. Prioridade: nome do SAP (override, fonte da verdade) ->
+    mapa estatico (fallback) -> codigo. O SAP vence porque o mapa estatico era so um
+    chute parcial; o nome real vem do OBJ_TXT da KSB1 (coleção AMG_CustoCentros)."""
+    return _CENTRO_OVERRIDE.get(centro) or CENTRO_NOME.get(centro) or centro
 
 
 # Ponte centro de custo (KOSTL) → posto de trabalho (ARBPL) das LINHAS de produção. O nome
