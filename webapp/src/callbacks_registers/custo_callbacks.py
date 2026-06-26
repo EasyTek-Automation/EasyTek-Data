@@ -533,9 +533,32 @@ def _value_card(titulo, valor_txt, cor, cid, sub=None):
     )
 
 
-def _tabela_lancamentos(docs):
+# chave de ordenação por coluna (sobre o doc cru) — usada no sort server-side
+_SORT_DOC_KEY = {
+    "data": lambda d: d.get("data_lancamento"),
+    "conta": lambda d: d.get("conta") or "",
+    "centro": lambda d: d.get("centro_custo") or "",
+    "valor": lambda d: d.get("valor") or 0,
+    "descritor": lambda d: (d.get("descritor") or "").lower(),
+    "tipo": lambda d: d.get("tipo_doc") or "",
+    "documento": lambda d: d.get("no_documento") or "",
+}
+
+
+def _tabela_lancamentos(docs, table_id=None, sort_by=None):
+    """Tabela de lançamentos. Com `table_id` usa sort **custom** (server-side): os docs são
+    ordenados aqui e os `tooltip_data` são montados na MESMA ordem — senão o tooltip (que é
+    posicional) cola na linha errada ao ordenar (sort nativo reordena só o cliente). Sem
+    `table_id` mantém o sort nativo (uso onde não há tooltip crítico)."""
     if not docs:
         return html.Small("Nenhum lançamento neste recorte.", className="text-muted")
+    # sort custom: reordena os docs ANTES de montar linhas+tooltips (alinhamento garantido)
+    if table_id and sort_by:
+        sb = sort_by[0]
+        keyfn = _SORT_DOC_KEY.get(sb.get("column_id"))
+        if keyfn:
+            docs = sorted(docs, key=lambda d: (keyfn(d) is None, keyfn(d)),
+                          reverse=sb.get("direction") == "desc")
     rows = []
     tooltips = []   # hover no código (conta/centro) mostra a descrição — só quando há de/para
     conta_sem_desc: set[str] = set()    # códigos sem de/para → itálico na célula
@@ -573,7 +596,7 @@ def _tabela_lancamentos(docs):
     ]
     _fmt_brl = Format(group=Group.yes, group_delimiter=".", decimal_delimiter=",",
                       precision=2, scheme=Scheme.fixed, symbol=Symbol.yes, symbol_prefix="R$ ")
-    return dash_table.DataTable(
+    kwargs = dict(
         data=rows,
         tooltip_data=tooltips,
         tooltip_duration=None,   # fica visível enquanto o mouse está sobre a célula
@@ -582,7 +605,7 @@ def _tabela_lancamentos(docs):
                  {"name": "Valor", "id": "valor", "type": "numeric", "format": _fmt_brl},
                  {"name": "Descrição", "id": "descritor"}, {"name": "Tipo", "id": "tipo"},
                  {"name": "Documento", "id": "documento"}],
-        page_size=12, sort_action="native", style_as_list_view=True,
+        page_size=12, style_as_list_view=True,
         style_cell={"fontSize": "0.82rem", "padding": "8px 10px", "textAlign": "left",
                     "border": "none", "borderBottom": "1px solid #eef0f3"},
         style_header={"fontWeight": "700", "textTransform": "uppercase", "fontSize": "0.7rem",
@@ -594,6 +617,13 @@ def _tabela_lancamentos(docs):
             {"if": {"column_id": "descritor"}, "color": "#495057"}] + _italico,
         style_table={"overflowX": "auto"},
     )
+    if table_id:
+        # sort custom (server-side) → tooltip alinhado mesmo ordenando
+        kwargs.update(id=table_id, sort_action="custom", sort_mode="single",
+                      sort_by=sort_by or [])
+    else:
+        kwargs["sort_action"] = "native"
+    return dash_table.DataTable(**kwargs)
 
 
 def _tabela_resumo(resumo, total_fatia, header):
@@ -629,6 +659,18 @@ def _tabela_resumo(resumo, total_fatia, header):
          html.Tbody(linhas)],
         hover=True, size="sm", className="mb-0", style={"fontSize": "1.0rem"},
     )
+
+
+def _build_rosca_tabela(ano, centros, fconta, fcentro, busca, faixa, sort_by):
+    """Monta o bloco da tabela de lançamentos da fatia (cabeçalho + tabela). `sort_by` vazio
+    = ordem padrão (data). Reusado pelo render por filtro e pelo callback de sort custom."""
+    docs = L.fetch_lancamentos(int(ano or 2026), centros=centros, limit=5000)
+    docs = _filtra_lancamentos(docs, fconta, fcentro, busca, faixa)
+    return html.Div([
+        html.H6([html.I(className="bi bi-list-ul me-2"),
+                 f"Lançamentos ({len(docs)})"], className="fw-bold mb-2"),
+        _tabela_lancamentos(docs, table_id="rosca-lanc-table", sort_by=sort_by),
+    ])
 
 
 def _rosca_slice_info(ano, equip):
@@ -876,7 +918,9 @@ def register_custo_callbacks(app):
     def _reset_rosca_click(is_open):
         return None if not is_open else no_update
 
-    # Tabela de lançamentos da fatia — reage ao store da fatia e aos 4 filtros.
+    # Tabela de lançamentos da fatia — criada a partir do store + 4 filtros (sort zerado).
+    # NÃO depende do sort_by da própria tabela (evita o ciclo "tabela criada por mim
+    # depende de mim mesma" → na 1ª vez não existia e nunca renderizava).
     @app.callback(
         Output("modal-rosca-tabela", "children"),
         Input("store-rosca-centros", "data"),
@@ -897,13 +941,25 @@ def register_custo_callbacks(app):
                  "lançamentos que já têm centro de custo — provisões e itens recentes ainda "
                  "sem centro atribuído. Não há lançamentos detalhados para listar."],
                 color="secondary", className="mb-0")
-        docs = L.fetch_lancamentos(int(ano or 2026), centros=centros, limit=5000)
-        docs = _filtra_lancamentos(docs, fconta, fcentro, busca, faixa)
-        return html.Div([
-            html.H6([html.I(className="bi bi-list-ul me-2"),
-                     f"Lançamentos ({len(docs)})"], className="fw-bold mb-2"),
-            _tabela_lancamentos(docs),
-        ])
+        return _build_rosca_tabela(ano, centros, fconta, fcentro, busca, faixa, [])
+
+    # Sort custom: clicar no cabeçalho reconstrói a tabela já ordenada (server-side), com
+    # os tooltips na mesma ordem (senão o tooltip — posicional — cola na linha errada).
+    @app.callback(
+        Output("modal-rosca-tabela", "children", allow_duplicate=True),
+        Input("rosca-lanc-table", "sort_by"),
+        State("store-rosca-centros", "data"),
+        State("rosca-f-conta", "value"),
+        State("rosca-f-centro", "value"),
+        State("rosca-f-busca", "value"),
+        State("rosca-f-valor", "value"),
+        State("store-custo-ano", "data"),
+        prevent_initial_call=True,
+    )
+    def _rosca_sort(sort_by, centros, fconta, fcentro, busca, faixa, ano):
+        if not centros:
+            return no_update
+        return _build_rosca_tabela(ano, centros, fconta, fcentro, busca, faixa, sort_by)
 
     # Toggles dos resumos colapsáveis (chevron acompanha o estado)
     @app.callback(
