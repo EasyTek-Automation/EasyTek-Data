@@ -14,6 +14,8 @@ from ...core.contracts import Result
 from . import custo_collect, _carga
 
 COLL = "AMG_CustoLancamentos"
+COLL_CENTROS = "AMG_CustoCentros"   # de/para código→nome do centro (OBJ_TXT da KSB1)
+COLL_CONTAS = "AMG_CustoContas"     # de/para código→nome da conta  (CEL_LTXT da KSB1)
 _BRT = pytz.timezone("America/Sao_Paulo")
 
 
@@ -36,6 +38,14 @@ def run(job, ctx):
             pass
     try:
         n = _carga.gravar(ctx.db, COLL, docs)
+        # de/para de nome (centro/conta) extraído da mesma grade — upsert idempotente.
+        # Não interrompe a carga principal se falhar (nome é complementar ao dado).
+        try:
+            cen, con = custo_collect.depara_de_docs(docs)
+            _carga.upsert_depara(ctx.db, COLL_CENTROS, cen)
+            _carga.upsert_depara(ctx.db, COLL_CONTAS, con)
+        except Exception:
+            pass
     except Exception as e:
         return Result.falha("mongo_update", e)
     return Result.sucesso(path_xlsx=f"mongo:{COLL}", tamanho_bytes=n)

@@ -81,41 +81,65 @@ CONTA_NOME: dict[str, str] = {
 
 
 # Nome legivel de cada centro de custo (grafia do SAP — KOSTL -> texto da KSB1).
-# Em linguagem simples: traduz o codigo do centro (ex: "108401") para o nome que o
-# gestor reconhece (ex: "PRENSA FAGOR"), so para exibir no filtro — o dado gravado
-# no Mongo continua sendo o codigo. Mapa estatico (igual a CONTA_NOME): nao depende
-# do SAP no cliente. Centros sem nome conhecido aparecem so com o codigo.
+# Em linguagem simples: traduz o codigo do centro (ex: "208401") para o nome que o
+# gestor reconhece (ex: "PRENSA FAGOR"), para exibir no filtro/tooltip/resumo — o dado
+# gravado no Mongo continua sendo o codigo. Mapa estatico (igual a CONTA_NOME): nao
+# depende do SAP no cliente. Centros sem nome conhecido aparecem so com o codigo.
+# IMPORTANTE: os centros do SAP desta planta usam prefixo "2" (2xxxxx) — mesmo prefixo
+# da ponte CENTRO_ARBPL. (Versao anterior usava "1xxxxx" por engano, e por isso nenhum
+# nome casava com os lancamentos reais.)
 CENTRO_NOME: dict[str, str] = {
-    "102001": "LINHA LASER",
-    "102004": "LINHA LASER II",
-    "105001": "LINHA LONGIDUDINAL-Q",
-    "105002": "LINHA LONGIDUDINAL-F",
-    "106001": "LINHA TRANSVERSAL-F",
-    "106002": "LINHA TRANSVERS.-QTE",
-    "108401": "PRENSA FAGOR",
-    "108402": "PRENSA SCHULLER 500",
-    "108403": "PRENSA SCHULLER 630",
-    "109000": "GERENTE INDUSTRIAL",
-    "109002": "SERVIÇOS GERAIS -ADM",
-    "109008": "ESTRUT CNTL COML PR",
-    "109012": "EST CENTRAL SUP PR",
-    "109100": "MANUTENÇÃO DA PLANTA",
-    "109710": "ARMAZENS E TRANSLADO",
-    "109800": "QUALIDADE PROD PR",
-    "109900": "SERVIÇOS GERAIS-PROD",
-    "109902": "ADMIN. PRODUÇÃO - PR",
-    "109903": "FERRAMENTARIA",
+    "202001": "LINHA LASER",
+    "202004": "LINHA LASER II",
+    "205001": "LINHA LONGIDUDINAL-Q",
+    "205002": "LINHA LONGIDUDINAL-F",
+    "206001": "LINHA TRANSVERSAL-F",
+    "206002": "LINHA TRANSVERS.-QTE",
+    "208401": "PRENSA FAGOR",
+    "208402": "PRENSA SCHULLER 500",
+    "208403": "PRENSA SCHULLER 630",
+    "209000": "GERENTE INDUSTRIAL",
+    "209002": "SERVIÇOS GERAIS -ADM",
+    "209008": "ESTRUT CNTL COML PR",
+    "209012": "EST CENTRAL SUP PR",
+    "209100": "MANUTENÇÃO DA PLANTA",
+    "209710": "ARMAZENS E TRANSLADO",
+    "209800": "QUALIDADE PROD PR",
+    "209900": "SERVIÇOS GERAIS-PROD",
+    "209902": "ADMIN. PRODUÇÃO - PR",
+    "209903": "FERRAMENTARIA",
 }
 
 
+# Override vindo do SAP (coleções AMG_CustoCentros/AMG_CustoContas, populadas pelo daemon
+# via OBJ_TXT/CEL_LTXT da KSB1). A camada de leitura carrega do Mongo e injeta aqui via
+# `set_overrides` — assim um rename no SAP reflete na tela sem mexer no código. Vazio =
+# cai nos mapas estáticos abaixo (fallback offline / antes da 1ª coleta).
+_CENTRO_OVERRIDE: dict[str, str] = {}
+_CONTA_OVERRIDE: dict[str, str] = {}
+
+
+def set_overrides(centros: dict | None = None, contas: dict | None = None) -> None:
+    """Injeta o de/para de nome vindo do SAP (Mongo). Chamado pela camada de leitura."""
+    if centros is not None:
+        _CENTRO_OVERRIDE.clear()
+        _CENTRO_OVERRIDE.update(centros)
+    if contas is not None:
+        _CONTA_OVERRIDE.clear()
+        _CONTA_OVERRIDE.update(contas)
+
+
 def nome_conta(conta: str) -> str:
-    """Nome legivel da conta; ecoa o codigo se desconhecida."""
-    return CONTA_NOME.get(conta, conta)
+    """Nome legivel da conta. Prioridade: mapa curado (CONTA_NOME, nomes completos) ->
+    nome do SAP (override) -> codigo. As 15 contas do GT340 têm nome curado bonito."""
+    return CONTA_NOME.get(conta) or _CONTA_OVERRIDE.get(conta) or conta
 
 
 def nome_centro(centro: str) -> str:
-    """Nome legivel do centro de custo; ecoa o codigo se desconhecido."""
-    return CENTRO_NOME.get(centro, centro)
+    """Nome legivel do centro. Prioridade: nome do SAP (override, fonte da verdade) ->
+    mapa estatico (fallback) -> codigo. O SAP vence porque o mapa estatico era so um
+    chute parcial; o nome real vem do OBJ_TXT da KSB1 (coleção AMG_CustoCentros)."""
+    return _CENTRO_OVERRIDE.get(centro) or CENTRO_NOME.get(centro) or centro
 
 
 # Ponte centro de custo (KOSTL) → posto de trabalho (ARBPL) das LINHAS de produção. O nome

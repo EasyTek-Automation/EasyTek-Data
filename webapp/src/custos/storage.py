@@ -21,6 +21,10 @@ COLL_RESUMO = "AMG_CustoResumo"
 COLL_LANCAMENTOS = "AMG_CustoLancamentos"
 # Config leve da feature (doc unico por chave) — ex: contas fixadas no slide da home.
 COLL_CONFIG = "AMG_CustoConfig"
+# De/para codigo->nome (1 doc por codigo, _id=codigo), populado pelo daemon a partir do
+# OBJ_TXT/CEL_LTXT da KSB1. Fonte do nome de centro/conta na tela (sem dict manual).
+COLL_CENTROS = "AMG_CustoCentros"
+COLL_CONTAS = "AMG_CustoContas"
 
 
 def ensure_indexes(db) -> None:

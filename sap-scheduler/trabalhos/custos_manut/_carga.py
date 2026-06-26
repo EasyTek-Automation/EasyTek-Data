@@ -9,3 +9,18 @@ def gravar(db, coll: str, docs: list) -> int:
     if docs:
         db[coll].insert_many(docs)
     return len(docs)
+
+
+def upsert_depara(db, coll: str, mapping: dict) -> int:
+    """Upsert do de/para código→nome (1 doc por código, `_id`=código). Idempotente.
+
+    Usado p/ AMG_CustoCentros / AMG_CustoContas: um rename no SAP atualiza a única linha
+    do código → reflete em toda a tela (inclusive meses antigos). Só grava nome não-vazio.
+    """
+    n = 0
+    for code, nome in (mapping or {}).items():
+        if not code or not nome:
+            continue
+        db[coll].update_one({"_id": code}, {"$set": {"nome": nome}}, upsert=True)
+        n += 1
+    return n

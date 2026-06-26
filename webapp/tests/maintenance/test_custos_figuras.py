@@ -54,3 +54,33 @@ class TestFiguraCustoMensal:
         assert captured["h"] == 460
         assert "2026-06" in captured["titulo"]
         assert len(captured["rows"]) == 2
+
+
+class TestTabelaResumoRosca:
+    """`_tabela_resumo` — quebra de uma fatia da rosca por conta/centro (modal da rosca)."""
+
+    def test_vazio_retorna_none(self):
+        import src.callbacks_registers.custo_callbacks as cc
+        assert cc._tabela_resumo([], 100.0, "Conta") is None
+        assert cc._tabela_resumo(None, 100.0, "Conta") is None
+
+    def test_codigo_oculto_quando_igual_ao_nome(self):
+        """Centro sem de/para (nome == código) → não repete '(209710)' redundante."""
+        import dash_bootstrap_components as dbc
+        import src.callbacks_registers.custo_callbacks as cc
+        tab = cc._tabela_resumo([{"code": "209710", "nome": "209710", "executado": 50.0}],
+                                100.0, "Centro de custo")
+        assert isinstance(tab, dbc.Table)
+        txt = str(tab)
+        # o código aparece uma vez só (no nome), sem o sufixo "(209710)"
+        assert "(209710)" not in txt
+
+    def test_codigo_visivel_quando_ha_nome_proprio(self):
+        """Conta com de/para → mostra nome amigável + código entre parênteses."""
+        import src.callbacks_registers.custo_callbacks as cc
+        tab = cc._tabela_resumo(
+            [{"code": "33102260", "nome": "Manutenção de Máquinas e Equipamentos",
+              "executado": 723767.0}], 2243118.0, "Conta")
+        txt = str(tab)
+        assert "Manutenção de Máquinas e Equipamentos" in txt
+        assert "(33102260)" in txt

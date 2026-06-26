@@ -537,19 +537,46 @@ def _tabela_lancamentos(docs):
     if not docs:
         return html.Small("Nenhum lançamento neste recorte.", className="text-muted")
     rows = []
+    tooltips = []   # hover no código (conta/centro) mostra a descrição — só quando há de/para
+    conta_sem_desc: set[str] = set()    # códigos sem de/para → itálico na célula
+    centro_sem_desc: set[str] = set()
     for d in docs:
         dt = d.get("data_lancamento")
+        conta = d.get("conta", "") or ""
+        centro = d.get("centro_custo", "") or ""
         rows.append({
             "data": dt.strftime("%d/%m/%Y") if dt else "",
-            "conta": d.get("conta", ""), "centro": d.get("centro_custo", ""),
+            "conta": conta, "centro": centro,
             "valor": round(d.get("valor") or 0, 2),   # número cru → sort numérico
             "descritor": d.get("descritor", "") or "(sem descrição)",
             "tipo": d.get("tipo_doc", ""), "documento": d.get("no_documento", ""),
         })
+        tip = {}
+        nc = nome_conta(conta)
+        if nc and nc != conta:
+            tip["conta"] = {"value": nc, "type": "text"}
+        elif conta:
+            conta_sem_desc.add(conta)
+        ncen = nome_centro(centro)
+        if ncen and ncen != centro:
+            tip["centro"] = {"value": ncen, "type": "text"}
+        elif centro:
+            centro_sem_desc.add(centro)
+        tooltips.append(tip)
+    # itálico cinza nas células de código que não têm descrição no de/para
+    _italico = [
+        {"if": {"column_id": "conta", "filter_query": f'{{conta}} = "{c}"'},
+         "fontStyle": "italic", "color": "#adb5bd"} for c in conta_sem_desc
+    ] + [
+        {"if": {"column_id": "centro", "filter_query": f'{{centro}} = "{c}"'},
+         "fontStyle": "italic", "color": "#adb5bd"} for c in centro_sem_desc
+    ]
     _fmt_brl = Format(group=Group.yes, group_delimiter=".", decimal_delimiter=",",
                       precision=2, scheme=Scheme.fixed, symbol=Symbol.yes, symbol_prefix="R$ ")
     return dash_table.DataTable(
         data=rows,
+        tooltip_data=tooltips,
+        tooltip_duration=None,   # fica visível enquanto o mouse está sobre a célula
         columns=[{"name": "Data", "id": "data"}, {"name": "Conta", "id": "conta"},
                  {"name": "Centro", "id": "centro"},
                  {"name": "Valor", "id": "valor", "type": "numeric", "format": _fmt_brl},
@@ -564,9 +591,98 @@ def _tabela_lancamentos(docs):
         style_data_conditional=[
             {"if": {"row_index": "odd"}, "backgroundColor": "rgba(248,250,252,0.6)"},
             {"if": {"column_id": "valor"}, "textAlign": "right", "fontWeight": "600"},
-            {"if": {"column_id": "descritor"}, "color": "#495057"}],
+            {"if": {"column_id": "descritor"}, "color": "#495057"}] + _italico,
         style_table={"overflowX": "auto"},
     )
+
+
+def _tabela_resumo(resumo, total_fatia, header):
+    """Quebra "o que compõe esta fatia" por um eixo (conta ou centro): nome + R$ + % da fatia.
+
+    Cada linha = `{code, nome, executado}`. O código só aparece entre parênteses quando o
+    de/para tem nome próprio (nome != código) — evita o redundante "209710 (209710)".
+    Sem de/para (nome == código) o rótulo vai em itálico + cinza, sinalizando "sem descrição".
+    """
+    if not resumo:
+        return None
+    linhas = []
+    for r in resumo:
+        v = r.get("executado") or 0
+        pct = (v / total_fatia) if total_fatia else 0
+        code = r.get("code") or ""
+        nome = r.get("nome") or code
+        if nome != code:
+            rotulo = [html.Span(nome, className="fw-semibold"),
+                      html.Span(f"  ({code})", className="text-muted small ms-1")]
+        else:
+            # sem descrição no de/para → só o código, em itálico cinza
+            rotulo = [html.Span(code, className="fst-italic text-muted")]
+        linhas.append(html.Tr([
+            html.Td(rotulo),
+            html.Td(_brl(v), className="text-end fw-semibold", style={"whiteSpace": "nowrap"}),
+            html.Td(f"{pct:.0%}", className="text-end text-muted", style={"width": "60px"}),
+        ]))
+    return dbc.Table(
+        [html.Thead(html.Tr([
+            html.Th(header), html.Th("Valor", className="text-end"),
+            html.Th("%", className="text-end")])),
+         html.Tbody(linhas)],
+        hover=True, size="sm", className="mb-0", style={"fontSize": "1.0rem"},
+    )
+
+
+def _rosca_slice_info(ano, equip):
+    """Acha a fatia clicada na rosca. Retorna `(alvo, total_ano)` ou `(None, total)`.
+    `alvo` = dict `{equip, executado, centros}` da fatia; `total_ano` = soma de todas."""
+    dados = L.fetch_por_equipamento(ano, None)
+    total = sum((d.get("executado") or 0) for d in dados) or 1
+    alvo = next((d for d in dados if d.get("equip") == equip), None)
+    return alvo, total
+
+
+def _opt_codigo(code, nome):
+    """Opção de dropdown p/ um código: 'código — Nome' quando há de/para, senão só o código."""
+    label = f"{code} — {nome}" if (nome and nome != code) else code
+    return {"label": label, "value": code}
+
+
+def _opcoes_filtro(docs):
+    """Opções (conta, centro) e teto de valor a partir dos lançamentos da fatia."""
+    contas, centros, vmax = {}, {}, 0.0
+    for d in docs:
+        c = (d.get("conta") or "").strip()
+        ce = (d.get("centro_custo") or "").strip()
+        if c:
+            contas[c] = nome_conta(c)
+        if ce:
+            centros[ce] = nome_centro(ce)
+        vmax = max(vmax, float(d.get("valor") or 0))
+    opt_conta = sorted((_opt_codigo(k, v) for k, v in contas.items()), key=lambda o: o["label"])
+    opt_centro = sorted((_opt_codigo(k, v) for k, v in centros.items()), key=lambda o: o["label"])
+    return opt_conta, opt_centro, vmax
+
+
+def _filtra_lancamentos(docs, contas, centros, busca, faixa):
+    """Aplica os filtros do modal da rosca sobre os lançamentos da fatia (em memória)."""
+    cset = set(contas or [])
+    ceset = set(centros or [])
+    termo = (busca or "").strip().lower()
+    lo, hi = (faixa or [None, None])
+    out = []
+    for d in docs:
+        if cset and (d.get("conta") or "") not in cset:
+            continue
+        if ceset and (d.get("centro_custo") or "") not in ceset:
+            continue
+        if termo and termo not in (d.get("descritor") or "").lower():
+            continue
+        v = float(d.get("valor") or 0)
+        if lo is not None and v < lo:
+            continue
+        if hi is not None and v > hi:
+            continue
+        out.append(d)
+    return out
 
 
 def _crumb(*partes):
@@ -688,6 +804,129 @@ def register_custo_callbacks(app):
     )
     def _render_rosca(ano, _n):
         return _fig_rosca(L.fetch_por_equipamento(int(ano or 2026), None))
+
+    # Clique numa fatia da rosca → abre o modal "o que compõe esta fatia": guarda os
+    # centros da fatia no store, pinta os resumos colapsáveis e prepara os filtros. A
+    # TABELA é renderizada pelo callback reativo abaixo (reage ao store + filtros).
+    _CHEV_DOWN = "bi bi-chevron-down"
+
+    @app.callback(
+        Output("modal-rosca", "is_open"),
+        Output("modal-rosca-title", "children"),
+        Output("store-rosca-centros", "data"),
+        Output("modal-rosca-resumo-conta", "children"),
+        Output("modal-rosca-resumo-centro", "children"),
+        Output("rosca-f-conta", "options"),
+        Output("rosca-f-conta", "value"),
+        Output("rosca-f-centro", "options"),
+        Output("rosca-f-centro", "value"),
+        Output("rosca-f-busca", "value"),
+        Output("rosca-f-valor", "min"),
+        Output("rosca-f-valor", "max"),
+        Output("rosca-f-valor", "value"),
+        Output("rosca-f-valor", "marks"),
+        Output("collapse-rosca-conta", "is_open", allow_duplicate=True),
+        Output("collapse-rosca-centro", "is_open", allow_duplicate=True),
+        Output("chev-rosca-conta", "className", allow_duplicate=True),
+        Output("chev-rosca-centro", "className", allow_duplicate=True),
+        Input("custo-graph-rosca", "clickData"),
+        Input("btn-rosca-close", "n_clicks"),
+        State("store-custo-ano", "data"),
+        prevent_initial_call=True,
+    )
+    def _modal_rosca(click, _close, ano):
+        n = 18
+        if ctx.triggered_id == "btn-rosca-close":
+            return (False,) + (no_update,) * (n - 1)
+        pts = (click or {}).get("points") or []
+        equip = pts[0].get("label") if pts else None
+        if not equip:
+            return (no_update,) * n
+        ano = int(ano or 2026)
+        alvo, total = _rosca_slice_info(ano, equip)
+        if alvo is None:
+            return (True, equip, None, None, None, [], [], [], [], "",
+                    0, 1, [0, 1], {}, False, False, _CHEV_DOWN, _CHEV_DOWN)
+        valor = alvo.get("executado") or 0
+        title = f"{equip} — {_brl(valor)} ({valor / total:.0%} do ano)"
+        centros = alvo.get("centros") or []
+        if not centros:
+            # 'Não atribuído' (BR-10): provisões/itens sem centro — sem detalhe por centro.
+            return (True, title, [], None, None, [], [], [], [], "",
+                    0, 1, [0, 1], {}, False, False, _CHEV_DOWN, _CHEV_DOWN)
+        resumo_conta = _tabela_resumo(L.fetch_contas_resumo(ano, centros), valor, "Conta")
+        resumo_centro = _tabela_resumo(L.fetch_centros_resumo(ano, centros), valor,
+                                       "Centro de custo")
+        docs = L.fetch_lancamentos(ano, centros=centros, limit=5000)
+        opt_conta, opt_centro, vmax = _opcoes_filtro(docs)
+        mx = max(round(vmax), 1)
+        marks = {0: "R$ 0", mx: _brl_abrev(mx)}
+        return (True, title, centros, resumo_conta, resumo_centro,
+                opt_conta, [], opt_centro, [], "",
+                0, mx, [0, mx], marks, False, False, _CHEV_DOWN, _CHEV_DOWN)
+
+    # Reabrir a MESMA fatia: o Plotly só re-dispara clickData quando o ponto MUDA. Ao fechar
+    # o modal, zeramos o clickData (callback separado — fora do que tem clickData como Input)
+    # p/ que o próximo clique, mesmo na mesma fatia, conte como mudança e reabra.
+    @app.callback(
+        Output("custo-graph-rosca", "clickData", allow_duplicate=True),
+        Input("modal-rosca", "is_open"),
+        prevent_initial_call=True,
+    )
+    def _reset_rosca_click(is_open):
+        return None if not is_open else no_update
+
+    # Tabela de lançamentos da fatia — reage ao store da fatia e aos 4 filtros.
+    @app.callback(
+        Output("modal-rosca-tabela", "children"),
+        Input("store-rosca-centros", "data"),
+        Input("rosca-f-conta", "value"),
+        Input("rosca-f-centro", "value"),
+        Input("rosca-f-busca", "value"),
+        Input("rosca-f-valor", "value"),
+        State("store-custo-ano", "data"),
+        prevent_initial_call=True,
+    )
+    def _rosca_tabela(centros, fconta, fcentro, busca, faixa, ano):
+        if centros is None:
+            return no_update
+        if centros == []:
+            return dbc.Alert(
+                [html.I(className="bi bi-info-circle me-2"),
+                 "Esta fatia é a diferença entre o total oficial do SAP e a soma dos "
+                 "lançamentos que já têm centro de custo — provisões e itens recentes ainda "
+                 "sem centro atribuído. Não há lançamentos detalhados para listar."],
+                color="secondary", className="mb-0")
+        docs = L.fetch_lancamentos(int(ano or 2026), centros=centros, limit=5000)
+        docs = _filtra_lancamentos(docs, fconta, fcentro, busca, faixa)
+        return html.Div([
+            html.H6([html.I(className="bi bi-list-ul me-2"),
+                     f"Lançamentos ({len(docs)})"], className="fw-bold mb-2"),
+            _tabela_lancamentos(docs),
+        ])
+
+    # Toggles dos resumos colapsáveis (chevron acompanha o estado)
+    @app.callback(
+        Output("collapse-rosca-conta", "is_open"),
+        Output("chev-rosca-conta", "className"),
+        Input("toggle-rosca-conta", "n_clicks"),
+        State("collapse-rosca-conta", "is_open"),
+        prevent_initial_call=True,
+    )
+    def _toggle_rosca_conta(_n, aberto):
+        novo = not aberto
+        return novo, ("bi bi-chevron-up" if novo else _CHEV_DOWN)
+
+    @app.callback(
+        Output("collapse-rosca-centro", "is_open"),
+        Output("chev-rosca-centro", "className"),
+        Input("toggle-rosca-centro", "n_clicks"),
+        State("collapse-rosca-centro", "is_open"),
+        prevent_initial_call=True,
+    )
+    def _toggle_rosca_centro(_n, aberto):
+        novo = not aberto
+        return novo, ("bi bi-chevron-up" if novo else _CHEV_DOWN)
 
     @app.callback(
         Output("custo-graph-entry", "figure"),
