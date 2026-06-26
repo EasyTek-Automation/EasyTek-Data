@@ -264,16 +264,93 @@ def build_tab() -> dbc.Tab:
 
                 # ---- Modal da rosca (clique numa fatia → o que compõe o equipamento) ----
                 # Isolado do #modal-custo (drill das contas) — dimensão diferente (centro
-                # de custo, não conta). Resumo por centro + tabela de lançamentos da fatia.
+                # de custo, não conta). Resumos colapsáveis (por conta / por centro) +
+                # filtros + tabela de lançamentos da fatia. Estrutura estática: a fatia
+                # clicada vai p/ `store-rosca-centros` e a tabela reage aos filtros.
                 dbc.Modal(
                     [
                         dbc.ModalHeader(dbc.ModalTitle(id="modal-rosca-title"),
                                         close_button=True),
                         dbc.ModalBody(
-                            dcc.Loading(
-                                type="circle", color="#34568b", delay_show=120,
-                                children=html.Div(id="modal-rosca-content"),
-                            )
+                            [
+                                dcc.Store(id="store-rosca-centros"),
+
+                                # --- Resumo "Por conta" (colapsável, fecha por padrão) ---
+                                dbc.Button(
+                                    [html.Span([html.I(className="bi bi-tags me-2"),
+                                                "Por conta"], className="fw-semibold"),
+                                     html.I(id="chev-rosca-conta",
+                                            className="bi bi-chevron-down")],
+                                    id="toggle-rosca-conta", color="light", n_clicks=0,
+                                    className="border w-100 d-flex align-items-center "
+                                              "justify-content-between mb-1",
+                                ),
+                                dbc.Collapse(
+                                    dcc.Loading(html.Div(id="modal-rosca-resumo-conta"),
+                                                type="circle", color="#34568b"),
+                                    id="collapse-rosca-conta", is_open=False,
+                                    className="mb-2",
+                                ),
+
+                                # --- Resumo "Por centro" (colapsável, fecha por padrão) ---
+                                dbc.Button(
+                                    [html.Span([html.I(className="bi bi-diagram-3 me-2"),
+                                                "Por centro de custo"], className="fw-semibold"),
+                                     html.I(id="chev-rosca-centro",
+                                            className="bi bi-chevron-down")],
+                                    id="toggle-rosca-centro", color="light", n_clicks=0,
+                                    className="border w-100 d-flex align-items-center "
+                                              "justify-content-between mb-1",
+                                ),
+                                dbc.Collapse(
+                                    dcc.Loading(html.Div(id="modal-rosca-resumo-centro"),
+                                                type="circle", color="#34568b"),
+                                    id="collapse-rosca-centro", is_open=False,
+                                    className="mb-3",
+                                ),
+
+                                html.Hr(className="my-2"),
+
+                                # --- Filtros da tabela de lançamentos ---
+                                dbc.Row(
+                                    [
+                                        dbc.Col(
+                                            [_label("Conta"),
+                                             dcc.Dropdown(id="rosca-f-conta", multi=True,
+                                                          options=[], value=[],
+                                                          placeholder="Todas")],
+                                            xs=12, md=3),
+                                        dbc.Col(
+                                            [_label("Centro"),
+                                             dcc.Dropdown(id="rosca-f-centro", multi=True,
+                                                          options=[], value=[],
+                                                          placeholder="Todos")],
+                                            xs=12, md=3),
+                                        dbc.Col(
+                                            [_label("Buscar na descrição"),
+                                             dcc.Input(id="rosca-f-busca", type="text",
+                                                       debounce=True, value="",
+                                                       placeholder="ex: inversor",
+                                                       className="form-control")],
+                                            xs=12, md=3),
+                                        dbc.Col(
+                                            [_label("Valor (R$)"),
+                                             dcc.RangeSlider(id="rosca-f-valor",
+                                                             min=0, max=1, value=[0, 1],
+                                                             step=1, allowCross=False,
+                                                             tooltip={"placement": "top",
+                                                                      "always_visible": False})],
+                                            xs=12, md=3),
+                                    ],
+                                    className="g-2 align-items-start mb-3",
+                                ),
+
+                                # --- Tabela de lançamentos (reage aos filtros) ---
+                                dcc.Loading(
+                                    type="circle", color="#34568b", delay_show=120,
+                                    children=html.Div(id="modal-rosca-tabela"),
+                                ),
+                            ]
                         ),
                         dbc.ModalFooter(
                             dbc.Button("Fechar", id="btn-rosca-close",
