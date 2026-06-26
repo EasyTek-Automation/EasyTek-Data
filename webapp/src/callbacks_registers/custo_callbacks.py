@@ -538,6 +538,8 @@ def _tabela_lancamentos(docs):
         return html.Small("Nenhum lançamento neste recorte.", className="text-muted")
     rows = []
     tooltips = []   # hover no código (conta/centro) mostra a descrição — só quando há de/para
+    conta_sem_desc: set[str] = set()    # códigos sem de/para → itálico na célula
+    centro_sem_desc: set[str] = set()
     for d in docs:
         dt = d.get("data_lancamento")
         conta = d.get("conta", "") or ""
@@ -553,10 +555,22 @@ def _tabela_lancamentos(docs):
         nc = nome_conta(conta)
         if nc and nc != conta:
             tip["conta"] = {"value": nc, "type": "text"}
+        elif conta:
+            conta_sem_desc.add(conta)
         ncen = nome_centro(centro)
         if ncen and ncen != centro:
             tip["centro"] = {"value": ncen, "type": "text"}
+        elif centro:
+            centro_sem_desc.add(centro)
         tooltips.append(tip)
+    # itálico cinza nas células de código que não têm descrição no de/para
+    _italico = [
+        {"if": {"column_id": "conta", "filter_query": f'{{conta}} = "{c}"'},
+         "fontStyle": "italic", "color": "#adb5bd"} for c in conta_sem_desc
+    ] + [
+        {"if": {"column_id": "centro", "filter_query": f'{{centro}} = "{c}"'},
+         "fontStyle": "italic", "color": "#adb5bd"} for c in centro_sem_desc
+    ]
     _fmt_brl = Format(group=Group.yes, group_delimiter=".", decimal_delimiter=",",
                       precision=2, scheme=Scheme.fixed, symbol=Symbol.yes, symbol_prefix="R$ ")
     return dash_table.DataTable(
@@ -577,7 +591,7 @@ def _tabela_lancamentos(docs):
         style_data_conditional=[
             {"if": {"row_index": "odd"}, "backgroundColor": "rgba(248,250,252,0.6)"},
             {"if": {"column_id": "valor"}, "textAlign": "right", "fontWeight": "600"},
-            {"if": {"column_id": "descritor"}, "color": "#495057"}],
+            {"if": {"column_id": "descritor"}, "color": "#495057"}] + _italico,
         style_table={"overflowX": "auto"},
     )
 
@@ -587,6 +601,7 @@ def _tabela_resumo(resumo, total_fatia, header):
 
     Cada linha = `{code, nome, executado}`. O código só aparece entre parênteses quando o
     de/para tem nome próprio (nome != código) — evita o redundante "209710 (209710)".
+    Sem de/para (nome == código) o rótulo vai em itálico + cinza, sinalizando "sem descrição".
     """
     if not resumo:
         return None
@@ -596,9 +611,12 @@ def _tabela_resumo(resumo, total_fatia, header):
         pct = (v / total_fatia) if total_fatia else 0
         code = r.get("code") or ""
         nome = r.get("nome") or code
-        rotulo = [html.Span(nome, className="fw-semibold")]
         if nome != code:
-            rotulo.append(html.Span(f"  ({code})", className="text-muted small ms-1"))
+            rotulo = [html.Span(nome, className="fw-semibold"),
+                      html.Span(f"  ({code})", className="text-muted small ms-1")]
+        else:
+            # sem descrição no de/para → só o código, em itálico cinza
+            rotulo = [html.Span(code, className="fst-italic text-muted")]
         linhas.append(html.Tr([
             html.Td(rotulo),
             html.Td(_brl(v), className="text-end fw-semibold", style={"whiteSpace": "nowrap"}),
