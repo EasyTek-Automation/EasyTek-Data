@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from ..trabalhos.kpis_manut import zppprd, nt0001
 from ..trabalhos.custos_manut import custo_exec, custo_orcado
+from ..trabalhos.backlog import backlog
 
 # tipo (campo `tipo` da coleche sap_jobs) → função run(job, ctx) -> Result
 REGISTRY = {
@@ -15,4 +16,5 @@ REGISTRY = {
     "zpp_nt0001":   nt0001.run,
     "custo_exec":   custo_exec.run,
     "custo_orcado": custo_orcado.run,
+    "backlog":      backlog.run,
 }

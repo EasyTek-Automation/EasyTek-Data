@@ -78,7 +78,7 @@ def load() -> DaemonConfig:
     if not pasta_input_raw:
         raise RuntimeError("PASTA_INPUT_ZPP_PROCESSOR obrigatorio (caminho do input/ do zpp-processor)")
 
-    tipos = _parse_csv_list(os.getenv("SAP_JOBS_TIPOS_SUPORTADOS", "zppprd,zpp_nt0001"))
+    tipos = _parse_csv_list(os.getenv("SAP_JOBS_TIPOS_SUPORTADOS", "zppprd,zpp_nt0001,backlog"))
     if not tipos:
         raise RuntimeError("SAP_JOBS_TIPOS_SUPORTADOS vazio")
 

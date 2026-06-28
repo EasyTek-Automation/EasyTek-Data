@@ -5,3 +5,4 @@ pymongo>=4.0,<5.0
 python-dotenv>=1.0,<2.0
 pywin32>=305
 pytz>=2024.1
+openpyxl>=3.1   # leitura do export &XXL (ALV->xlsx) — trabalho backlog (IM-03)

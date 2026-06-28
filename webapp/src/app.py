@@ -75,6 +75,7 @@ try:
     from src.sap_scheduler.config import load_config as _sap_load_config
     from src.sap_scheduler.cron import init_scheduler as _sap_init_scheduler
     from src.sap_scheduler.migrations import migracao_dedup_sap_jobs as _sap_migracao_dedup
+    from src.sap_scheduler.migrations import migracao_agendamento_backlog as _sap_migracao_backlog
     from src.sap_scheduler.mongo_helpers import get_db as _sap_get_db, ensure_indexes as _sap_ensure_indexes
     from src.sap_scheduler.storage import bootstrap_config as _sap_bootstrap_config
     from src.sap_scheduler.timestamp_callback import register_callback as _sap_register_rodape_callback
@@ -96,6 +97,9 @@ try:
             logging.getLogger("sap_scheduler").info(
                 "sap_scheduler: SAP_JOBS_AGENDADOS env var lida como seed (so usado se collection vazia)"
             )
+        # 5b. Garante o agendamento do job backlog (04:00) em singletons já existentes
+        #     (bootstrap usa $setOnInsert; esta migração adiciona se ausente) — SDD Backlog IM-14
+        _sap_migracao_backlog(_sap_db, _sap_config.collection_sap_scheduler_config)
         # 6. BackgroundScheduler — _tick rele config Mongo a cada 60s
         _sap_init_scheduler(_sap_config, _sap_db)
     else:

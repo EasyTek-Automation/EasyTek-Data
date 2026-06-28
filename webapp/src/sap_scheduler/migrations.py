@@ -68,3 +68,32 @@ def migracao_dedup_sap_jobs(db, collection_name: str = "sap_jobs") -> int:
         total_deletados,
     )
     return total_deletados
+
+
+def migracao_agendamento_backlog(
+    db, collection_name: str = "sap_scheduler_config"
+) -> int:
+    """Garante o agendamento diário do job `backlog` (04:00) no singleton de config.
+
+    Idempotente: adiciona `{tipo:"backlog", hora:"04:00", ativo:True}` ao array
+    `agendamentos` apenas se ainda não houver entrada `tipo=backlog`. Necessária porque
+    `bootstrap_config` usa `$setOnInsert` — não toca singletons já existentes (instalações
+    em produção). Não sobrescreve a hora se o usuário já tiver ajustado pela UI admin.
+
+    Args:
+        db: handle do database Mongo (objeto, não Collection).
+        collection_name: nome da collection do singleton (default sap_scheduler_config).
+
+    Returns:
+        1 se inseriu o agendamento; 0 se já existia (no-op).
+    """
+    coll = db[collection_name]
+    res = coll.update_one(
+        {"_id": "singleton", "agendamentos.tipo": {"$ne": "backlog"}},
+        {"$push": {"agendamentos": {"tipo": "backlog", "hora": "04:00", "ativo": True}}},
+    )
+    if res.modified_count:
+        logger.info("[migracao_agendamento_backlog] agendamento backlog 04:00 adicionado")
+        return 1
+    logger.info("[migracao_agendamento_backlog] no-op — backlog já agendado ou singleton ausente")
+    return 0

@@ -27,6 +27,7 @@ VERSAO_SCHEMA = 1
 DEFAULT_AGENDAMENTOS: list[dict] = [
     {"tipo": "zppprd", "hora": "03:30", "ativo": True},
     {"tipo": "zpp_nt0001", "hora": "03:30", "ativo": True},
+    {"tipo": "backlog", "hora": "04:00", "ativo": True},
 ]
 
 
