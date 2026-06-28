@@ -115,6 +115,14 @@ except RuntimeError as _sap_e:
 except Exception:
     logging.getLogger("sap_scheduler").exception("sap_scheduler: erro inesperado no boot (webapp continua)")
 
+# Bootstrap das collections do Backlog (sap_ativos + sap_backlog) — SDD Backlog.
+# Idempotente/race-safe; só semeia se vazias. Garante página funcional após deploy.
+try:
+    from src.utils.backlog_seed import bootstrap_backlog as _bootstrap_backlog
+    _bootstrap_backlog()
+except Exception:
+    logging.getLogger("backlog").exception("backlog: seed no boot falhou (webapp continua)")
+
 # --- Custo de Manutenção: garante schema (coleções + índices) no boot (DS-03) ---
 # Idempotente. Cria AMG_CustoResumo/AMG_CustoLancamentos vazias + índices, para a
 # coleta SAP (Bloco D) gravar direto sem depender de seed/CSV. Webapp continua se falhar.
