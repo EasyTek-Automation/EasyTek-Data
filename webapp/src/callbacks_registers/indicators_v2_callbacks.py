@@ -1467,22 +1467,20 @@ def _bar(x, y, title, color, unit="", target=None, show_trend=True, compact=Fals
         )
     )
 
-    if show_trend and len(y) >= 3:
-        x_idx = np.arange(len(y))
+    # Tendência só sobre meses úteis: corta a cauda de meses vazios à frente (sem dados,
+    # value=0 ou None) para o polyfit não ser puxado pelos meses futuros ainda sem apontamento.
+    # Buracos internos permanecem; só a cauda vazia sai.
+    last_idx = -1
+    for i, v in enumerate(y):
+        if v is not None and v != 0:
+            last_idx = i
+    y_fit = y[:last_idx + 1]
+    if show_trend and len(y_fit) >= 3:
+        x_idx = np.arange(len(y_fit))
         try:
-            deg = 2 if len(y) >= 5 else 1
-            coefs = np.polyfit(x_idx, y, deg)
-            x_dense = np.linspace(0, len(y) - 1, 60)
-            y_trend = np.polyval(coefs, x_dense)
-            # mapeia x_dense de volta pra labels só nos pontos inteiros — mas Plotly aceita categórico
-            # truque: usar os mesmos x labels via interpolação inteira
-            x_trend_labels = []
-            for xi in x_dense:
-                idx_left = int(np.floor(xi))
-                idx_right = min(idx_left + 1, len(x) - 1)
-                frac = xi - idx_left
-                x_trend_labels.append(x[idx_left] if frac < 0.5 else x[idx_right])
-            # Plotly não interpola categóricos — usa modo numérico
+            deg = 2 if len(y_fit) >= 5 else 1
+            coefs = np.polyfit(x_idx, y_fit, deg)
+            # Plotly não interpola categóricos — usa modo numérico (xaxis2 paralelo)
             fig.add_trace(
                 go.Scatter(
                     x=list(x_idx),

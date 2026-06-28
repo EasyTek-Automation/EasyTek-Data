@@ -1,0 +1,686 @@
+"""Camada de leitura/agregacao de custo de manutencao (DS-05).
+
+Funcoes puras (sem Dash) que leem as duas coleches do Mongo e entregam, prontos
+para a tela, os numeros por nivel: geral -> grupo -> conta -> mes -> dia. Calculam
+% consumido, saldo, estouro e a borda "sem orcamento" (BR-05), e a reconciliacao
+(DS-09). O filtro por centro de custo recorta **apenas o executado** (vem dos
+lancamentos); o orcado permanece o da conta (resumo), sem dimensao de centro.
+
+Dados sao pequenos (dezenas de docs de resumo, milhares de lancamentos), entao a
+agregacao por nivel e feita em Python apos um `find()` enxuto — simples e testavel.
+Um memo TTL curto evita reconsulta repetida na navegacao (DS-05 #6).
+"""
+from __future__ import annotations
+
+import logging
+import time
+from typing import Iterable, Optional
+
+try:  # contexto do webapp (pacote src.custos)
+    from src.database.connection import get_mongo_connection
+    from src.custos import hierarquia as _H
+    from src.custos.hierarquia import (EQUIP_OUTROS, GRUPOS, grupo_da_conta, label_grupo,
+                                       nome_centro, nome_conta, nome_equipamento)
+    from src.custos.storage import (COLL_CENTROS, COLL_CONFIG, COLL_CONTAS,
+                                    COLL_LANCAMENTOS, COLL_RESUMO)
+except ImportError:  # contexto de teste/script (cwd = webapp/src)
+    from database.connection import get_mongo_connection  # type: ignore
+    from custos import hierarquia as _H  # type: ignore
+    from custos.hierarquia import (EQUIP_OUTROS, GRUPOS, grupo_da_conta,  # type: ignore
+                                   label_grupo, nome_centro, nome_conta, nome_equipamento)
+    from custos.storage import (COLL_CENTROS, COLL_CONFIG, COLL_CONTAS,  # type: ignore
+                                COLL_LANCAMENTOS, COLL_RESUMO)
+
+logger = logging.getLogger("custos.leitura")
+
+_CACHE_TTL_S = 30.0
+_cache: dict[tuple, tuple[float, object]] = {}
+
+
+# --------------------------------------------------------------------------- #
+# Infra: cache TTL e normalizacao de filtros
+# --------------------------------------------------------------------------- #
+def limpar_cache() -> None:
+    """Esvazia o memo TTL. Chamar apos recarga de dados (seed / 'Rodar agora')."""
+    _cache.clear()
+
+
+def _memo(chave: tuple, produtor):
+    """Memoiza `produtor()` por `chave` com expiracao TTL."""
+    agora = time.monotonic()
+    hit = _cache.get(chave)
+    if hit is not None and (agora - hit[0]) < _CACHE_TTL_S:
+        return hit[1]
+    valor = produtor()
+    _cache[chave] = (agora, valor)
+    return valor
+
+
+def carregar_depara() -> None:
+    """Carrega o de/para de nome (centro/conta) do Mongo e injeta no `hierarquia`.
+
+    Fonte: coleções `AMG_CustoCentros`/`AMG_CustoContas` populadas pelo daemon (OBJ_TXT/
+    CEL_LTXT da KSB1). Memoizado (TTL) — barato chamar no início de cada fetch que usa nome.
+    Robusto a Mongo offline / coleções ausentes (override fica vazio → fallback estático).
+    """
+    def _calc():
+        cen, con = {}, {}
+        c = get_mongo_connection(COLL_CENTROS)
+        if c is not None:
+            try:
+                cen = {d["_id"]: d.get("nome", "") for d in c.find({}, {"nome": 1})}
+            except Exception as e:
+                logger.warning("custos: carregar de/para centros falhou: %s", e)
+        k = get_mongo_connection(COLL_CONTAS)
+        if k is not None:
+            try:
+                con = {d["_id"]: d.get("nome", "") for d in k.find({}, {"nome": 1})}
+            except Exception as e:
+                logger.warning("custos: carregar de/para contas falhou: %s", e)
+        _H.set_overrides(centros=cen, contas=con)
+        return True
+
+    _memo(("depara_nome",), _calc)
+
+
+# --------------------------------------------------------------------------- #
+# Config leve da feature — contas fixadas no slide de Custos da home (server-side,
+# pra o slide do telao herdar a selecao feita na aba via botao "Fixar no telao").
+# --------------------------------------------------------------------------- #
+_SLIDE_CONTAS_ID = "home_slide_contas"
+
+
+def salvar_slide_contas(contas: Optional[Iterable[str]]) -> bool:
+    """Grava no Mongo a lista de contas fixadas para o slide de Custos. Retorna sucesso.
+
+    Lista vazia/None = sem filtro (slide mostra todas). Doc unico em COLL_CONFIG.
+    Robusto a Mongo offline -> False (UI avisa, nao quebra).
+    """
+    coll = get_mongo_connection(COLL_CONFIG)
+    if coll is None:
+        return False
+    codes = [c for c in (contas or []) if c]
+    try:
+        coll.update_one({"_id": _SLIDE_CONTAS_ID},
+                        {"$set": {"contas": codes}}, upsert=True)
+        return True
+    except Exception as e:
+        logger.warning("custos: salvar_slide_contas falhou: %s", e)
+        return False
+
+
+def ler_slide_contas() -> list[str]:
+    """Le as contas fixadas para o slide (lista de codigos). Vazia = sem filtro (todas).
+    Robusto a Mongo offline -> []."""
+    coll = get_mongo_connection(COLL_CONFIG)
+    if coll is None:
+        return []
+    try:
+        doc = coll.find_one({"_id": _SLIDE_CONTAS_ID}, {"contas": 1, "_id": 0})
+        return list(doc.get("contas", [])) if doc else []
+    except Exception as e:
+        logger.warning("custos: ler_slide_contas falhou: %s", e)
+        return []
+
+
+def _norm_centros(centros: Optional[Iterable[str]]) -> Optional[tuple[str, ...]]:
+    """Normaliza o filtro de centros: vazio/None -> None (sem filtro); senao tupla ordenada."""
+    if not centros:
+        return None
+    limpos = tuple(sorted({c for c in centros if c}))
+    return limpos or None
+
+
+# --------------------------------------------------------------------------- #
+# Metricas (BR-05)
+# --------------------------------------------------------------------------- #
+def calcular_metricas(orcado: float, executado: float) -> dict:
+    """Deriva %, saldo, estouro e 'sem orcamento' de um par (orcado, executado).
+
+    - `pct` = exec/orcado*100; `None` quando orcado = 0 (divisao indefinida).
+    - `saldo` = orcado - executado (negativo quando estourou ou nao havia orcamento).
+    - `estouro` = pct > 100 (consumo real, nunca capado).
+    - `sem_orcamento` = orcado 0 e houve gasto (borda BR-05) -> rotulo proprio na UI.
+    """
+    orcado = round(orcado, 2)
+    executado = round(executado, 2)
+    saldo = round(orcado - executado, 2)
+    sem_orcamento = orcado == 0 and executado != 0
+    pct = round(executado / orcado * 100, 2) if orcado > 0 else None
+    estouro = pct is not None and pct > 100
+    return {
+        "orcado": orcado,
+        "executado": executado,
+        "saldo": saldo,
+        "pct": pct,
+        "estouro": estouro,
+        "sem_orcamento": sem_orcamento,
+    }
+
+
+# --------------------------------------------------------------------------- #
+# Acesso bruto ao Mongo
+# --------------------------------------------------------------------------- #
+def _filtro_ano(ano: int, mes: Optional[str] = None) -> dict:
+    """Match de janela: um mes especifico ('YYYY-MM') ou o ano inteiro (regex '^YYYY-')."""
+    if mes:
+        return {"mes_referencia": mes}
+    return {"mes_referencia": {"$regex": f"^{ano}-"}}
+
+
+def _resumo_docs(ano: int, mes: Optional[str] = None) -> list[dict]:
+    """Docs de `AMG_CustoResumo` da janela (conta x mes: orcado, executado, oficial)."""
+    coll = get_mongo_connection(COLL_RESUMO)
+    if coll is None:
+        return []
+    return list(coll.find(_filtro_ano(ano, mes)))
+
+
+def _exec_por_conta_lancamentos(
+    ano: int, centros: Optional[tuple[str, ...]], mes: Optional[str] = None
+) -> dict[str, float]:
+    """Soma o executado por conta a partir dos lancamentos, filtrando por centro.
+
+    Usado quando ha filtro de centro (o resumo nao tem centro). Retorna {conta: soma}.
+    """
+    coll = get_mongo_connection(COLL_LANCAMENTOS)
+    if coll is None:
+        return {}
+    match = _filtro_ano(ano, mes)
+    if centros:
+        match["centro_custo"] = {"$in": list(centros)}
+    pipeline = [
+        {"$match": match},
+        {"$group": {"_id": "$conta", "soma": {"$sum": "$valor"}}},
+    ]
+    return {d["_id"]: round(d["soma"], 2) for d in coll.aggregate(pipeline)}
+
+
+# --------------------------------------------------------------------------- #
+# Niveis de leitura
+# --------------------------------------------------------------------------- #
+def _orcado_executado_por_conta(
+    ano: int, centros: Optional[tuple[str, ...]], mes: Optional[str] = None
+) -> dict[str, dict]:
+    """Base de todos os niveis: por conta, o orcado (resumo) e o executado (resumo ou centro).
+
+    Sem filtro de centro -> executado vem do resumo (rapido, ja reconciliado).
+    Com filtro -> executado recomputado dos lancamentos do(s) centro(s); orcado intacto.
+    """
+    docs = _resumo_docs(ano, mes)
+    por_conta: dict[str, dict] = {}
+    for d in docs:
+        c = d["conta"]
+        acc = por_conta.setdefault(
+            c, {"conta": c, "conta_desc": d.get("conta_desc", ""), "orcado": 0.0, "executado": 0.0}
+        )
+        acc["orcado"] += d.get("orcado", 0.0)
+        acc["executado"] += d.get("executado", 0.0)
+
+    if centros:
+        exec_centro = _exec_por_conta_lancamentos(ano, centros, mes)
+        for c, acc in por_conta.items():
+            acc["executado"] = exec_centro.get(c, 0.0)
+        # contas que so tem lancamento no centro (sem linha de resumo) — raro, mas cobre
+        for c, soma in exec_centro.items():
+            if c not in por_conta:
+                por_conta[c] = {"conta": c, "conta_desc": "", "orcado": 0.0, "executado": soma}
+    return por_conta
+
+
+def fetch_geral(ano: int, centros: Optional[Iterable[str]] = None) -> dict:
+    """Metricas do GT340 inteiro (raiz do drill-down) para o ano."""
+    cz = _norm_centros(centros)
+
+    def _calc():
+        por_conta = _orcado_executado_por_conta(ano, cz)
+        orcado = sum(a["orcado"] for a in por_conta.values())
+        executado = sum(a["executado"] for a in por_conta.values())
+        return calcular_metricas(orcado, executado)
+
+    return _memo(("geral", ano, cz), _calc)
+
+
+def fetch_grupos(ano: int, centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """Lista dos grupos (G034x) com metricas. Ordem canonica do mapa; % = Sexec/Sorcado."""
+    cz = _norm_centros(centros)
+
+    def _calc():
+        por_conta = _orcado_executado_por_conta(ano, cz)
+        acc: dict[str, dict] = {}
+        for a in por_conta.values():
+            g = grupo_da_conta(a["conta"])
+            if g is None:
+                continue
+            box = acc.setdefault(g, {"orcado": 0.0, "executado": 0.0})
+            box["orcado"] += a["orcado"]
+            box["executado"] += a["executado"]
+        linhas = []
+        for g in GRUPOS:  # ordem canonica G0341..G0344
+            if g not in acc:
+                continue
+            m = calcular_metricas(acc[g]["orcado"], acc[g]["executado"])
+            linhas.append({"grupo": g, "label": label_grupo(g), **m})
+        return linhas
+
+    return _memo(("grupos", ano, cz), _calc)
+
+
+def fetch_contas(grupo: str, ano: int, centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """Contas de um grupo com metricas (lista vem do orcado — BR-04). Ordena por executado desc."""
+    cz = _norm_centros(centros)
+
+    def _calc():
+        por_conta = _orcado_executado_por_conta(ano, cz)
+        linhas = []
+        for a in por_conta.values():
+            if grupo_da_conta(a["conta"]) != grupo:
+                continue
+            m = calcular_metricas(a["orcado"], a["executado"])
+            linhas.append({"conta": a["conta"], "conta_desc": a["conta_desc"], **m})
+        linhas.sort(key=lambda x: x["executado"], reverse=True)
+        return linhas
+
+    return _memo(("contas", grupo, ano, cz), _calc)
+
+
+def fetch_meses_da_conta(conta: str, ano: int, centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """Serie mensal de uma conta (orcado x executado por mes). Ordenada por mes."""
+    cz = _norm_centros(centros)
+
+    def _calc():
+        docs = [d for d in _resumo_docs(ano) if d["conta"] == conta]
+        exec_centro_mes: dict[str, float] = {}
+        if cz:
+            coll = get_mongo_connection(COLL_LANCAMENTOS)
+            if coll is not None:
+                match = {"conta": conta, "centro_custo": {"$in": list(cz)},
+                         "mes_referencia": {"$regex": f"^{ano}-"}}
+                pipe = [{"$match": match},
+                        {"$group": {"_id": "$mes_referencia", "soma": {"$sum": "$valor"}}}]
+                exec_centro_mes = {d["_id"]: round(d["soma"], 2) for d in coll.aggregate(pipe)}
+        linhas = []
+        for d in docs:
+            mes = d["mes_referencia"]
+            executado = exec_centro_mes.get(mes, 0.0) if cz else d.get("executado", 0.0)
+            m = calcular_metricas(d.get("orcado", 0.0), executado)
+            linhas.append({"mes": mes, **m})
+        linhas.sort(key=lambda x: x["mes"])
+        return linhas
+
+    return _memo(("meses", conta, ano, cz), _calc)
+
+
+def fetch_dias_da_conta_mes(
+    conta: str, mes: str, centros: Optional[Iterable[str]] = None
+) -> list[dict]:
+    """Executado diario de uma conta num mes (orcado e mensal, nao existe por dia)."""
+    cz = _norm_centros(centros)
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match = {"conta": conta, "mes_referencia": mes}
+        if cz:
+            match["centro_custo"] = {"$in": list(cz)}
+        pipe = [
+            {"$match": match},
+            {"$group": {"_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$data_lancamento"}},
+                        "executado": {"$sum": "$valor"}}},
+            {"$sort": {"_id": 1}},
+        ]
+        return [{"dia": d["_id"], "executado": round(d["executado"], 2)} for d in coll.aggregate(pipe)]
+
+    return _memo(("dias", conta, mes, cz), _calc)
+
+
+def fetch_centros_disponiveis(ano: int) -> list[str]:
+    """Lista (ordenada) dos centros de custo presentes nos lancamentos do ano — filtro lateral."""
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        centros = coll.distinct("centro_custo", {"mes_referencia": {"$regex": f"^{ano}-"}})
+        return sorted(c for c in centros if c)
+
+    return _memo(("centros", ano), _calc)
+
+
+def fetch_por_equipamento(ano: int, centros: Optional[Iterable[str]] = None,
+                          top: int = 10, mes: Optional[str] = None) -> list[dict]:
+    """Executado por EQUIPAMENTO (centro de custo) — gráfico de rosca.
+
+    Soma o executado de cada `centro_custo`, nomeia pelo de/para (`nome_equipamento`,
+    fallback = código) e mostra os `top` maiores como fatias; a cauda vai p/ 'Outros'.
+    Centros já mapeados ao MESMO nome no de/para somam juntos (ex: várias linhas de uma
+    família). Retorna `[{equip, executado, centros}]` ordenado desc, com 'Outros' por último.
+
+    `mes='YYYY-MM'` restringe a janela ao mês exato (slide de Custos da home — BR-14);
+    `mes=None` (default) = ano inteiro, comportamento da aba de custos (retrocompatível).
+    """
+    cz = _norm_centros(centros)
+    janela = mes if mes else {"$regex": f"^{ano}-"}  # mês exato OU ano todo
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match: dict = {"mes_referencia": janela}
+        if cz:
+            match["centro_custo"] = {"$in": list(cz)}
+        pipe = [{"$match": match},
+                {"$group": {"_id": "$centro_custo", "executado": {"$sum": "$valor"}}}]
+        # agrega por nome de equipamento (de/para); guarda os centros que compõem cada um
+        acc: dict[str, float] = {}
+        membros: dict[str, list] = {}
+        for d in coll.aggregate(pipe):
+            nome = nome_equipamento(d["_id"])
+            acc[nome] = acc.get(nome, 0.0) + (d["executado"] or 0.0)
+            membros.setdefault(nome, []).append(d["_id"])
+        ordenado = sorted(acc.items(), key=lambda kv: kv[1], reverse=True)
+        principais = ordenado[:top]
+        cauda = ordenado[top:]
+        out = [{"equip": nome, "executado": round(v, 2), "centros": membros[nome]}
+               for nome, v in principais]
+        if cauda:
+            out.append({"equip": EQUIP_OUTROS, "executado": round(sum(v for _, v in cauda), 2),
+                        "centros": [c for nome, _ in cauda for c in membros[nome]]})
+        # Reconcilia com o GERAL das barras (resumo ZBRCO019): os lançamentos (KSB1) podem
+        # somar menos que o executado oficial — no mês corrente, provisões/itens pós-D-1 não
+        # têm centro, logo não entram por equipamento. O resto vira "Não atribuído".
+        rcoll = get_mongo_connection(COLL_RESUMO)
+        if rcoll is not None:
+            rmatch = {"mes_referencia": janela}
+            g = list(rcoll.aggregate([{"$match": rmatch},
+                                      {"$group": {"_id": None, "v": {"$sum": "$executado"}}}]))
+            total_oficial = g[0]["v"] if g else 0
+            gap = round(total_oficial - sum(acc.values()), 2)
+            if gap > 1:
+                out.append({"equip": "Não atribuído", "executado": gap, "centros": []})
+        return out
+
+    return _memo(("equip", ano, cz, top, mes), _calc)
+
+
+def fetch_centros_resumo(ano: int, centros: Iterable[str],
+                         mes: Optional[str] = None) -> list[dict]:
+    """Executado por CENTRO DE CUSTO dentro de um conjunto de centros — quebra de uma
+    fatia da rosca. Soma real (sem limite) p/ o resumo "o que compõe esta fatia".
+
+    Recebe os `centros` que formam a fatia clicada (ex: todos os centros de 'Apoio/Admin')
+    e devolve `[{centro, nome, executado}]` ordenado desc, nomeando cada um pelo de/para
+    (`nome_centro`, fallback = código). `mes='YYYY-MM'` restringe ao mês; `mes=None` = ano.
+    """
+    carregar_depara()
+    cz = _norm_centros(centros)
+    if not cz:
+        return []
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match = _filtro_ano(ano, mes)
+        match["centro_custo"] = {"$in": list(cz)}
+        pipe = [{"$match": match},
+                {"$group": {"_id": "$centro_custo", "executado": {"$sum": "$valor"}}}]
+        rows = [{"code": d["_id"], "nome": nome_centro(d["_id"]),
+                 "executado": round(d["executado"] or 0.0, 2)}
+                for d in coll.aggregate(pipe)]
+        return sorted(rows, key=lambda r: r["executado"], reverse=True)
+
+    return _memo(("centros_resumo", ano, cz, mes), _calc)
+
+
+def fetch_contas_resumo(ano: int, centros: Iterable[str],
+                        mes: Optional[str] = None) -> list[dict]:
+    """Executado por CONTA contábil dentro de um conjunto de centros — quebra de uma fatia
+    da rosca pelo eixo que TEM nome amigável (de/para de conta resolve; o de centro não).
+
+    Recebe os `centros` que formam a fatia clicada e devolve `[{code, nome, executado}]`
+    ordenado desc, nomeando cada conta via `nome_conta` (ex: 'Manutenção de Máquinas e
+    Equipamentos'). `mes='YYYY-MM'` restringe ao mês; `mes=None` = ano.
+    """
+    carregar_depara()
+    cz = _norm_centros(centros)
+    if not cz:
+        return []
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match = _filtro_ano(ano, mes)
+        match["centro_custo"] = {"$in": list(cz)}
+        pipe = [{"$match": match},
+                {"$group": {"_id": "$conta", "executado": {"$sum": "$valor"}}}]
+        rows = [{"code": d["_id"], "nome": nome_conta(d["_id"]),
+                 "executado": round(d["executado"] or 0.0, 2)}
+                for d in coll.aggregate(pipe)]
+        return sorted(rows, key=lambda r: r["executado"], reverse=True)
+
+    return _memo(("contas_resumo", ano, cz, mes), _calc)
+
+
+def fetch_lancamentos(
+    ano: int,
+    conta: Optional[str] = None,
+    mes: Optional[str] = None,
+    centros: Optional[Iterable[str]] = None,
+    limit: int = 500,
+) -> list[dict]:
+    """Lancamentos do recorte acumulado (conta/mes/centro) para a tabela (DS-08).
+
+    Ordena por data. `limit` evita despejar milhares de linhas no nivel planta/grupo.
+    """
+    carregar_depara()   # garante o de/para de nome (centro/conta) p/ tooltips/filtros
+    coll = get_mongo_connection(COLL_LANCAMENTOS)
+    if coll is None:
+        return []
+    cz = _norm_centros(centros)
+    match: dict = {"mes_referencia": mes} if mes else {"mes_referencia": {"$regex": f"^{ano}-"}}
+    if conta:
+        match["conta"] = conta
+    if cz:
+        match["centro_custo"] = {"$in": list(cz)}
+    cursor = coll.find(match).sort([("data_lancamento", 1)]).limit(limit)
+    return list(cursor)
+
+
+def _row_lanc(d: dict) -> dict:
+    """Linha de lançamento pronta p/ tabela (relatório DOCX): nome de conta e equipamento
+    já resolvidos a partir dos códigos."""
+    centro = (d.get("centro_custo") or "").strip()
+    conta = (d.get("conta") or "").strip()
+    return {
+        "data": d.get("data_lancamento"),                 # datetime (o relatório formata)
+        "conta": conta,
+        "conta_nome": nome_conta(conta),
+        "centro_custo": centro,
+        "equipamento": nome_equipamento(centro),          # LCT-08, PRENSA-01… (de/para KPIs)
+        "descritor": (d.get("descritor") or "").strip(),
+        "tipo_doc": (d.get("tipo_doc") or "").strip(),
+        "no_documento": (d.get("no_documento") or "").strip(),
+        "valor": round(d.get("valor", 0) or 0, 2),        # float (sort/format no relatório)
+    }
+
+
+def fetch_lancamentos_recentes(ano: int, mes: Optional[str] = None, limit: int = 10,
+                               centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """Os `limit` lançamentos mais RECENTES (data desc) — tabela 'últimos custos' do relatório.
+    `mes='YYYY-MM'` → mês; `mes=None` → ano. Linhas via `_row_lanc` (nome de conta/equipamento)."""
+    cz = _norm_centros(centros)
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match = _filtro_ano(ano, mes)
+        if cz:
+            match["centro_custo"] = {"$in": list(cz)}
+        cur = coll.find(match).sort([("data_lancamento", -1), ("valor", -1)]).limit(limit)
+        return [_row_lanc(d) for d in cur]
+
+    return _memo(("lanc_recentes", ano, mes, cz, limit), _calc)
+
+
+def fetch_lancamentos_maiores(ano: int, mes: Optional[str] = None, limit: int = 5,
+                              centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """Os `limit` MAIORES lançamentos (valor desc) — tabela 'top maiores' do relatório.
+    Ordena por valor desc (estornos negativos caem no fim). Linhas via `_row_lanc`."""
+    cz = _norm_centros(centros)
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match = _filtro_ano(ano, mes)
+        if cz:
+            match["centro_custo"] = {"$in": list(cz)}
+        cur = coll.find(match).sort([("valor", -1)]).limit(limit)
+        return [_row_lanc(d) for d in cur]
+
+    return _memo(("lanc_maiores", ano, mes, cz, limit), _calc)
+
+
+def fetch_contas_geral(ano: int, mes: Optional[str] = None,
+                       centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """GERAL + todas as contas (orçado × executado) da janela — eixo do gráfico.
+
+    Primeira linha = GERAL (rollup GT340); depois cada conta, ordenada por ORÇADO
+    desc (desempate executado). `mes=None` → ano inteiro. Cada item tem o contrato do gráfico
+    (label/code/orcado/executado/pct/estouro/sem_orcamento).
+    """
+    cz = _norm_centros(centros)
+
+    def _calc():
+        por_conta = _orcado_executado_por_conta(ano, cz, mes)
+        tot_o = sum(a["orcado"] for a in por_conta.values())
+        tot_e = sum(a["executado"] for a in por_conta.values())
+        geral = {"code": "__GERAL__", "label": "GERAL", "conta_desc": "Manutenção (GT340)",
+                 **calcular_metricas(tot_o, tot_e)}
+        contas = []
+        for a in por_conta.values():
+            contas.append({"code": a["conta"], "label": nome_conta(a["conta"]),
+                           "conta_desc": a.get("conta_desc", ""),
+                           **calcular_metricas(a["orcado"], a["executado"])})
+        # ordem das barras (esq→dir) por ORÇADO desc; desempate por executado
+        contas.sort(key=lambda x: (x["orcado"], x["executado"]), reverse=True)
+        return [geral] + contas
+
+    return _memo(("contas_geral", ano, mes, cz), _calc)
+
+
+def meses_com_dados(ano: int) -> list[str]:
+    """Meses 'YYYY-MM' com dados de resumo no ano (ordenados)."""
+    coll = get_mongo_connection(COLL_RESUMO)
+    if coll is None:
+        return []
+    return sorted(coll.distinct("mes_referencia", {"mes_referencia": {"$regex": f"^{ano}-"}}))
+
+
+def fetch_dias_total_mes(ano: int, mes: str,
+                         centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """Executado total por dia no mês (todas as contas somadas) — cards/gráfico de dia."""
+    cz = _norm_centros(centros)
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match: dict = {"mes_referencia": mes}
+        if cz:
+            match["centro_custo"] = {"$in": list(cz)}
+        pipe = [
+            {"$match": match},
+            {"$group": {"_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$data_lancamento"}},
+                        "executado": {"$sum": "$valor"}}},
+            {"$sort": {"_id": 1}},
+        ]
+        return [{"code": d["_id"], "label": d["_id"][-2:], "dia": d["_id"],
+                 "orcado": 0, "executado": round(d["executado"], 2),
+                 "pct": None, "estouro": False, "sem_orcamento": False}
+                for d in coll.aggregate(pipe)]
+
+    return _memo(("dias_total", ano, mes, cz), _calc)
+
+
+def fetch_contas_no_dia(ano: int, dia: str,
+                        centros: Optional[Iterable[str]] = None) -> list[dict]:
+    """GERAL + contas com executado num dia específico ('YYYY-MM-DD'). Só executado."""
+    cz = _norm_centros(centros)
+
+    def _calc():
+        coll = get_mongo_connection(COLL_LANCAMENTOS)
+        if coll is None:
+            return []
+        match: dict = {"mes_referencia": dia[:7]}
+        if cz:
+            match["centro_custo"] = {"$in": list(cz)}
+        pipe = [
+            {"$match": match},
+            {"$addFields": {"_d": {"$dateToString": {"format": "%Y-%m-%d", "date": "$data_lancamento"}}}},
+            {"$match": {"_d": dia}},
+            {"$group": {"_id": "$conta", "executado": {"$sum": "$valor"}}},
+        ]
+        contas = [{"code": d["_id"], "label": nome_conta(d["_id"]), "orcado": 0,
+                   "executado": round(d["executado"], 2), "pct": None,
+                   "estouro": False, "sem_orcamento": False}
+                  for d in coll.aggregate(pipe)]
+        contas.sort(key=lambda x: x["executado"], reverse=True)
+        tot = round(sum(c["executado"] for c in contas), 2)
+        geral = {"code": "__GERAL__", "label": "GERAL", "orcado": 0, "executado": tot,
+                 "pct": None, "estouro": False, "sem_orcamento": False}
+        return [geral] + contas
+
+    return _memo(("contas_dia", ano, dia, cz), _calc)
+
+
+def fetch_lancamentos_no_dia(ano: int, dia: str, conta: Optional[str] = None,
+                             centros: Optional[Iterable[str]] = None,
+                             limit: int = 500) -> list[dict]:
+    """Lançamentos de um dia ('YYYY-MM-DD'), opcionalmente de uma conta."""
+    docs = fetch_lancamentos(ano, conta=conta, mes=dia[:7], centros=centros, limit=limit)
+    return [d for d in docs if d.get("data_lancamento")
+            and d["data_lancamento"].strftime("%Y-%m-%d") == dia]
+
+
+def fonte_dos_dados(ano: int) -> Optional[str]:
+    """Retorna a origem predominante dos dados do ano ('csv'|'sap') ou None se vazio."""
+    coll = get_mongo_connection(COLL_RESUMO)
+    if coll is None:
+        return None
+    doc = coll.find_one({"mes_referencia": {"$regex": f"^{ano}-"}}, {"fonte": 1})
+    return doc.get("fonte") if doc else None
+
+
+def reconciliacao(ano: int, mes: Optional[str] = None) -> dict:
+    """Confere a soma do executado das contas x total oficial do mes (DS-09).
+
+    Reconciliacao usa o resumo (sempre o numero oficial), independente de filtro de
+    centro. Retorna {bate, soma_exec, oficial, diff, por_mes}. `bate` = diferenca < 1 centavo.
+    """
+    def _calc():
+        docs = _resumo_docs(ano, mes)
+        por_mes: dict[str, dict] = {}
+        for d in docs:
+            box = por_mes.setdefault(d["mes_referencia"], {"soma_exec": 0.0, "oficial": 0.0})
+            box["soma_exec"] += d.get("executado", 0.0)
+            box["oficial"] = d.get("total_oficial_geral", 0.0)  # igual em todos os docs do mes
+        soma_exec = round(sum(b["soma_exec"] for b in por_mes.values()), 2)
+        oficial = round(sum(b["oficial"] for b in por_mes.values()), 2)
+        detalhe = {
+            m: {"soma_exec": round(b["soma_exec"], 2), "oficial": round(b["oficial"], 2),
+                "bate": abs(round(b["soma_exec"], 2) - round(b["oficial"], 2)) < 0.005}
+            for m, b in sorted(por_mes.items())
+        }
+        return {
+            "bate": abs(soma_exec - oficial) < 0.005,
+            "soma_exec": soma_exec,
+            "oficial": oficial,
+            "diff": round(soma_exec - oficial, 2),
+            "por_mes": detalhe,
+        }
+
+    return _memo(("reconc", ano, mes), _calc)

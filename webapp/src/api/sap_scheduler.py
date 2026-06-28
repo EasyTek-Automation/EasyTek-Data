@@ -25,15 +25,29 @@ from src.sap_scheduler.config import load_config
 
 from . import api_bp
 
-TIPOS_VALIDOS = {"zppprd", "zpp_nt0001"}
+TIPOS_VALIDOS = {"zppprd", "zpp_nt0001", "backlog"}
+
+# Nível mínimo para disparar cada tipo de job manualmente (RF-09.5 / DS-06).
+# Default 3 (admin) para qualquer tipo não mapeado — segurança por omissão.
+MIN_LEVEL_POR_TIPO = {"zppprd": 3, "zpp_nt0001": 3, "backlog": 2}
 
 
 def _check_admin():
-    """Retorna None se ok, ou (response, status) se negado."""
+    """Retorna None se ok, ou (response, status) se negado. (level >= 3)"""
     if not current_user.is_authenticated:
         return jsonify({"error": "unauthorized"}), 401
     if getattr(current_user, "level", 0) < 3:
         return jsonify({"error": "forbidden — requer level 3 (admin)"}), 403
+    return None
+
+
+def _check_level(tipo: str):
+    """Autorização por tipo: backlog aceita level >= 2; demais level >= 3 (default)."""
+    if not current_user.is_authenticated:
+        return jsonify({"error": "unauthorized"}), 401
+    req = MIN_LEVEL_POR_TIPO.get(tipo, 3)
+    if getattr(current_user, "level", 0) < req:
+        return jsonify({"error": f"forbidden — requer level {req}"}), 403
     return None
 
 
@@ -47,10 +61,6 @@ def trigger_job():
       - delay_segundos: int (opcional, default 0) — agendado_para = now + delay
         (delay=0 → daemon claim imediato; delay>0 → claim depois do delay)
     """
-    deny = _check_admin()
-    if deny:
-        return deny
-
     body = request.get_json(silent=True) or {}
     tipo = (body.get("tipo") or request.args.get("tipo") or "").strip().lower()
     delay = body.get("delay_segundos") or request.args.get("delay_segundos") or 0
@@ -61,6 +71,11 @@ def trigger_job():
 
     if tipo not in TIPOS_VALIDOS:
         return jsonify({"error": f"tipo invalido. Aceita: {sorted(TIPOS_VALIDOS)}"}), 400
+
+    # autorização por tipo (backlog level 2+, demais level 3) — RF-09.5
+    deny = _check_level(tipo)
+    if deny:
+        return deny
 
     try:
         cfg = load_config()

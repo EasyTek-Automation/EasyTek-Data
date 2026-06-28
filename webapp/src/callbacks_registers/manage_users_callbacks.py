@@ -19,6 +19,79 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+# ============================================
+# REGRAS DE NÍVEL (espelham create_user_callbacks)
+# ============================================
+
+LEVEL_LABELS = {
+    1: "Nível 1 - Visualizador",
+    2: "Nível 2 - Operador",
+    3: "Nível 3 - Administrador",
+}
+
+
+def level_options_for_admin(admin_perfil):
+    """Opções de nível que um admin do perfil dado pode atribuir.
+
+    Espelha a regra do create_user: perfil ``admin`` (TI) atribui níveis 1-3;
+    demais perfis atribuem apenas 1-2 (não criam/promovem nível 3).
+    """
+    niveis = [1, 2, 3] if admin_perfil == "admin" else [1, 2]
+    return [{"label": LEVEL_LABELS[n], "value": n} for n in niveis]
+
+
+def assignable_levels(admin_perfil):
+    """Conjunto de níveis que um admin do perfil dado pode atribuir/alterar.
+
+    ``admin`` (TI) opera 1-3; demais perfis apenas 1-2. Níveis fora do conjunto
+    (ex: nível 4 = gestor) são especiais e ficam fora do alcance de edição.
+    """
+    return {1, 2, 3} if admin_perfil == "admin" else {1, 2}
+
+
+def validate_level_change(admin_perfil, admin_id, target_user, new_level):
+    """Valida server-side a troca de nível de um usuário (defesa em profundidade).
+
+    Edge cases cobertos: (a) no-op — manter o mesmo nível nunca é bloqueado, mesmo
+    para níveis especiais (ex: gestor nível 4), pra não travar edição de nome/email;
+    (b) anti-lockout — ninguém altera o próprio nível; (c) níveis especiais (fora do
+    conjunto atribuível, ex: nível 4) não podem ser alterados por esta tela.
+    Retorna ``(ok: bool, erro: str | None)``.
+    """
+    try:
+        new_level = int(new_level)
+    except (TypeError, ValueError):
+        return False, "Nível inválido."
+
+    current_level = int(target_user.get("level", 1))
+    target_id = str(target_user.get("_id"))
+
+    # No-op: manter o mesmo nível nunca é bloqueado (inclui nível 4 = gestor)
+    if new_level == current_level:
+        return True, None
+
+    # Daqui em diante há mudança real de nível.
+    # Anti-lockout: ninguém altera o próprio nível de acesso
+    if admin_id is not None and target_id == str(admin_id):
+        return False, "Você não pode alterar o seu próprio nível de acesso."
+
+    allowed = assignable_levels(admin_perfil)
+
+    # Nível atual especial (fora do alcance do admin, ex: gestor nível 4)
+    if current_level not in allowed:
+        if current_level == 3:
+            return False, "PERMISSÃO NEGADA: apenas Administradores podem alterar o nível de um usuário nível 3."
+        return False, f"Nível especial (nível {current_level}) não pode ser alterado por esta tela."
+
+    # Novo nível precisa estar no alcance do admin
+    if new_level not in allowed:
+        if new_level == 3:
+            return False, "PERMISSÃO NEGADA: apenas Administradores podem atribuir o nível 3."
+        return False, f"Nível inválido: {new_level}"
+
+    return True, None
+
+
 def register_manage_users_callbacks(app):
     """Register all callbacks for user management page"""
 
@@ -391,7 +464,11 @@ def register_manage_users_callbacks(app):
             Output("edit-username-input", "value"),
             Output("edit-email-input", "value"),
             Output("edit-user-data", "data"),
-            Output("edit-user-modal-alert", "children")
+            Output("edit-user-modal-alert", "children"),
+            Output("edit-level-input", "options"),
+            Output("edit-level-input", "value"),
+            Output("edit-level-input", "disabled"),
+            Output("edit-level-note", "children")
         ],
         [
             Input({"type": "edit-user-btn", "index": ALL}, "n_clicks"),
@@ -400,29 +477,30 @@ def register_manage_users_callbacks(app):
         ],
         [
             State("manage-admin-user-perfil", "data"),
+            State("manage-admin-user-id", "data"),
             State("edit-user-data", "data")
         ],
         prevent_initial_call=True
     )
-    def toggle_edit_modal(edit_clicks, cancel_clicks, save_clicks, admin_perfil, current_user_data):
-        """Open/close edit modal and populate fields"""
+    def toggle_edit_modal(edit_clicks, cancel_clicks, save_clicks, admin_perfil, admin_id, current_user_data):
+        """Open/close edit modal and populate fields (inclui nível, com trava nos edge cases)"""
         from dash import no_update
         from src.database.connection import get_mongo_connection
         import json
 
         ctx = callback_context
         if not ctx.triggered:
-            return no_update, no_update, no_update, no_update, no_update
+            return (no_update,) * 9
 
         trigger_id = ctx.triggered[0]["prop_id"].split(".")[0]
 
         # Check if any button was actually clicked (not just table refresh)
         if not any(edit_clicks) and not cancel_clicks and not save_clicks:
-            return no_update, no_update, no_update, no_update, no_update
+            return (no_update,) * 9
 
         # Close modal on cancel or save
         if "cancel" in trigger_id or "save" in trigger_id:
-            return False, "", "", None, ""
+            return False, "", "", None, "", [], None, False, ""
 
         # Open modal on edit button click
         if "edit-user-btn" in trigger_id:
@@ -440,7 +518,7 @@ def register_manage_users_callbacks(app):
 
                 # If no button has clicks, don't open modal
                 if button_index is None:
-                    return no_update, no_update, no_update, no_update, no_update
+                    return (no_update,) * 9
 
                 usuarios = get_mongo_connection("usuarios")
                 user = usuarios.find_one({"_id": ObjectId(user_id)})
@@ -449,7 +527,7 @@ def register_manage_users_callbacks(app):
                     return False, "", "", None, dbc.Alert([
                         html.I(className="bi bi-x-circle me-2"),
                         "Erro: Usuário não encontrado."
-                    ], color="danger")
+                    ], color="danger"), [], None, False, ""
 
                 # RBAC Check: Admin can edit any, others only their department
                 if admin_perfil != "admin" and user.get("perfil") != admin_perfil:
@@ -460,25 +538,57 @@ def register_manage_users_callbacks(app):
                     return False, "", "", None, dbc.Alert([
                         html.I(className="bi bi-shield-x me-2"),
                         "PERMISSÃO NEGADA: Você só pode editar usuários do seu departamento."
-                    ], color="danger")
+                    ], color="danger"), [], None, False, ""
+
+                # Nível: opções + trava conforme regras e edge cases aprovados
+                current_level = int(user.get("level", 1))
+                is_self = (user_id == str(admin_id))
+                allowed = assignable_levels(admin_perfil)
+                # Trava quando: é o próprio usuário, OU o nível atual está fora do
+                # alcance deste admin (nível 3 pra não-admin, nível 4+ gestor pra todos)
+                special = current_level not in allowed
+                locked = is_self or special
+
+                if locked:
+                    lvl_options = [{
+                        "label": LEVEL_LABELS.get(current_level, f"Nível {current_level} - Especial"),
+                        "value": current_level
+                    }]
+                    lvl_disabled = True
+                    if is_self:
+                        lvl_note = "Você não pode alterar o seu próprio nível de acesso."
+                    elif current_level == 3:
+                        lvl_note = "Apenas Administradores podem alterar o nível de um usuário nível 3."
+                    else:
+                        lvl_note = f"Nível especial (nível {current_level}, gestor). Alteração não disponível por aqui."
+                else:
+                    lvl_options = level_options_for_admin(admin_perfil)
+                    lvl_disabled = False
+                    lvl_note = (
+                        "TI pode atribuir qualquer nível (1-3)."
+                        if admin_perfil == "admin" else
+                        "Você pode atribuir apenas níveis 1 ou 2."
+                    )
 
                 # Store user data for save operation
                 user_data = {
                     "id": user_id,
                     "original_username": user.get("username"),
-                    "original_email": user.get("email")
+                    "original_email": user.get("email"),
+                    "original_level": current_level
                 }
 
-                return True, user.get("username", ""), user.get("email", ""), user_data, ""
+                return (True, user.get("username", ""), user.get("email", ""), user_data, "",
+                        lvl_options, current_level, lvl_disabled, lvl_note)
 
             except Exception as e:
                 logger.error(f"[EDIT_MODAL_ERROR] {str(e)}")
                 return False, "", "", None, dbc.Alert([
                     html.I(className="bi bi-x-circle me-2"),
                     f"Erro interno: {str(e)}"
-                ], color="danger")
+                ], color="danger"), [], None, False, ""
 
-        return no_update, no_update, no_update, no_update, no_update
+        return (no_update,) * 9
 
     # ============================================
     # CALLBACK 7: Save User Edits
@@ -489,13 +599,15 @@ def register_manage_users_callbacks(app):
         [
             State("edit-username-input", "value"),
             State("edit-email-input", "value"),
+            State("edit-level-input", "value"),
             State("edit-user-data", "data"),
-            State("manage-admin-user-perfil", "data")
+            State("manage-admin-user-perfil", "data"),
+            State("manage-admin-user-id", "data")
         ],
         prevent_initial_call=True
     )
-    def save_user_edits(n_clicks, new_username, new_email, user_data, admin_perfil):
-        """Save username and email changes with validation"""
+    def save_user_edits(n_clicks, new_username, new_email, new_level, user_data, admin_perfil, admin_id):
+        """Save username, email and access-level changes with validation"""
         from dash import no_update
         from src.database.connection import get_mongo_connection
 
@@ -536,6 +648,21 @@ def register_manage_users_callbacks(app):
                     "PERMISSÃO NEGADA: Você só pode editar usuários do seu departamento."
                 ], color="danger", dismissable=True)
 
+            # Level change validation (server-side, defense in depth)
+            effective_level = new_level if new_level is not None else target_user.get("level", 1)
+            ok_level, level_error = validate_level_change(
+                admin_perfil, admin_id, target_user, effective_level
+            )
+            if not ok_level:
+                logger.warning(
+                    f"[PERMISSION_DENIED] Admin '{admin_perfil}' level-change blocked for "
+                    f"'{target_user.get('username')}': {level_error}"
+                )
+                return dbc.Alert([
+                    html.I(className="bi bi-shield-x me-2"),
+                    level_error
+                ], color="danger", dismissable=True)
+
             # Check uniqueness (exclude current user)
             if new_username != original_username:
                 existing_user = usuarios.find_one({
@@ -564,18 +691,20 @@ def register_manage_users_callbacks(app):
                 {"_id": ObjectId(user_id)},
                 {"$set": {
                     "username": new_username,
-                    "email": new_email
+                    "email": new_email,
+                    "level": int(effective_level)
                 }}
             )
 
             if result.modified_count == 1:
                 logger.info(
                     f"[USER_EDITED] Admin '{admin_perfil}' edited user '{original_username}' "
-                    f"(new username: {new_username}, new email: {new_email})"
+                    f"(new username: {new_username}, new email: {new_email}, new level: {int(effective_level)})"
                 )
                 return dbc.Alert([
                     html.I(className="bi bi-check-circle me-2"),
-                    f"Usuário atualizado com sucesso! Username: {new_username}, E-mail: {new_email}"
+                    f"Usuário atualizado com sucesso! Username: {new_username}, "
+                    f"E-mail: {new_email}, Nível: {int(effective_level)}"
                 ], color="success", dismissable=True, duration=4000)
             else:
                 # No changes were made (values are the same)

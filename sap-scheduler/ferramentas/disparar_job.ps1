@@ -15,7 +15,7 @@
 
 param(
     [Parameter(Mandatory=$true)]
-    [ValidateSet("zppprd", "zpp_nt0001")]
+    [ValidateSet("zppprd", "zpp_nt0001", "custo_exec", "custo_orcado")]
     [string]$tipo
 )
 
@@ -35,15 +35,14 @@ Write-Host "Disparando job '$tipo' em sap_jobs..." -ForegroundColor Cyan
 # Insert direto na fila via pymongo
 # `agendado_para = now - 60s` (truncado pro minuto) garante claim imediato
 $pyScript = @"
-import sys
-sys.path.insert(0, r'$root')
+import os, sys
 from datetime import datetime, timedelta
-import config as cfg_mod
+from dotenv import load_dotenv
+load_dotenv(os.path.join(r'$root', '.env'))
 import pymongo
 
-cfg = cfg_mod.load()
-client = pymongo.MongoClient(cfg.mongo_uri, serverSelectionTimeoutMS=5000)
-db = client[cfg.db_name]
+client = pymongo.MongoClient(os.getenv('MONGO_URI'), serverSelectionTimeoutMS=5000)
+db = client[os.getenv('DB_NAME')]
 agendado = (datetime.utcnow() - timedelta(seconds=60)).replace(second=0, microsecond=0)
 doc = {
     'tipo': '$tipo',
@@ -70,7 +69,7 @@ $tmpFile = "$env:TEMP\disparar_job_$($tipo)_$([guid]::NewGuid().Guid.Substring(0
 $pyScript | Out-File -FilePath $tmpFile -Encoding utf8
 
 try {
-    & $venvPython $tmpFile
+    & $venvPython -W ignore $tmpFile 2>$null
 } finally {
     Remove-Item $tmpFile -ErrorAction SilentlyContinue
 }

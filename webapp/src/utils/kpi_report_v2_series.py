@@ -13,6 +13,7 @@ próprios `BREAKDOWN_CODES` / janelas**. Apenas particiona janelas em buckets.
 from __future__ import annotations
 
 import logging
+import time as _time
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -24,6 +25,11 @@ from src.utils.zpp_kpi_calculator import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Cache TTL para a série 24h da home (carrossel gira a cada 15s; sem cache,
+# cada giro dispara até `max_lookback`+`n_days` queries ao Mongo). 60s = padrão v2.
+_CACHE_TTL_SECONDS = 60
+_CACHE_24H: dict = {}  # date_key (YYYY-MM-DD) → (ts, payload)
 
 
 MESES_PT: tuple[str, ...] = (
@@ -190,3 +196,85 @@ def _compute_plant_kpis_for_window(
     mttr_min = total_breakdown_min / num_failures
     br_pct = (total_breakdown_hours / total_active_hours) * 100.0
     return round(mtbf, 1), round(mttr_min, 1), round(br_pct, 2)
+
+
+def _day_has_production(day_midnight: datetime) -> bool:
+    """True se o dia-calendário `[day 00:00, day+1 00:00)` teve produção (>0 h ativas)."""
+    from src.utils.zpp_kpi_calculator import fetch_zpp_production_data
+    d_start = day_midnight.replace(hour=0, minute=0, second=0, microsecond=0, tzinfo=None)
+    d_end = d_start + timedelta(days=1)
+    try:
+        prod_df = fetch_zpp_production_data(d_start, d_end)
+    except Exception as exc:
+        logger.debug("find_last_production_day: falha probe %s (%s)",
+                     d_start.date(), type(exc).__name__)
+        return False
+    return (not prod_df.empty) and float(prod_df["horasact"].sum()) > 0.0
+
+
+def find_last_production_day(now: datetime, max_lookback: int = 14) -> datetime:
+    """Retorna o último dia-calendário (à meia-noite) que teve produção.
+
+    Começa em **ontem** e retrocede dia a dia até achar um dia com horas ativas > 0.
+    Resolve o caso fim-de-semana/feriado: numa 2ª de manhã, "ontem" é domingo sem
+    produção → retrocede até a 6ª. Se nenhum dos `max_lookback` dias tiver produção,
+    cai em ontem (comportamento neutro, série virá zerada).
+
+    Args:
+        now: Instante de referência (naïve ou aware; normalizado a naïve).
+        max_lookback: Máximo de dias a retroceder antes de desistir.
+
+    Returns:
+        `datetime` à meia-noite do dia destacado (naïve, tzinfo removido).
+    """
+    yesterday = now.replace(hour=0, minute=0, second=0, microsecond=0,
+                            tzinfo=None) - timedelta(days=1)
+    probe = yesterday
+    for _ in range(max(1, max_lookback)):
+        if _day_has_production(probe):
+            return probe
+        probe -= timedelta(days=1)
+    logger.info("find_last_production_day: sem produção nos últimos %d dias até %s — "
+                "usando ontem (%s) como fallback neutro.",
+                max_lookback, yesterday.date(), yesterday.date())
+    return yesterday
+
+
+def build_last_production_24h_series(
+    now: datetime,
+    n_days: int = 7,
+    equipment_ids: Optional[list[str]] = None,
+    max_lookback: int = 14,
+) -> dict:
+    """Série de N dias encerrando no **último dia com produção** (home — recorte 24h).
+
+    Acha o último dia-calendário com produção (`find_last_production_day`) e devolve a
+    série diária de `n_days` terminando nele, com `current_idx` no último item (= o dia
+    destacado, fonte do "número grande"). Mantém o anti-pattern do módulo: **não
+    recalcula KPI**, só particiona janelas via `build_daily_series_last_n_ending`.
+
+    Cacheado por `_CACHE_TTL_SECONDS` keyed pela data do dia destacado — o carrossel
+    gira a cada 15s e não deve remartelar o Mongo.
+
+    Returns:
+        ```
+        {
+            "labels": ["31/05", ..., "06/06"],   # n_days rótulos dd/mm
+            "mtbf":   [v1..vN],                  # h
+            "mttr":   [v1..vN],                  # min
+            "taxa_avaria": [v1..vN],             # %
+            "current_idx": N-1,                  # dia destacado (último com produção)
+            "highlight_date": "06/06",           # rótulo do dia destacado
+        }
+        ```
+    """
+    end_day = find_last_production_day(now, max_lookback=max_lookback)
+    cache_key = end_day.strftime("%Y-%m-%d") + ":%d" % n_days
+    hit = _CACHE_24H.get(cache_key)
+    if hit and (_time.time() - hit[0]) < _CACHE_TTL_SECONDS:
+        return hit[1]
+
+    series = build_daily_series_last_n_ending(end_day, n_days, equipment_ids or [])
+    series["highlight_date"] = end_day.strftime("%d/%m")
+    _CACHE_24H[cache_key] = (_time.time(), series)
+    return series

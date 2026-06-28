@@ -102,14 +102,20 @@ def build_bar_figure(
         showlegend=False,
     ))
 
-    # Curva de tendência polinomial
-    if show_trend and len([v for v in safe_vals if v]) >= 3:
+    # Curva de tendência polinomial — só sobre meses úteis. Corta a cauda de meses vazios
+    # à frente (value 0/None) para o polyfit não ser puxado por meses ainda sem dados.
+    last_idx = -1
+    for i, v in enumerate(safe_vals):
+        if v:
+            last_idx = i
+    fit_vals = safe_vals[:last_idx + 1]
+    if show_trend and len([v for v in fit_vals if v]) >= 3:
         try:
-            x_idx = np.arange(len(safe_vals), dtype=float)
-            deg = 2 if len(safe_vals) >= 5 else 1
-            coefs = np.polyfit(x_idx, safe_vals, deg)
+            x_idx = np.arange(len(fit_vals), dtype=float)
+            deg = 2 if len(fit_vals) >= 5 else 1
+            coefs = np.polyfit(x_idx, fit_vals, deg)
             fig.add_trace(go.Scatter(
-                x=labels,
+                x=labels[:last_idx + 1],
                 y=np.polyval(coefs, x_idx).tolist(),
                 mode="lines",
                 line=dict(color="#212529", width=2, dash="dot"),

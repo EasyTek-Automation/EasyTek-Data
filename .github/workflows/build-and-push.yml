@@ -76,3 +76,42 @@ jobs:
           echo "### ✅ ${{ matrix.service }}" >> $GITHUB_STEP_SUMMARY
           echo "Tag: \`${{ needs.generate-tag.outputs.TAG }}\`" >> $GITHUB_STEP_SUMMARY
           echo "Imagem: \`${{ env.IMAGE_BASE }}/${{ matrix.service }}:${{ needs.generate-tag.outputs.TAG }}\`" >> $GITHUB_STEP_SUMMARY
+
+  package-daemon:
+    # O daemon sap-scheduler NÃO containeriza (precisa do SAP GUI, Windows nativo
+    # 32-bit). Em vez de imagem, é empacotado como artefato .zip versionado e
+    # publicado no Release com a MESMA tag das imagens. O servidor baixa via
+    # deploy-daemon.ps1 (AMG_Infra) e roda nativo. Ver sap-scheduler/RECUPERACAO.md.
+    name: Empacotar daemon sap-scheduler (zip)
+    runs-on: ubuntu-latest
+    needs: [generate-tag]
+    permissions:
+      contents: write   # criar/atualizar Release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Empacotar fonte versionada (git archive — exclui .env/.venv/logs)
+        run: |
+          TAG="${{ needs.generate-tag.outputs.TAG }}"
+          # git archive só inclui arquivos rastreados → .env/.venv/logs/old ficam de fora
+          git archive --format=zip -o "sap-scheduler-${TAG}.zip" HEAD sap-scheduler
+          ls -la "sap-scheduler-${TAG}.zip"
+
+      - name: Publicar zip no Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.generate-tag.outputs.TAG }}"
+          ASSET="sap-scheduler-${TAG}.zip"
+          # Cria o Release na tag (idempotente: se já existir, só anexa o asset)
+          gh release create "$TAG" "$ASSET" \
+            --title "$TAG" \
+            --notes "Artefato do daemon sap-scheduler (deploy nativo Windows via deploy-daemon.ps1)." \
+            || gh release upload "$TAG" "$ASSET" --clobber
+
+      - name: Resumo do empacotamento
+        run: |
+          echo "### 📦 sap-scheduler (daemon, zip)" >> $GITHUB_STEP_SUMMARY
+          echo "Tag: \`${{ needs.generate-tag.outputs.TAG }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "Asset: \`sap-scheduler-${{ needs.generate-tag.outputs.TAG }}.zip\` no Release \`${{ needs.generate-tag.outputs.TAG }}\`" >> $GITHUB_STEP_SUMMARY

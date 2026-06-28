@@ -29,9 +29,9 @@ from flask_login import current_user
 from src.sap_scheduler.rodape_component import build_rodape
 from src.sap_scheduler.manual_trigger import build_rerun_controls
 
-# Ordem do carrossel (present mode): 3 cortes do confronto + a ROW de KPIs da V2
-SLIDES = ["month", "week", "band", "kpis"]
-GRAPH_SLIDES = {"kpis"}
+# Ordem do carrossel (present mode): 3 cortes do confronto + ROW de KPIs da V2 + Custos do mês
+SLIDES = ["month", "week", "band", "kpis", "custos"]
+GRAPH_SLIDES = {"kpis", "custos"}
 
 
 # ============================================================
@@ -210,6 +210,11 @@ TRANS = {
         "v_detail": "Período atual vence em {n} de {total} indicadores",
         "fresh_title": "Atualização dos dados", "fresh_prod": "Produção", "fresh_stops": "Paradas",
         "fresh_collect": "última coleta", "fresh_through": "dado até",
+        "kpi24h_section": "Indicadores — últimas 24h",
+        "kpi24h_lastprod": "Último dia com produção: {d}",
+        "kpi24h_bars": "Planta — últimos {n} dias",
+        "costs_section": "Custo de Manutenção", "costs_month": "Mês de referência: {m}",
+        "costs_rosca": "Custo por equipamento (mês)", "costs_bars": "Realizado por conta (% do orçado, mês)",
     },
     "es": {
         "title": "Visión General del Mantenimiento",
@@ -237,6 +242,11 @@ TRANS = {
         "v_detail": "El período actual gana en {n} de {total} indicadores",
         "fresh_title": "Actualización de datos", "fresh_prod": "Producción", "fresh_stops": "Paradas",
         "fresh_collect": "última recolección", "fresh_through": "datos hasta",
+        "kpi24h_section": "Indicadores — últimas 24h",
+        "kpi24h_lastprod": "Último día con producción: {d}",
+        "kpi24h_bars": "Planta — últimos {n} días",
+        "costs_section": "Costo de Mantenimiento", "costs_month": "Mes de referencia: {m}",
+        "costs_rosca": "Costo por equipo (mes)", "costs_bars": "Realizado por cuenta (% del presupuesto, mes)",
     },
     "en": {
         "title": "Maintenance Overview",
@@ -264,6 +274,11 @@ TRANS = {
         "v_detail": "Current period wins {n} of {total} indicators",
         "fresh_title": "Data update", "fresh_prod": "Production", "fresh_stops": "Stops",
         "fresh_collect": "last collected", "fresh_through": "data through",
+        "kpi24h_section": "Indicators — last 24h",
+        "kpi24h_lastprod": "Last day with production: {d}",
+        "kpi24h_bars": "Plant — last {n} days",
+        "costs_section": "Maintenance Cost", "costs_month": "Reference month: {m}",
+        "costs_rosca": "Cost by equipment (month)", "costs_bars": "Actual by account (% of budget, month)",
     },
 }
 
@@ -470,6 +485,36 @@ def _bar_label(key, icon, lang, sm=False):
     return _lbl(icon, t(f"c_{key}", lang), t(f"s_{key}", lang), sm=sm)
 
 
+def _compare_header(meta, lang):
+    """Cabeçalho acima das barras: ANTERIOR (esq) vs ATUAL (dir) + período analisado (datas).
+
+    Reusa a mesma estrutura das barras (espaçador da coluna de rótulo 218px + área flex
+    dividida 50/50) para o divisor central cair EXATAMENTE no eixo das barras abaixo.
+    """
+    now_s, prev_s = t("now", lang), t("prev", lang)
+    return html.Div(
+        [
+            html.Div(className="home-lbl"),  # espaçador = largura da coluna de identidade
+            html.Div(
+                [
+                    html.Div(
+                        [html.Span([html.I(className="bi bi-caret-left-fill me-1"), prev_s.upper()],
+                                   className="home-cmp-period"),
+                         html.Span(meta["prev_range"], className="home-cmp-range")],
+                        className="home-cmp-side"),
+                    html.Div(
+                        [html.Span([now_s.upper(), html.I(className="bi bi-caret-right-fill ms-1")],
+                                   className="home-cmp-period"),
+                         html.Span(meta["cur_range"], className="home-cmp-range")],
+                        className="home-cmp-side"),
+                ],
+                className="home-cmp-head",
+            ),
+        ],
+        className="home-bar-line home-cmp-row",
+    )
+
+
 def _duel_bar(key, icon, lang, metric, meta, ghost_w=None, real_pct=None):
     """Barra divergente com rótulo de identidade à esquerda (chip+nome+subtítulo) + trilho.
 
@@ -514,7 +559,7 @@ def render_duels(period, lang):
         className="home-kpi-block",
     )
     return dbc.Card(
-        dbc.CardBody([ops_block, kpi_block], className="p-3"),
+        dbc.CardBody([_compare_header(meta, lang), ops_block, kpi_block], className="p-3"),
         className="shadow-sm indicator-v2-card-static home-duel-arena",
         style={"borderTop": "4px solid #0d6efd"},
     )
@@ -691,9 +736,9 @@ def render_kpi_skeleton(lang=None):
                                 className="d-flex justify-content-between align-items-center px-2 mb-2",
                                 style={"height": "60px"},
                             ),
-                            html.Div(className="skel-block", style={"height": "280px"}),
+                            html.Div(className="skel-block", style={"height": "222px"}),
                         ],
-                        className="p-2", style={"minHeight": "340px"},
+                        className="p-2", style={"minHeight": "271px"},
                     ),
                 ],
                 className="shadow-sm h-100 indicator-v2-card",
@@ -723,7 +768,7 @@ def render_v2_kpi_row(period, lang):
                         KPI_META[kpi]["color"], KPI_META[kpi]["unit"],
                         target=target, direction=KPI_META[kpi]["direction"],
                         td=td_lang, bar_statuses=statuses)
-        fig.update_layout(height=280)
+        fig.update_layout(height=222)
         return fig
 
     def _ring(kpi, value, target):
@@ -859,9 +904,9 @@ def render_v2_kpi_row(period, lang):
                             ),
                             dcc.Graph(figure=fig,
                                       config={"displayModeBar": False, "staticPlot": True, "responsive": True},
-                                      style={"height": "280px", "width": "100%"}),
+                                      style={"height": "222px", "width": "100%"}),
                         ],
-                        className="p-2", style={"minHeight": "340px"},
+                        className="p-2", style={"minHeight": "271px"},
                     ),
                 ],
                 className="shadow-sm h-100 indicator-v2-card" + pulse,
@@ -874,6 +919,266 @@ def render_v2_kpi_row(period, lang):
                   className="mb-4 kpi-row-v2")
     return html.Div(row)
 
+
+# ------------------------------------------------------------
+# Recorte 24h (último dia com produção) — helpers de nível de módulo.
+# Cópias isoladas dos closures de `render_v2_kpi_row` para NÃO tocar na função
+# anual já validada (premissa de preservação de UI). Usados só pela row de 24h.
+# ------------------------------------------------------------
+def _h24_hex_to_rgba(hex_color, alpha=0.15):
+    h = hex_color.lstrip("#")
+    if len(h) == 3:
+        h = "".join(c * 2 for c in h)
+    try:
+        r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+        return "rgba(%d,%d,%d,%s)" % (r, g, b, alpha)
+    except Exception:
+        return "rgba(108,117,125,%s)" % alpha
+
+
+def _h24_ring(kpi_meta, value, target):
+    import plotly.graph_objects as go
+    direction = kpi_meta["direction"]
+    if not target or value is None:
+        achievement = 0
+    elif direction == "lower":
+        achievement = min(1.0, target / value) if value > 0 else 1.0
+    else:
+        achievement = min(1.0, value / target) if target > 0 else 0
+    pct = int(round(achievement * 100))
+    ring_color = "#198754" if achievement >= 0.95 else ("#ffc107" if achievement >= 0.7 else "#dc3545")
+    fig = go.Figure(go.Pie(values=[achievement, max(0, 1 - achievement)],
+                           marker=dict(colors=[ring_color, "rgba(0,0,0,0.06)"], line=dict(width=0)),
+                           hole=0.72, textinfo="none", hoverinfo="skip", sort=False,
+                           direction="clockwise", rotation=0))
+    fig.add_annotation(text="<b>%d%%</b>" % pct, showarrow=False,
+                       font=dict(size=12, color=ring_color, family="Arial Black"), x=0.5, y=0.5)
+    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), showlegend=False,
+                      paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", height=60, width=60)
+    return dcc.Graph(figure=fig, config={"displayModeBar": False, "staticPlot": True, "responsive": False},
+                     style={"height": "60px", "width": "60px"})
+
+
+def _h24_sparkline(values, color):
+    import plotly.graph_objects as go
+    cut = len(values)
+    while cut > 0 and values[cut - 1] in (0, None):
+        cut -= 1
+    truncated = values[:cut]
+    non_zero = [v for v in truncated if v not in (0, None)]
+    if len(non_zero) < 2:
+        return None
+    fig = go.Figure(go.Scatter(x=list(range(len(truncated))), y=truncated, mode="lines",
+                               line=dict(color=color, width=2, shape="spline"),
+                               fill="tozeroy", fillcolor=_h24_hex_to_rgba(color, 0.18), hoverinfo="skip"))
+    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0), xaxis=dict(visible=False),
+                      yaxis=dict(visible=False), plot_bgcolor="rgba(0,0,0,0)",
+                      paper_bgcolor="rgba(0,0,0,0)", height=28, width=90, showlegend=False)
+    return dcc.Graph(figure=fig, config={"displayModeBar": False, "staticPlot": True},
+                     style={"height": "28px", "width": "90px"})
+
+
+def _h24_trend_delta(kpi_meta, values):
+    non_zero = [(i, v) for i, v in enumerate(values) if v not in (0, None)]
+    if len(non_zero) < 2:
+        return html.Span()
+    last_v, prev_v = non_zero[-1][1], non_zero[-2][1]
+    if prev_v == 0:
+        return html.Span()
+    delta_pct = ((last_v - prev_v) / prev_v) * 100
+    direction = kpi_meta["direction"]
+    improving = (delta_pct < 0) if direction == "lower" else (delta_pct > 0)
+    cls_mod = "delta-neutral" if abs(delta_pct) < 1 else ("delta-good" if improving else "delta-bad")
+    arrow = "↓" if delta_pct < 0 else ("↑" if delta_pct > 0 else "→")
+    return html.Span("%s %.1f%%" % (arrow, abs(delta_pct)), className="kpi-trend-delta " + cls_mod,
+                     title="Último: %s%s vs anterior: %s%s" % (last_v, kpi_meta["unit"], prev_v, kpi_meta["unit"]))
+
+
+def _h24_pulse_class(kpi_meta, values, target):
+    non_zero = [v for v in values if v not in (0, None)]
+    if not non_zero or target is None:
+        return ""
+    last = non_zero[-1]
+    direction = kpi_meta["direction"]
+    excedeu = (last > target) if direction == "lower" else (last < target)
+    return " v2-pulse-warning" if excedeu else ""
+
+
+def render_24h_kpi_row(lang):
+    """Row de KPIs do recorte 24h: MTBF/MTTR/Avaria do último dia com produção,
+    com barras dos últimos N dias. Visual idêntico à row anual (`render_v2_kpi_row`),
+    mas alimentada por `build_last_production_24h_series` (fallback fim de semana)."""
+    from src.callbacks_registers.indicators_v2_callbacks import _bar_rich, KPI_META, _resolve_target
+    from src.pages.maintenance.indicators_v2 import TRANS as _TRANS
+    from src.utils.kpi_report_config import _now_in_report_timezone
+    from src.utils.kpi_report_v2_series import build_last_production_24h_series
+
+    lang = lang or "pt"
+    td_lang = _TRANS.get(lang, _TRANS["pt"])
+    n_days = 7
+    series = build_last_production_24h_series(_now_in_report_timezone(), n_days=n_days)
+    labels = series["labels"]
+    cur = series.get("current_idx", len(labels) - 1)
+    bars_title = t("kpi24h_bars", lang).format(n=n_days)
+
+    # mapa kpi (KPI_META) → chave da série
+    _skey = {"mtbf": "mtbf", "mttr": "mttr", "breakdown": "taxa_avaria"}
+    _short = {"mtbf": "mtbf", "mttr": "mttr", "breakdown": "br"}
+    _dec = {"mtbf": 2, "mttr": 2, "breakdown": 2}
+
+    def card(kpi):
+        meta = KPI_META[kpi]
+        color, unit = meta["color"], meta["unit"]
+        values = series.get(_skey[kpi], [0.0] * len(labels))
+        target = _resolve_target(kpi)
+        big = values[cur] if 0 <= cur < len(values) else 0.0
+        fig = _bar_rich(labels, values, bars_title, color, unit,
+                        target=target, direction=meta["direction"], td=td_lang)
+        fig.update_layout(height=222)
+        title = td_lang.get("kpi_%s_title" % _short[kpi], meta["label"])
+        subtitle = td_lang.get("kpi_%s_sub" % _short[kpi], "")
+        pulse = _h24_pulse_class(meta, values, target)
+        return html.Div(
+            dbc.Card(
+                [
+                    dbc.CardHeader(
+                        html.Div(
+                            [
+                                html.Div(
+                                    [
+                                        html.Span([html.Strong(title, style={"fontSize": "1rem"}),
+                                                   _h24_trend_delta(meta, values)]),
+                                        html.Div(
+                                            [html.Span(subtitle, className="text-muted",
+                                                       style={"fontSize": "0.78rem", "lineHeight": "1.2"}),
+                                             html.Span(_h24_sparkline(values, color), className="v2-sparkline-mini")],
+                                            className="d-flex justify-content-between align-items-center mt-1",
+                                        ),
+                                    ],
+                                    style={"flex": "1"},
+                                ),
+                                dbc.Badge([html.I(className="bi bi-clock-history me-1"), "24h"],
+                                          color="light", text_color="primary", className="border align-self-start",
+                                          style={"fontSize": "0.7rem", "fontWeight": "500"}),
+                            ],
+                            className="d-flex justify-content-between align-items-start gap-2",
+                            style={"minHeight": "74px"},
+                        ),
+                        className="py-2",
+                    ),
+                    dbc.CardBody(
+                        [
+                            html.Div(
+                                [
+                                    html.Span("—", **{"data-v2-anim": str(big), "data-v2-unit": unit,
+                                                      "data-v2-decimals": str(_dec[kpi])},
+                                              style={"fontSize": "1.7rem", "fontWeight": "700", "color": color,
+                                                     "letterSpacing": "-0.5px", "lineHeight": "1"}),
+                                    html.Div(_h24_ring(meta, big, target), style={"width": "60px", "height": "60px"}),
+                                ],
+                                className="d-flex justify-content-between align-items-center px-2 mb-2",
+                                style={"height": "60px"},
+                            ),
+                            dcc.Graph(figure=fig,
+                                      config={"displayModeBar": False, "staticPlot": True, "responsive": True},
+                                      style={"height": "222px", "width": "100%"}),
+                        ],
+                        className="p-2", style={"minHeight": "271px"},
+                    ),
+                ],
+                className="shadow-sm h-100 indicator-v2-card" + pulse,
+                style={"borderTop": "4px solid " + color},
+            ),
+            n_clicks=0, style={"cursor": "default", "height": "100%"},
+        )
+
+    section = html.Div(
+        [
+            html.Span(t("kpi24h_section", lang), className="home-kpi24h-title"),
+            html.Span(t("kpi24h_lastprod", lang).format(d=series.get("highlight_date", "—")),
+                      className="home-kpi24h-sub"),
+        ],
+        className="home-kpi24h-header",
+    )
+    row = dbc.Row([dbc.Col(card(k), xs=12, md=4) for k in ("mtbf", "mttr", "breakdown")],
+                  className="mb-2 kpi-row-v2")
+    return html.Div([section, row], className="home-kpi24h-block")
+
+
+def render_kpis_dual(period, lang):
+    """Slide de KPIs: row anual (intacta) em cima + row 24h (novo) embaixo."""
+    return html.Div([
+        render_v2_kpi_row(period, lang),
+        render_24h_kpi_row(lang),
+    ])
+
+
+# ============================================================
+# Slide do carrossel: Custo de Manutenção do MÊS corrente (BR-14 / DS-12)
+# Réplica ESTÁTICA da "geral de custos" (aba de custos da V2): rosca por equipamento
+# (esq) + barras orçado×executado por conta (dir). Importa as figuras de custo e a
+# leitura por dentro da função (import lazy) — mesmo padrão de reuso de render_v2_kpi_row,
+# evita import circular no topo do módulo. Sem clique/slider/modal (telão = leitura).
+# ============================================================
+def render_costs_slide(lang):
+    """Slide de custos do mês corrente: rosca (equipamento) + barras (% por conta), estático."""
+    lang = lang or "pt"
+    try:
+        from src.callbacks_registers.custo_callbacks import (
+            _fig_rosca, _fig_barras, _filtra_por_contas)
+        from src.custos import leitura as L
+        from src.utils.kpi_report_config import _now_in_report_timezone
+        now = _now_in_report_timezone()
+        ano, mm = now.year, now.month
+        mes = f"{ano}-{mm:02d}"  # BR-14: mês do relógio; executado já cortado em ≤ D-1 na coleta
+        rosca = _fig_rosca(L.fetch_por_equipamento(ano, None, mes=mes))  # rosca = todas (igual à aba)
+        rosca.update_layout(title_text=t("costs_rosca", lang))  # figura diz "(ano)"; aqui é mês
+        # Barras herdam as contas fixadas na aba via "Fixar no telão" (vazio = todas).
+        rows = _filtra_por_contas(L.fetch_contas_geral(ano, mes=mes), L.ler_slide_contas() or None)
+        barras = _fig_barras(rows, True, t("costs_bars", lang), h=460, modo="pct")
+        cfg = {"displayModeBar": False, "staticPlot": True, "responsive": True}
+        row = dbc.Row(
+            [
+                dbc.Col(dcc.Graph(figure=rosca, config=cfg,
+                                  style={"height": "460px", "width": "100%"}), xs=12, md=4),
+                dbc.Col(dcc.Graph(figure=barras, config=cfg,
+                                  style={"height": "460px", "width": "100%"}), xs=12, md=8),
+            ],
+            className="g-2 align-items-center",
+        )
+        mes_lbl = f"{_MON[lang][mm - 1]}/{ano}"
+        section = html.Div(
+            [
+                html.Span(t("costs_section", lang), className="home-kpi24h-title"),
+                html.Span(t("costs_month", lang).format(m=mes_lbl), className="home-kpi24h-sub"),
+            ],
+            className="home-kpi24h-header",
+        )
+        return html.Div([section, row], className="home-costs-slide")
+    except Exception as e:  # custos offline / sem dados do mês → cabeçalho + aviso (UI não quebra)
+        import logging
+        logging.getLogger(__name__).warning("home render_costs_slide falhou: %s", e)
+        return html.Div(
+            html.Span(t("costs_section", lang), className="home-kpi24h-title"),
+            className="home-costs-slide",
+        )
+
+
+def render_costs_skeleton():
+    """Empty-state (shimmer) do slide de Custos — círculo (rosca) + bloco (barras), mesma grade."""
+    return html.Div(
+        dbc.Row(
+            [
+                dbc.Col(html.Div(className="skel-circle",
+                                 style={"width": "260px", "height": "260px",
+                                        "borderRadius": "50%", "margin": "40px auto"}),
+                        xs=12, md=4),
+                dbc.Col(html.Div(className="skel-block", style={"height": "420px"}), xs=12, md=8),
+            ],
+            className="g-2 align-items-center",
+        ),
+        className="home-costs-slide",
+    )
 
 
 # ============================================================

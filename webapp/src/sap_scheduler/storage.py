@@ -11,7 +11,7 @@ desprezivel (1x por 60s) e simplifica raciocinio.
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 try:
@@ -27,6 +27,7 @@ VERSAO_SCHEMA = 1
 DEFAULT_AGENDAMENTOS: list[dict] = [
     {"tipo": "zppprd", "hora": "03:30", "ativo": True},
     {"tipo": "zpp_nt0001", "hora": "03:30", "ativo": True},
+    {"tipo": "backlog", "hora": "04:00", "ativo": True},
 ]
 
 
@@ -71,7 +72,7 @@ def atualizar_agendamento(
     if coll is None:
         raise RuntimeError("Mongo indisponivel — atualizar_agendamento abortado")
 
-    agora = datetime.utcnow()
+    agora = datetime.now(timezone.utc)
     coll.update_one(
         {"_id": SINGLETON_ID},
         {
@@ -126,7 +127,7 @@ def bootstrap_config(
             "$setOnInsert": {
                 "agendamentos": seed,
                 "historico_alteracoes": [],
-                "atualizado_em": datetime.utcnow(),
+                "atualizado_em": datetime.now(timezone.utc),
                 "versao_schema": VERSAO_SCHEMA,
             }
         },

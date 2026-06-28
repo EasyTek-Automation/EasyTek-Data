@@ -1,0 +1,24 @@
+/* Gantt — destaque de conflito de atribuição gerado por reagendamento
+   (Feature Reagendamento, SP-16 item 8 / DS-17 §4).
+   Aplicado na barra da atribuição cujo _id está em store-conflict-highlight.
+   Mecânica análoga ao .gantt-selected, porém com cor de alerta âmbar-avermelhada.
+   É um GUIA visual transitório (some no próximo refresh) — não estado persistido. */
+
+.gantt-conflict {
+    /* Contorno de alerta + leve brilho para destacar a barra em conflito. */
+    outline: 2px solid #C0392B;
+    outline-offset: 1px;
+    box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.35), 0 0 6px rgba(192, 57, 43, 0.55);
+    background-color: #E67E22 !important;  /* âmbar-avermelhado, distinto do amarelo padrão */
+    animation: gantt-conflict-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes gantt-conflict-pulse {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(192, 57, 43, 0.35), 0 0 6px rgba(192, 57, 43, 0.55); }
+    50%      { box-shadow: 0 0 0 3px rgba(192, 57, 43, 0.55), 0 0 10px rgba(192, 57, 43, 0.8); }
+}
+
+/* Marcador ⚠ na coluna esquerda da atribuição em conflito. */
+.gantt-conflict-flag {
+    cursor: help;
+}

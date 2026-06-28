@@ -75,6 +75,7 @@ try:
     from src.sap_scheduler.config import load_config as _sap_load_config
     from src.sap_scheduler.cron import init_scheduler as _sap_init_scheduler
     from src.sap_scheduler.migrations import migracao_dedup_sap_jobs as _sap_migracao_dedup
+    from src.sap_scheduler.migrations import migracao_agendamento_backlog as _sap_migracao_backlog
     from src.sap_scheduler.mongo_helpers import get_db as _sap_get_db, ensure_indexes as _sap_ensure_indexes
     from src.sap_scheduler.storage import bootstrap_config as _sap_bootstrap_config
     from src.sap_scheduler.timestamp_callback import register_callback as _sap_register_rodape_callback
@@ -96,6 +97,9 @@ try:
             logging.getLogger("sap_scheduler").info(
                 "sap_scheduler: SAP_JOBS_AGENDADOS env var lida como seed (so usado se collection vazia)"
             )
+        # 5b. Garante o agendamento do job backlog (04:00) em singletons já existentes
+        #     (bootstrap usa $setOnInsert; esta migração adiciona se ausente) — SDD Backlog IM-14
+        _sap_migracao_backlog(_sap_db, _sap_config.collection_sap_scheduler_config)
         # 6. BackgroundScheduler — _tick rele config Mongo a cada 60s
         _sap_init_scheduler(_sap_config, _sap_db)
     else:
@@ -110,6 +114,33 @@ except RuntimeError as _sap_e:
     raise
 except Exception:
     logging.getLogger("sap_scheduler").exception("sap_scheduler: erro inesperado no boot (webapp continua)")
+
+# Bootstrap das collections do Backlog (sap_ativos + sap_backlog) — SDD Backlog.
+# Idempotente/race-safe; só semeia se vazias. Garante página funcional após deploy.
+try:
+    from src.utils.backlog_seed import bootstrap_backlog as _bootstrap_backlog
+    _bootstrap_backlog()
+except Exception:
+    logging.getLogger("backlog").exception("backlog: seed no boot falhou (webapp continua)")
+
+# --- Custo de Manutenção: garante schema (coleções + índices) no boot (DS-03) ---
+# Idempotente. Cria AMG_CustoResumo/AMG_CustoLancamentos vazias + índices, para a
+# coleta SAP (Bloco D) gravar direto sem depender de seed/CSV. Webapp continua se falhar.
+try:
+    from src.custos.storage import ensure_indexes as _custos_ensure_indexes
+    from src.custos.scheduler import init_custo_scheduler as _custos_init_scheduler
+    from src.sap_scheduler.mongo_helpers import get_db as _custos_get_db
+    _custos_db = _custos_get_db()
+    if _custos_db is not None:
+        _custos_ensure_indexes(_custos_db)
+        # Agendamento diário da coleta SAP de custo (isolado do sap-scheduler)
+        _custos_init_scheduler(_custos_db, os.getenv("TZ", "America/Sao_Paulo"))
+    else:
+        logging.getLogger("custos").warning(
+            "custos: Mongo offline no boot — schema garantido no próximo restart"
+        )
+except Exception:
+    logging.getLogger("custos").exception("custos: erro ao garantir schema no boot (webapp continua)")
 
 # --- Configuração do Favicon Customizado ---
 app.index_string = '''

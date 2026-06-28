@@ -8,6 +8,35 @@ import dash_bootstrap_components as dbc
 # Helpers de modal
 # ---------------------------------------------------------------------------
 
+def _modal_reschedule():
+    """Modal de reagendamento de plano (Feature Reagendamento — SP-16 / DS-17).
+
+    Datepicker para a nova data de início + painel de prévia (delta, contagens,
+    conflitos cross-projeto) preenchido por callback. Confirmar só habilita
+    quando há mudança real."""
+    return dbc.Modal([
+        dbc.ModalHeader(dbc.ModalTitle(id="title-modal-reschedule")),
+        dbc.ModalBody([
+            dbc.Alert(
+                "Reagendar desloca TODO o plano deste projeto — categorias, atividades "
+                "e atribuições — pelo mesmo intervalo, preservando as durações. "
+                "Os demais projetos não são afetados.",
+                color="info", className="py-2", style={"fontSize": "0.85rem"},
+            ),
+            dbc.Label("Nova data e hora de início do projeto *"),
+            dbc.Input(id="input-reschedule-novo-inicio", type="datetime-local",
+                      className="mb-3"),
+            html.Div(id="reschedule-preview"),
+        ]),
+        dbc.ModalFooter([
+            dbc.Button("Cancelar", id="btn-cancel-reschedule",
+                       color="secondary", outline=True),
+            dbc.Button("Confirmar reagendamento", id="btn-confirm-reschedule",
+                       color="primary", disabled=True),
+        ]),
+    ], id="modal-reschedule", is_open=False, backdrop="static")
+
+
 def _modal_project():
     return dbc.Modal([
         dbc.ModalHeader(dbc.ModalTitle(id="title-modal-project")),
@@ -287,6 +316,8 @@ def layout():
         dcc.Store(id="store-gantt-categories-state", storage_type="local",  data={}),
         dcc.Store(id="store-gantt-activities-state", storage_type="local",  data={}),
         dcc.Store(id="store-project-editing-id",     storage_type="memory"),
+        dcc.Store(id="store-reschedule-target",      storage_type="memory"),
+        dcc.Store(id="store-conflict-highlight",     storage_type="memory", data=[]),
         dcc.Store(id="store-gantt-refresh",          storage_type="memory", data=0),
         dcc.Store(id="store-category-editing-id",    storage_type="memory"),
         dcc.Store(id="store-activity-editing-id",    storage_type="memory"),
@@ -513,6 +544,7 @@ def layout():
 
         # Modais
         _modal_project(),
+        _modal_reschedule(),
         _modal_category(),
         _modal_activity(),
         _modal_assignment(),

@@ -15,7 +15,7 @@ import time
 
 from pymongo.errors import PyMongoError
 
-from . import mongo
+from . import mongo, registry
 from .config import DaemonConfig
 
 logger = logging.getLogger(__name__)
@@ -56,16 +56,22 @@ def loop_principal(db, cfg: DaemonConfig, dispatcher=None) -> None:
     SHUTDOWN.clear()
     ultimo_heartbeat = time.monotonic()
 
+    # Tipos claimáveis = união do whitelist do .env com TODOS os trabalhos registrados
+    # (REGISTRY). Assim um trabalho novo (ex.: `backlog`) é claimado sem editar o `.env`
+    # do cliente — o deploy preserva o `.env`, então depender só dele deixaria o job
+    # eternamente `pendente`. SDD Backlog (IM-14b).
+    tipos_efetivos = sorted(set(cfg.tipos_suportados) | set(registry.REGISTRY.keys()))
+
     logger.info(
         "daemon: loop principal iniciado | polling=%ds heartbeat=%ds tipos=%s",
         cfg.polling_segundos,
         cfg.heartbeat_segundos,
-        cfg.tipos_suportados,
+        tipos_efetivos,
     )
 
     while not SHUTDOWN.is_set():
         try:
-            job = mongo.claim_atomico(db, cfg.tipos_suportados, cfg.collection)
+            job = mongo.claim_atomico(db, tipos_efetivos, cfg.collection)
             if job is None:
                 if time.monotonic() - ultimo_heartbeat >= cfg.heartbeat_segundos:
                     logger.debug("[tick] heartbeat: alive, 0 jobs pendentes")

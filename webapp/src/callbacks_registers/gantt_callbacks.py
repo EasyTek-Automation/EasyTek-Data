@@ -67,6 +67,84 @@ def _validation_errors_output(errors):
 
 
 # ---------------------------------------------------------------------------
+# Reagendamento de plano — helpers de prévia (Feature Reagendamento / SP-16)
+# ---------------------------------------------------------------------------
+
+def _fmt_delta(seconds):
+    """Formata um deslocamento (segundos) em texto legível: '+ 2 dias 4 h', '− 3 dias'."""
+    if not seconds:
+        return "sem mudança"
+    sign = "+" if seconds > 0 else "−"
+    secs = abs(int(seconds))
+    days  = secs // 86400
+    hours = (secs % 86400) // 3600
+    mins  = (secs % 3600) // 60
+    parts = []
+    if days:
+        parts.append(f"{days} dia" + ("s" if days != 1 else ""))
+    if hours:
+        parts.append(f"{hours} h")
+    if mins:
+        parts.append(f"{mins} min")
+    if not parts:
+        parts.append("0 min")
+    return f"{sign} " + " ".join(parts)
+
+
+def _fmt_iso_human(iso):
+    """Converte ISO para 'dd/mm/aaaa HH:MM' (tolerante a entrada já formatada)."""
+    try:
+        return datetime.fromisoformat(iso).strftime("%d/%m/%Y %H:%M")
+    except Exception:
+        return iso
+
+
+def _reschedule_preview_panel(preview):
+    """Monta o painel de prévia do reagendamento (delta, contagens, conflitos)."""
+    if preview is None:
+        return dbc.Alert("Projeto não encontrado.", color="danger", className="py-2")
+    c = preview["contagens"]
+    conflitos = preview.get("conflitos", [])
+    blocks = [
+        html.Div([html.Strong("Deslocamento: "), html.Span(_fmt_delta(preview["delta_segundos"]))]),
+        html.Div([html.Span("De "), html.Strong(_fmt_iso_human(preview["inicio_atual"])),
+                  html.Span(" para "), html.Strong(_fmt_iso_human(preview["inicio_novo"]))],
+                 style={"fontSize": "0.85rem", "color": "var(--bs-secondary)"}),
+        html.Div(f"Serão deslocados: {c['categorias']} categoria(s), "
+                 f"{c['atividades']} atividade(s), {c['atribuicoes']} atribuição(ões).",
+                 style={"fontSize": "0.85rem", "marginTop": "4px"}),
+    ]
+    if preview.get("sem_mudanca"):
+        blocks.append(dbc.Alert("A nova data é igual à atual — nada a reagendar.",
+                                color="secondary", className="py-1 mt-2",
+                                style={"fontSize": "0.82rem"}))
+        return html.Div(blocks)
+    if conflitos:
+        items = [
+            html.Li([
+                html.Strong(cf.get("funcionario_nome", "Funcionário")),
+                html.Span(" — conflito com o projeto "),
+                html.Strong(cf.get("projeto_externo") or "(outro)"),
+                html.Span(f", entre {_fmt_iso_human(cf['janela_inicio'])} e "
+                          f"{_fmt_iso_human(cf['janela_fim'])}"),
+            ], style={"fontSize": "0.8rem"})
+            for cf in conflitos
+        ]
+        blocks.append(dbc.Alert([
+            html.Strong(f"⚠ {len(conflitos)} conflito(s) de atribuição entre projetos seriam gerados:"),
+            html.Ul(items, className="mb-0 mt-1"),
+            html.Div("O reagendamento é permitido — as atribuições em conflito serão "
+                     "destacadas no Gantt para resolução posterior.",
+                     style={"fontSize": "0.78rem", "marginTop": "4px"}),
+        ], color="warning", className="py-2 mt-2"))
+    else:
+        blocks.append(dbc.Alert("Nenhum conflito de atribuição entre projetos.",
+                                color="success", className="py-1 mt-2",
+                                style={"fontSize": "0.82rem"}))
+    return html.Div(blocks)
+
+
+# ---------------------------------------------------------------------------
 # Empty states — Feature C / DS-14 (loading, erro de leitura, vazio)
 # ---------------------------------------------------------------------------
 
@@ -261,11 +339,13 @@ def register_gantt_callbacks(app):
         Input("store-gantt-filter",           "data"),
         Input("store-gantt-view-mode",        "data"),
         State("store-gantt-employees-state",  "data"),
+        Input("store-conflict-highlight",     "data"),
         prevent_initial_call=False,
     )
     def render_gantt(projects, categories, activities, assignments, employees, status,
                      granularity, projects_state, categories_state, activities_state,
-                     hour_offset, filter_query, view_mode, employees_state):
+                     hour_offset, filter_query, view_mode, employees_state,
+                     conflict_highlight):
         # Empty states (DS-14) — prioridade: erro > loading > vazio
         if status == "error":
             return _gantt_error_state()
@@ -307,6 +387,7 @@ def register_gantt_callbacks(app):
             employees=employees,
             hour_offset=hour_offset or 0,
             filter_query=filter_query or "",
+            conflict_ids=conflict_highlight or [],
         )
 
     # ------------------------------------------------------------------
@@ -1366,6 +1447,106 @@ def register_gantt_callbacks(app):
                 proj_id,
             )
         raise PreventUpdate
+
+    # ------------------------------------------------------------------
+    # CB-Reagendamento 1 — abrir modal (botão na linha do projeto, nível 2+)
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("modal-reschedule", "is_open", allow_duplicate=True),
+        Output("title-modal-reschedule", "children"),
+        Output("input-reschedule-novo-inicio", "value"),
+        Output("store-reschedule-target", "data"),
+        Output("reschedule-preview", "children", allow_duplicate=True),
+        Output("btn-confirm-reschedule", "disabled", allow_duplicate=True),
+        Input({"type": "gantt-reschedule-btn", "index": ALL}, "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def open_reschedule_modal(n_clicks_list):
+        if not any(n_clicks_list or []):
+            raise PreventUpdate
+        triggered_id = ctx.triggered_id
+        if not isinstance(triggered_id, dict):
+            raise PreventUpdate
+        if current_user.level < 2:
+            raise PreventUpdate
+        proj_id = triggered_id["index"]
+        proj = gantt_db.get_project_by_id(proj_id)
+        if not proj:
+            raise PreventUpdate
+        title = f"Reagendar — {proj['nome']}"
+        prefill = _fmt_dt(proj.get("data_hora_inicio"))
+        # Abre modal, pré-preenche datepicker, limpa prévia, desabilita Confirmar.
+        return True, title, prefill, proj_id, None, True
+
+    # ------------------------------------------------------------------
+    # CB-Reagendamento 2 — prévia ao mudar a data (sem gravar)
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("reschedule-preview", "children", allow_duplicate=True),
+        Output("btn-confirm-reschedule", "disabled", allow_duplicate=True),
+        Input("input-reschedule-novo-inicio", "value"),
+        State("store-reschedule-target", "data"),
+        prevent_initial_call=True,
+    )
+    def update_reschedule_preview(value, target):
+        if not target:
+            raise PreventUpdate
+        novo = _parse_dt(value)
+        if novo is None:
+            return None, True
+        preview = gantt_db.preview_reschedule_project(target, novo)
+        if preview is None:
+            return dbc.Alert("Projeto não encontrado.", color="danger", className="py-2"), True
+        # Confirmar habilita só quando há mudança real.
+        return _reschedule_preview_panel(preview), bool(preview.get("sem_mudanca"))
+
+    # ------------------------------------------------------------------
+    # CB-Reagendamento 3 — confirmar (transação → refresh → destaque)
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("modal-reschedule", "is_open", allow_duplicate=True),
+        Output("store-gantt-refresh", "data", allow_duplicate=True),
+        Output("store-conflict-highlight", "data", allow_duplicate=True),
+        Output("reschedule-preview", "children", allow_duplicate=True),
+        Input("btn-confirm-reschedule", "n_clicks"),
+        State("store-reschedule-target", "data"),
+        State("input-reschedule-novo-inicio", "value"),
+        State("store-gantt-refresh", "data"),
+        prevent_initial_call=True,
+    )
+    def confirm_reschedule(n_clicks, target, value, refresh):
+        if not n_clicks or not target:
+            raise PreventUpdate
+        # Guard de acesso no servidor (defesa além de esconder o botão).
+        if current_user.level < 2:
+            raise PreventUpdate
+        novo = _parse_dt(value)
+        if novo is None:
+            return no_update, no_update, no_update, dbc.Alert(
+                "Data inválida.", color="danger", className="py-2")
+        result = gantt_db.reschedule_project(
+            target, novo, getattr(current_user, "id", None), getattr(current_user, "username", None))
+        if not result.get("ok"):
+            # Mantém o modal aberto e mostra o erro (ex: transação não suportada).
+            return True, no_update, no_update, dbc.Alert(
+                result.get("erro", "Falha ao reagendar."), color="danger", className="py-2")
+        conflitos = result.get("conflitos", [])
+        # Fecha modal, força reload do banco (BR-17) e grava o destaque de conflito.
+        return False, (refresh or 0) + 1, conflitos, None
+
+    # ------------------------------------------------------------------
+    # CB-Reagendamento 4 — cancelar (nada é gravado)
+    # ------------------------------------------------------------------
+    @app.callback(
+        Output("modal-reschedule", "is_open", allow_duplicate=True),
+        Output("reschedule-preview", "children", allow_duplicate=True),
+        Input("btn-cancel-reschedule", "n_clicks"),
+        prevent_initial_call=True,
+    )
+    def close_reschedule_modal(n_clicks):
+        if not n_clicks:
+            raise PreventUpdate
+        return False, None
 
     # ------------------------------------------------------------------
     # CB-23 — Salvar projeto

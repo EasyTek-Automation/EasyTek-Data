@@ -59,6 +59,41 @@ body.home-present-mode .home-fresh-label {
     min-width: 0;
 }
 
+/* Cabeçalho do confronto — ANTERIOR (esq) vs ATUAL (dir) + período analisado.
+   padding 0 12px = mesmo padding horizontal do box azul (home-kpi-block), p/ o
+   divisor 50/50 cair no mesmo x do eixo das barras. */
+.home-cmp-row {
+    padding: 0 12px;
+    margin-bottom: 6px;
+}
+.home-cmp-head {
+    position: relative;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+}
+.home-cmp-side {
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    line-height: 1.12;
+}
+.home-cmp-period {
+    font-weight: 700;
+    font-size: 0.8rem;
+    letter-spacing: 0.3px;
+}
+.home-cmp-range {
+    font-size: 0.7rem;
+    color: #6c757d;
+}
+[data-bs-theme="dark"] .home-cmp-range {
+    color: #adb5bd;
+}
+body.home-present-mode .home-cmp-period { font-size: 1.12rem; }
+body.home-present-mode .home-cmp-range { font-size: 0.9rem; }
+
 /* Rótulo de identidade da barra — chip de ícone + título + subtítulo */
 .home-lbl {
     flex: 0 0 218px;
@@ -637,4 +672,45 @@ body.home-present-mode .home-present-only { display: inline-flex !important; }
 @keyframes cd-load {
     0%   { background-position: 200% 0; }
     100% { background-position: -200% 0; }
+}
+
+/* ===== Recorte 24h (segunda row do slide de KPIs) ===== */
+.home-kpi24h-block {
+    margin-top: 0.5rem;
+}
+.home-kpi24h-header {
+    display: flex;
+    align-items: baseline;
+    gap: 0.75rem;
+    padding: 0 0.25rem;
+    margin-bottom: 0.35rem;
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    padding-top: 0.5rem;
+}
+.home-kpi24h-title {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #212529;
+    letter-spacing: -0.3px;
+}
+.home-kpi24h-sub {
+    font-size: 0.82rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+/* Slide de Custos (DS-12) — réplica estática da geral de custos no carrossel.
+   Reusa .home-kpi24h-header/-title/-sub p/ o cabeçalho. Classe isolada: não toca
+   nos slides existentes (preservação de UI). */
+.home-costs-slide {
+    margin-top: 0.5rem;
+}
+body.home-present-mode .home-costs-slide {
+    padding: 0 1.5rem;
+}
+body.home-present-mode .home-costs-slide .home-kpi24h-title {
+    font-size: 1.4rem;
+}
+body.home-present-mode .home-costs-slide .home-kpi24h-sub {
+    font-size: 1.05rem;
 }

@@ -27,12 +27,19 @@ if __name__ == "__main__" and __package__ is None:
     sys.path.insert(0, str(_THIS.parent.parent))
     __package__ = _THIS.parent.name
 
-from . import config as _config_mod
-from . import logger as _logger_mod
-from . import lockfile as _lock
-from . import mongo as _mongo_mod
-from . import orfaos as _orfaos
-from .loop_principal import loop_principal, request_shutdown
+# stdout robusto (os scripts ALV usam print() com unicode; evita crash em console cp1252)
+try:
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+except Exception:
+    pass
+
+from .core import config as _config_mod
+from .core import logger as _logger_mod
+from .core import lockfile as _lock
+from .core import mongo as _mongo_mod
+from .core import orfaos as _orfaos
+from .core.loop_principal import loop_principal, request_shutdown
 
 VERSAO = "0.1.0-IM-D1"
 
@@ -88,7 +95,7 @@ def main() -> int:
         log.warning("daemon: falha em detectar_orfaos (continua): %s", e)
 
     # IM-E5 conectado: executor.executar_job substitui o stub do bloco D.
-    from .executor import executar_job
+    from .core.executor import executar_job
     try:
         loop_principal(db, cfg, dispatcher=executar_job)
     except KeyboardInterrupt:

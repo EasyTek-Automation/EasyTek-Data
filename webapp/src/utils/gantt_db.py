@@ -1,8 +1,8 @@
 # src/utils/gantt_db.py
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from bson import ObjectId
-from src.database.connection import get_mongo_connection
+from src.database.connection import get_mongo_connection, get_mongo_client
 
 
 # ---------------------------------------------------------------------------
@@ -672,3 +672,271 @@ def get_audit_log(limit=200):
     if col is None:
         return []
     return [_serialize(d) for d in col.find().sort("timestamp", -1).limit(limit)]
+
+
+# ---------------------------------------------------------------------------
+# Reagendamento de plano — deslocamento de baseline (BR-19 / SP-16 / DS-16)
+# ---------------------------------------------------------------------------
+
+def _collect_project_subtree(project_id):
+    """Lê a subárvore completa do projeto em uma query por coleção (sem N+1).
+
+    Retorna dict com o doc do projeto, listas de ObjectId de categorias/atividades,
+    os docs brutos das atribuições (precisamos das datas + funcionário para detectar
+    conflito) e as contagens por tipo. Retorna None se projeto inexistente/sem banco.
+    """
+    proj_col = _col("gantt_projects")
+    cat_col  = _col("gantt_categories")
+    act_col  = _col("gantt_activities")
+    asg_col  = _col("gantt_assignments")
+    if proj_col is None:
+        return None
+    pid = ObjectId(project_id)
+    projeto = proj_col.find_one({"_id": pid})
+    if projeto is None:
+        return None
+    cat_ids = [c["_id"] for c in cat_col.find({"projeto_id": pid}, {"_id": 1})]
+    act_ids = (
+        [a["_id"] for a in act_col.find({"categoria_id": {"$in": cat_ids}}, {"_id": 1})]
+        if cat_ids else []
+    )
+    asg_docs = list(asg_col.find({"atividade_id": {"$in": act_ids}})) if act_ids else []
+    return {
+        "projeto":       projeto,
+        "pid":           pid,
+        "categoria_ids": cat_ids,
+        "atividade_ids": act_ids,
+        "atribuicoes":   asg_docs,
+        "contagens": {
+            "categorias":  len(cat_ids),
+            "atividades":  len(act_ids),
+            "atribuicoes": len(asg_docs),
+        },
+    }
+
+
+def _project_names_for_activities(activity_ids):
+    """Mapa atividade_id(str) -> nome do projeto (ativ→categoria→projeto) em batch."""
+    act_col  = _col("gantt_activities")
+    cat_col  = _col("gantt_categories")
+    proj_col = _col("gantt_projects")
+    if not activity_ids or act_col is None:
+        return {}
+    oids = [ObjectId(a) for a in activity_ids]
+    acts = list(act_col.find({"_id": {"$in": oids}}, {"categoria_id": 1}))
+    cat_ids = list({a["categoria_id"] for a in acts})
+    cats = {c["_id"]: c.get("projeto_id") for c in cat_col.find({"_id": {"$in": cat_ids}}, {"projeto_id": 1})}
+    proj_ids = list({v for v in cats.values() if v is not None})
+    projs = {p["_id"]: p.get("nome", "") for p in proj_col.find({"_id": {"$in": proj_ids}}, {"nome": 1})}
+    out = {}
+    for a in acts:
+        out[str(a["_id"])] = projs.get(cats.get(a["categoria_id"]), "")
+    return out
+
+
+def _enrich_conflicts(raw):
+    """Resolve nomes de funcionário e projeto externo dos conflitos (batch) e
+    serializa para JSON (ObjectId→str, datetime→ISO)."""
+    if not raw:
+        return []
+    emp_ids = list({c["funcionario_id"] for c in raw})
+    ext_act_ids = list({str(c["atividade_externa_id"]) for c in raw})
+    emp_col = _col("gantt_employees")
+    emp_names = {}
+    if emp_col is not None and emp_ids:
+        for e in emp_col.find({"_id": {"$in": emp_ids}}, {"nome": 1}):
+            emp_names[e["_id"]] = e.get("nome", "")
+    proj_names = _project_names_for_activities(ext_act_ids)
+    out = []
+    for c in raw:
+        out.append({
+            "funcionario_id":        str(c["funcionario_id"]),
+            "funcionario_nome":      emp_names.get(c["funcionario_id"], "Funcionário"),
+            "atribuicao_id":         str(c["atribuicao_id"]),
+            "atividade_id":          str(c["atividade_id"]),
+            "atribuicao_externa_id": str(c["atribuicao_externa_id"]),
+            "projeto_externo":       proj_names.get(str(c["atividade_externa_id"]), ""),
+            "janela_inicio":         c["janela_inicio"].isoformat(),
+            "janela_fim":            c["janela_fim"].isoformat(),
+        })
+    return out
+
+
+def _detect_cross_project_conflicts(subtree, delta):
+    """Detecta conflitos de atribuição entre o projeto (datas + delta, em memória)
+    e atribuições do MESMO funcionário em OUTROS projetos (não deslocadas).
+
+    Mesmo critério de sobreposição de AssignmentConflictRule. Conflitos internos
+    ao projeto nunca ocorrem (deslocamento uniforme) — por isso excluímos as
+    próprias atribuições do projeto. delta=timedelta(0) recalcula pós-gravação.
+    """
+    asg_col = _col("gantt_assignments")
+    if asg_col is None:
+        return []
+    internal_ids = {a["_id"] for a in subtree["atribuicoes"]}
+    by_emp = {}
+    for a in subtree["atribuicoes"]:
+        by_emp.setdefault(a["funcionario_id"], []).append(a)
+
+    raw = []
+    for emp_id, internas in by_emp.items():
+        todas = list(asg_col.find({"funcionario_id": emp_id}))
+        externas = [e for e in todas if e["_id"] not in internal_ids]
+        if not externas:
+            continue
+        for ai in internas:
+            ai_s = ai["data_hora_entrada"] + delta
+            ai_e = ai["data_hora_saida"] + delta
+            for ext in externas:
+                if ai_s < ext["data_hora_saida"] and ext["data_hora_entrada"] < ai_e:
+                    raw.append({
+                        "funcionario_id":        emp_id,
+                        "atribuicao_id":         ai["_id"],
+                        "atividade_id":          ai["atividade_id"],
+                        "atribuicao_externa_id": ext["_id"],
+                        "atividade_externa_id":  ext["atividade_id"],
+                        "janela_inicio":         max(ai_s, ext["data_hora_entrada"]),
+                        "janela_fim":            min(ai_e, ext["data_hora_saida"]),
+                    })
+    return _enrich_conflicts(raw)
+
+
+def preview_reschedule_project(project_id, novo_inicio):
+    """Calcula o efeito de reagendar o projeto SEM gravar nada (SP-16 item 4).
+
+    Retorna dict com delta, datas, contagens por tipo e conflitos cross-projeto
+    que seriam gerados. Retorna None se projeto inexistente/sem banco.
+    """
+    subtree = _collect_project_subtree(project_id)
+    if subtree is None:
+        return None
+    inicio_atual = subtree["projeto"]["data_hora_inicio"]
+    delta = novo_inicio - inicio_atual
+    sem_mudanca = (delta == timedelta(0))
+    conflitos = [] if sem_mudanca else _detect_cross_project_conflicts(subtree, delta)
+    return {
+        "sem_mudanca":   sem_mudanca,
+        "delta_segundos": delta.total_seconds(),
+        "inicio_atual":  inicio_atual.isoformat(),
+        "inicio_novo":   novo_inicio.isoformat(),
+        "contagens":     subtree["contagens"],
+        "conflitos":     conflitos,
+    }
+
+
+def _build_reschedule_audit(subtree, inicio_atual, novo_inicio, n_conflitos,
+                            usuario_id=None, usuario_nome=None):
+    """Monta a entrada de auditoria (BR-13) do reagendamento."""
+    c = subtree["contagens"]
+    delta = novo_inicio - inicio_atual
+    return {
+        "timestamp":      _now(),
+        "usuario_id":     usuario_id,
+        "usuario_nome":   usuario_nome,
+        "entidade":       "projeto",
+        "entidade_id":    str(subtree["pid"]),
+        "entidade_nome":  subtree["projeto"].get("nome", ""),
+        "acao":           "reagendamento",
+        "campo_alterado": "data_hora_inicio",
+        "valor_anterior": inicio_atual.isoformat(),
+        "valor_novo":     novo_inicio.isoformat(),
+        "detalhe": {
+            "delta_segundos":  delta.total_seconds(),
+            "categorias":      c["categorias"],
+            "atividades":      c["atividades"],
+            "atribuicoes":     c["atribuicoes"],
+            "conflitos_gerados": n_conflitos,
+        },
+    }
+
+
+def reschedule_project(project_id, novo_inicio, usuario_id=None, usuario_nome=None):
+    """Desloca todas as datas da subárvore do projeto pelo delta, atomicamente.
+
+    SP-16 itens 5-7, 10. Aplica o mesmo delta (intervalo puro) a projeto,
+    categorias, atividades e atribuições via $dateAdd, dentro de uma transação
+    MongoDB (tudo-ou-nada). Registra auditoria na mesma transação. Retorna dict
+    {ok, contagens, conflitos} ou {ok: False, erro}.
+    """
+    subtree = _collect_project_subtree(project_id)
+    if subtree is None:
+        return {"ok": False, "erro": "Projeto não encontrado."}
+    inicio_atual = subtree["projeto"]["data_hora_inicio"]
+    delta = novo_inicio - inicio_atual
+    if delta == timedelta(0):
+        return {"ok": False, "sem_mudanca": True, "erro": "Nova data igual à atual — nada a fazer."}
+
+    client = get_mongo_client()
+    if client is None:
+        return {"ok": False, "erro": "Sem conexão com o banco de dados."}
+
+    pid      = subtree["pid"]
+    cat_ids  = subtree["categoria_ids"]
+    act_ids  = subtree["atividade_ids"]
+    delta_ms = int(delta.total_seconds() * 1000)
+
+    def _shift(field):
+        return {field: {"$dateAdd": {"startDate": f"${field}", "unit": "millisecond", "amount": delta_ms}}}
+
+    proj_col  = _col("gantt_projects")
+    cat_col   = _col("gantt_categories")
+    act_col   = _col("gantt_activities")
+    asg_col   = _col("gantt_assignments")
+    audit_col = _col("gantt_audit_log")
+
+    # Conflitos calculados em memória (pré-gravação) para gravar a contagem na auditoria.
+    conflitos_preview = _detect_cross_project_conflicts(subtree, delta)
+
+    try:
+        with client.start_session() as session:
+            with session.start_transaction():
+                proj_col.update_one(
+                    {"_id": pid},
+                    [{"$set": {**_shift("data_hora_inicio"), **_shift("data_hora_fim"),
+                               "atualizado_em": _now()}}],
+                    session=session,
+                )
+                if cat_ids:
+                    cat_col.update_many(
+                        {"projeto_id": pid},
+                        [{"$set": {**_shift("data_hora_inicio"), **_shift("data_hora_fim"),
+                                   "atualizado_em": _now()}}],
+                        session=session,
+                    )
+                if act_ids:
+                    act_col.update_many(
+                        {"categoria_id": {"$in": cat_ids}},
+                        [{"$set": {**_shift("data_hora_inicio"), **_shift("data_hora_fim"),
+                                   "atualizado_em": _now()}}],
+                        session=session,
+                    )
+                    asg_col.update_many(
+                        {"atividade_id": {"$in": act_ids}},
+                        [{"$set": {**_shift("data_hora_entrada"), **_shift("data_hora_saida"),
+                                   "atualizado_em": _now()}}],
+                        session=session,
+                    )
+                if audit_col is not None:
+                    audit_col.insert_one(
+                        _build_reschedule_audit(subtree, inicio_atual, novo_inicio,
+                                                len(conflitos_preview), usuario_id, usuario_nome),
+                        session=session,
+                    )
+    except Exception as e:
+        msg = str(e)
+        low = msg.lower()
+        if "replica set" in low or "transaction numbers" in low or "transaction" in low:
+            return {"ok": False, "erro": (
+                "Transação não suportada pelo MongoDB atual (reagendamento exige replica set). "
+                f"Detalhe: {msg}"
+            )}
+        return {"ok": False, "erro": f"Falha ao reagendar: {msg}"}
+
+    # Recalcula conflitos a partir do banco já deslocado (SP-16 item 9).
+    subtree_after = _collect_project_subtree(project_id)
+    conflitos = _detect_cross_project_conflicts(subtree_after, timedelta(0)) if subtree_after else []
+    return {
+        "ok":        True,
+        "contagens": subtree["contagens"],
+        "conflitos": conflitos,
+    }

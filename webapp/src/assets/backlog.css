@@ -1,0 +1,92 @@
+/* Backlog de Manutenção — ajustes finos da página /maintenance/backlog */
+
+/* Campos de filtro — contorno forte com accent navy Tekmont (#08137C) */
+.bk-field {
+  border: 1px solid #b9bedb;
+  border-left: 4px solid #08137C;
+  box-shadow: 0 1px 2px rgba(8, 19, 124, 0.06);
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+.bk-field:hover {
+  border-color: #08137C;
+  box-shadow: 0 2px 8px rgba(8, 19, 124, 0.14);
+}
+.bk-field-label {
+  color: #08137C;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  font-size: 0.72rem;
+}
+
+/* cabeçalho do accordion de filtros com leve tom navy + sombra navy atrás */
+.accordion-button:not(.collapsed) {
+  color: #08137C;
+  background-color: rgba(8, 19, 124, 0.06);
+}
+.accordion-button:focus {
+  box-shadow: 0 0 0 0.15rem rgba(8, 19, 124, 0.25);
+}
+.bk-filtros-acc .accordion-button {
+  box-shadow: 0 3px 8px rgba(8, 19, 124, 0.22);
+}
+.bk-filtros-acc .accordion-button:focus {
+  box-shadow: 0 3px 8px rgba(8, 19, 124, 0.22), 0 0 0 0.15rem rgba(8, 19, 124, 0.25);
+}
+
+/* botões navy-outline (Atualizar agora / Exportar) */
+.bk-btn-navy-outline {
+  color: #08137C;
+  border: 1px solid #08137C;
+  background-color: transparent;
+}
+.bk-btn-navy-outline:hover,
+.bk-btn-navy-outline:focus {
+  color: #fff;
+  background-color: #08137C;
+  border-color: #08137C;
+  box-shadow: 0 0 0 0.15rem rgba(8, 19, 124, 0.25);
+}
+.bk-btn-navy-outline:disabled {
+  color: #08137C;
+  border-color: #08137C;
+  opacity: 0.5;
+}
+
+/* DatePickerRange em UMA linha (o default do Dash empilha De / seta / Até) */
+.bk-daterange .DateRangePickerInput {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  border-radius: 0.375rem;
+}
+.bk-daterange .DateInput {
+  width: 108px;
+  display: inline-block;
+}
+.bk-daterange .DateInput_input {
+  font-size: 0.85rem;
+  padding: 5px 8px;
+  line-height: 1.2;
+}
+.bk-daterange .DateRangePickerInput_arrow {
+  padding: 0 4px;
+}
+/* calendário aberto: por cima de tudo (cards/tabela), sem ser clipado pelo painel */
+.bk-daterange .DateRangePicker_picker {
+  z-index: 2000;
+}
+
+/* painel de filtros: cantos arredondados SEM overflow:hidden (que clipava o
+   calendário). Arredonda o header do accordion pra casar com a borda do painel. */
+.bk-filtros-panel { position: relative; }
+.bk-filtros-acc .accordion-button {
+  border-top-left-radius: 0.45rem;
+  border-top-right-radius: 0.45rem;
+}
+
+/* checkboxes dos filtros — leve respiro entre linhas quando quebram */
+#bk-f-categoria .form-check,
+#bk-f-disciplina .form-check,
+#bk-f-subclass .form-check {
+  margin-bottom: 0.25rem;
+}
