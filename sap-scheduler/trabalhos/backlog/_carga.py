@@ -41,4 +41,5 @@ def ensure_indexes(db, coll: str) -> None:
     c.create_index([("disciplina", 1)], name="idx_disciplina")
     c.create_index([("subclassificacao", 1)], name="idx_subclass")
     c.create_index([("data_inicio", 1)], name="idx_data_inicio")
+    c.create_index([("data_criacao", 1)], name="idx_data_criacao")
     c.create_index([("ordem", 1)], name="idx_ordem")

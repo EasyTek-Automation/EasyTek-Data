@@ -1,0 +1,641 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-200 -110 1340 640">
+  <defs>
+    <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.20" />
+    </filter>
+    <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbfbfa" />
+      <stop offset="1" stop-color="#ecece8" />
+    </linearGradient>
+    <radialGradient id="steel" cx="38%" cy="34%" r="72%">
+      <stop offset="0" stop-color="#f4f5f6" />
+      <stop offset="0.55" stop-color="#c9cbce" />
+      <stop offset="1" stop-color="#94969a" />
+    </radialGradient>
+    <pattern id="pit" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="6" height="6" fill="#d9dad8" />
+      <line x1="0" y1="0" x2="0" y2="6" stroke="#a9aaa7" stroke-width="1.1" />
+    </pattern>
+  </defs>
+  <rect x="-180" y="-95" width="420" height="610" rx="16" fill="url(#floor)" stroke="#e0e0db" stroke-width="1" />
+  <rect x="260" y="-95" width="420" height="610" rx="16" fill="url(#floor)" stroke="#e0e0db" stroke-width="1" />
+  <rect x="700" y="-95" width="420" height="610" rx="16" fill="url(#floor)" stroke="#e0e0db" stroke-width="1" />
+  <text class="linelbl" x="30" y="-74" text-anchor="middle">LCP02</text>
+  <text class="linelbl" x="470" y="-74" text-anchor="middle">LCP01</text>
+  <text class="linelbl" x="910" y="-74" text-anchor="middle">LCT2,5</text>
+  <g id="lineA" transform="translate(79,0)" data-ativo="LCP01">
+    <g transform="rotate(90 330 212)">
+      <path class="flow" d="M118 193 H612" marker-end="url(#arrow)" />
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M1 1 L9 5 L1 9" fill="none" stroke="#9aa0a6" stroke-width="1.6" stroke-linecap="round" />
+        </marker>
+      </defs>
+      <g class="machine" id="m1" data-name="Desbobinador" data-conj="LCP01.DESBOBINADOR">
+        <g transform="translate(68,214)">
+          <rect class="hub" x="11" y="0" width="8" height="8" rx="1" />
+          <rect class="body" x="7" y="7" width="16" height="7" rx="2" />
+          <rect class="body" x="3" y="13" width="24" height="30" rx="3" />
+          <line class="detail" x1="6" y1="18" x2="24" y2="18" />
+          <line class="detail" x1="6" y1="23" x2="24" y2="23" />
+          <line class="detail" x1="6" y1="28" x2="24" y2="28" />
+          <line class="detail" x1="6" y1="33" x2="24" y2="33" />
+          <line class="detail" x1="6" y1="38" x2="24" y2="38" />
+          <rect class="hub" x="26" y="18" width="7" height="13" rx="1" />
+          <rect class="body" x="3" y="42" width="24" height="10" rx="5" />
+        </g>
+        <rect class="body" x="54" y="146" width="58" height="74" rx="6" />
+        <rect class="bevel" x="57" y="149" width="52" height="68" rx="5" />
+        <rect class="coil" x="62" y="152" width="42" height="42" rx="4" />
+        <line class="ring" x1="69" y1="154" x2="69" y2="192" />
+        <line class="ring" x1="76" y1="154" x2="76" y2="192" />
+        <line class="ring" x1="90" y1="154" x2="90" y2="192" />
+        <line class="ring" x1="97" y1="154" x2="97" y2="192" />
+        <line class="hub" x1="83" y1="140" x2="83" y2="216" stroke-width="3.4" />
+        <circle class="hub" cx="83" cy="173" r="4.5" />
+        <path class="detail" d="M62 158 q-10 6 -8 15" stroke-width="2" />
+        <circle class="hub" cx="54" cy="173" r="3.4" />
+      </g>
+      <g class="machine" id="m2" data-name="Pinch roll" data-conj="LCP01.PINCH_ROLL">
+        <g transform="translate(133,232)">
+          <rect class="hub" x="11" y="0" width="8" height="8" rx="1" />
+          <rect class="body" x="7" y="7" width="16" height="7" rx="2" />
+          <rect class="body" x="3" y="13" width="24" height="30" rx="3" />
+          <line class="detail" x1="6" y1="18" x2="24" y2="18" />
+          <line class="detail" x1="6" y1="23" x2="24" y2="23" />
+          <line class="detail" x1="6" y1="28" x2="24" y2="28" />
+          <line class="detail" x1="6" y1="33" x2="24" y2="33" />
+          <line class="detail" x1="6" y1="38" x2="24" y2="38" />
+          <rect class="hub" x="26" y="18" width="7" height="13" rx="1" />
+          <rect class="body" x="3" y="42" width="24" height="10" rx="5" />
+        </g>
+        <rect class="body" x="130" y="158" width="36" height="72" rx="6" />
+        <rect class="bevel" x="133" y="161" width="30" height="66" rx="5" />
+        <rect class="coil" x="135" y="164" width="9" height="60" rx="4" />
+        <rect class="coil" x="152" y="164" width="9" height="60" rx="4" />
+      </g>
+      <g class="machine" id="m3" data-name="Aplainadora" data-conj="LCP01.APLANADORA">
+        <g transform="translate(197,248)">
+          <rect class="hub" x="11" y="0" width="8" height="8" rx="1" />
+          <rect class="body" x="7" y="7" width="16" height="7" rx="2" />
+          <rect class="body" x="3" y="13" width="24" height="30" rx="3" />
+          <line class="detail" x1="6" y1="18" x2="24" y2="18" />
+          <line class="detail" x1="6" y1="23" x2="24" y2="23" />
+          <line class="detail" x1="6" y1="28" x2="24" y2="28" />
+          <line class="detail" x1="6" y1="33" x2="24" y2="33" />
+          <line class="detail" x1="6" y1="38" x2="24" y2="38" />
+          <rect class="hub" x="26" y="18" width="7" height="13" rx="1" />
+          <rect class="body" x="3" y="42" width="24" height="10" rx="5" />
+        </g>
+        <rect class="body" x="176" y="150" width="72" height="96" rx="6" />
+        <rect class="bevel" x="179" y="153" width="66" height="90" rx="5" />
+        <rect class="coil" x="184" y="162" width="6" height="72" rx="3" />
+        <rect class="coil" x="196" y="162" width="6" height="72" rx="3" />
+        <rect class="coil" x="208" y="162" width="6" height="72" rx="3" />
+        <rect class="coil" x="220" y="162" width="6" height="72" rx="3" />
+        <rect class="coil" x="232" y="162" width="6" height="72" rx="3" />
+      </g>
+      <g class="machine" id="m4" data-name="Fosso de laço" data-conj="LCP01.FOSSO_DE_LACO">
+        <rect class="body" x="258" y="146" width="64" height="104" rx="6" />
+        <rect class="bevel" x="261" y="149" width="58" height="98" rx="5" />
+        <rect x="266" y="158" width="48" height="80" rx="3" fill="url(#pit)" stroke="var(--stroke)" stroke-width="1.1" />
+        <rect class="coil" x="260" y="184" width="6" height="20" rx="2" />
+        <rect class="coil" x="314" y="184" width="6" height="20" rx="2" />
+        <circle class="hub" cx="290" cy="164" r="3" />
+        <circle class="hub" cx="290" cy="232" r="3" />
+      </g>
+      <g class="machine" id="m5" data-name="Alimentador" data-conj="LCP01.ALIMENTADOR">
+        <g transform="translate(339,232)">
+          <rect class="hub" x="11" y="0" width="8" height="8" rx="1" />
+          <rect class="body" x="7" y="7" width="16" height="7" rx="2" />
+          <rect class="body" x="3" y="13" width="24" height="30" rx="3" />
+          <line class="detail" x1="6" y1="18" x2="24" y2="18" />
+          <line class="detail" x1="6" y1="23" x2="24" y2="23" />
+          <line class="detail" x1="6" y1="28" x2="24" y2="28" />
+          <line class="detail" x1="6" y1="33" x2="24" y2="33" />
+          <line class="detail" x1="6" y1="38" x2="24" y2="38" />
+          <rect class="hub" x="26" y="18" width="7" height="13" rx="1" />
+          <rect class="body" x="3" y="42" width="24" height="10" rx="5" />
+        </g>
+        <rect class="body" x="332" y="158" width="44" height="72" rx="6" />
+        <rect class="bevel" x="335" y="161" width="38" height="66" rx="5" />
+        <rect class="coil" x="338" y="164" width="8" height="60" rx="4" />
+        <rect class="coil" x="360" y="164" width="8" height="60" rx="4" />
+      </g>
+      <g class="machine" id="m6" data-name="Prensa Fagor" data-conj="LCP01.PRENSA_FAGOR">
+        <rect class="body" x="386" y="98" width="92" height="204" rx="8" />
+        <rect class="bevel" x="390" y="102" width="84" height="196" rx="7" />
+        <rect class="fill-detail" x="396" y="106" width="72" height="26" rx="4" />
+        <rect class="detail" x="396" y="106" width="72" height="26" rx="4" />
+        <rect class="coil" x="398" y="146" width="68" height="108" rx="4" />
+        <rect class="detail" x="414" y="166" width="36" height="68" rx="2" stroke-dasharray="5 4" />
+        <circle class="hub" cx="400" cy="120" r="8" />
+        <circle class="detail" cx="400" cy="120" r="3.5" />
+        <circle class="hub" cx="464" cy="120" r="8" />
+        <circle class="detail" cx="464" cy="120" r="3.5" />
+        <circle class="hub" cx="400" cy="280" r="8" />
+        <circle class="detail" cx="400" cy="280" r="3.5" />
+        <circle class="hub" cx="464" cy="280" r="8" />
+        <circle class="detail" cx="464" cy="280" r="3.5" />
+        <circle class="hub" cx="432" cy="290" r="13" />
+        <circle class="detail" cx="432" cy="290" r="6" />
+      </g>
+      <g class="machine" id="m7" data-name="Esteira de saída" data-conj="LCP01.ESTEIRA_DE_SAIDA">
+        <g transform="translate(499,222)">
+          <rect class="hub" x="11" y="0" width="8" height="8" rx="1" />
+          <rect class="body" x="7" y="7" width="16" height="7" rx="2" />
+          <rect class="body" x="3" y="13" width="24" height="30" rx="3" />
+          <line class="detail" x1="6" y1="18" x2="24" y2="18" />
+          <line class="detail" x1="6" y1="23" x2="24" y2="23" />
+          <line class="detail" x1="6" y1="28" x2="24" y2="28" />
+          <line class="detail" x1="6" y1="33" x2="24" y2="33" />
+          <line class="detail" x1="6" y1="38" x2="24" y2="38" />
+          <rect class="hub" x="26" y="18" width="7" height="13" rx="1" />
+          <rect class="body" x="3" y="42" width="24" height="10" rx="5" />
+        </g>
+        <rect class="body" x="490" y="168" width="48" height="50" rx="6" />
+        <rect class="bevel" x="493" y="171" width="42" height="44" rx="5" />
+        <rect class="coil" x="496" y="174" width="4" height="38" rx="2" />
+        <rect class="coil" x="505" y="174" width="4" height="38" rx="2" />
+        <rect class="coil" x="514" y="174" width="4" height="38" rx="2" />
+        <rect class="coil" x="523" y="174" width="4" height="38" rx="2" />
+      </g>
+      <g class="machine" id="m8" data-name="Empilhador 1" data-conj="LCP01.EMPILHADOR_1">
+        <rect class="body" x="546" y="150" width="40" height="84" rx="6" />
+        <rect class="bevel" x="549" y="153" width="34" height="78" rx="5" />
+        <rect class="coil" x="554" y="168" width="24" height="40" rx="2" />
+        <line class="ring" x1="554" y1="176" x2="578" y2="176" />
+        <line class="ring" x1="554" y1="186" x2="578" y2="186" />
+        <line class="ring" x1="554" y1="196" x2="578" y2="196" />
+        <line class="ring" x1="554" y1="206" x2="578" y2="206" />
+        <rect class="detail" x="552" y="212" width="28" height="7" rx="2" />
+        <rect class="detail" x="548" y="116" width="36" height="6" rx="2" />
+        <rect class="detail" x="548" y="127" width="36" height="6" rx="2" />
+        <line class="detail" x1="554" y1="116" x2="554" y2="133" />
+        <line class="detail" x1="566" y1="116" x2="566" y2="133" />
+        <line class="detail" x1="578" y1="116" x2="578" y2="133" />
+      </g>
+      <g class="machine" id="m9" data-name="Empilhador 2" data-conj="LCP01.EMPILHADOR_2">
+        <rect class="body" x="590" y="150" width="40" height="84" rx="6" />
+        <rect class="bevel" x="593" y="153" width="34" height="78" rx="5" />
+        <rect class="coil" x="598" y="168" width="24" height="40" rx="2" />
+        <line class="ring" x1="598" y1="176" x2="622" y2="176" />
+        <line class="ring" x1="598" y1="186" x2="622" y2="186" />
+        <line class="ring" x1="598" y1="196" x2="622" y2="196" />
+        <line class="ring" x1="598" y1="206" x2="622" y2="206" />
+        <rect class="detail" x="596" y="212" width="28" height="7" rx="2" />
+        <rect class="detail" x="592" y="116" width="36" height="6" rx="2" />
+        <rect class="detail" x="592" y="127" width="36" height="6" rx="2" />
+        <line class="detail" x1="598" y1="116" x2="598" y2="133" />
+        <line class="detail" x1="610" y1="116" x2="610" y2="133" />
+        <line class="detail" x1="622" y1="116" x2="622" y2="133" />
+      </g>
+    </g>
+    <g class="machine" id="mc" data-name="Carga de bobinas" filter="url(#shadow)" data-conj="LCP01.CARGA_DE_BOBINAS">
+      <rect x="398" y="-72" width="164" height="50" rx="6" fill="none" stroke="#9aa0a6" stroke-width="1.3" stroke-dasharray="6 4" />
+      <line x1="398" y1="-58" x2="452" y2="-58" stroke="#b7b9bc" stroke-width="2.2" />
+      <line x1="398" y1="-32" x2="452" y2="-32" stroke="#b7b9bc" stroke-width="2.2" />
+      <rect class="body" x="404" y="-64" width="44" height="38" rx="3" />
+      <rect x="411" y="-58" width="30" height="26" rx="3" fill="url(#steel)" stroke="#3a3a37" stroke-width="1.1" />
+      <line x1="418" y1="-56" x2="418" y2="-34" stroke="#8b8d90" stroke-width=".9" opacity=".6" />
+      <line x1="426" y1="-56" x2="426" y2="-34" stroke="#8b8d90" stroke-width=".9" opacity=".6" />
+      <line x1="434" y1="-56" x2="434" y2="-34" stroke="#8b8d90" stroke-width=".9" opacity=".6" />
+      <circle cx="410" cy="-58" r="2.4" fill="#b7b9bc" stroke="#3a3a37" stroke-width=".8" />
+      <circle cx="442" cy="-58" r="2.4" fill="#b7b9bc" stroke="#3a3a37" stroke-width=".8" />
+      <circle cx="410" cy="-32" r="2.4" fill="#b7b9bc" stroke="#3a3a37" stroke-width=".8" />
+      <circle cx="442" cy="-32" r="2.4" fill="#b7b9bc" stroke="#3a3a37" stroke-width=".8" />
+      <g>
+        <rect class="body" x="466" y="-46" width="26" height="7" rx="2" />
+        <rect x="468" y="-66" width="22" height="20" rx="3" fill="url(#steel)" stroke="#3a3a37" stroke-width="1" />
+        <line x1="474" y1="-64" x2="474" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+        <line x1="481" y1="-64" x2="481" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+      </g>
+      <g>
+        <rect class="body" x="500" y="-46" width="26" height="7" rx="2" />
+        <rect x="502" y="-66" width="22" height="20" rx="3" fill="url(#steel)" stroke="#3a3a37" stroke-width="1" />
+        <line x1="508" y1="-64" x2="508" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+        <line x1="515" y1="-64" x2="515" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+      </g>
+      <g>
+        <rect class="body" x="534" y="-46" width="26" height="7" rx="2" />
+        <rect x="536" y="-66" width="22" height="20" rx="3" fill="url(#steel)" stroke="#3a3a37" stroke-width="1" />
+        <line x1="542" y1="-64" x2="542" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+        <line x1="549" y1="-64" x2="549" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+      </g>
+    </g>
+  </g>
+  <g id="lineC" transform="translate(671,-50) rotate(90 279 211)" data-ativo="LCT2,5">
+    <path class="flow" d="M104 252 H492 V100" marker-end="url(#arrow)" />
+    <g class="machine" id="n2" data-name="Desbobinador" data-conj="LCT2,5.DESBOBINADOR">
+      <g transform="translate(68,162)">
+        <rect class="body" x="3" y="0" width="24" height="10" rx="5" />
+        <rect class="body" x="3" y="9" width="24" height="30" rx="3" />
+        <line class="detail" x1="6" y1="14" x2="24" y2="14" />
+        <line class="detail" x1="6" y1="19" x2="24" y2="19" />
+        <line class="detail" x1="6" y1="24" x2="24" y2="24" />
+        <line class="detail" x1="6" y1="29" x2="24" y2="29" />
+        <line class="detail" x1="6" y1="34" x2="24" y2="34" />
+        <rect class="hub" x="26" y="15" width="7" height="13" rx="1" />
+        <rect class="body" x="7" y="38" width="16" height="7" rx="2" />
+        <rect class="hub" x="11" y="44" width="8" height="8" rx="1" />
+      </g>
+      <rect class="body" x="54" y="214" width="58" height="74" rx="6" />
+      <rect class="bevel" x="57" y="217" width="52" height="68" rx="5" />
+      <rect class="coil" x="62" y="220" width="42" height="42" rx="4" />
+      <line class="ring" x1="69" y1="222" x2="69" y2="260" />
+      <line class="ring" x1="76" y1="222" x2="76" y2="260" />
+      <line class="ring" x1="90" y1="222" x2="90" y2="260" />
+      <line class="ring" x1="97" y1="222" x2="97" y2="260" />
+      <line class="hub" x1="83" y1="208" x2="83" y2="284" stroke-width="3.4" />
+      <circle class="hub" cx="83" cy="241" r="4.5" />
+      <path class="detail" d="M62 226 q-10 6 -8 15" stroke-width="2" />
+      <circle class="hub" cx="54" cy="241" r="3.4" />
+    </g>
+    <g class="machine" id="n3" data-name="Endireitadeira" data-conj="LCT2,5.ENDIREITADEIRA">
+      <g transform="translate(117,168)">
+        <rect class="body" x="3" y="0" width="24" height="10" rx="5" />
+        <rect class="body" x="3" y="9" width="24" height="30" rx="3" />
+        <line class="detail" x1="6" y1="14" x2="24" y2="14" />
+        <line class="detail" x1="6" y1="19" x2="24" y2="19" />
+        <line class="detail" x1="6" y1="24" x2="24" y2="24" />
+        <line class="detail" x1="6" y1="29" x2="24" y2="29" />
+        <line class="detail" x1="6" y1="34" x2="24" y2="34" />
+        <rect class="hub" x="26" y="15" width="7" height="13" rx="1" />
+        <rect class="body" x="7" y="38" width="16" height="7" rx="2" />
+        <rect class="hub" x="11" y="44" width="8" height="8" rx="1" />
+      </g>
+      <rect class="body" x="112" y="220" width="40" height="64" rx="5" />
+      <rect class="bevel" x="115" y="223" width="34" height="58" rx="4" />
+      <rect class="coil" x="122" y="228" width="6" height="48" rx="3" />
+      <rect class="coil" x="134" y="228" width="6" height="48" rx="3" />
+    </g>
+    <g class="machine" id="n4" data-name="Aplanadora" data-conj="LCT2,5.APLANADORA">
+      <g transform="translate(175,164)">
+        <rect class="body" x="3" y="0" width="24" height="10" rx="5" />
+        <rect class="body" x="3" y="9" width="24" height="30" rx="3" />
+        <line class="detail" x1="6" y1="14" x2="24" y2="14" />
+        <line class="detail" x1="6" y1="19" x2="24" y2="19" />
+        <line class="detail" x1="6" y1="24" x2="24" y2="24" />
+        <line class="detail" x1="6" y1="29" x2="24" y2="29" />
+        <line class="detail" x1="6" y1="34" x2="24" y2="34" />
+        <rect class="hub" x="26" y="15" width="7" height="13" rx="1" />
+        <rect class="body" x="7" y="38" width="16" height="7" rx="2" />
+        <rect class="hub" x="11" y="44" width="8" height="8" rx="1" />
+      </g>
+      <rect class="body" x="156" y="216" width="68" height="70" rx="6" />
+      <rect class="bevel" x="159" y="219" width="62" height="64" rx="5" />
+      <rect class="coil" x="162" y="224" width="5" height="58" rx="2" />
+      <rect class="coil" x="174" y="224" width="5" height="58" rx="2" />
+      <rect class="coil" x="186" y="224" width="5" height="58" rx="2" />
+      <rect class="coil" x="198" y="224" width="5" height="58" rx="2" />
+      <rect class="coil" x="210" y="224" width="5" height="58" rx="2" />
+    </g>
+    <g class="machine" id="n5" data-name="Mesa de roletes" data-conj="LCT2,5.MESA_DE_ROLETES">
+      <g transform="translate(245,184)">
+        <rect class="body" x="3" y="0" width="24" height="10" rx="5" />
+        <rect class="body" x="3" y="9" width="24" height="30" rx="3" />
+        <line class="detail" x1="6" y1="14" x2="24" y2="14" />
+        <line class="detail" x1="6" y1="19" x2="24" y2="19" />
+        <line class="detail" x1="6" y1="24" x2="24" y2="24" />
+        <line class="detail" x1="6" y1="29" x2="24" y2="29" />
+        <line class="detail" x1="6" y1="34" x2="24" y2="34" />
+        <rect class="hub" x="26" y="15" width="7" height="13" rx="1" />
+        <rect class="body" x="7" y="38" width="16" height="7" rx="2" />
+        <rect class="hub" x="11" y="44" width="8" height="8" rx="1" />
+      </g>
+      <rect class="body" x="232" y="236" width="56" height="40" rx="5" />
+      <rect class="bevel" x="235" y="239" width="50" height="34" rx="4" />
+      <rect class="coil" x="238" y="240" width="5" height="32" rx="2" />
+      <rect class="coil" x="248" y="240" width="5" height="32" rx="2" />
+      <rect class="coil" x="258" y="240" width="5" height="32" rx="2" />
+      <rect class="coil" x="268" y="240" width="5" height="32" rx="2" />
+      <rect class="coil" x="278" y="240" width="5" height="32" rx="2" />
+    </g>
+    <g class="machine" id="n6" data-name="Cisalha rotativa" data-conj="LCT2,5.CISALHA_ROTATIVA">
+      <g transform="translate(315,146)">
+        <rect class="body" x="3" y="0" width="24" height="10" rx="5" />
+        <rect class="body" x="3" y="9" width="24" height="30" rx="3" />
+        <line class="detail" x1="6" y1="14" x2="24" y2="14" />
+        <line class="detail" x1="6" y1="19" x2="24" y2="19" />
+        <line class="detail" x1="6" y1="24" x2="24" y2="24" />
+        <line class="detail" x1="6" y1="29" x2="24" y2="29" />
+        <line class="detail" x1="6" y1="34" x2="24" y2="34" />
+        <rect class="hub" x="26" y="15" width="7" height="13" rx="1" />
+        <rect class="body" x="7" y="38" width="16" height="7" rx="2" />
+        <rect class="hub" x="11" y="44" width="8" height="8" rx="1" />
+      </g>
+      <rect class="body" x="296" y="198" width="68" height="98" rx="6" />
+      <rect class="bevel" x="299" y="201" width="62" height="92" rx="5" />
+      <rect class="coil" x="304" y="212" width="12" height="72" rx="3" />
+      <rect class="coil" x="322" y="212" width="12" height="72" rx="3" />
+      <circle class="hub" cx="346" cy="240" r="10" />
+      <circle class="detail" cx="346" cy="240" r="5" />
+      <line class="detail" x1="346" y1="230" x2="346" y2="250" />
+      <line class="detail" x1="336" y1="240" x2="356" y2="240" />
+      <line class="detail" x1="300" y1="250" x2="360" y2="250" stroke-dasharray="5 4" />
+    </g>
+    <g class="machine" id="n7" data-name="Esteira de saída" data-conj="LCT2,5.ESTEIRA_DE_SAIDA">
+      <g transform="translate(406,186)">
+        <rect class="body" x="3" y="0" width="24" height="10" rx="5" />
+        <rect class="body" x="3" y="9" width="24" height="30" rx="3" />
+        <line class="detail" x1="6" y1="14" x2="24" y2="14" />
+        <line class="detail" x1="6" y1="19" x2="24" y2="19" />
+        <line class="detail" x1="6" y1="24" x2="24" y2="24" />
+        <line class="detail" x1="6" y1="29" x2="24" y2="29" />
+        <line class="detail" x1="6" y1="34" x2="24" y2="34" />
+        <rect class="hub" x="26" y="15" width="7" height="13" rx="1" />
+        <rect class="body" x="7" y="38" width="16" height="7" rx="2" />
+        <rect class="hub" x="11" y="44" width="8" height="8" rx="1" />
+      </g>
+      <rect class="body" x="372" y="238" width="98" height="30" rx="5" />
+      <rect class="bevel" x="375" y="241" width="92" height="24" rx="4" />
+      <rect class="coil" x="382" y="242" width="4" height="24" rx="2" />
+      <rect class="coil" x="392" y="242" width="4" height="24" rx="2" />
+      <rect class="coil" x="402" y="242" width="4" height="24" rx="2" />
+      <rect class="coil" x="412" y="242" width="4" height="24" rx="2" />
+      <rect class="coil" x="422" y="242" width="4" height="24" rx="2" />
+      <rect class="coil" x="432" y="242" width="4" height="24" rx="2" />
+      <rect class="coil" x="442" y="242" width="4" height="24" rx="2" />
+      <rect class="coil" x="452" y="242" width="4" height="24" rx="2" />
+      <rect class="coil" x="462" y="242" width="4" height="24" rx="2" />
+    </g>
+    <g class="machine" id="n8" data-name="Esteira transversal" data-conj="LCT2,5.ESTEIRA_TRANSVERSAL">
+      <g transform="translate(424,120)">
+        <rect class="body" x="0" y="3" width="10" height="24" rx="5" />
+        <rect class="body" x="9" y="3" width="30" height="24" rx="3" />
+        <line class="detail" x1="14" y1="6" x2="14" y2="24" />
+        <line class="detail" x1="19" y1="6" x2="19" y2="24" />
+        <line class="detail" x1="24" y1="6" x2="24" y2="24" />
+        <line class="detail" x1="29" y1="6" x2="29" y2="24" />
+        <line class="detail" x1="34" y1="6" x2="34" y2="24" />
+        <rect class="hub" x="15" y="-4" width="13" height="7" rx="1" />
+        <rect class="body" x="38" y="7" width="7" height="16" rx="2" />
+        <rect class="hub" x="44" y="10" width="8" height="8" rx="1" />
+      </g>
+      <rect class="body" x="478" y="132" width="42" height="138" rx="5" />
+      <rect class="bevel" x="481" y="135" width="36" height="132" rx="4" />
+      <rect class="coil" x="482" y="140" width="34" height="5" rx="2" />
+      <rect class="coil" x="482" y="152" width="34" height="5" rx="2" />
+      <rect class="coil" x="482" y="164" width="34" height="5" rx="2" />
+      <rect class="coil" x="482" y="176" width="34" height="5" rx="2" />
+      <rect class="coil" x="482" y="188" width="34" height="5" rx="2" />
+      <rect class="coil" x="482" y="200" width="34" height="5" rx="2" />
+      <rect class="coil" x="482" y="212" width="34" height="5" rx="2" />
+      <rect class="coil" x="482" y="224" width="34" height="5" rx="2" />
+      <rect class="coil" x="482" y="236" width="34" height="5" rx="2" />
+      <rect class="coil" x="482" y="248" width="34" height="5" rx="2" />
+      <rect class="coil" x="482" y="260" width="34" height="5" rx="2" />
+    </g>
+    <g class="machine" id="n9" data-name="Empilhador 1" data-conj="LCT2,5.EMPILHADOR_1">
+      <rect class="body" x="522" y="134" width="42" height="64" rx="5" />
+      <rect class="bevel" x="525" y="137" width="36" height="58" rx="4" />
+      <rect class="coil" x="528" y="140" width="30" height="40" rx="2" />
+      <line class="ring" x1="534" y1="142" x2="534" y2="178" />
+      <line class="ring" x1="542" y1="142" x2="542" y2="178" />
+      <line class="ring" x1="550" y1="142" x2="550" y2="178" />
+      <rect class="detail" x="526" y="182" width="34" height="6" rx="2" />
+    </g>
+    <g class="machine" id="n9b" data-name="Empilhador 2" data-conj="LCT2,5.EMPILHADOR_2">
+      <rect class="body" x="522" y="204" width="42" height="64" rx="5" />
+      <rect class="bevel" x="525" y="207" width="36" height="58" rx="4" />
+      <rect class="coil" x="528" y="210" width="30" height="40" rx="2" />
+      <line class="ring" x1="534" y1="212" x2="534" y2="248" />
+      <line class="ring" x1="542" y1="212" x2="542" y2="248" />
+      <line class="ring" x1="550" y1="212" x2="550" y2="248" />
+      <rect class="detail" x="526" y="252" width="34" height="6" rx="2" />
+    </g>
+  </g>
+  <g class="machine" id="nc" data-name="Carro de bobinas" filter="url(#shadow)" transform="translate(1269,0) scale(-1,1)" data-conj="LCT2,5.CARRO_DE_BOBINAS">
+    <rect x="398" y="-72" width="164" height="50" rx="6" fill="none" stroke="#9aa0a6" stroke-width="1.3" stroke-dasharray="6 4" />
+    <line x1="398" y1="-58" x2="452" y2="-58" stroke="#b7b9bc" stroke-width="2.2" />
+    <line x1="398" y1="-32" x2="452" y2="-32" stroke="#b7b9bc" stroke-width="2.2" />
+    <rect class="body" x="404" y="-64" width="44" height="38" rx="3" />
+    <rect x="411" y="-58" width="30" height="26" rx="3" fill="url(#steel)" stroke="#3a3a37" stroke-width="1.1" />
+    <line x1="418" y1="-56" x2="418" y2="-34" stroke="#8b8d90" stroke-width=".9" opacity=".6" />
+    <line x1="426" y1="-56" x2="426" y2="-34" stroke="#8b8d90" stroke-width=".9" opacity=".6" />
+    <line x1="434" y1="-56" x2="434" y2="-34" stroke="#8b8d90" stroke-width=".9" opacity=".6" />
+    <circle cx="410" cy="-58" r="2.4" fill="#b7b9bc" stroke="#3a3a37" stroke-width=".8" />
+    <circle cx="442" cy="-58" r="2.4" fill="#b7b9bc" stroke="#3a3a37" stroke-width=".8" />
+    <circle cx="410" cy="-32" r="2.4" fill="#b7b9bc" stroke="#3a3a37" stroke-width=".8" />
+    <circle cx="442" cy="-32" r="2.4" fill="#b7b9bc" stroke="#3a3a37" stroke-width=".8" />
+    <g>
+      <rect class="body" x="466" y="-46" width="26" height="7" rx="2" />
+      <rect x="468" y="-66" width="22" height="20" rx="3" fill="url(#steel)" stroke="#3a3a37" stroke-width="1" />
+      <line x1="474" y1="-64" x2="474" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+      <line x1="481" y1="-64" x2="481" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+    </g>
+    <g>
+      <rect class="body" x="500" y="-46" width="26" height="7" rx="2" />
+      <rect x="502" y="-66" width="22" height="20" rx="3" fill="url(#steel)" stroke="#3a3a37" stroke-width="1" />
+      <line x1="508" y1="-64" x2="508" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+      <line x1="515" y1="-64" x2="515" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+    </g>
+    <g>
+      <rect class="body" x="534" y="-46" width="26" height="7" rx="2" />
+      <rect x="536" y="-66" width="22" height="20" rx="3" fill="url(#steel)" stroke="#3a3a37" stroke-width="1" />
+      <line x1="542" y1="-64" x2="542" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+      <line x1="549" y1="-64" x2="549" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+    </g>
+  </g>
+  <g id="lineB" transform="translate(421,0) scale(-1,1)" data-ativo="LCP02">
+    <g transform="rotate(90 330 212)">
+      <path class="flow" d="M118 193 H612" marker-end="url(#arrow)" />
+      <defs>
+        <marker id="arrow_b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M1 1 L9 5 L1 9" fill="none" stroke="#9aa0a6" stroke-width="1.6" stroke-linecap="round" />
+        </marker>
+      </defs>
+      <g class="machine" id="m1_b" data-name="Desbobinador" data-conj="LCP02.DESBOBINADOR">
+        <g transform="translate(68,214)">
+          <rect class="hub" x="11" y="0" width="8" height="8" rx="1" />
+          <rect class="body" x="7" y="7" width="16" height="7" rx="2" />
+          <rect class="body" x="3" y="13" width="24" height="30" rx="3" />
+          <line class="detail" x1="6" y1="18" x2="24" y2="18" />
+          <line class="detail" x1="6" y1="23" x2="24" y2="23" />
+          <line class="detail" x1="6" y1="28" x2="24" y2="28" />
+          <line class="detail" x1="6" y1="33" x2="24" y2="33" />
+          <line class="detail" x1="6" y1="38" x2="24" y2="38" />
+          <rect class="hub" x="26" y="18" width="7" height="13" rx="1" />
+          <rect class="body" x="3" y="42" width="24" height="10" rx="5" />
+        </g>
+        <rect class="body" x="54" y="146" width="58" height="74" rx="6" />
+        <rect class="bevel" x="57" y="149" width="52" height="68" rx="5" />
+        <rect class="coil" x="62" y="152" width="42" height="42" rx="4" />
+        <line class="ring" x1="69" y1="154" x2="69" y2="192" />
+        <line class="ring" x1="76" y1="154" x2="76" y2="192" />
+        <line class="ring" x1="90" y1="154" x2="90" y2="192" />
+        <line class="ring" x1="97" y1="154" x2="97" y2="192" />
+        <line class="hub" x1="83" y1="140" x2="83" y2="216" stroke-width="3.4" />
+        <circle class="hub" cx="83" cy="173" r="4.5" />
+        <path class="detail" d="M62 158 q-10 6 -8 15" stroke-width="2" />
+        <circle class="hub" cx="54" cy="173" r="3.4" />
+      </g>
+      <g class="machine" id="m2_b" data-name="Pinch roll" data-conj="LCP02.PINCH_ROLL">
+        <g transform="translate(133,232)">
+          <rect class="hub" x="11" y="0" width="8" height="8" rx="1" />
+          <rect class="body" x="7" y="7" width="16" height="7" rx="2" />
+          <rect class="body" x="3" y="13" width="24" height="30" rx="3" />
+          <line class="detail" x1="6" y1="18" x2="24" y2="18" />
+          <line class="detail" x1="6" y1="23" x2="24" y2="23" />
+          <line class="detail" x1="6" y1="28" x2="24" y2="28" />
+          <line class="detail" x1="6" y1="33" x2="24" y2="33" />
+          <line class="detail" x1="6" y1="38" x2="24" y2="38" />
+          <rect class="hub" x="26" y="18" width="7" height="13" rx="1" />
+          <rect class="body" x="3" y="42" width="24" height="10" rx="5" />
+        </g>
+        <rect class="body" x="130" y="158" width="36" height="72" rx="6" />
+        <rect class="bevel" x="133" y="161" width="30" height="66" rx="5" />
+        <rect class="coil" x="135" y="164" width="9" height="60" rx="4" />
+        <rect class="coil" x="152" y="164" width="9" height="60" rx="4" />
+      </g>
+      <g class="machine" id="m3_b" data-name="Aplainadora" data-conj="LCP02.APLANADORA">
+        <g transform="translate(197,248)">
+          <rect class="hub" x="11" y="0" width="8" height="8" rx="1" />
+          <rect class="body" x="7" y="7" width="16" height="7" rx="2" />
+          <rect class="body" x="3" y="13" width="24" height="30" rx="3" />
+          <line class="detail" x1="6" y1="18" x2="24" y2="18" />
+          <line class="detail" x1="6" y1="23" x2="24" y2="23" />
+          <line class="detail" x1="6" y1="28" x2="24" y2="28" />
+          <line class="detail" x1="6" y1="33" x2="24" y2="33" />
+          <line class="detail" x1="6" y1="38" x2="24" y2="38" />
+          <rect class="hub" x="26" y="18" width="7" height="13" rx="1" />
+          <rect class="body" x="3" y="42" width="24" height="10" rx="5" />
+        </g>
+        <rect class="body" x="176" y="150" width="72" height="96" rx="6" />
+        <rect class="bevel" x="179" y="153" width="66" height="90" rx="5" />
+        <rect class="coil" x="184" y="162" width="6" height="72" rx="3" />
+        <rect class="coil" x="196" y="162" width="6" height="72" rx="3" />
+        <rect class="coil" x="208" y="162" width="6" height="72" rx="3" />
+        <rect class="coil" x="220" y="162" width="6" height="72" rx="3" />
+        <rect class="coil" x="232" y="162" width="6" height="72" rx="3" />
+      </g>
+      <g class="machine" id="m4_b" data-name="Fosso de laço" data-conj="LCP02.FOSSO_DE_LACO">
+        <rect class="body" x="258" y="146" width="64" height="104" rx="6" />
+        <rect class="bevel" x="261" y="149" width="58" height="98" rx="5" />
+        <rect x="266" y="158" width="48" height="80" rx="3" fill="url(#pit)" stroke="var(--stroke)" stroke-width="1.1" />
+        <rect class="coil" x="260" y="184" width="6" height="20" rx="2" />
+        <rect class="coil" x="314" y="184" width="6" height="20" rx="2" />
+        <circle class="hub" cx="290" cy="164" r="3" />
+        <circle class="hub" cx="290" cy="232" r="3" />
+      </g>
+      <g class="machine" id="m5_b" data-name="Alimentador" data-conj="LCP02.ALIMENTADOR">
+        <g transform="translate(339,232)">
+          <rect class="hub" x="11" y="0" width="8" height="8" rx="1" />
+          <rect class="body" x="7" y="7" width="16" height="7" rx="2" />
+          <rect class="body" x="3" y="13" width="24" height="30" rx="3" />
+          <line class="detail" x1="6" y1="18" x2="24" y2="18" />
+          <line class="detail" x1="6" y1="23" x2="24" y2="23" />
+          <line class="detail" x1="6" y1="28" x2="24" y2="28" />
+          <line class="detail" x1="6" y1="33" x2="24" y2="33" />
+          <line class="detail" x1="6" y1="38" x2="24" y2="38" />
+          <rect class="hub" x="26" y="18" width="7" height="13" rx="1" />
+          <rect class="body" x="3" y="42" width="24" height="10" rx="5" />
+        </g>
+        <rect class="body" x="332" y="158" width="44" height="72" rx="6" />
+        <rect class="bevel" x="335" y="161" width="38" height="66" rx="5" />
+        <rect class="coil" x="338" y="164" width="8" height="60" rx="4" />
+        <rect class="coil" x="360" y="164" width="8" height="60" rx="4" />
+      </g>
+      <g class="machine" id="m6_b" data-name="Prensa Fagor" data-conj="LCP02.PRENSA_FAGOR">
+        <rect class="body" x="386" y="98" width="92" height="204" rx="8" />
+        <rect class="bevel" x="390" y="102" width="84" height="196" rx="7" />
+        <rect class="fill-detail" x="396" y="106" width="72" height="26" rx="4" />
+        <rect class="detail" x="396" y="106" width="72" height="26" rx="4" />
+        <rect class="coil" x="398" y="146" width="68" height="108" rx="4" />
+        <rect class="detail" x="414" y="166" width="36" height="68" rx="2" stroke-dasharray="5 4" />
+        <circle class="hub" cx="400" cy="120" r="8" />
+        <circle class="detail" cx="400" cy="120" r="3.5" />
+        <circle class="hub" cx="464" cy="120" r="8" />
+        <circle class="detail" cx="464" cy="120" r="3.5" />
+        <circle class="hub" cx="400" cy="280" r="8" />
+        <circle class="detail" cx="400" cy="280" r="3.5" />
+        <circle class="hub" cx="464" cy="280" r="8" />
+        <circle class="detail" cx="464" cy="280" r="3.5" />
+        <circle class="hub" cx="432" cy="290" r="13" />
+        <circle class="detail" cx="432" cy="290" r="6" />
+      </g>
+      <g class="machine" id="m7_b" data-name="Esteira de saída" data-conj="LCP02.ESTEIRA_DE_SAIDA">
+        <g transform="translate(499,222)">
+          <rect class="hub" x="11" y="0" width="8" height="8" rx="1" />
+          <rect class="body" x="7" y="7" width="16" height="7" rx="2" />
+          <rect class="body" x="3" y="13" width="24" height="30" rx="3" />
+          <line class="detail" x1="6" y1="18" x2="24" y2="18" />
+          <line class="detail" x1="6" y1="23" x2="24" y2="23" />
+          <line class="detail" x1="6" y1="28" x2="24" y2="28" />
+          <line class="detail" x1="6" y1="33" x2="24" y2="33" />
+          <line class="detail" x1="6" y1="38" x2="24" y2="38" />
+          <rect class="hub" x="26" y="18" width="7" height="13" rx="1" />
+          <rect class="body" x="3" y="42" width="24" height="10" rx="5" />
+        </g>
+        <rect class="body" x="490" y="168" width="48" height="50" rx="6" />
+        <rect class="bevel" x="493" y="171" width="42" height="44" rx="5" />
+        <rect class="coil" x="496" y="174" width="4" height="38" rx="2" />
+        <rect class="coil" x="505" y="174" width="4" height="38" rx="2" />
+        <rect class="coil" x="514" y="174" width="4" height="38" rx="2" />
+        <rect class="coil" x="523" y="174" width="4" height="38" rx="2" />
+      </g>
+      <g class="machine" id="m8_b" data-name="Empilhador 1" data-conj="LCP02.EMPILHADOR_1">
+        <rect class="body" x="546" y="150" width="40" height="84" rx="6" />
+        <rect class="bevel" x="549" y="153" width="34" height="78" rx="5" />
+        <rect class="coil" x="554" y="168" width="24" height="40" rx="2" />
+        <line class="ring" x1="554" y1="176" x2="578" y2="176" />
+        <line class="ring" x1="554" y1="186" x2="578" y2="186" />
+        <line class="ring" x1="554" y1="196" x2="578" y2="196" />
+        <line class="ring" x1="554" y1="206" x2="578" y2="206" />
+        <rect class="detail" x="552" y="212" width="28" height="7" rx="2" />
+        <rect class="detail" x="548" y="116" width="36" height="6" rx="2" />
+        <rect class="detail" x="548" y="127" width="36" height="6" rx="2" />
+        <line class="detail" x1="554" y1="116" x2="554" y2="133" />
+        <line class="detail" x1="566" y1="116" x2="566" y2="133" />
+        <line class="detail" x1="578" y1="116" x2="578" y2="133" />
+      </g>
+      <g class="machine" id="m9_b" data-name="Empilhador 2" data-conj="LCP02.EMPILHADOR_2">
+        <rect class="body" x="590" y="150" width="40" height="84" rx="6" />
+        <rect class="bevel" x="593" y="153" width="34" height="78" rx="5" />
+        <rect class="coil" x="598" y="168" width="24" height="40" rx="2" />
+        <line class="ring" x1="598" y1="176" x2="622" y2="176" />
+        <line class="ring" x1="598" y1="186" x2="622" y2="186" />
+        <line class="ring" x1="598" y1="196" x2="622" y2="196" />
+        <line class="ring" x1="598" y1="206" x2="622" y2="206" />
+        <rect class="detail" x="596" y="212" width="28" height="7" rx="2" />
+        <rect class="detail" x="592" y="116" width="36" height="6" rx="2" />
+        <rect class="detail" x="592" y="127" width="36" height="6" rx="2" />
+        <line class="detail" x1="598" y1="116" x2="598" y2="133" />
+        <line class="detail" x1="610" y1="116" x2="610" y2="133" />
+        <line class="detail" x1="622" y1="116" x2="622" y2="133" />
+      </g>
+    </g>
+    <g class="machine" id="mc_b" data-name="Carga de bobinas" filter="url(#shadow)" data-conj="LCP02.CARGA_DE_BOBINAS">
+      <rect x="398" y="-72" width="164" height="50" rx="6" fill="none" stroke="#9aa0a6" stroke-width="1.3" stroke-dasharray="6 4" />
+      <line x1="398" y1="-58" x2="452" y2="-58" stroke="#b7b9bc" stroke-width="2.2" />
+      <line x1="398" y1="-32" x2="452" y2="-32" stroke="#b7b9bc" stroke-width="2.2" />
+      <rect class="body" x="404" y="-64" width="44" height="38" rx="3" />
+      <rect x="411" y="-58" width="30" height="26" rx="3" fill="url(#steel)" stroke="#3a3a37" stroke-width="1.1" />
+      <line x1="418" y1="-56" x2="418" y2="-34" stroke="#8b8d90" stroke-width=".9" opacity=".6" />
+      <line x1="426" y1="-56" x2="426" y2="-34" stroke="#8b8d90" stroke-width=".9" opacity=".6" />
+      <line x1="434" y1="-56" x2="434" y2="-34" stroke="#8b8d90" stroke-width=".9" opacity=".6" />
+      <circle cx="410" cy="-58" r="2.4" fill="#b7b9bc" stroke="#3a3a37" stroke-width=".8" />
+      <circle cx="442" cy="-58" r="2.4" fill="#b7b9bc" stroke="#3a3a37" stroke-width=".8" />
+      <circle cx="410" cy="-32" r="2.4" fill="#b7b9bc" stroke="#3a3a37" stroke-width=".8" />
+      <circle cx="442" cy="-32" r="2.4" fill="#b7b9bc" stroke="#3a3a37" stroke-width=".8" />
+      <g>
+        <rect class="body" x="466" y="-46" width="26" height="7" rx="2" />
+        <rect x="468" y="-66" width="22" height="20" rx="3" fill="url(#steel)" stroke="#3a3a37" stroke-width="1" />
+        <line x1="474" y1="-64" x2="474" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+        <line x1="481" y1="-64" x2="481" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+      </g>
+      <g>
+        <rect class="body" x="500" y="-46" width="26" height="7" rx="2" />
+        <rect x="502" y="-66" width="22" height="20" rx="3" fill="url(#steel)" stroke="#3a3a37" stroke-width="1" />
+        <line x1="508" y1="-64" x2="508" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+        <line x1="515" y1="-64" x2="515" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+      </g>
+      <g>
+        <rect class="body" x="534" y="-46" width="26" height="7" rx="2" />
+        <rect x="536" y="-66" width="22" height="20" rx="3" fill="url(#steel)" stroke="#3a3a37" stroke-width="1" />
+        <line x1="542" y1="-64" x2="542" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+        <line x1="549" y1="-64" x2="549" y2="-48" stroke="#8b8d90" stroke-width=".8" opacity=".6" />
+      </g>
+    </g>
+  </g>
+</svg>

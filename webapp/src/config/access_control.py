@@ -84,6 +84,12 @@ ROUTE_ACCESS = {
     # ========================================
     # MANUTENÇÃO
     # ========================================
+    "/maintenance/overview": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 1,
+        "description": "Visão Geral da Manutenção"
+    },
     "/maintenance/alarms": {
         "shared": False,
         "perfis": ["manutencao"],
@@ -125,6 +131,25 @@ ROUTE_ACCESS = {
         "perfis": ["manutencao"],
         "min_level": 1,
         "description": "Indicadores de Manutenção V2 (POC drilldown)"
+    },
+    "/lab/radar": {
+        "shared": True,
+        "min_level": 3,
+        "description": "Radar Lab (playground provisório)"
+    },
+    "/maintenance/analise-de-falhas": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 2,
+        "description": "Análise de Falhas"
+    },
+    # Mesma regra da listagem: quem vê o Pareto vê a análise da parada. A
+    # distinção de papéis (editar vs. reabrir) é feita dentro da página.
+    "/maintenance/analise-de-falhas/ishikawa": {
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 2,
+        "description": "Análise de Falhas — Diagrama de Ishikawa"
     },
     "/maintenance/kpi-report-v2": {
         "shared": False,
@@ -399,12 +424,42 @@ ROUTE_ACCESS = {
         "min_level": 3,
         "description": "Criar Novo Usuário"
     },
+    "/config/dds": {
+        # Vive no menu Configurações, mas o dado é da manutenção: perfil manutenção,
+        # nível 3 — registrar acidente zera o contador exibido para a planta inteira.
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 3,
+        "description": "Configuração do DDS (dias sem acidente e ritmo dos passos)"
+    },
     "/config/sap-scheduler": {
-        # Página admin de agendamento do SAP Scheduler (SDD sap-scheduler / SP-09).
-        # Permissão alinhada com precedente /config/users/create (qualquer lvl 3).
+        # Redireciona para /maintenance/coletas-sap (consolidado). Mantido por compat.
         "shared": True,
         "min_level": 3,
-        "description": "Agendamento SAP",
+        "description": "Agendamento SAP (redirect)",
+    },
+    "/maintenance/coletas-sap": {
+        # Coletas SAP consolidadas (agendamento + disparo manual) — perfil manutenção, nível 2+.
+        "shared": False,
+        "perfis": ["manutencao"],
+        "min_level": 2,
+        "description": "Coletas SAP (agendamento + disparo manual)",
+    },
+    "/maintenance/monitoramento-ativos": {
+        # Protótipo de Monitoramento de Ativos — planta da fábrica com a saúde por cor.
+        # Inclui o perfil `producao` de propósito: sem ele, ninguém da área veria o
+        # próprio recorte no filtro de escopo da tela.
+        "shared": False,
+        "perfis": ["manutencao", "producao"],
+        "min_level": 1,
+        "description": "Monitoramento de Ativos (protótipo)",
+    },
+    "/maintenance/monitoramento-ativos/ativo": {
+        # Mesma regra da planta: quem vê a fábrica vê o detalhe da linha.
+        "shared": False,
+        "perfis": ["manutencao", "producao"],
+        "min_level": 1,
+        "description": "Monitoramento de Ativos — detalhe do ativo",
     },
 }
 

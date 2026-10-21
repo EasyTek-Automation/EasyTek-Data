@@ -2,7 +2,7 @@
 """Script custo_exec — lançamentos reais de manutenção (KSB1) → AMG_CustoLancamentos.
 
 Read-only no SAP (lê a grade VIA B). Grava Mongo direto. Auto-contido.
-Janela: 2 meses (mês corrente + anterior, até D-1).
+Janela: 2 meses INTEIROS (mês anterior + corrente) — ver `custo_collect.janela_dois_meses`.
 """
 from __future__ import annotations
 
@@ -15,7 +15,8 @@ from . import custo_collect, _carga
 
 COLL = "AMG_CustoLancamentos"
 COLL_CENTROS = "AMG_CustoCentros"   # de/para código→nome do centro (OBJ_TXT da KSB1)
-COLL_CONTAS = "AMG_CustoContas"     # de/para código→nome da conta  (CEL_LTXT da KSB1)
+COLL_CONTAS = "AMG_CustoContas"     # de/para código→nome da conta  (CEL_KTXT da KSB1)
+COLL_COMP = "AMG_CustoOrdemComponentes"   # itens do almoxarifado por ordem (MB25, BR-15)
 _BRT = pytz.timezone("America/Sao_Paulo")
 
 
@@ -46,6 +47,21 @@ def run(job, ctx):
             _carga.upsert_depara(ctx.db, COLL_CONTAS, con)
         except Exception:
             pass
+        # BR-15: itens do almoxarifado das ordens de liquidação, via MB25 em lote.
+        # Best-effort — falha aqui não invalida a carga principal de lançamentos.
+        try:
+            ordens = sorted({d["ordem_emissora"] for d in docs
+                             if d.get("familia") == "liquidacao" and d.get("ordem_emissora")})
+            if ordens:
+                mes_ref = max((d.get("mes_referencia") or "") for d in docs)
+                comp = custo_collect.collect_componentes(session, ordens, mes_ref)
+                _carga.gravar_componentes(ctx.db, COLL_COMP, comp, ordens)
+        except Exception:
+            pass
     except Exception as e:
         return Result.falha("mongo_update", e)
-    return Result.sucesso(path_xlsx=f"mongo:{COLL}", tamanho_bytes=n)
+    # a janela REAL usada fica no doc do job (`resultado.janela`): o daemon é o dono da
+    # regra e recalcula — `parametros.janela`, gravado pelo webapp, é ignorado (CONTRATO §5).
+    return Result.sucesso(path_xlsx=f"mongo:{COLL}", tamanho_bytes=n,
+                          janela={"inicio": custo_collect._ddmm(ini),
+                                  "fim": custo_collect._ddmm(fim)})

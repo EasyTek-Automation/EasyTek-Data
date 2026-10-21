@@ -1,0 +1,403 @@
+/* hh-management — quadro semanal: visual sofisticado + dropzones (claro/escuro via vars BS) */
+
+/* ---- cartão da disciplina ---------------------------------------------------------- */
+.hh-disc-card {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(8, 19, 124, .06);
+}
+.hh-disc-head {
+  display: flex; align-items: center; gap: .5rem;
+  padding: .6rem .9rem;
+  font-weight: 600; letter-spacing: .2px;
+  border-left: 5px solid var(--hh-accent, #08137C);
+  background: linear-gradient(90deg,
+              color-mix(in srgb, var(--hh-accent, #08137C) 12%, var(--bs-body-bg)) 0%,
+              var(--bs-body-bg) 60%);
+}
+.hh-disc-head .hh-disc-icon {
+  width: 26px; height: 26px; border-radius: 7px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--hh-accent, #08137C); color: #fff; font-size: .95rem;
+}
+.hh-disc-count { margin-left: auto; font-weight: 500; opacity: .7; font-size: .85rem; }
+/* cabeçalho inteiro clicável (chevron+ícone+texto+contador) para colapsar/expandir */
+.hh-head-click { cursor: pointer; display: flex; align-items: center; gap: .4rem; flex-grow: 1;
+                 user-select: none; transition: background .1s; }
+.hh-head-click:hover { background: color-mix(in srgb, var(--bs-primary) 8%, transparent); }
+.hh-chev { opacity: .7; font-size: .9rem; }
+.hh-head-click:hover .hh-chev { opacity: 1; }
+
+/* paleta por disciplina */
+.hh-mec { --hh-accent: #2f6fb0; }   /* mecânica — azul aço */
+.hh-ele { --hh-accent: #d98a00; }   /* elétrica — âmbar */
+.hh-ter { --hh-accent: #6f42c1; }   /* serviço de terceiros — roxo */
+
+/* ---- tabela ------------------------------------------------------------------------ */
+.hh-quadro { border-collapse: separate; border-spacing: 0; table-layout: fixed; margin: 0; }
+.hh-quadro thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--bs-tertiary-bg);
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .4px;
+  color: var(--bs-secondary-color); font-weight: 600;
+  padding: .45rem .4rem; text-align: center;
+  border-bottom: 2px solid var(--bs-border-color);
+}
+.hh-quadro thead th:first-child { text-align: left; padding-left: .7rem; }
+/* cabeçalho de dias ÚNICO e fixo na rolagem (compartilhado Mecânica+Elétrica).
+   Precisa ficar FORA do wrapper overflow das tabelas (que quebra o sticky). */
+.hh-headfix-wrap {
+  position: sticky; top: 0; z-index: 6;
+  background: var(--bs-body-bg);
+  margin-bottom: .25rem;
+  box-shadow: 0 2px 4px -2px rgba(0, 0, 0, .18);
+}
+.hh-headfix { margin: 0; }
+/* cabeçalho de dia como indicador (B44): nome + Δ% vs semana passada + barra planejado×disponível
+   (cor da zona igual à faixa B21) + 'Xh / Yh'. Só o cabeçalho; quadros/faixas intactos. */
+.hh-diahdr { text-align: center; vertical-align: bottom; padding: 3px 5px 5px; line-height: 1.15; }
+.hh-diahdr-tec { vertical-align: bottom; }
+.hh-diahdr-nome { font-weight: 600; font-size: .82rem; }
+.hh-diahdr-delta { display: block; font-size: .68rem; font-weight: 600; margin: 1px 0; color: var(--bs-secondary-color); }
+.hh-diahdr-delta.zero { color: var(--bs-secondary-color); opacity: .7; }
+/* Δ% vs semana passada colorido pelas cores da marca: mais planejado (▲) = melhor = azul;
+   menos (▼) = pior = laranja/âmbar. Só ▲/▼; zero e '—' seguem neutros. */
+.hh-diahdr-delta.up   { color: #08137C; }
+.hh-diahdr-delta.down { color: #d98a00; }
+.hh-diahdr-bar { height: 10px; border-radius: 5px; background: var(--bs-border-color); overflow: hidden; margin: 3px 0 2px; }
+.hh-diahdr-bar > span { display: block; height: 100%; border-radius: 5px; background: transparent; }
+.hh-diahdr-bar.ok   > span { background: var(--hh-ocup-baixo); }
+.hh-diahdr-bar.warn > span { background: var(--hh-ocup-meta); }
+.hh-diahdr-bar.over > span { background: var(--hh-ocup-alto); }
+.hh-diahdr-bar.zero > span { background: transparent; }
+.hh-diahdr-vals { font-size: .66rem; color: var(--bs-secondary-color); white-space: nowrap; }
+.hh-diahdr-pct { font-size: .72rem; line-height: 1.1; }
+/* Número de % de OCUPAÇÃO colorido pela mesma zona da barra (laranja < meta / azul meta–100% /
+   âmbar > 100%). Usado no cabeçalho-dia e no rodapé de turno. O tom de >100% é um âmbar escuro
+   (não o amarelo #FFD400 da barra, que fica ilegível como texto no fundo claro). */
+.hh-ocup-txt { font-weight: 700; }
+.hh-ocup-txt.ok   { color: var(--hh-ocup-baixo); }
+.hh-ocup-txt.warn { color: var(--hh-ocup-meta); }
+.hh-ocup-txt.over { color: var(--hh-ocup-alto-txt); }
+.hh-ocup-txt.zero { color: var(--bs-secondary-color); opacity: .7; }
+/* células de dia centralizadas verticalmente: "livre" e cards alinham com o nome do técnico
+   e com a nota da ordem (antes ficavam no topo, descentralizados em linhas altas) */
+.hh-quadro tbody td { padding: 3px; vertical-align: middle; }
+/* divisória clara entre linhas de técnico + zebra (faixa alternada) — separa as rows */
+.hh-tec-row td, .hh-tec-row th { border-bottom: 2px solid var(--bs-border-color); }
+.hh-row-alt td, .hh-row-alt .hh-tec-cell {
+  background: color-mix(in srgb, var(--bs-tertiary-bg) 70%, transparent);
+}
+.hh-tec-row:hover td, .hh-tec-row:hover .hh-tec-cell {
+  background: color-mix(in srgb, var(--bs-primary) 5%, transparent);
+}
+.hh-quadro td.hh-tec-cell {
+  vertical-align: middle; padding: .3rem .6rem; min-width: 130px;
+  border-right: 1px solid var(--bs-border-color);
+}
+.hh-tec-nome { font-weight: 600; font-size: .82rem; line-height: 1.15; }
+.hh-tec-rem { border: none; background: none; color: var(--bs-secondary-color); cursor: pointer;
+              font-size: .95rem; line-height: 1; padding: 0 .25rem; opacity: .45; }
+.hh-tec-rem:hover { color: var(--bs-danger); opacity: 1; }
+/* mão de obra temporária (BR-25): "retirar" ocupa o lugar do × só na linha do temporário */
+.hh-temp-ret { border: none; background: none; color: var(--bs-secondary-color); cursor: pointer;
+               font-size: .68rem; line-height: 1; padding: .1rem .25rem; text-decoration: underline; opacity: .7; }
+.hh-temp-ret:hover:not(:disabled) { color: var(--bs-danger); opacity: 1; }
+.hh-temp-ret:disabled { cursor: not-allowed; opacity: .35; }
+.hh-turno-pill.hh-temp-pill { background: color-mix(in srgb, #FFD400 45%, var(--bs-body-bg)); color: #6b5300; }
+.hh-tec-add { display: inline-block; width: auto; max-width: 150px; font-size: .75rem; }
+.hh-turno-pill {
+  display: inline-block; margin-top: 2px; padding: .05rem .45rem; border-radius: 999px;
+  font-size: .66rem; font-weight: 600; letter-spacing: .3px;
+  background: color-mix(in srgb, var(--hh-accent, #08137C) 18%, var(--bs-body-bg));
+  color: var(--hh-accent, #08137C);
+}
+
+/* ---- slot (dropzone) --------------------------------------------------------------- */
+.hh-slot {
+  min-height: 40px; border-radius: 8px; padding: 3px;
+  border: 1.5px dashed transparent; transition: background .12s, border-color .12s, box-shadow .12s;
+}
+/* célula vazia em REPOUSO: contorno "livre" visível mas leve — dá estrutura ao quadro */
+.hh-slot-vazio {
+  display: flex; align-items: center; justify-content: center;
+  border-color: color-mix(in srgb, var(--hh-accent, #08137C) 35%, var(--bs-border-color));
+  background: color-mix(in srgb, var(--bs-tertiary-bg) 55%, transparent);
+}
+.hh-slot-hint { font-size: .66rem; color: var(--bs-secondary-color); opacity: .65;
+                transition: opacity .12s; letter-spacing: .3px; }
+.hh-slot-vazio:hover { border-color: var(--bs-primary);
+                       background: color-mix(in srgb, var(--bs-primary) 8%, transparent); }
+.hh-slot-vazio:hover .hh-slot-hint { opacity: .9; }
+
+/* durante o arraste: acendem só as dropzones da MESMA disciplina da ordem arrastada */
+body.hh-drag-Mecanica .hh-slot[data-hh-disc="Mecanica"],
+body.hh-drag-Eletrica .hh-slot[data-hh-disc="Eletrica"] {
+  border-color: color-mix(in srgb, var(--bs-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--bs-primary) 7%, transparent);
+}
+body.hh-drag-Mecanica .hh-slot[data-hh-disc="Mecanica"] .hh-slot-hint,
+body.hh-drag-Eletrica .hh-slot[data-hh-disc="Eletrica"] .hh-slot-hint { opacity: .85; }
+/* o quadro da disciplina compatível ganha um anel sutil (mostra onde pode soltar) */
+body.hh-drag-Mecanica .hh-disc-card.hh-mec,
+body.hh-drag-Eletrica .hh-disc-card.hh-ele {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bs-primary) 25%, transparent);
+}
+
+/* Terceiros (B15) é coringa: acende os slots e o anel dos DOIS quadros (Mec e Elé) */
+body.hh-drag-Terceiros .hh-slot[data-hh-disc="Mecanica"],
+body.hh-drag-Terceiros .hh-slot[data-hh-disc="Eletrica"] {
+  border-color: color-mix(in srgb, var(--bs-primary) 45%, transparent);
+  background: color-mix(in srgb, var(--bs-primary) 7%, transparent);
+}
+body.hh-drag-Terceiros .hh-slot[data-hh-disc="Mecanica"] .hh-slot-hint,
+body.hh-drag-Terceiros .hh-slot[data-hh-disc="Eletrica"] .hh-slot-hint { opacity: .85; }
+body.hh-drag-Terceiros .hh-disc-card.hh-mec,
+body.hh-drag-Terceiros .hh-disc-card.hh-ele {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--bs-primary) 25%, transparent);
+}
+
+/* disciplina cruzada (B33): ao arrastar Mec/Elé, os slots do OUTRO quadro acendem em AMARELO
+   (aceita com aviso de confirmação — não é bloqueio) */
+body.hh-drag-Mecanica .hh-slot[data-hh-disc="Eletrica"],
+body.hh-drag-Eletrica .hh-slot[data-hh-disc="Mecanica"] {
+  border-color: color-mix(in srgb, var(--bs-warning) 55%, transparent);
+  background: color-mix(in srgb, var(--bs-warning) 8%, transparent);
+}
+body.hh-drag-Mecanica .hh-slot[data-hh-disc="Eletrica"] .hh-slot-hint,
+body.hh-drag-Eletrica .hh-slot[data-hh-disc="Mecanica"] .hh-slot-hint { opacity: .7; }
+
+/* célula sob o cursor (mesma disciplina): destaque forte (aceita) */
+.hh-slot-over {
+  border-color: var(--bs-primary) !important;
+  background: color-mix(in srgb, var(--bs-primary) 16%, transparent) !important;
+  box-shadow: inset 0 0 0 1px var(--bs-primary);
+}
+/* célula sob o cursor em disciplina CRUZADA (B33): destaque amarelo (aceita, vai pedir confirmação) */
+.hh-slot-cross {
+  border-color: var(--bs-warning) !important;
+  background: color-mix(in srgb, var(--bs-warning) 18%, transparent) !important;
+  box-shadow: inset 0 0 0 1px var(--bs-warning);
+}
+/* célula sob o cursor de ordem NÃO classificada: bloqueio (repele — ordem volta pra fila) */
+.hh-slot-block {
+  border: 1.5px solid var(--bs-danger) !important;
+  background: color-mix(in srgb, var(--bs-danger) 12%, transparent) !important;
+  cursor: not-allowed;
+}
+
+/* ---- cards de ordem ---------------------------------------------------------------- */
+.hh-card {
+  position: relative; cursor: grab;
+  border: 1px solid var(--bs-border-color); border-left: 3px solid var(--bs-secondary);
+  border-radius: 8px; padding: .5rem .5rem .45rem; margin-bottom: .35rem;
+  background: var(--bs-body-bg);
+  box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  transition: box-shadow .1s, transform .1s;
+}
+.hh-card[draggable="true"]:hover { box-shadow: 0 3px 10px rgba(8,19,124,.15); transform: translateY(-1px); }
+.hh-card[draggable="false"] { cursor: default; opacity: .85; }
+.hh-card.hh-dragging-card { opacity: .4; }
+.hh-card-ord { font-weight: 700; font-size: .8rem; }
+.hh-card-desc { font-size: .72rem; color: var(--bs-secondary-color); }
+.hh-card-nums { font-size: .72rem; margin-top: 1px; }
+.hh-card-rm {
+  position: absolute; top: 2px; right: 4px; line-height: 1;
+  border: none; background: none; color: var(--bs-secondary-color);
+  font-size: 1rem; cursor: pointer; padding: 0 2px; opacity: .5;
+}
+.hh-card-rm:hover { color: var(--bs-danger); opacity: 1; }
+.hh-card-split {
+  display: block; width: -moz-fit-content; width: fit-content; line-height: 1;
+  border: none; background: none; color: var(--bs-primary);
+  font-size: 1.15rem; cursor: pointer; padding: 0; margin: 0 0 2px -1px; opacity: .75;
+}
+.hh-card-split:hover { opacity: 1; }
+
+/* tarja por classificação (4px à esquerda) */
+.hh-card { border-left-width: 4px; }
+.hh-card.disc-mec { border-left-color: #2f6fb0; }   /* Mecânica — azul */
+.hh-card.disc-ele { border-left-color: #d98a00; }   /* Elétrica — laranja/âmbar */
+.hh-card.disc-ter { border-left-color: #6f42c1; }   /* Serviço de terceiros — roxo */
+.hh-card.disc-nc  { border-left-color: var(--bs-danger); }  /* Não classificado — vermelho */
+
+/* aderência colorida */
+.hh-ader-ok   { color: var(--bs-success); font-weight: 700; }
+.hh-ader-mid  { color: #d98a00; font-weight: 700; }
+.hh-ader-low  { color: var(--bs-danger); font-weight: 700; }
+
+/* pills de sinal */
+.hh-pill { display: inline-block; padding: .05rem .4rem; border-radius: 999px; font-size: .64rem;
+           font-weight: 600; margin-right: 3px; }
+.hh-pill-idade { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
+.hh-pill-carry { background: color-mix(in srgb, var(--bs-warning) 30%, var(--bs-body-bg)); color: #8a5a00; }
+.hh-pill-pend  { background: color-mix(in srgb, var(--bs-danger) 18%, var(--bs-body-bg)); color: var(--bs-danger); }
+/* status do usuário (B30): rótulo rico do ciclo de vida da ordem (Em Tratamento / Em Pausa / …) */
+.hh-pill-statususr { background: color-mix(in srgb, var(--bs-primary) 14%, var(--bs-body-bg));
+                     color: var(--bs-primary-text-emphasis, #0a58ca); font-weight: 600; }
+/* cores do ciclo de vida (status do usuário) — pedido PCM 2026-07-15: Aberta=vermelho, em andamento
+   (Em Tratamento/Em Pausa/Aceitação de Espera)=amarelo, Encerrada=verde, Cancelada=cinza.
+   Modificadores aplicados JUNTO com .hh-pill-statususr (sobrescrevem bg/cor). */
+.hh-pill-usr-aberta    { background: color-mix(in srgb, var(--bs-danger) 18%, var(--bs-body-bg));
+                         color: var(--bs-danger); }
+.hh-pill-usr-andamento { background: color-mix(in srgb, var(--bs-warning) 30%, var(--bs-body-bg));
+                         color: #8a5a00; }
+.hh-pill-usr-encerrada { background: color-mix(in srgb, var(--bs-success) 22%, var(--bs-body-bg));
+                         color: var(--bs-success-text-emphasis, #146c43); }
+.hh-pill-usr-cancelada { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
+/* pill de Linha/ativo no card (B16) — discreta, azulada, não compete com a aderência */
+.hh-pill-linha { background: color-mix(in srgb, var(--bs-info) 16%, var(--bs-body-bg));
+                 color: var(--bs-info-text-emphasis, #0c7a99); max-width: 100%; vertical-align: bottom; }
+.hh-card-linha { margin: .1rem 0; line-height: 1; }
+/* pill "restante Xh" no card da fila parcialmente planejada (B20) */
+.hh-pill-restante { background: color-mix(in srgb, var(--bs-warning) 28%, var(--bs-body-bg));
+                    color: #8a5a00; }
+/* toast de progresso da coleta (B28) — canto inferior-direito, cor por estado */
+.hh-jobs-toast { position: fixed; bottom: 20px; right: 20px; width: 300px; z-index: 1090;
+                 display: none; padding: .6rem .75rem; border-radius: .5rem;
+                 border: 1px solid var(--bs-border-color); background: var(--bs-body-bg);
+                 box-shadow: 0 .4rem 1.2rem rgba(0,0,0,.18); font-size: .82rem; }
+.hh-jobs-toast.show { display: block; animation: hh-jobs-in .18s ease-out; }
+@keyframes hh-jobs-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; } }
+.hh-jobs-toast.andamento { border-left: 4px solid var(--bs-warning);
+                           background: color-mix(in srgb, var(--bs-warning) 8%, var(--bs-body-bg)); }
+.hh-jobs-toast.ok        { border-left: 4px solid var(--bs-success);
+                           background: color-mix(in srgb, var(--bs-success) 10%, var(--bs-body-bg)); }
+.hh-jobs-toast.falha     { border-left: 4px solid var(--bs-danger);
+                           background: color-mix(in srgb, var(--bs-danger) 10%, var(--bs-body-bg)); }
+.hh-jobs-h { font-weight: 700; margin-bottom: .35rem; }
+.hh-jobs-toast.andamento .hh-jobs-h { color: #8a5a00; }
+.hh-jobs-toast.ok .hh-jobs-h        { color: var(--bs-success-text-emphasis, #146c43); }
+.hh-jobs-toast.falha .hh-jobs-h     { color: var(--bs-danger); }
+.hh-jobs-row { display: flex; justify-content: space-between; align-items: center;
+               padding: .1rem 0; line-height: 1.3; }
+.hh-jobs-t { color: var(--bs-body-color); }
+.hh-jobs-s.muted { color: var(--bs-secondary-color); }
+.hh-jobs-s.run   { color: #8a5a00; font-weight: 600; }
+.hh-jobs-s.ok    { color: var(--bs-success-text-emphasis, #146c43); font-weight: 600; }
+.hh-jobs-s.err   { color: var(--bs-danger); font-weight: 700; }
+/* X: só aparece no estado falha (não fecha sozinho) */
+.hh-jobs-x { display: none; position: absolute; top: .3rem; right: .45rem; border: 0;
+             background: transparent; font-size: 1.1rem; line-height: 1; cursor: pointer;
+             color: var(--bs-secondary-color); }
+.hh-jobs-toast.falha .hh-jobs-x { display: block; }
+
+/* selos de saída do backlog (BR-20): ordem entregue/encerrada não some do quadro */
+.hh-pill-entregue  { background: color-mix(in srgb, var(--bs-success) 22%, var(--bs-body-bg));
+                     color: var(--bs-success-text-emphasis, #146c43); }
+.hh-pill-saida     { background: var(--bs-secondary-bg); color: var(--bs-secondary-color); }
+.hh-pill-aguardando { background: color-mix(in srgb, var(--bs-info) 18%, var(--bs-body-bg));
+                      color: var(--bs-info-text-emphasis, #0c7a99); }
+/* badge da parcela no card de um slot dividido (B20) */
+.hh-parcela-badge { color: var(--bs-primary); font-weight: 600; }
+/* bolinha de completude do planejamento da ordem (B22): cinza=parcial, verde=100% planejada */
+.hh-card-dot { position: absolute; right: 6px; bottom: 5px; width: 9px; height: 9px;
+               border-radius: 50%; box-shadow: 0 0 0 2px var(--bs-body-bg); }
+.hh-card-dot.partial { background: var(--bs-secondary-color); opacity: .45; }
+.hh-card-dot.full { background: var(--bs-success); }
+/* REGRA ÚNICA DE COR DE OCUPAÇÃO (cores do logo do cliente marca/marca):
+   abaixo da meta = LARANJA (#E96D38, pouca hora → atenção); na faixa meta–100% = AZUL
+   (#005090, no alvo); acima de 100% = AMARELO VIVO (#FFD400, superaquecendo). Substitui o
+   verde/amarelo/vermelho — verde passava a impressão errada de "tudo ok". Vale para TODAS as
+   barras de ocupação: modal de parcela, rodapé de turno, faixa por técnico e cabeçalho-dia. */
+:root {
+  --hh-ocup-baixo: #E96D38;   /* < meta  — laranja da marca */
+  --hh-ocup-meta:  #005090;   /* meta–100% — azul da marca */
+  --hh-ocup-alto:  #FFD400;   /* > 100%  — amarelo vivo (alerta) */
+  --hh-ocup-alto-txt: #A67C00; /* > 100% como TEXTO — âmbar escuro legível (o #FFD400 some no branco) */
+}
+/* barrinha de ocupação do dia no modal de divisão (B20) */
+.hh-parcela-bar { height: 14px; border-radius: 7px; background: var(--bs-secondary-bg);
+                  overflow: hidden; }
+.hh-parcela-bar-fill { height: 100%; border-radius: 7px; transition: width .15s ease, background .15s ease; }
+.hh-parcela-bar-fill.ok   { background: var(--hh-ocup-baixo); }
+.hh-parcela-bar-fill.warn { background: var(--hh-ocup-meta); }
+.hh-parcela-bar-fill.over { background: var(--hh-ocup-alto); }
+
+/* ---- resumo de capacidade por turno (no TOPO do quadro) ---------------------------- */
+.hh-quadro .hh-cap-row td, .hh-quadro .hh-cap-row th {
+  padding: .3rem .25rem; background: var(--bs-tertiary-bg);
+  border-bottom: 2px solid var(--bs-border-color);
+}
+.hh-quadro .hh-cap-row:last-of-type td, .hh-quadro .hh-cap-row:last-of-type th {
+  border-bottom: 3px solid var(--bs-border-color);     /* separa o resumo dos técnicos */
+}
+.hh-cap-turno { font-size: .7rem; font-weight: 700; color: var(--bs-secondary-color);
+                text-transform: uppercase; letter-spacing: .3px; padding-left: .7rem; }
+.hh-cap-nord { font-size: .72rem; font-weight: 700; text-align: center; }
+.hh-cap-vals { font-size: .68rem; text-align: center; line-height: 1.25; }
+.hh-cap-bar { height: 9px; border-radius: 5px; background: var(--bs-border-color);
+              overflow: hidden; margin: 3px 3px 0; }
+.hh-cap-bar > span { display: block; height: 100%; border-radius: 5px; background: transparent; }
+.hh-cap-bar.ok   > span { background: var(--hh-ocup-baixo); }
+.hh-cap-bar.warn > span { background: var(--hh-ocup-meta); }
+.hh-cap-bar.over > span { background: var(--hh-ocup-alto); }
+/* B21: FAIXA de ocupação por técnico — 1 linha dedicada acima dos cards, contorno reservado
+   abrangendo a semana; barras finas alinhadas no topo. Verde ≤meta, amarelo meta–100, vermelho >100 */
+.hh-caprow .hh-cap-cell {
+  height: 14px; vertical-align: middle; padding: 3px 5px;
+  background: var(--bs-tertiary-bg);
+  border-top: 1px solid var(--bs-border-color);
+  border-bottom: 1px solid var(--bs-border-color);
+}
+.hh-tec-cell + .hh-cap-cell { border-left: 1px solid var(--bs-border-color);
+  border-top-left-radius: 6px; border-bottom-left-radius: 6px; }
+.hh-caprow .hh-cap-cell:last-child { border-right: 1px solid var(--bs-border-color);
+  border-top-right-radius: 6px; border-bottom-right-radius: 6px; }
+.hh-slot-cap { height: 8px; border-radius: 4px; background: var(--bs-border-color);
+               overflow: hidden; margin: 0; }
+.hh-slot-cap > span { display: block; height: 100%; border-radius: 4px; }
+.hh-slot-cap.ok > span   { background: var(--hh-ocup-baixo); }
+.hh-slot-cap.warn > span { background: var(--hh-ocup-meta); }
+.hh-slot-cap.over > span { background: var(--hh-ocup-alto); }
+
+/* ---- painel lateral "a planejar" --------------------------------------------------- */
+.hh-side-card { border: 1px solid var(--bs-border-color); border-radius: 12px; overflow: hidden;
+                box-shadow: 0 2px 10px rgba(8,19,124,.05); }
+.hh-side-head { display: flex; align-items: center; gap: .35rem;
+                padding: .5rem .75rem; font-weight: 600; font-size: .82rem;
+                background: var(--bs-tertiary-bg); border-bottom: 1px solid var(--bs-border-color);
+                border-left: 4px solid var(--hh-accent, #08137C); }
+.hh-side-body { padding: .5rem; }
+
+/* ---- modo leitura (fila ocupa a tela; quadros recolhidos horizontalmente) ---------- */
+.hh-mode-fila .hh-col-tables { display: none; }            /* esconde os quadros */
+.hh-mode-fila .hh-col-side { flex: 0 0 100%; max-width: 100%; }  /* fila ocupa tudo */
+/* cards da fila em colunas (≈360px) — lê vários de uma vez, descrição inteira */
+.hh-mode-fila .hh-side-body { column-width: 360px; column-gap: 1rem; }
+.hh-mode-fila .hh-side-body .hh-card { break-inside: avoid; }
+.hh-mode-fila .hh-card-desc { white-space: normal; }       /* descrição completa (sem truncar) */
+
+/* ---- duas colunas com rolagem vertical INDEPENDENTE (tabelas × ordens) -------------- */
+/* Permite alinhar o quadro de uma disciplina (rola à esquerda) com a ordem a planejar
+   (rola à direita) e arrastar a curta distância, sem caçar com um scroll único. */
+.hh-col-tables, .hh-col-side {
+  max-height: calc(100vh - 235px);
+  overflow-y: auto; overflow-x: hidden;
+  scrollbar-width: thin;
+}
+.hh-col-tables { padding-right: .4rem; }
+/* barra de rolagem discreta e distinta por coluna (webkit) */
+.hh-col-tables::-webkit-scrollbar, .hh-col-side::-webkit-scrollbar { width: 10px; }
+.hh-col-tables::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--bs-primary) 35%, var(--bs-border-color));
+  border-radius: 6px; border: 2px solid transparent; background-clip: content-box;
+}
+.hh-col-side::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--bs-secondary) 45%, var(--bs-border-color));
+  border-radius: 6px; border: 2px solid transparent; background-clip: content-box;
+}
+.hh-mais { font-size: .7rem; font-style: italic; color: var(--bs-secondary-color); margin-top: .35rem; }
+
+/* ---- modal de detalhe da ordem (B9) ------------------------------------------------ */
+.hh-det-head { border-left: 5px solid var(--hh-accent, #08137C); padding: .5rem .85rem;
+               border-radius: 8px;
+               background: linear-gradient(90deg,
+                 color-mix(in srgb, var(--hh-accent, #08137C) 12%, var(--bs-body-bg)) 0%,
+                 var(--bs-body-bg) 60%); }
+.hh-det-kpi { min-width: 92px; padding: .4rem .7rem; border: 1px solid var(--bs-border-color);
+              border-radius: 10px; background: var(--bs-body-bg); }
+/* ---- modal de detalhe: largura ampliada + 2 colunas (B42) --------------------------- */
+.hh-modal-wide .modal-dialog { max-width: min(1500px, 95vw); }
+.hh-det-ficha-linha { display: block; margin-bottom: .15rem; }

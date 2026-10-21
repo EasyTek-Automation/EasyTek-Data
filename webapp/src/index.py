@@ -34,7 +34,11 @@ from src.pages.energy import overview as energy_overview, config as energy_confi
 from src.pages.production import states
 
 # Manutenção
-from src.pages.maintenance import alarms, procedures, indicators, indicators_v2, kpi_report_v2, config as maintenance_config, zpp_processor, zpp_debug, gantt, hh_gantt, backlog
+from src.components.dds_overlay import build_dds_overlay
+from src.pages.maintenance import alarms, procedures, indicators, indicators_v2, kpi_report_v2, config as maintenance_config, dds as maintenance_dds, zpp_processor, zpp_debug, gantt, hh_gantt, backlog, coletas_sap, analise_de_falhas, failure_analysis, monitoramento_ativos, monitoramento_ativos_ativo
+
+# Lab (páginas experimentais — rotas provisórias)
+from src.pages.lab import radar_lab
 
 # Workflow
 from src.pages.workflow import dashboard as workflow_dashboard
@@ -61,8 +65,9 @@ ROUTES = {
     "/change-password": change_password.layout_wrapper,
     
     # Dashboards
-    "/": home.layout,                       
-    "/production/oee": production_oee.layout,    
+    "/": home.layout,                       # dispatch por perfil+nível (BR-15/DS-13)
+    "/maintenance/overview": home.overview_layout,  # Visão Geral migrada da home (BR-17/DS-15)
+    "/production/oee": production_oee.layout,
     
     # Energia
     "/energy": energy_overview.layout,
@@ -131,6 +136,8 @@ ROUTES = {
     "/maintenance/backlog": backlog.layout,
     "/maintenance/indicators": indicators.layout,
     "/maintenance/indicators-v2": indicators_v2.layout,
+    "/maintenance/analise-de-falhas": analise_de_falhas.layout,
+    "/maintenance/analise-de-falhas/ishikawa": failure_analysis.layout,
     "/maintenance/kpi-report-v2": kpi_report_v2.layout,
     "/maintenance/config": maintenance_config.layout,
     "/maintenance/gantt": gantt.layout,
@@ -141,19 +148,41 @@ ROUTES = {
     "/config/users": manage_users.layout_wrapper,
     "/config/users/create": create_user.layout_wrapper,
     "/config/sap-scheduler": sap_scheduler_config.layout_wrapper,
+    "/config/dds": maintenance_dds.layout,
+    "/maintenance/coletas-sap": coletas_sap.layout_wrapper,
+    "/maintenance/monitoramento-ativos": monitoramento_ativos.layout,
+    "/maintenance/monitoramento-ativos/ativo": monitoramento_ativos_ativo.layout,
     "/config/preferences": lambda: under_development.config_development(),
     "/config/logs": lambda: under_development.config_development(),
+
+    # Lab — playgrounds provisórios, fora do menu (acesso digitando a URL)
+    "/lab/radar": radar_lab.layout,
 }
 
 # ========================================
 # ALIASES PARA RETROCOMPATIBILIDADE
 # ========================================
+def _query_param(search, nome):
+    """Lê um parâmetro da query string do dcc.Location (`?a=1&b=2`).
+
+    Usa parse_qs em vez do teste de substring feito para `?tab=custo`: aqui o
+    valor é uma chave de parada que vai virar consulta ao banco, e um match
+    frouxo pegaria a chave errada.
+    """
+    from urllib.parse import parse_qs
+    if not search:
+        return None
+    valores = parse_qs(search.lstrip("?")).get(nome)
+    return valores[0] if valores else None
+
+
 ROUTE_ALIASES = {
     "/dashboard": "/production/oee",
     "/states": "/production/states",
     "/superv": "/supervision",
     "/production/alarms": "/maintenance/alarms",
     "/alarms": "/maintenance/alarms",
+    "/config/sap-scheduler": "/maintenance/coletas-sap",  # consolidado no perfil manutenção
 }
 
 # --- Configurações Iniciais ---
@@ -195,9 +224,10 @@ app.layout = html.Div([
     Output("app-container", "children"),
     Output("reveal-timer", "disabled"),
     Input("url", "pathname"),
-    State("sidebar-state", "data")
+    State("sidebar-state", "data"),
+    State("url", "search"),
 )
-def route_and_prepare_content(pathname, sidebar_state):
+def route_and_prepare_content(pathname, sidebar_state, search):
     # ========================================
     # VERIFICAÇÃO DE AUTENTICAÇÃO
     # ========================================
@@ -244,6 +274,23 @@ def route_and_prepare_content(pathname, sidebar_state):
         if page_content is None:
             # 404 - Página não encontrada
             page_content = _build_404_page(pathname)
+        elif pathname == "/maintenance/indicators-v2":
+            # Deep-link de aba: ?tab=custo abre a aba de Custo já na montagem
+            # (sem renderizar a Geral antes — evita o flash de troca pós-render).
+            active = "tab-v2-custo" if (search and "tab=custo" in search) else "tab-v2-general"
+            page_content = page_content(active_tab=active)
+        elif pathname == "/maintenance/monitoramento-ativos/ativo":
+            # Mesmo caso da Análise de Falhas: o roteador resolve ROUTES por pathname
+            # exato, então o ativo viaja por query string em vez de /ativo/<id>.
+            page_content = page_content(
+                ativo=_query_param(search, "id"),
+                cenario=_query_param(search, "cenario"),
+                escopo=_query_param(search, "escopo"),
+            )
+        elif pathname == "/maintenance/analise-de-falhas/ishikawa":
+            # A parada vem por query string: o router resolve ROUTES por pathname
+            # exato, então não há como usar /paradas/<id>/ishikawa.
+            page_content = page_content(parada=_query_param(search, "parada"))
         elif callable(page_content):
             page_content = page_content()
 
@@ -338,6 +385,11 @@ def _build_main_layout(pathname, page_content, sidebar_state):
             style={"position": "fixed", "top": 66, "right": 10, "width": 350, "zIndex": 9999}
         ),
         dcc.Interval(id='interval-component', interval=10 * 1000, n_intervals=0, disabled=False),
+
+        # DDS em tela cheia — global: a tecla F9 chama o guia de qualquer tela.
+        # Fica FORA de `#content-column` de propósito; ali dentro o contexto de
+        # empilhamento daquele container deixaria o header por cima do overlay.
+        build_dds_overlay(),
     ])
 
 

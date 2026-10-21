@@ -8,7 +8,7 @@ import dash_bootstrap_components as dbc
 from flask import Response, abort
 from flask_login import current_user, login_required
 
-from src.utils import gantt_db
+from src.utils import gantt_db, hh_data
 from src.utils.gantt_validation import (
     CATEGORY_PIPELINE, ACTIVITY_PIPELINE, ASSIGNMENT_PIPELINE,
     ValidationContext,
@@ -1169,8 +1169,12 @@ def register_gantt_callbacks(app):
         for emp in employees:
             emp_id = str(emp["_id"])
             ativo  = emp.get("ativo", True)
+            # etiqueta só no temporário (BR-25); linha de fixo fica idêntica
+            nome_td = (html.Td([emp["nome"], dbc.Badge("Temporária", color="warning", pill=True,
+                                                       className="ms-1")])
+                       if emp.get("temporario") else html.Td(emp["nome"]))
             rows.append(html.Tr([
-                html.Td(emp["nome"]),
+                nome_td,
                 html.Td(TURNO_LABEL.get(emp.get("turno_padrao", "B"), "—")),
                 html.Td(html.Span("Ativo" if ativo else "Inativo",
                                   className=f"badge bg-{'success' if ativo else 'secondary'}")),
@@ -1215,17 +1219,21 @@ def register_gantt_callbacks(app):
         Output("div-employee-photo-preview", "children"),
         Output("btn-clear-employee-photo", "style"),
         Output("store-employee-photo-staged", "data"),
+        Output("input-employee-siglas", "value"),
+        Output("input-employee-jornada", "value"),
+        Output("check-employee-temporario", "value"),
         Input({"type": "btn-edit-employee", "index": ALL}, "n_clicks"),
         Input("btn-cancel-employee", "n_clicks"),
         prevent_initial_call=True,
     )
     def open_employee_form(edit_clicks, cancel):
+        """Cancelar volta à lista; lápis abre a aba de formulário preenchida com o funcionário."""
         triggered_id = ctx.triggered_id
         if triggered_id is None:
             raise PreventUpdate
         if triggered_id == "btn-cancel-employee":
             return ("tab-emp-list", no_update, no_update, no_update, no_update,
-                    no_update, no_update, no_update)
+                    no_update, no_update, no_update, no_update, no_update, no_update)
         if isinstance(triggered_id, dict) and triggered_id.get("type") == "btn-edit-employee":
             if not any(edit_clicks):
                 raise PreventUpdate
@@ -1243,9 +1251,11 @@ def register_gantt_callbacks(app):
             else:
                 preview = ""
                 btn_style = {"display": "none"}
+            siglas_txt = ", ".join(emp.get("siglas_sap") or [])
             return ("tab-emp-form", "Editar Funcionário", emp["nome"],
                     emp.get("turno_padrao", "B"), emp_id,
-                    preview, btn_style, None)
+                    preview, btn_style, None,
+                    siglas_txt, emp.get("jornada_min"), bool(emp.get("temporario")))
         raise PreventUpdate
 
     # ------------------------------------------------------------------
@@ -1285,28 +1295,51 @@ def register_gantt_callbacks(app):
         Output("radio-employee-turno", "value", allow_duplicate=True),
         Output("store-employee-editing-id", "data", allow_duplicate=True),
         Output("store-employee-photo-staged", "data", allow_duplicate=True),
+        Output("input-employee-siglas", "value", allow_duplicate=True),
+        Output("input-employee-jornada", "value", allow_duplicate=True),
+        Output("check-employee-temporario", "value", allow_duplicate=True),
         Input("btn-save-employee", "n_clicks"),
         State("input-employee-nome", "value"),
         State("radio-employee-turno", "value"),
         State("store-employee-editing-id", "data"),
         State("store-gantt-refresh", "data"),
         State("store-employee-photo-staged", "data"),
+        State("input-employee-siglas", "value"),
+        State("input-employee-jornada", "value"),
+        State("check-employee-temporario", "value"),
         prevent_initial_call=True,
     )
-    def save_employee(n_clicks, nome, turno, editing_id, refresh, photo_staged):
+    def save_employee(n_clicks, nome, turno, editing_id, refresh, photo_staged, siglas, jornada,
+                      temporario):
+        """Cria/edita funcionário. Mudar 'mão de obra temporária' de um existente passa pela regra
+        do quadro (BR-25 item 7): recusa sem gravar NADA se houver ordem atribuída daqui em diante."""
         if not n_clicks:
             raise PreventUpdate
         if current_user.level < 2:
             raise PreventUpdate
+        sem_mudanca = (no_update,) * 7
         if not nome or not turno:
             items = [html.Li("Nome e turno são obrigatórios.")]
-            return no_update, no_update, True, items, no_update, no_update, no_update, no_update
+            return (no_update, no_update, True, items) + sem_mudanca
         if turno not in ("A", "B", "C", "ADM"):
             items = [html.Li("Turno inválido.")]
-            return no_update, no_update, True, items, no_update, no_update, no_update, no_update
-        data = {"nome": nome.strip(), "turno_padrao": turno}
+            return (no_update, no_update, True, items) + sem_mudanca
+        # campos do hh-management (BR-14): siglas separadas por vírgula; jornada opcional
+        siglas_list = [s.strip() for s in (siglas or "").split(",") if s.strip()]
+        try:
+            jornada_min = int(jornada) if jornada not in (None, "") else None
+        except (TypeError, ValueError):
+            jornada_min = None
+        data = {"nome": nome.strip(), "turno_padrao": turno,
+                "siglas_sap": siglas_list, "jornada_min": jornada_min}
+        temporario = bool(temporario)
         if editing_id:
             old = gantt_db.get_employee_by_id(editing_id)
+            if old and bool(old.get("temporario")) != temporario:
+                ok, msg = hh_data.marcar_temporario(
+                    editing_id, temporario, {"id": current_user.id, "nome": current_user.username})
+                if not ok:
+                    return (no_update, no_update, True, [html.Li(msg)]) + sem_mudanca
             gantt_db.update_employee(editing_id, data)
             target_id = editing_id
             if old:
@@ -1314,7 +1347,9 @@ def register_gantt_callbacks(app):
                     if old.get(field) != data[field]:
                         _log("edicao", "funcionario", editing_id, nome, field, old.get(field), data[field])
         else:
-            target_id = gantt_db.create_employee(data)
+            # BR-26: fixo novo conta no quadro só a partir da semana do cadastro
+            target_id = gantt_db.create_employee(
+                dict(data, temporario=temporario, semana_cadastro=hh_data.semana_atual()))
             _log("criacao", "funcionario", target_id, nome)
 
         # Aplica mudanças pendentes de foto staged no store
@@ -1327,7 +1362,7 @@ def register_gantt_callbacks(app):
             gantt_db.set_employee_photo(target_id, photo_bytes, photo_staged.get("mime", "image/jpeg"))
             _log("edicao", "funcionario", target_id, nome, "foto", "anterior", "atualizada")
 
-        return "tab-emp-list", (refresh or 0) + 1, False, [], "", "B", None, None
+        return "tab-emp-list", (refresh or 0) + 1, False, [], "", "B", None, None, "", None, False
 
     # ------------------------------------------------------------------
     # CB-16b — Upload de foto: processa arquivo, faz resize e salva no store

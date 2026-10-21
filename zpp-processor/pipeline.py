@@ -297,7 +297,9 @@ def _prepare_df(df: pd.DataFrame, mes_referencia: str) -> list[dict]:
 
 _UNIQUE_KEYS = {
     "zppprd":      ("pto_trab", "ordem", "mes_referencia"),
-    "zppparadas":  ("centro_de_trabalho", "ordem", "inicio_real_hora", "causa_do_desvio"),
+    # inicio_execucao (dia) é obrigatório: ordem que atravessa dias pode ter a mesma
+    # causa começando no mesmo horário em dias diferentes (LONGI001 06/10 e 07/10).
+    "zppparadas":  ("centro_de_trabalho", "ordem", "inicio_execucao", "inicio_real_hora", "causa_do_desvio"),
 }
 
 
@@ -463,9 +465,9 @@ def ensure_indexes(db, collection_name: str, tipo: str) -> None:
         )
     else:
         _safe_create(collection,
-            [("centro_de_trabalho", ASCENDING), ("ordem", ASCENDING),
+            [("centro_de_trabalho", ASCENDING), ("ordem", ASCENDING), ("inicio_execucao", ASCENDING),
              ("inicio_real_hora", ASCENDING), ("causa_do_desvio", ASCENDING)],
-            name="idx_unique_paradas", unique=True, sparse=True
+            name="idx_unique_paradas_v2", unique=True, sparse=True
         )
         _safe_create(collection, "mes_referencia", name="idx_mes_ref")
         _safe_create(collection,

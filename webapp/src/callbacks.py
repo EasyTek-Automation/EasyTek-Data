@@ -25,11 +25,15 @@ from src.callbacks_registers.hourlyconsumption_callback import register_hourlyco
 from src.callbacks_registers.sidebar_content_callback import register_sidebar_content_callback
 from src.callbacks_registers.sidebar_toggle_callback import register_sidebar_toggle_callback
 from src.callbacks_registers.indicators_v2_callbacks import register_indicators_v2_callbacks
+from src.callbacks_registers.radar_lab_callbacks import register_radar_lab_callbacks
 from src.callbacks_registers.backlog_callbacks import register_backlog_callbacks
+from src.callbacks_registers.hh_quadro_callbacks import register_hh_quadro_callbacks
+from src.callbacks_registers.hh_historico_callbacks import register_hh_historico_callbacks
 from src.callbacks_registers.custo_callbacks import register_custo_callbacks
 from src.callbacks_registers.home_callbacks import register_home_callbacks
 from src.callbacks_registers.hh_gantt_callbacks import register_hh_gantt_callbacks
 from src.callbacks_registers.alarms_callbacks import register_alarms_callbacks
+from src.callbacks_registers.monitoring_callbacks import register_monitoring_callbacks
 from src.callbacks_registers.create_user_callbacks import register_create_user_callbacks
 from src.callbacks_registers.change_password_callbacks import register_change_password_callbacks
 from src.callbacks_registers.manage_users_callbacks import register_manage_users_callbacks
@@ -57,6 +61,13 @@ from src.callbacks_registers.gantt_export    import register_gantt_export_routes
 
 from src.pages.energy import callbacks as energy_callbacks
 from src.callbacks_registers.se03_telemetry_callbacks import register_se03_telemetry_callbacks
+from src.callbacks_registers.email_test_callbacks import register_email_test_callbacks
+from src.callbacks_registers.analise_falhas_callbacks import register_analise_falhas_callbacks
+from src.callbacks_registers.failure_analysis_callbacks import register_failure_analysis_callbacks
+from src.callbacks_registers.failure_a3_callbacks import register_failure_a3_callbacks
+from src.callbacks_registers.failure_management_callbacks import (
+    register_failure_management_callbacks,
+)
 
 # (Seu logger, se houver)
 
@@ -107,11 +118,15 @@ def register_callbacks(app):
     register_sidebar_content_callback(app)
     register_sidebar_toggle_callback(app)
     register_indicators_v2_callbacks(app)
+    register_radar_lab_callbacks(app)
     register_backlog_callbacks(app)
+    register_hh_quadro_callbacks(app)
+    register_hh_historico_callbacks(app)
     register_custo_callbacks(app)
     register_home_callbacks(app)
     register_hh_gantt_callbacks(app)
     register_alarms_callbacks(app)
+    register_monitoring_callbacks(app)
     register_create_user_callbacks(app)
     register_change_password_callbacks(app)
     register_manage_users_callbacks(app)
@@ -167,3 +182,34 @@ def register_callbacks(app):
     # SE03 Telemetria ao vivo
     collection_telemetry = get_mongo_connection("AMG_EnergyTelemetry", silent=True)
     register_se03_telemetry_callbacks(app, collection_telemetry)
+
+    # Botão 'Testar e-mail' no header
+    register_email_test_callbacks(app)
+
+    # Página Análise de Falhas (Pareto de paradas)
+    register_analise_falhas_callbacks(app)
+    register_failure_analysis_callbacks(app)
+    register_failure_a3_callbacks(app)
+    register_failure_management_callbacks(app)
+    # Fotos da Análise de Falhas: rotas Flask (upload/serve/delete/legenda) + callbacks
+    from src.callbacks_registers.failure_photos_routes import register_failure_photos_routes
+    from src.callbacks_registers.failure_photos_callbacks import register_failure_photos_callbacks
+    register_failure_photos_routes(app.server)
+    # Imagem do diagrama (SVG + PNG) exportada pelo quadro, usada no slide (IM-AF3-08)
+    from src.callbacks_registers.failure_diagram_routes import register_failure_diagram_routes
+    register_failure_diagram_routes(app.server)
+
+    # Bibliotecas vendorizadas grandes (Excalidraw) — servidas por rota própria, e não
+    # por `assets/`, que o Dash injeta inteira em todas as páginas.
+    from src.callbacks_registers.vendor_routes import register_vendor_routes
+    register_vendor_routes(app.server)
+
+    from src.callbacks_registers.dds_config_callbacks import register_dds_config_callbacks
+    register_dds_config_callbacks(app)   # Configuração do DDS (/config/dds)
+
+    from src.callbacks_registers.dds_callbacks import register_dds_callbacks
+    register_dds_callbacks(app)          # DDS em tela cheia (F9, global)
+
+    from src.callbacks_registers.monitoring_routes import register_monitoring_routes
+    register_monitoring_routes(app.server)
+    register_failure_photos_callbacks(app)

@@ -231,6 +231,9 @@ def montar_docx(dados: dict) -> bytes:
     # imprime via Jinja sem filtro, expondo floats como "31.362000000000002" (BR-07).
     _formatar_numeros_docx(dados)
 
+    # BR-14 / SP-27: selo de parada pendente vai como texto na célula de causa (template intacto)
+    _marcar_pendentes_docx(dados)
+
     try:
         template.render(dados, autoescape=True)
     except (TemplateSyntaxError, UndefinedError) as exc:
@@ -238,4 +241,145 @@ def montar_docx(dados: dict) -> bytes:
 
     buffer = BytesIO()
     template.save(buffer)
-    return buffer.getvalue()
+    doc_bytes = _inserir_legenda_pendentes_docx(buffer.getvalue(), dados)
+    return _inserir_mao_de_obra_docx(doc_bytes, dados)
+
+
+# Texto puro no DOCX/PDF: o "⏳" depende da fonte de quem abre/imprime; o selo em texto basta.
+_SELO_DOCX = "PENDENTE"
+_BLOCOS_PARADAS = ("bloco2", "bloco5")  # ordem das tabelas "# | Equipamento | ..." no template
+
+
+def _marcar_pendentes_docx(dados: dict) -> None:
+    """Prefixa `PENDENTE · ` na causa das paradas ainda não consolidadas na NT0001 (BR-14)."""
+    for bkey in _BLOCOS_PARADAS:
+        for parada in ((dados.get(bkey) or {}).get("paradas") or []):
+            if parada.get("pendente") and not str(parada.get("causa", "")).startswith(_SELO_DOCX):
+                parada["causa"] = f"{_SELO_DOCX} · {parada.get('causa', '')}"
+
+
+def _inserir_legenda_pendentes_docx(doc_bytes: bytes, dados: dict) -> bytes:
+    """Legenda (se houver pendente) e aviso de checagem logo abaixo das tabelas dos Blocos 2 e 5.
+
+    Pós-render via python-docx (template binário intacto). As tabelas de paradas são as que
+    começam com "#" / "Equipamento", na ordem Bloco 2 → Bloco 5. Sem nada a inserir, devolve os
+    bytes originais; qualquer falha também (nunca derruba o export).
+    """
+    textos = []
+    for bkey in _BLOCOS_PARADAS:
+        bloco = dados.get(bkey) or {}
+        linhas = []
+        if any(p.get("pendente") for p in (bloco.get("paradas") or [])):
+            from src.utils.zpp_paradas_pendentes import LEGENDA
+            linhas.append((LEGENDA.replace("⏳", "").strip(), False))
+        if bloco.get("aviso_checagem"):
+            linhas.append((bloco["aviso_checagem"], True))
+        textos.append(linhas)
+    if not any(textos):
+        return doc_bytes
+    try:
+        from copy import deepcopy
+
+        from docx import Document
+        from docx.shared import Pt
+
+        doc = Document(BytesIO(doc_bytes))
+        tabelas = [t for t in doc.tables
+                   if len(t.rows) and [c.text.strip() for c in t.rows[0].cells][:2] == ["#", "Equipamento"]]
+        if len(tabelas) != len(_BLOCOS_PARADAS):
+            logger.warning("DOCX: tabelas de paradas não identificadas (%d) — legenda omitida", len(tabelas))
+            return doc_bytes
+        for tabela, linhas in zip(tabelas, textos):
+            ancora = tabela._tbl
+            for texto, italico in linhas:
+                par = doc.add_paragraph()
+                run = par.add_run(texto)
+                run.font.size = Pt(8)
+                run.italic = italico
+                elem = deepcopy(par._p)
+                par._p.getparent().remove(par._p)
+                ancora.addnext(elem)
+                ancora = elem
+        out = BytesIO()
+        doc.save(out)
+        return out.getvalue()
+    except Exception:
+        logger.exception("DOCX: falha ao inserir legenda de pendentes — export segue sem ela")
+        return doc_bytes
+
+
+def _inserir_mao_de_obra_docx(doc_bytes: bytes, dados: dict) -> bytes:
+    """Insere o bloco "Mão de obra da semana" no DOCX já renderizado, ANTES do parágrafo
+    "Anotações da Reunião" (SP-18/BR-11/12). Pós-render via python-docx — não edita o template
+    binário. Defensivo: qualquer falha (HH indisponível, âncora não achada, kaleido) devolve o
+    DOCX original intacto — nunca derruba o export (SP-19)."""
+    try:
+        from datetime import datetime as _dt
+        from datetime import timedelta as _td
+
+        from docx import Document
+        from docx.shared import Mm, Pt
+
+        from src.utils import kpi_report_config as _cfg
+        from src.utils import kpi_report_maodeobra as _mdo
+        from src.utils.hh_data import semana_mao_de_obra
+        from src.utils.kpi_report_figures import renderizar_sunburst_png
+
+        # dia avaliado = o mesmo do relatório (DatePicker, default ontem) — injetado pelo callback
+        # de export em `dados["_mao_de_obra_ref"]`. Fallback: ontem.
+        ref = dados.get("_mao_de_obra_ref")
+        if ref is None:
+            agora = _cfg._now_in_report_timezone() if hasattr(_cfg, "_now_in_report_timezone") else _dt.now()
+            ref = agora - _td(days=1)
+        sem = semana_mao_de_obra(ref)
+        if not sem or sem.get("sem_dados") or not sem.get("dias"):
+            return doc_bytes
+        dias = sem["dias"]
+
+        doc = Document(BytesIO(doc_bytes))
+        anchor = next((p for p in doc.paragraphs if "Anotações da Reunião" in (p.text or "")), None)
+        if anchor is None:
+            logger.warning("DOCX mão de obra: âncora 'Anotações da Reunião' não encontrada; bloco omitido")
+            return doc_bytes
+
+        # heading + subtítulo com a semana de referência (deixa claro QUAL semana)
+        h = doc.add_paragraph()
+        run = h.add_run("Mão de obra da semana")
+        run.bold = True
+        run.font.size = Pt(14)
+        sub = doc.add_paragraph()
+        srun = sub.add_run(_mdo.rotulo_semana(sem))
+        srun.italic = True
+        srun.font.size = Pt(10)
+        # imagem do gráfico (PNG kaleido — herda pin chromium IM-17)
+        png = renderizar_sunburst_png(_mdo.fig_mao_de_obra(dias),
+                                      kpi_label="mao_de_obra", width=1400, height=420, scale=2)
+        doc.add_picture(BytesIO(png), width=Mm(255))
+        pic_par = doc.paragraphs[-1]
+        # tabela nativa
+        linhas = _mdo.linhas_tabela(dias)
+        tbl = doc.add_table(rows=1 + len(linhas), cols=len(_mdo.CABECALHOS))
+        tbl.style = "Table Grid"
+        for j, c in enumerate(_mdo.CABECALHOS):
+            cel = tbl.rows[0].cells[j]
+            cel.text = c
+            for p in cel.paragraphs:
+                for r in p.runs:
+                    r.bold = True
+        for i, l in enumerate(linhas, start=1):
+            vals = (l["dia"], l["disponivel"], l["planejado"], l["pct"], l["executado"], l["aderencia"])
+            for j, v in enumerate(vals):
+                tbl.rows[i].cells[j].text = v
+
+        # move heading → subtítulo → imagem → tabela para ANTES da âncora (mantém a ordem)
+        anchor._p.addprevious(h._p)
+        anchor._p.addprevious(sub._p)
+        anchor._p.addprevious(pic_par._p)
+        anchor._p.addprevious(tbl._tbl)
+
+        out = BytesIO()
+        doc.save(out)
+        return out.getvalue()
+    except Exception:
+        logger.exception("Falha ao inserir bloco de mão de obra no DOCX; bloco omitido")
+        return doc_bytes

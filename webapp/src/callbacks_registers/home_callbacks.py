@@ -39,19 +39,9 @@ def register_home_callbacks(app):
         return [f"{base} active" if (i or {}).get("lang") == (lang or "pt") else base
                 for i in ids]
 
-    # 3. Toggle manual de granularidade → slide (0/1/2 = mês/semana/faixa)
-    @app.callback(
-        Output("store-home-slide", "data"),
-        Input("btn-home-period-month", "n_clicks"),
-        Input("btn-home-period-week", "n_clicks"),
-        Input("btn-home-period-band", "n_clicks"),
-        prevent_initial_call=True,
-    )
-    def toggle_home_period(_m, _w, _b):
-        trig = ctx.triggered_id
-        return {"btn-home-period-week": 1, "btn-home-period-band": 2}.get(trig, 0)
-
     # 3c. Slide → corte (period) + gráfico ativo (graph). Fonte única do carrossel.
+    #     (Os botões mês/semana/faixa foram removidos: os 3 cortes viraram slides
+    #      navegáveis por Anterior/Próximo, como KPIs e Custos.)
     @app.callback(
         Output("store-home-period", "data"),
         Output("store-home-graph", "data"),
@@ -64,29 +54,14 @@ def register_home_callbacks(app):
             return no_update, slide          # gráfico: mantém o corte atual
         return slide, None                    # corte: arena visível
 
-    # 3b. store-home-period → estado outline dos 3 botões (vale p/ manual E rotação automática)
-    @app.callback(
-        Output("btn-home-period-month", "outline"),
-        Output("btn-home-period-week", "outline"),
-        Output("btn-home-period-band", "outline"),
-        Input("store-home-period", "data"),
-    )
-    def highlight_period_btn(period):
-        period = period or "month"
-        return (period != "month"), (period != "week"), (period != "band")
-
     # 4. Render: período + idioma → gráficos + veredito + textos i18n
     @app.callback(
         Output("home-charts-container", "children"),
         Output("home-verdict-container", "children"),
-        Output("home-i18n-period-sub", "children"),
         Output("home-i18n-title", "children"),
         Output("home-i18n-subtitle", "children"),
         Output("home-i18n-mock-badge", "children"),
         Output("home-mock-tooltip", "children"),
-        Output("home-i18n-btn-month", "children"),
-        Output("home-i18n-btn-week", "children"),
-        Output("home-i18n-btn-band", "children"),
         Output("home-i18n-btn-present", "children"),
         Output("store-rendered-cuts", "data"),
         Input("store-home-period", "data"),
@@ -97,18 +72,13 @@ def register_home_callbacks(app):
         period = period or "month"
         lang = lang or "pt"
         t = home_page.t
-        psub = home_page.period_meta(period, lang, today=home_page._data_anchor())["psub"]
         return (
             home_page.render_duels(period, lang),
             home_page.render_freshness(lang),
-            psub,
             t("title", lang),
             t("subtitle", lang),
             t("mock_badge", lang),
             t("mock_tooltip", lang),
-            t("btn_month", lang),
-            t("btn_week", lang),
-            t("btn_band", lang),
             t("btn_present", lang),
             (ccount or 0) + 1,  # confirma render dos cortes
         )
@@ -161,6 +131,26 @@ def register_home_callbacks(app):
         Input("btn-home-present", "n_clicks"),
         State("store-home-present", "data"),
         prevent_initial_call=True,
+    )
+
+    # 6a-deep. Abrir já no modo apresentação: a home linka /maintenance/overview?present=1.
+    # Dispara um clique programático no botão Apresentação (reusa todo o toggle: carrossel
+    # + estilo present). Fullscreen pode não abrir sem gesto do usuário — degrada ok.
+    app.clientside_callback(
+        """
+        function(search) {
+            if (search && search.indexOf('present=1') !== -1) {
+                setTimeout(function () {
+                    var b = document.getElementById('btn-home-present');
+                    if (b && b.dataset.present !== 'true') { b.click(); }
+                }, 450);
+            }
+            return window.dash_clientside.no_update;
+        }
+        """,
+        Output("store-home-present", "data", allow_duplicate=True),
+        Input("url", "search"),
+        prevent_initial_call='initial_duplicate',
     )
 
     # 6b. Rotação ativa só quando present ON e NÃO pausado.
@@ -220,9 +210,10 @@ def register_home_callbacks(app):
     def rotate_slide(_n, idx):
         return ((idx or 0) + 1) % len(home_page.SLIDES)
 
-    # 6g. Navegação manual < > → passo no slide (inclui os gráficos)
+    # 6g. Navegação manual < > → passo no slide (inclui os gráficos). Dono primário do
+    #     store-home-slide (os demais escritores usam allow_duplicate).
     @app.callback(
-        Output("store-home-slide", "data", allow_duplicate=True),
+        Output("store-home-slide", "data"),
         Input("btn-home-present-prev", "n_clicks"),
         Input("btn-home-present-next", "n_clicks"),
         State("store-home-slide", "data"),

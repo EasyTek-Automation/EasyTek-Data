@@ -92,9 +92,19 @@ def _row_3_sunbursts(sunbursts: dict) -> dbc.Row:
     return dbc.Row(cols)
 
 
-def _tabela_top_paradas(paradas: list[dict], vazio: bool, vazio_msg: str) -> html.Div:
+def _tabela_top_paradas(paradas: list[dict], vazio: bool, vazio_msg: str,
+                        aviso: str = "") -> html.Div:
+    """Tabela das paradas (Blocos 2/5) — tela V1 e aba Relatório do indicators-v2.
+
+    BR-14 / SP-27: linha `pendente` (lançada na ZPP Paradas, ainda fora da NT0001) ganha selo +
+    fundo, e a legenda aparece abaixo só se houver pendente. `aviso` = checagem indisponível
+    (SP-28). A V1 chama sem pendentes e sem aviso → saída idêntica à de antes.
+    """
+    from src.utils.zpp_paradas_pendentes import LEGENDA, SELO
+    rodape = [html.Div(aviso, className="kpi-v2-aviso-checagem mt-1")] if aviso else []
     if vazio or not paradas:
-        return dbc.Alert(vazio_msg, color="info", className="text-center")
+        alerta = dbc.Alert(vazio_msg, color="info", className="text-center")
+        return html.Div([alerta] + rodape) if rodape else alerta
     header = html.Thead(html.Tr([
         html.Th("#"),
         html.Th("Equipamento"),
@@ -103,17 +113,28 @@ def _tabela_top_paradas(paradas: list[dict], vazio: bool, vazio_msg: str) -> htm
         html.Th("Causa"),
         html.Th("Descrição"),
     ]))
-    body = html.Tbody([
-        html.Tr([
+
+    def _linha(p):
+        """Uma linha; a pendente recebe classe e selo antes do código de causa."""
+        causa = p.get("causa")
+        props = {}
+        if p.get("pendente"):
+            causa = [html.Span(SELO, className="kpi-v2-selo-pendente me-1"), causa]
+            props["className"] = "kpi-v2-row-pendente"
+        return html.Tr([
             html.Td(p.get("posicao")),
             html.Td(p.get("equipamento")),
             html.Td(p.get("data_hora")),
             html.Td(p.get("duracao_min")),
-            html.Td(p.get("causa")),
+            html.Td(causa),
             html.Td(p.get("descricao")),
-        ]) for p in paradas
-    ])
-    return dbc.Table([header, body], striped=True, hover=True, bordered=True, responsive=True, size="sm")
+        ], **props)
+
+    body = html.Tbody([_linha(p) for p in paradas])
+    tabela = dbc.Table([header, body], striped=True, hover=True, bordered=True, responsive=True, size="sm")
+    if any(p.get("pendente") for p in paradas):
+        rodape = [html.Div(LEGENDA, className="kpi-v2-legenda-pendente mt-1")] + rodape
+    return html.Div([tabela] + rodape) if rodape else tabela
 
 
 def _tabela_detalhamento(bloco4: dict) -> html.Div:
@@ -199,7 +220,8 @@ def register_kpi_report_screen_callbacks(app: dash.Dash) -> None:
 
         try:
             agora = cfg._now_in_report_timezone()
-            dados = coletar_dados_relatorio(stored_data, agora, as_png=False)
+            # BR-14: V1 não desenha o selo de pendente → fica sem pendentes (idêntica a antes)
+            dados = coletar_dados_relatorio(stored_data, agora, as_png=False, incluir_pendentes=False)
         except Exception:
             logger.exception("Falha ao coletar dados para Relatório Diário na tela")
             return dbc.Alert("Erro ao gerar relatório. Veja os logs.", color="danger"), ""

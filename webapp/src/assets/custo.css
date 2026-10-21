@@ -48,3 +48,58 @@
         width: 98vw;
     }
 }
+
+/* ---- Filtro de contas: painel flutuante com caixinhas (não empurra a barra) ---- */
+.custo-contas-flutua {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1060;
+    min-width: 320px;
+}
+.custo-contas-painel {
+    margin-top: 4px;
+    background: var(--bs-body-bg, #fff);
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 8px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    padding: 10px 12px 6px;
+}
+.custo-contas-acoes {
+    font-size: 0.8rem;
+    padding-bottom: 6px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+}
+.custo-contas-link {
+    background: none;
+    border: 0;
+    padding: 0;
+    color: var(--bs-primary, #0d6efd);
+    font-weight: 600;
+    cursor: pointer;
+}
+.custo-contas-link:hover {
+    text-decoration: underline;
+}
+.custo-contas-lista {
+    max-height: 340px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+}
+.custo-contas-lista .form-check {
+    padding-top: 3px;
+    padding-bottom: 3px;
+    margin-bottom: 0;
+}
+.custo-contas-lista .form-check:hover {
+    background: rgba(13, 110, 253, 0.06);
+    border-radius: 4px;
+}
+.custo-contas-rodape {
+    display: flex;
+    justify-content: flex-end;
+    padding-top: 8px;
+    margin-top: 6px;
+    border-top: 1px solid var(--bs-border-color, #dee2e6);
+}

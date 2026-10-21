@@ -10,7 +10,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
-TIPOS_VALIDOS = frozenset({"zppprd", "zpp_nt0001", "backlog"})
+TIPOS_VALIDOS = frozenset({"zppprd", "zpp_nt0001", "backlog", "hh_planejado", "hh_realizado",
+                           "hh_entregas"})
 HORA_REGEX = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 
 

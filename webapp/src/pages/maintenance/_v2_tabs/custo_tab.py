@@ -12,9 +12,28 @@ Bloco autocontido (IN-05). So le do Mongo (DS-01). Comportamento em
 from __future__ import annotations
 
 import dash_bootstrap_components as dbc
+import plotly.graph_objects as go
 from dash import dcc, html
 
+from src.custos import periodo as P
+
 ANO_PADRAO = 2026
+TITULO_ENTRADA = "Realizado por conta (% do orçado, {periodo}) — clique para abrir os meses"
+
+
+def _loading_fig() -> go.Figure:
+    """Figura placeholder ('Carregando…') enquanto a coleta de custos popula os gráficos.
+
+    Evita a área em branco no primeiro paint quando se navega direto para a aba (deep-link),
+    onde o render dos gráficos só ocorre após o disparo de `custo-init`."""
+    fig = go.Figure()
+    fig.add_annotation(text="Carregando custos…", showarrow=False,
+                       font=dict(size=14, color="#8a93a6"),
+                       x=0.5, y=0.5, xref="paper", yref="paper")
+    fig.update_layout(margin=dict(l=0, r=0, t=0, b=0),
+                      xaxis=dict(visible=False), yaxis=dict(visible=False),
+                      plot_bgcolor="white", paper_bgcolor="white")
+    return fig
 
 
 def _label(txt: str) -> html.Label:
@@ -26,8 +45,31 @@ def _label(txt: str) -> html.Label:
     )
 
 
-def build_tab() -> dbc.Tab:
-    """Constroi a `dbc.Tab` da feature de custo, para inserir em indicators_v2."""
+def _prerender_figs():
+    """Renderiza as figuras anuais (rosca + barras) no servidor, p/ deep-link cair na aba
+    de custo já com os gráficos (sem janela vazia até o `custo-init`). Reusa os mesmos
+    builders dos callbacks; degrada para o placeholder 'Carregando…' se algo falhar."""
+    try:
+        try:
+            from src.callbacks_registers.custo_callbacks import _fig_rosca, _fig_barras
+            from src.custos import leitura as L
+        except ImportError:
+            from callbacks_registers.custo_callbacks import _fig_rosca, _fig_barras
+            from custos import leitura as L
+        rosca = _fig_rosca(L.fetch_por_equipamento(ANO_PADRAO, None))
+        entry = _fig_barras(L.fetch_contas_geral(ANO_PADRAO, None, None), True, "",
+                            h=460, modo="pct")
+        return rosca, entry
+    except Exception:
+        return _loading_fig(), _loading_fig()
+
+
+def build_tab(prerender: bool = False) -> dbc.Tab:
+    """Constroi a `dbc.Tab` da feature de custo, para inserir em indicators_v2.
+
+    prerender=True (deep-link ?tab=custo) → gráficos já vêm renderizados no primeiro paint.
+    """
+    rosca_fig, entry_fig = _prerender_figs() if prerender else (_loading_fig(), _loading_fig())
     return dbc.Tab(
         label="💰 Custo de Manutenção",
         id="tab-v2-custo-component",
@@ -36,17 +78,39 @@ def build_tab() -> dbc.Tab:
             [
                 # Estado proprio (autocontido). Drill por tempo: ano -> mes -> dia -> conta.
                 # Filtros persistem na sessão do navegador (sobrevivem a reload/navegação).
-                dcc.Store(id="store-custo-ano", data=ANO_PADRAO, storage_type="session"),
-                dcc.Store(id="store-custo-contas-sel", data=[], storage_type="session"),
+                # Ano e Período NÃO são lembrados (BR-18.6, revisado 2026-10-05): ao recarregar,
+                # a aba volta ao Ano inteiro do ano atual.
+                dcc.Store(id="store-custo-ano", data=ANO_PADRAO),
+                # Período (BR-18): escolha do seletor + janela resolvida (ano ou meses)
+                # que os callbacks de dado leem no lugar do ano.
+                dcc.Store(id="store-custo-periodo", data={"tipo": P.ANO_INTEIRO}),
+                dcc.Store(id="store-custo-janela",
+                          data={"ano": ANO_PADRAO, "meses": None, "rotulo": str(ANO_PADRAO)}),
+                dcc.Store(id="store-custo-contas-sel", data=None, storage_type="session"),  # None = todas
                 dcc.Store(id="store-custo-level", data="planta"),
                 dcc.Store(id="store-custo-mes", data=None),
                 dcc.Store(id="store-custo-dia", data=None),
                 dcc.Store(id="store-custo-conta", data=None),
-                dcc.Interval(id="custo-init", interval=300, max_intervals=1),
+                # Export Excel dos modais (IM-40): a ordem clicada no mini-modal do almox +
+                # 3 alvos de download (drill, rosca, itens da ordem).
+                dcc.Store(id="store-comp-ordem"),
+                dcc.Download(id="download-custo-drill"),
+                dcc.Download(id="download-custo-rosca"),
+                dcc.Download(id="download-custo-comp"),
+                dcc.Interval(id="custo-init", interval=80, max_intervals=1),
 
                 dcc.Loading(
                     type="circle",
                     color="#0d6efd",
+                    # Só os gráficos acionam o "carregando". Sem isto, qualquer callback da barra
+                    # (abrir o painel de contas, marcar caixinha, rótulo do botão) cobria a aba
+                    # inteira com o spinner e a tela piscava.
+                    target_components={"custo-graph-entry": "figure",
+                                       "custo-graph-rosca": "figure"},
+                    # Durante o recálculo os gráficos ficam visíveis (esmaecidos) em vez de sumir,
+                    # e o spinner só aparece se demorar — sem "piscar" a cada filtro.
+                    overlay_style={"visibility": "visible", "opacity": 0.55},
+                    delay_show=200,
                     children=html.Div(
                         [
                             # ---- Cabecalho + toolbar ----
@@ -80,6 +144,34 @@ def build_tab() -> dbc.Tab:
                                                      style={"width": "110px"})],
                                                 className="me-3",
                                             ),
+                                            # Período (BR-18) — bloco novo, fora do do Ano.
+                                            html.Div(
+                                                [_label("Período"),
+                                                 dcc.Dropdown(
+                                                     id="custo-periodo-select",
+                                                     options=P.OPCOES, value=P.ANO_INTEIRO,
+                                                     clearable=False, searchable=False,
+                                                     style={"width": "175px"})],
+                                                className="me-3",
+                                            ),
+                                            html.Div(
+                                                [html.Div(
+                                                    [_label("De"),
+                                                     dcc.Dropdown(id="custo-periodo-de",
+                                                                  options=[], clearable=False,
+                                                                  searchable=False,
+                                                                  style={"width": "120px"})],
+                                                    className="me-2"),
+                                                 html.Div(
+                                                    [_label("Até"),
+                                                     dcc.Dropdown(id="custo-periodo-ate",
+                                                                  options=[], clearable=False,
+                                                                  searchable=False,
+                                                                  style={"width": "120px"})])],
+                                                id="custo-periodo-custom",
+                                                className="me-3",
+                                                style={"display": "none"},
+                                            ),
                                             html.Div(
                                                 [_label("Contas (barras)"),
                                                  # Filtro das BARRAS (contas/classes de custo) —
@@ -92,15 +184,40 @@ def build_tab() -> dbc.Tab:
                                                      className="border d-flex align-items-center "
                                                                "justify-content-between",
                                                      style={"minWidth": "260px"}),
-                                                 dbc.Collapse(
-                                                     dcc.Dropdown(
-                                                         id="custo-conta-filter", options=[],
-                                                         value=[], multi=True,
-                                                         placeholder="Todas as contas",
-                                                         className="mt-1",
-                                                         style={"minWidth": "260px"}),
-                                                     id="custo-contas-collapse", is_open=False)],
+                                                 # Painel FLUTUANTE (não empurra a barra): lista
+                                                 # de caixinhas + "Marcar todas · Limpar".
+                                                 html.Div(
+                                                     dbc.Collapse(
+                                                         html.Div(
+                                                             [html.Div(
+                                                                 [html.Button("Marcar todas",
+                                                                              id="custo-contas-todas",
+                                                                              n_clicks=0,
+                                                                              className="custo-contas-link"),
+                                                                  html.Span(" · ",
+                                                                            className="text-muted"),
+                                                                  html.Button("Limpar",
+                                                                              id="custo-contas-limpar",
+                                                                              n_clicks=0,
+                                                                              className="custo-contas-link")],
+                                                                 className="custo-contas-acoes"),
+                                                              dbc.Checklist(
+                                                                  id="custo-conta-filter",
+                                                                  options=[], value=[],
+                                                                  className="custo-contas-lista"),
+                                                              # Seleção só vale ao aplicar (sem
+                                                              # recalcular a cada caixinha).
+                                                              html.Div(
+                                                                  dbc.Button("Aplicar",
+                                                                             id="custo-contas-aplicar",
+                                                                             color="primary",
+                                                                             size="sm", n_clicks=0),
+                                                                  className="custo-contas-rodape")],
+                                                             className="custo-contas-painel"),
+                                                         id="custo-contas-collapse", is_open=False),
+                                                     className="custo-contas-flutua")],
                                                 className="me-3 d-flex flex-column",
+                                                style={"position": "relative"},
                                             ),
                                             html.Div(
                                                 [_label("Coleta"),
@@ -141,7 +258,9 @@ def build_tab() -> dbc.Tab:
                                     dbc.CardHeader(
                                         html.H6(
                                             [html.I(className="bi bi-bar-chart-line me-2"),
-                                             "Realizado por conta (% do orçado, ano) — clique para abrir os meses"],
+                                             # texto trocado pelo período escolhido (BR-18)
+                                             html.Span(TITULO_ENTRADA.format(periodo="ano"),
+                                                       id="custo-entry-titulo")],
                                             className="mb-0 fw-bold",
                                         ),
                                         className="py-2",
@@ -154,6 +273,7 @@ def build_tab() -> dbc.Tab:
                                                     dbc.Col(
                                                         dcc.Graph(
                                                             id="custo-graph-rosca",
+                                                            figure=rosca_fig,
                                                             config={"displayModeBar": False,
                                                                     "responsive": True},
                                                             style={"height": "460px",
@@ -167,6 +287,7 @@ def build_tab() -> dbc.Tab:
                                                         html.Div(
                                                             dcc.Graph(
                                                                 id="custo-graph-entry",
+                                                                figure=entry_fig,
                                                                 config={"displayModeBar": False,
                                                                         "responsive": True,
                                                                         "doubleClick": False,
@@ -251,6 +372,13 @@ def build_tab() -> dbc.Tab:
                         ),
                         dbc.ModalFooter(
                             [
+                                # Export Excel (IM-40) — controle novo, isolado à esquerda; só
+                                # aparece no nível de lançamentos (único com tabela).
+                                dbc.Button([html.I(className="bi bi-file-earmark-excel me-1"),
+                                            "Exportar Excel"],
+                                           id="btn-custo-drill-export", color="success",
+                                           outline=True, className="me-2",
+                                           style={"display": "none"}),
                                 dbc.Button([html.I(className="bi bi-arrow-left me-1"), "Voltar"],
                                            id="btn-custo-back", color="secondary", outline=True),
                                 dbc.Button("Fechar", id="btn-custo-close",
@@ -353,12 +481,35 @@ def build_tab() -> dbc.Tab:
                             ]
                         ),
                         dbc.ModalFooter(
-                            dbc.Button("Fechar", id="btn-rosca-close",
-                                       color="primary", className="ms-auto"),
+                            [
+                                # Export Excel (IM-40) — 1 arquivo, 3 abas (Lançamentos, Por
+                                # conta, Por centro). Isolado à esquerda; Fechar segue à direita.
+                                dbc.Button([html.I(className="bi bi-file-earmark-excel me-1"),
+                                            "Exportar Excel"],
+                                           id="btn-rosca-export", color="success", outline=True),
+                                dbc.Button("Fechar", id="btn-rosca-close",
+                                           color="primary", className="ms-auto"),
+                            ]
                         ),
                     ],
                     id="modal-rosca", size="xl", is_open=False, scrollable=True,
                     fullscreen="lg-down",
+                ),
+                # Mini-modal do almoxarifado (BR-15/IM-33): clique na linha de liquidação →
+                # lista os itens de material da ordem (qtd) + R$ total da linha no cabeçalho.
+                dbc.Modal(
+                    [
+                        dbc.ModalHeader(dbc.ModalTitle(id="modal-comp-title")),
+                        dbc.ModalBody(html.Div(id="modal-comp-body")),
+                        # Footer novo (aditivo, IM-40) — export dos itens da ordem (1 linha/item).
+                        dbc.ModalFooter(
+                            dbc.Button([html.I(className="bi bi-file-earmark-excel me-1"),
+                                        "Exportar Excel"],
+                                       id="btn-comp-export", color="success", outline=True,
+                                       size="sm"),
+                        ),
+                    ],
+                    id="modal-comp", size="md", is_open=False, scrollable=True, centered=True,
                 ),
             ],
         ),

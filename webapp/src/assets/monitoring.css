@@ -1,0 +1,1423 @@
+/* Monitoramento de Ativos (protótipo) — /maintenance/monitoramento-ativos
+ *
+ * Tudo aqui é escopado por `.mon-art` ou pelo prefixo `mon-`. O desenho vem do mockup
+ * PlantaFagor e traz classes genéricas (.machine, .body, .cell...) que colidiriam com o
+ * resto do webapp se ficassem soltas.
+ *
+ * Convenção herdada do desenho: cor de estado vive **só** no `.body` do conjunto. A moldura
+ * do ativo é um elemento à parte e nunca pinta máquina nenhuma.
+ */
+
+/* Os fundos vivem em variáveis na raiz do documento, e não em cada regra, porque o tema
+   escuro precisa vencer regras de tela cheia que carregam id e pseudo-classe
+   (`html:fullscreen #mon-pagina-ativo` é mais específico que `[data-mon-tema] #mon-pagina-ativo`).
+   Variável não disputa especificidade: quem troca o valor troca o resultado, onde quer que ele
+   seja usado. Foi assim que a página do ativo aparecia branca dentro da tela cheia. */
+:root {
+  --mon-fundo-pagina: #fff;
+  --mon-fundo-quadro: #fff;
+  --mon-fundo-superficie: #fff;
+}
+
+[data-mon-tema="escuro"] {
+  --mon-fundo-pagina: #0f1216;
+  --mon-fundo-quadro: #12161c;
+  --mon-fundo-superficie: #171b21;
+}
+
+.mon-page {
+  --mon-parado: #d7d7d2;
+  --mon-parcial: #f6c026;
+  --mon-cheio: #28c76f;
+  --mon-vermelho: #e74c3c;
+  --mon-parado-halo: #8f8f88;
+  --mon-stroke: #3a3a37;
+}
+
+/* ---------------------------------------------------------------- cabeçalho */
+
+.mon-titulo {
+  font-weight: 700;
+  margin: 0;
+}
+
+.mon-convite {
+  color: var(--bs-secondary-color, #6c757d);
+  font-size: 0.82rem;
+  margin: 0;
+  max-width: 62ch;
+}
+
+/* Título e convite dividem a mesma linha: cada linha de texto acima do desenho sai do tamanho
+   da fábrica na tela, e o convite é uma frase de apoio — não precisa de linha própria. */
+.mon-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 1.1rem;
+}
+
+/* ---------------------------------------------------------------- controles */
+
+.mon-controles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: flex-end;
+  margin: 0.6rem 0 0.5rem;
+}
+
+.mon-control-label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color, #6c757d);
+  margin-bottom: 0.3rem;
+}
+
+.mon-cenario {
+  /* Cabe o rótulo mais longo da lista ("Parada geral programada") sem o texto encostar na
+     seta do seletor. */
+  min-width: 19rem;
+}
+
+.mon-escopo .btn {
+  font-size: 0.85rem;
+}
+
+/* ------------------------------------------------------------------ legenda */
+
+.mon-legenda {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1.4rem;
+  padding: 0.25rem 0 0.4rem;
+  font-size: 0.78rem;
+}
+
+.mon-legenda-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.mon-chip {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 3px;
+  border: 1px solid var(--mon-stroke);
+  display: inline-block;
+}
+
+.mon-chip-cheio { background: var(--mon-cheio); }
+.mon-chip-parcial { background: var(--mon-parcial); }
+.mon-chip-vermelho { background: var(--mon-vermelho); }
+.mon-chip-parado { background: var(--mon-parado); }
+
+/* Chip da moldura: o mesmo tamanho do chip de cor, mas oco e com a borda grossa — o que
+   informa aqui é o contorno, que é exatamente o que a linha ganha no desenho. */
+.mon-halo {
+  width: 0.95rem;
+  height: 0.95rem;
+  border-radius: 3px;
+  background: transparent;
+  border: 2.5px solid transparent;
+  display: inline-block;
+}
+
+.mon-halo-vermelho {
+  border-color: var(--mon-vermelho);
+  animation: mon-pulse 1.4s ease-in-out infinite;
+}
+.mon-halo-parcial { border-color: var(--mon-parcial); }
+.mon-halo-parado {
+  border-color: var(--mon-parado-halo);
+  border-style: dashed;
+}
+.mon-halo-nenhuma {
+  border-color: #d8d8d2;
+  border-style: dotted;
+  opacity: 0.7;
+}
+
+.mon-legenda-molduras {
+  padding-top: 0;
+  align-items: center;
+}
+
+.mon-legenda-rotulo {
+  font-weight: 700;
+  font-size: 0.82rem;
+  color: var(--bs-secondary-color, #6c757d);
+}
+
+.mon-chip-titulo { font-weight: 600; }
+
+.mon-chip-texto {
+  color: var(--bs-secondary-color, #6c757d);
+}
+
+.mon-legenda-escopo .mon-escopo-ativo {
+  font-weight: 700;
+}
+
+/* -------------------------------------------------------------- o desenho */
+
+.mon-art {
+  position: relative;
+  background: #fff;
+  border: 1px solid #e3e3df;
+  border-radius: 10px;
+  padding: 12px;
+  /* O quadro abraça o desenho em vez de esticar pela largura toda — desenho pequeno no
+     meio de um card enorme fica órfão na tela. */
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+  overflow-x: auto;
+}
+
+/* A planta cabe na tela: o desenho é dimensionado pela ALTURA disponível e a largura
+   segue a proporção do `viewBox`. Antes ele ocupava a largura toda e transbordava para
+   baixo, obrigando a rolar para ver a fábrica inteira. */
+.mon-palco {
+  position: relative;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+/* O que fica acima do desenho — cabeçalho, controles e as duas legendas — é descontado da
+   altura da janela para a planta caber sem rolagem. Ao mexer no que vem antes do desenho,
+   este número tem de acompanhar: a legenda das molduras custou ~96px e a faixa de situação
+   ~62px, ambos medidos no navegador (não estimados).
+
+   Quem carrega a altura é o **piso** (desenho + painel de ocorrências), não o desenho: se
+   fosse o desenho, uma lista de ocorrências longa esticaria o quadro para fora da janela. Com
+   a altura no piso, a lista rola dentro do próprio painel e o desenho nunca cresce. */
+.mon-piso {
+  height: calc(100vh - 398px);
+  min-height: 300px;
+}
+
+.mon-canvas {
+  height: 100%;
+  min-height: 0;
+}
+
+/* Em tela cheia o desenho e o painel de ocorrências dividem a largura, e o painel ganha altura
+   própria: a lista rola dentro dele em vez de esticar o quadro. */
+html:fullscreen .mon-piso { align-items: stretch; }
+
+.mon-art svg {
+  display: block;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+}
+
+/* --- máquinas (vocabulário do desenho, escopado) --- */
+
+.mon-art .machine .body {
+  fill: #fff;
+  stroke: var(--mon-stroke);
+  stroke-width: 1.4;
+  transition: fill 0.3s;
+}
+.mon-art .machine .detail { fill: none; stroke: var(--mon-stroke); stroke-width: 0.9; stroke-linecap: round; }
+.mon-art .machine .fill-detail { fill: var(--mon-stroke); opacity: 0.1; stroke: none; }
+.mon-art .machine .bevel { fill: none; stroke: #fff; stroke-width: 1.1; opacity: 0.5; }
+.mon-art .badge { display: none; }
+.mon-art .flow { fill: none; stroke: #9aa0a6; stroke-width: 1.4; stroke-dasharray: 2 6; stroke-linecap: round; opacity: 0.5; }
+.mon-art .coil { fill: url(#steel); stroke: var(--mon-stroke); stroke-width: 1.1; }
+.mon-art .ring { fill: none; stroke: #8b8d90; stroke-width: 0.9; opacity: 0.65; }
+.mon-art .hub { fill: #b7b9bc; stroke: var(--mon-stroke); stroke-width: 1; }
+.mon-art .weld { fill: none; stroke: #c0451f; stroke-width: 2.6; stroke-linecap: round; }
+.mon-art .stack { fill: #f6e6dc; stroke: #a24b28; stroke-width: 1; }
+.mon-art .pallet { fill: #ecebe5; stroke: #83817a; stroke-width: 1; }
+.mon-art .pmat { fill: #8f8d86; opacity: 0.5; }
+.mon-art .grp { fill: none; stroke: #9aa0a6; stroke-width: 1.1; stroke-dasharray: 8 5; opacity: 0.6; }
+.mon-art .grplbl { fill: #6a6a64; font: 600 11px 'Segoe UI', Arial; }
+.mon-art .linelbl { display: none; }
+.mon-art .assetlbl {
+  fill: #2a2a28;
+  font: 800 26px 'Segoe UI', Arial;
+  letter-spacing: 0.5px;
+  /* O nome da linha nasce em cima da parede do prédio — no desenho original ele fica no
+     limite entre a parede e a área da linha, e o traço da parede corta as letras ao meio.
+     Descer 8 unidades do desenho tira o texto de cima do traço sem encostar na moldura da
+     linha, que começa 6 unidades abaixo do fim do texto. Sete unidades é o ponto exato: com
+     menos, o traço ainda encosta nas letras; com mais, a vírgula de "LCT2,5" e "LCL4,5" entra
+     na moldura. */
+  transform: translateY(7px);
+}
+
+/* --- cor de estado do conjunto (BR-02) ---
+   Vem depois das regras de máquina de propósito: mesma especificidade, e quem estiver por
+   último vence. Invertido, a carcaça branca apagaria a cor do estado. */
+
+.mon-art .machine[data-state="cheio"] .body { fill: var(--mon-cheio); }
+.mon-art .machine[data-state="parcial"] .body { fill: var(--mon-parcial); }
+.mon-art .machine[data-state="vermelho"] .body { fill: var(--mon-vermelho); }
+.mon-art .machine[data-state="parado"] .body { fill: var(--mon-parado); }
+
+/* --- zonas da planta --- */
+
+.mon-art .zone { fill: #f6f6f4; stroke: #d9d9d3; stroke-width: 1.4; }
+.mon-art .zonelbl { fill: #9a9a92; font: 700 26px 'Segoe UI', Arial; letter-spacing: 0.5px; }
+.mon-art .zonelbl.sm { font-size: 15px; }
+.mon-art .blue { fill: #1f6fe0; }
+.mon-art .bluelbl { fill: #fff; font: 700 15px 'Segoe UI', Arial; letter-spacing: 0.5px; }
+.mon-art .vlbl { fill: #5a5a54; font: 700 15px 'Segoe UI', Arial; letter-spacing: 1px; }
+.mon-art .yard { fill: #fafaf8; stroke: #dcdcd6; stroke-width: 1; }
+.mon-art .cell { fill: #eeeee9; stroke: #cfcfc8; stroke-width: 0.8; }
+.mon-art .yardlbl { fill: #9a9a92; font: 600 10px 'Segoe UI', Arial; }
+.mon-art .aisle { fill: #f3ead9; stroke: #e2d3b6; stroke-width: 1; }
+.mon-art .mchapa { fill: #e9e7e1; stroke: #b3afa4; stroke-width: 0.8; }
+.mon-art .mblank { fill: #d3eddd; stroke: #63b98f; stroke-width: 0.8; }
+.mon-art .mline { stroke: #b0aca1; stroke-width: 0.7; }
+.mon-art .mdot { fill: #d3d3cc; stroke: #adada6; stroke-width: 0.5; }
+
+/* --- moldura do ativo (BR-03) --- */
+
+.mon-art .asset-frame {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 4;
+  opacity: 0;
+}
+
+.mon-art [data-mark="parcial"] .asset-frame {
+  stroke: var(--mon-parcial);
+  opacity: 1;
+}
+
+/* Só o vermelho pisca: recurso de atenção usado em tudo deixa de ser forte. */
+.mon-art [data-mark="vermelho"] .asset-frame {
+  stroke: var(--mon-vermelho);
+  opacity: 1;
+  animation: mon-pulse 1.4s ease-in-out infinite;
+}
+
+/* Parada prevista também precisa ser vista de longe (BR-03 revisada em 2026-08-05), mas não
+   é alarme: moldura tracejada e fixa. A forma é que separa "programado" de "aconteceu algo".
+   O traço usa um cinza mais escuro que o corpo da máquina — o `--mon-parado` da régua
+   desaparece sobre o fundo claro da zona quando vira contorno fino. */
+.mon-art [data-mark="parado"] .asset-frame {
+  stroke: var(--mon-parado-halo);
+  stroke-dasharray: 10 7;
+  opacity: 1;
+}
+
+/* A área que o desenho reserva para captura de clique não recebe o clique: quem navega é a
+   camada de links por cima. Fica inerte para não roubar o hover dela. */
+.mon-art .asset-hit {
+  fill: none;
+  pointer-events: none;
+}
+
+@keyframes mon-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.25; }
+}
+
+/* Piscar é conforto de leitura, não informação: a cor já carrega o significado inteiro. */
+@media (prefers-reduced-motion: reduce) {
+  .mon-art .asset-frame,
+  .mon-halo-vermelho { animation: none !important; }
+}
+
+/* ------------------------------------------------- camada de links por ativo */
+
+.mon-hit-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.mon-hit {
+  position: absolute;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  pointer-events: auto;
+  /* Opacidade mínima diferente de zero: área totalmente transparente deixa de receber
+     ponteiro em alguns navegadores. */
+  background: rgba(0, 0, 0, 0.01);
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.mon-hit:hover,
+.mon-hit:focus-visible {
+  background: rgba(31, 111, 224, 0.08);
+  border-color: rgba(31, 111, 224, 0.55);
+  outline: none;
+}
+
+.mon-hit-nome {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ================================================================ página do ativo */
+
+.mon-cabecalho-ativo {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.mon-voltar {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.mon-titulo-ativo {
+  letter-spacing: 0.02em;
+}
+
+.mon-corpo-ativo {
+  align-items: stretch;
+}
+
+/* O croqui ocupa a coluna inteira, sem moldura: ela só faz sentido na planta, onde há
+   vários ativos para comparar. */
+.mon-asset-art {
+  height: 100%;
+  overflow: hidden;
+}
+
+/* O croqui é mostrado pela altura, não pela largura. Motivo: quando sobra espaço lateral,
+   o SVG continua desenhando o que está FORA do recorte — e a linha vizinha aparecia pela
+   borda. Fixando a altura e deixando a largura seguir a proporção do recorte, a área
+   visível passa a ser exatamente o `viewBox` do ativo. */
+.mon-asset-canvas {
+  display: flex;
+  justify-content: center;
+  height: 72vh;
+  min-width: 0;
+}
+
+.mon-asset-canvas svg {
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+}
+
+.mon-bloco + .mon-bloco {
+  margin-top: 1rem;
+}
+
+.mon-secao {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color, #6c757d);
+  margin-bottom: 0.4rem;
+}
+
+.mon-timeline {
+  background: #fff;
+  border: 1px solid #e3e3df;
+  border-radius: 10px;
+  padding: 6px 4px 0;
+}
+
+/* ------------------------------------------------------------------- cards */
+
+.mon-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.mon-card {
+  flex: 1 1 12rem;
+  border: 1px solid #e3e3df;
+  border-radius: 10px;
+}
+
+.mon-card .card-body {
+  padding: 0.7rem 0.9rem;
+}
+
+.mon-card-rotulo {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--bs-secondary-color, #6c757d);
+}
+
+.mon-card-valor {
+  font-size: 1rem;
+  font-weight: 600;
+  margin-top: 0.15rem;
+}
+
+.mon-card-origem {
+  display: inline-block;
+  margin-top: 0.4rem;
+  font-size: 0.7rem;
+  color: var(--bs-secondary-color, #6c757d);
+  border: 1px solid #e3e3df;
+  border-radius: 999px;
+  padding: 0 0.5rem;
+}
+
+/* ---------------------------------------------------------------- tabelas */
+
+.mon-tabela-bloco + .mon-tabela-bloco {
+  margin-top: 0.9rem;
+}
+
+.mon-tabela-titulo {
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 0.35rem 0.7rem;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid #e3e3df;
+  border-bottom: none;
+}
+
+/* O cabeçalho segue a mesma régua da máquina: bloco de texto e desenho contam a mesma
+   história. Fundo suave — a cor forte fica no desenho. */
+.mon-tabela-vermelho { background: #fdeceb; border-left: 4px solid var(--mon-vermelho); }
+.mon-tabela-amarelo { background: #fdf6e0; border-left: 4px solid var(--mon-parcial); }
+.mon-tabela-cinza { background: #f3f3f1; border-left: 4px solid #9a9a92; }
+
+.mon-tabela {
+  margin-bottom: 0;
+  font-size: 0.82rem;
+  background: #fff;
+  border: 1px solid #e3e3df;
+  border-radius: 0 0 8px 8px;
+}
+
+.mon-tabela th {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--bs-secondary-color, #6c757d);
+  font-weight: 600;
+}
+
+/* Data, hora e duração numa linha só: quebradas em duas, a tabela vira um bloco de texto
+   e a leitura de "quando" some. A descrição é a única coluna que pode quebrar. */
+.mon-tabela th:nth-child(-n + 4),
+.mon-tabela td:nth-child(-n + 4) {
+  white-space: nowrap;
+  width: 1%;
+}
+
+.mon-tabela-descricao {
+  color: #2a2a28;
+  white-space: normal;
+}
+
+.mon-sem-tabela,
+.mon-aviso-conjunto {
+  color: var(--bs-secondary-color, #6c757d);
+  font-size: 0.85rem;
+}
+
+.mon-sem-tabela {
+  background: #fff;
+  border: 1px dashed #dcdcd6;
+  border-radius: 10px;
+  padding: 0.9rem;
+}
+
+.mon-aviso-conjunto {
+  margin-top: 1rem;
+  font-style: italic;
+}
+
+/* -------------------------------------------------------- selo de demonstração */
+
+.mon-titulo-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+/* O componente compartilhado nasce amarelo, e amarelo é cor de estado nesta tela
+   ("rodando abaixo do programado"). A variante neutra vale só aqui — o badge segue
+   servindo o resto do webapp sem alteração. */
+.mon-page .mon-selo.badge {
+  background-color: #3a3a37 !important;
+  color: #fff;
+  opacity: 1 !important;
+}
+
+/* ------------------------------------------------------------------ tela cheia */
+
+.mon-tela-cheia {
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------ tela cheia
+ *
+ * Quem entra em tela cheia é o documento inteiro, não o quadro do desenho — só assim a tela
+ * cheia sobrevive ao clique numa linha, que troca de página e reconstrói o layout. O que
+ * some da vista é escondido aqui, reproduzindo o enquadramento que o quadro sozinho dava:
+ * menu, sidebar e o cabeçalho da página saem; o desenho fica com a janela toda.
+ */
+
+html:fullscreen #header,
+html:fullscreen #sidebar-column,
+html:fullscreen #sidebar-overlay {
+  display: none !important;
+}
+
+/* O conteúdo era empurrado 80px para baixo para caber sob o menu; sem menu, ele começa no
+   topo da janela. */
+html:fullscreen #content-column {
+  top: 0 !important;
+}
+
+/* Na planta, o que interessa é o desenho: título, convite, controles e a legenda longa dão
+   lugar à faixa de contexto compacta, que diz a mesma coisa em duas linhas. */
+html:fullscreen #mon-pagina-planta > .mon-cabecalho,
+html:fullscreen #mon-pagina-planta > .mon-controles,
+html:fullscreen #mon-pagina-planta > #mon-legenda-slot {
+  display: none;
+}
+
+html:fullscreen #mon-pagina-planta {
+  padding: 0 !important;
+}
+
+/* Em tela cheia o desenho usa a altura toda: é o mesmo desenho, só maior. */
+html:fullscreen #mon-art {
+  border-radius: 0;
+  border: none;
+  padding: 14px;
+  background: var(--mon-fundo-quadro, #fff);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* O desconto acompanha a faixa de contexto: ela ganhou a legenda compacta em 2026-08-05 e
+   passou de ~29px para ~53px de altura (mais o padding e o gap do quadro). */
+html:fullscreen #mon-art .mon-piso {
+  height: calc(100vh - 102px);
+  width: 100%;
+}
+
+/* A página do ativo herda a mesma tela cheia ao ser aberta a partir da planta. Aqui a página
+   aparece inteira — é ela que responde à pergunta que fez a pessoa clicar na linha —, só sem
+   o menu e com rolagem própria: a linha do tempo e as tabelas passam da altura da janela. */
+html:fullscreen #mon-pagina-ativo {
+  background: var(--mon-fundo-pagina, #fff);
+  min-height: 100vh;
+  padding: 1rem 1.5rem !important;
+}
+
+/* A faixa de contexto só existe em tela cheia — na tela normal o cabeçalho e a legenda
+   já dizem tudo isso. */
+.mon-barra-fs {
+  display: none;
+}
+
+html:fullscreen .mon-barra-fs {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  width: 100%;
+  font-size: 0.9rem;
+}
+
+/* Linha 1 da faixa: cenário, escopo e a saída. Era a faixa inteira antes da legenda entrar. */
+html:fullscreen .mon-fs-linha {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+/* Tema e saída andam juntos, encostados à direita: são as duas ações da faixa, e separá-los
+   faria parecer que um deles pertence ao cenário, que fica à esquerda. */
+html:fullscreen .mon-fs-linha .mon-tema { margin-left: auto; }
+
+/* Legenda comprimida: sem as frases, tudo numa faixa só, e sem o respiro vertical da
+   legenda da tela normal — em tela cheia cada pixel de altura sai do desenho. */
+.mon-legenda-compacta {
+  padding: 0;
+  gap: 0.25rem 1.1rem;
+  align-items: center;
+  font-size: 0.8rem;
+}
+
+.mon-fs-sep-legenda {
+  border-left: 1px solid var(--bs-border-color, #dee2e6);
+  padding-left: 1.1rem;
+}
+
+.mon-fs-cenario {
+  font-weight: 700;
+}
+
+/* O botão de trocar cenário se disfarça de texto: em tela cheia o que importa é a fábrica,
+   e um botão desenhado ali competiria com ela. A seta ao lado e o realce no hover é que
+   contam que aquilo é clicável.
+   O `#mon-art` no seletor não é enfeite: o Bootstrap é carregado depois deste arquivo
+   (`assets/vendor/...` vem depois de `assets/monitoring.css` na ordem alfabética que o Dash
+   usa), então `.btn-link` venceria a cor e o nome do cenário sairia verde de link. */
+#mon-art .mon-fs-trocar,
+#mon-art .mon-fs-trocar:hover,
+#mon-art .mon-fs-trocar:focus-visible,
+#mon-art .mon-fs-trocar:active {
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  text-decoration: none;
+  color: #2a2a28;  /* o tema Minty deixa o texto do corpo em #888 — lavado demais para o
+                      nome do cenário, que é a informação principal da faixa */
+  font-size: inherit;
+  line-height: 1.2;
+}
+
+#mon-art .mon-fs-trocar:hover,
+#mon-art .mon-fs-trocar:focus-visible {
+  opacity: 0.72;
+}
+
+.mon-fs-girar {
+  font-size: 0.85em;
+  opacity: 0.55;
+}
+
+.mon-fs-trocar:hover .mon-fs-girar { opacity: 1; }
+
+.mon-fs-sep {
+  color: #b6b6b0;
+}
+
+.mon-fs-escopo {
+  color: var(--bs-secondary-color, #6c757d);
+}
+
+/* ==========================================================================
+   Refino visual — 2026-08-05
+   Vocabulário emprestado do resto da aplicação, não inventado aqui: raio 13px e sombra
+   projetada dos cards da home (`home_overview.css:828`), eyebrow em caixa alta 0.6rem/700
+   (`home_overview.css:860`), chip pill de 999px com ponto colorido (`evocon_transitions.css:672`),
+   ponto pulsante de "ao vivo" (`se03_telemetry.css:11`), malha técnica do diagrama de falhas
+   (`failure_analysis.css:8`) e sombra colorida em vez de cinza.
+   ========================================================================== */
+
+/* -------------------------------------------------- marcação de projeto no texto */
+
+/* Motor M09, drive U31, sensor B12, código F0001: o que o técnico procura primeiro não pode
+   se dissolver no meio da frase. Monoespaçado com fundo discreto — a mesma forma com que um
+   supervisório mostra endereço de equipamento. */
+.mon-tag {
+  font-family: 'Consolas', 'DejaVu Sans Mono', 'Courier New', monospace;
+  font-size: 0.86em;
+  font-weight: 600;
+  color: #2a3a52;
+  background: rgba(13, 110, 253, 0.07);
+  border: 1px solid rgba(13, 110, 253, 0.14);
+  border-radius: 4px;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+/* Hora, duração e data alinham por dígito: coluna de números que dança a cada linha obriga a
+   reler. */
+.mon-tabela td:nth-child(-n + 3),
+.mon-situacao-numero,
+.mon-situacao-hora,
+.mon-feed-tempo {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ------------------------------------------------ faixa de situação da fábrica */
+
+.mon-situacao {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 1.6rem;
+  padding: 0.45rem 0.85rem;
+  margin-bottom: 0.55rem;
+  border-radius: 12px;
+  background: rgba(13, 110, 253, 0.035);
+  border: 1px solid rgba(13, 110, 253, 0.12);
+}
+
+.mon-situacao-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+.mon-situacao-numero {
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  color: #1f2733;
+  line-height: 1;
+}
+
+.mon-situacao-rotulo {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #8a93a6;
+}
+
+.mon-situacao-hora {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #5a6473;
+}
+
+/* Estado sem nenhuma linha continua na faixa, apagado: sumir com ele faria a faixa mudar de
+   largura a cada troca de cenário, e "zero paradas" informa tanto quanto "uma parada". */
+.mon-situacao-zero { opacity: 0.42; }
+
+.mon-situacao-leitura {
+  margin-left: auto;
+  align-items: center;
+}
+
+/* O ponto que pulsa é o único sinal de que a tela está viva — sem ele, uma planta parada e um
+   sistema travado se parecem. */
+.mon-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--mon-cheio);
+  box-shadow: 0 0 0 3px rgba(40, 199, 111, 0.18);
+  animation: mon-live 1.6s ease-in-out infinite;
+}
+
+@keyframes mon-live {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(1.25); }
+}
+
+/* -------------------------------------------- piso: desenho + ocorrências ativas */
+
+.mon-piso {
+  display: flex;
+  align-items: stretch;
+  gap: 0.9rem;
+  width: 100%;
+}
+
+.mon-piso .mon-palco {
+  flex: 0 1 auto;
+  min-width: 0;
+  height: 100%;
+  margin: 0 auto;
+}
+
+.mon-piso .mon-canvas { display: flex; align-items: center; justify-content: center; }
+
+.mon-feed-slot {
+  flex: 0 0 clamp(230px, 21vw, 310px);
+  display: flex;
+}
+
+.mon-feed {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 0;
+  border-radius: 13px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(8, 19, 124, 0.10);
+  overflow: hidden;
+}
+
+.mon-feed-cabecalho {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.55rem 0.8rem;
+  background: #fafbfc;
+  border-bottom: 1px solid #eef0f3;
+}
+
+.mon-feed-titulo {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: #8a93a6;
+}
+
+.mon-feed-contador {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #5a6473;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.mon-feed-lista {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+/* Cada item é o mesmo destino do clique no desenho, por outro caminho — por isso se comporta
+   como card clicável da aplicação: eleva no hover, sem sublinhado de link. */
+.mon-feed-item {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+  padding: 0.5rem 0.6rem 0.55rem;
+  border-radius: 9px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-left: 3px solid var(--mon-parado-halo);
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.mon-feed-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(8, 19, 124, 0.12);
+  color: inherit;
+  text-decoration: none;
+}
+
+.mon-feed-vermelho { border-left-color: var(--mon-vermelho); }
+.mon-feed-parcial { border-left-color: var(--mon-parcial); }
+.mon-feed-parado {
+  border-left-color: var(--mon-parado-halo);
+  border-left-style: dashed;
+}
+
+.mon-feed-topo {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.mon-feed-ativo {
+  font-size: 0.82rem;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: #1f2733;
+}
+
+.mon-feed-tempo {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #8a93a6;
+}
+
+.mon-feed-conjunto {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #5a6473;
+  margin-top: 1px;
+}
+
+.mon-feed-texto {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: #6c757d;
+  margin-top: 3px;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.mon-feed-vazio {
+  padding: 1.4rem 0.8rem;
+  text-align: center;
+}
+
+.mon-feed-vazio-titulo {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #5a6473;
+}
+
+.mon-feed-vazio-texto {
+  font-size: 0.72rem;
+  color: #8a93a6;
+  margin-top: 2px;
+}
+
+/* ------------------------------------------- superfície do quadro e acabamento */
+
+/* O quadro passa a falar a língua dos cards da aplicação: raio 13, borda quase invisível e
+   sombra projetada colorida (a mesma família de `5px 11px 24px rgba(8,19,124,.20)` da home,
+   suavizada porque aqui a área é muito maior). */
+.mon-art {
+  border-radius: 13px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 12px 30px rgba(8, 19, 124, 0.12);
+  /* Malha técnica: o mesmo idioma do diagrama de falhas (`failure_analysis.css:8`) — grade
+     fina de 8px com destaque a cada 40px. Fica no limite do perceptível de propósito: dá
+     textura de painel sem competir com o desenho. */
+  background-image:
+    linear-gradient(rgba(120, 130, 140, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 130, 140, 0.05) 1px, transparent 1px),
+    linear-gradient(rgba(120, 130, 140, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 130, 140, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px, 40px 40px, 8px 8px, 8px 8px;
+}
+
+/* Cantos de mira: quatro marcas de enquadramento, como visor de supervisório. Não informam
+   nada — enquadram, e é isso que separa "painel" de "caixa branca". */
+.mon-art::before,
+.mon-art::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  border: 2px solid rgba(13, 110, 253, 0.22);
+}
+
+.mon-art::before {
+  top: 7px;
+  left: 7px;
+  border-right: none;
+  border-bottom: none;
+  border-radius: 6px 0 0 0;
+}
+
+.mon-art::after {
+  bottom: 7px;
+  right: 7px;
+  border-left: none;
+  border-top: none;
+  border-radius: 0 0 6px 0;
+}
+
+.mon-palco::before,
+.mon-palco::after {
+  content: "";
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  pointer-events: none;
+  z-index: 2;
+  border: 2px solid rgba(13, 110, 253, 0.18);
+}
+
+.mon-palco::before {
+  top: -6px;
+  right: -6px;
+  border-left: none;
+  border-bottom: none;
+  border-radius: 0 6px 0 0;
+}
+
+.mon-palco::after {
+  bottom: -6px;
+  left: -6px;
+  border-right: none;
+  border-top: none;
+  border-radius: 0 0 0 6px;
+}
+
+/* ------------------------------------------------------ cards da página do ativo */
+
+/* Faixa de cor no topo, do jeito que os cards da home e da indicators-v2 fazem: a gravidade
+   se lê antes do texto. E a mesma elevação no hover, para o conjunto de cards da aplicação
+   parecer um conjunto só. */
+.mon-card {
+  border-radius: 13px !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: 0 6px 16px rgba(8, 19, 124, 0.08) !important;
+  transition: transform 0.22s ease, box-shadow 0.22s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.mon-card::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--mon-parado-halo);
+}
+
+.mon-card-vermelho::before { background: var(--mon-vermelho); }
+.mon-card-parcial::before { background: var(--mon-parcial); }
+.mon-card-parado::before { background: var(--mon-parado-halo); }
+.mon-card-cheio::before { background: var(--mon-cheio); }
+
+.mon-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 30px rgba(8, 19, 124, 0.14) !important;
+}
+
+/* O rótulo do card vira eyebrow: caixa alta, 0.6rem, tracking largo — idêntico ao da home. */
+.mon-card-rotulo {
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #8a93a6;
+}
+
+.mon-card-valor {
+  font-weight: 800;
+  letter-spacing: -0.4px;
+  color: #1f2733;
+}
+
+/* ============================================================== painel escuro
+   Escolha de quem está olhando, guardada no navegador — a aplicação segue clara. O atributo
+   fica no elemento raiz porque em tela cheia quem ocupa a janela é o documento inteiro.
+
+   O desenho é geometria com carcaça pintada por estado: no escuro, o que muda é o **fundo**
+   (zonas, pátios, corredores) e o traço; as quatro cores de estado ficam como estão — são a
+   régua da BR-02 e mudá-las por tema seria mudar o significado.
+   ========================================================================== */
+
+[data-mon-tema="escuro"] #mon-pagina-planta,
+[data-mon-tema="escuro"] #mon-pagina-ativo {
+  background: var(--mon-fundo-pagina);
+}
+
+[data-mon-tema="escuro"] .mon-titulo,
+[data-mon-tema="escuro"] .mon-titulo-ativo,
+[data-mon-tema="escuro"] .mon-situacao-numero,
+[data-mon-tema="escuro"] .mon-feed-ativo,
+[data-mon-tema="escuro"] .mon-card-valor,
+[data-mon-tema="escuro"] .mon-secao {
+  color: #e9ecef;
+}
+
+[data-mon-tema="escuro"] .mon-convite,
+[data-mon-tema="escuro"] .mon-chip-texto,
+[data-mon-tema="escuro"] .mon-feed-texto,
+[data-mon-tema="escuro"] .mon-feed-conjunto,
+[data-mon-tema="escuro"] .mon-situacao-hora {
+  color: #adb5bd;
+}
+
+[data-mon-tema="escuro"] .mon-chip-titulo,
+[data-mon-tema="escuro"] .mon-legenda-rotulo,
+[data-mon-tema="escuro"] .mon-control-label {
+  color: #ced4da;
+}
+
+/* --- faixa de situação e painel de ocorrências --- */
+
+[data-mon-tema="escuro"] .mon-situacao {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+[data-mon-tema="escuro"] .mon-feed,
+[data-mon-tema="escuro"] .mon-feed-item {
+  background: #171b21;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+[data-mon-tema="escuro"] .mon-feed-cabecalho {
+  background: #1d222a;
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-mon-tema="escuro"] .mon-feed-item:hover {
+  background: #1d222a;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.45);
+}
+
+[data-mon-tema="escuro"] .mon-feed-contador {
+  background: rgba(255, 255, 255, 0.08);
+  color: #ced4da;
+}
+
+[data-mon-tema="escuro"] .mon-tag {
+  color: #cfe2ff;
+  background: rgba(110, 168, 254, 0.14);
+  border-color: rgba(110, 168, 254, 0.28);
+}
+
+/* --- o quadro e o desenho --- */
+
+[data-mon-tema="escuro"] .mon-art {
+  background-color: var(--mon-fundo-quadro);
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  background-image:
+    linear-gradient(rgba(140, 160, 190, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(140, 160, 190, 0.06) 1px, transparent 1px),
+    linear-gradient(rgba(140, 160, 190, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(140, 160, 190, 0.035) 1px, transparent 1px);
+}
+
+[data-mon-tema="escuro"] .mon-art::before,
+[data-mon-tema="escuro"] .mon-art::after,
+[data-mon-tema="escuro"] .mon-palco::before,
+[data-mon-tema="escuro"] .mon-palco::after {
+  border-color: rgba(110, 168, 254, 0.35);
+}
+
+/* Zonas, pátios e corredores: o fundo da fábrica escurece, mantendo a mesma hierarquia de
+   tons que existe no claro (zona mais clara que o fundo, pátio mais escuro que a zona). */
+[data-mon-tema="escuro"] .mon-art .zone { fill: #1a1f27; stroke: #2b3340; }
+[data-mon-tema="escuro"] .mon-art .yard { fill: #161b22; stroke: #262d38; }
+[data-mon-tema="escuro"] .mon-art .cell { fill: #1e242d; stroke: #2b3340; }
+[data-mon-tema="escuro"] .mon-art .aisle { fill: #2a2418; stroke: #3d3320; }
+[data-mon-tema="escuro"] .mon-art .mchapa { fill: #23282f; stroke: #39404a; }
+[data-mon-tema="escuro"] .mon-art .mblank { fill: #17352a; stroke: #2c6b52; }
+[data-mon-tema="escuro"] .mon-art .mdot { fill: #262c35; stroke: #333a45; }
+[data-mon-tema="escuro"] .mon-art .mline { stroke: #333a45; }
+
+/* Rótulos: a hierarquia do claro invertida — nome de linha bem legível, nome de zona discreto. */
+[data-mon-tema="escuro"] .mon-art .assetlbl { fill: #e9ecef; }
+[data-mon-tema="escuro"] .mon-art .zonelbl { fill: #5a6473; }
+[data-mon-tema="escuro"] .mon-art .yardlbl { fill: #5a6473; }
+[data-mon-tema="escuro"] .mon-art .grplbl { fill: #8a93a6; }
+[data-mon-tema="escuro"] .mon-art .vlbl { fill: #8a93a6; }
+
+/* As superfícies grandes do desenho (piso das áreas, caixas dos ativos, muros) não têm classe:
+   vêm com `fill` e `stroke` escritos no próprio elemento. Como folha de estilo vence atributo
+   de apresentação em SVG, dá para escurecê-las por seletor de atributo — sem reescrever o
+   desenho e sem manter uma segunda versão dele. */
+[data-mon-tema="escuro"] .mon-art svg [fill="#ffffff"],
+[data-mon-tema="escuro"] .mon-art svg [fill="#fff"] { fill: #171b21; }
+[data-mon-tema="escuro"] .mon-art svg [fill="url(#floor)"] { fill: #12161c; }
+[data-mon-tema="escuro"] .mon-art svg [stroke="#000000"],
+[data-mon-tema="escuro"] .mon-art svg [stroke="#000"] { stroke: #39414d; }
+[data-mon-tema="escuro"] .mon-art svg [fill="#d9dad8"] { fill: #2a313b; }
+[data-mon-tema="escuro"] .mon-art svg [fill="#b7b9bc"] { fill: #3a424e; }
+[data-mon-tema="escuro"] .mon-art svg [fill="#fad7ac"] { fill: #3d3320; }
+[data-mon-tema="escuro"] .mon-art svg [fill="url(#pit)"] { fill: #232a33; }
+
+/* A carcaça da máquina e o traço: sem isto, o desenho vira um recorte branco no escuro. */
+[data-mon-tema="escuro"] .mon-page { --mon-stroke: #6b7480; }
+[data-mon-tema="escuro"] .mon-art .machine:not([data-state]) .body { fill: #232a33; }
+[data-mon-tema="escuro"] .mon-art .machine .bevel { stroke: rgba(255, 255, 255, 0.18); }
+[data-mon-tema="escuro"] .mon-art .grp { stroke: #444c58; }
+[data-mon-tema="escuro"] .mon-art .flow { stroke: #4a525e; }
+[data-mon-tema="escuro"] .mon-art .hub { fill: #3a424e; }
+[data-mon-tema="escuro"] .mon-art .ring { stroke: #4a525e; }
+[data-mon-tema="escuro"] .mon-art .stack { fill: #33241c; stroke: #6b3a24; }
+[data-mon-tema="escuro"] .mon-art .pallet { fill: #262a2f; stroke: #444a52; }
+
+/* --- cards, tabelas e faixa de tela cheia --- */
+
+[data-mon-tema="escuro"] .mon-card,
+[data-mon-tema="escuro"] .mon-bloco {
+  background: #171b21 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+
+[data-mon-tema="escuro"] .mon-tabela th {
+  background: #1d222a;
+  color: #adb5bd;
+}
+
+[data-mon-tema="escuro"] .mon-tabela td { color: #ced4da; }
+
+[data-mon-tema="escuro"] #mon-art {
+  background-color: #12161c;
+}
+
+[data-mon-tema="escuro"] html:fullscreen #mon-art,
+html:fullscreen[data-mon-tema="escuro"] #mon-art {
+  background: #12161c;
+}
+
+[data-mon-tema="escuro"] #mon-art .mon-fs-cenario,
+[data-mon-tema="escuro"] #mon-art .mon-fs-trocar {
+  color: #e9ecef;
+}
+
+/* Controles no painel escuro. Os botões nascem `outline-dark` (borda e texto escuros), que
+   somem contra o fundo do painel; e o seletor de cenário do Dash tem fundo branco fixo. */
+[data-mon-tema="escuro"] .mon-tela-cheia,
+[data-mon-tema="escuro"] .mon-tema,
+[data-mon-tema="escuro"] #btn-mon-fullscreen-sair {
+  color: #dee2e6;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+[data-mon-tema="escuro"] .mon-tela-cheia:hover,
+[data-mon-tema="escuro"] .mon-tema:hover,
+[data-mon-tema="escuro"] #btn-mon-fullscreen-sair:hover {
+  color: #12161c;
+  background: #dee2e6;
+  border-color: #dee2e6;
+}
+
+[data-mon-tema="escuro"] .mon-cenario .Select-control,
+[data-mon-tema="escuro"] .mon-cenario .Select-menu-outer {
+  background: #171b21;
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #e9ecef;
+}
+
+[data-mon-tema="escuro"] .mon-cenario .Select-value-label,
+[data-mon-tema="escuro"] .mon-cenario .Select-option {
+  color: #e9ecef !important;
+  background: transparent;
+}
+
+[data-mon-tema="escuro"] .mon-cenario .Select-option.is-focused {
+  background: rgba(110, 168, 254, 0.16) !important;
+}
+
+[data-mon-tema="escuro"] .mon-cenario .Select-arrow { border-top-color: #adb5bd; }
+
+/* O selo de demonstração e o link de voltar seguem a mesma inversão. */
+[data-mon-tema="escuro"] .mon-voltar { color: #6ea8fe; }
+
+/* ---------------------------------- painel escuro: página do ativo (correção) ---------
+   O primeiro corte do tema escuro cuidou da planta e deixou a página do ativo pela metade:
+   tabelas com fundo branco, cabeçalhos de conjunto em tint claro (rosa, amarelo, cinza) e o
+   quadro da linha do tempo branco. No escuro isso não é "quase certo" — é um bloco de luz no
+   meio do painel. */
+
+[data-mon-tema="escuro"] .mon-timeline {
+  background: #171b21;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+/* O gráfico da linha do tempo já vem com fundo transparente do lado do servidor; o que
+   restava branco era o quadro em volta. As faixas coloridas continuam iguais — são a régua. */
+[data-mon-tema="escuro"] .mon-timeline .main-svg { background: transparent !important; }
+[data-mon-tema="escuro"] .mon-timeline .xtick text,
+[data-mon-tema="escuro"] .mon-timeline .ytick text {
+  fill: #adb5bd !important;
+}
+
+[data-mon-tema="escuro"] .mon-tabela {
+  background: #171b21;
+  border-color: rgba(255, 255, 255, 0.08);
+  --bs-table-bg: transparent;
+  --bs-table-color: #ced4da;
+  --bs-table-striped-bg: rgba(255, 255, 255, 0.03);
+  --bs-table-striped-color: #ced4da;
+  --bs-table-border-color: rgba(255, 255, 255, 0.07);
+  --bs-table-hover-bg: rgba(110, 168, 254, 0.08);
+  --bs-table-hover-color: #e9ecef;
+}
+
+[data-mon-tema="escuro"] .mon-tabela th {
+  background: transparent;
+  color: #8a93a6;
+  border-bottom-color: rgba(255, 255, 255, 0.09);
+}
+
+[data-mon-tema="escuro"] .mon-tabela td,
+[data-mon-tema="escuro"] .mon-tabela-descricao {
+  color: #ced4da;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+/* Cabeçalho de cada conjunto: o tint claro vira tint escuro da mesma cor. A barra lateral
+   continua na cor cheia — é ela que carrega a gravidade. */
+[data-mon-tema="escuro"] .mon-tabela-titulo {
+  border-color: rgba(255, 255, 255, 0.08);
+  color: #e9ecef;
+}
+
+[data-mon-tema="escuro"] .mon-tabela-vermelho { background: rgba(231, 76, 60, 0.14); }
+[data-mon-tema="escuro"] .mon-tabela-amarelo { background: rgba(246, 192, 38, 0.13); }
+[data-mon-tema="escuro"] .mon-tabela-cinza { background: rgba(215, 215, 210, 0.09); }
+
+[data-mon-tema="escuro"] .mon-card {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-mon-tema="escuro"] .mon-card .card-body { background: transparent; }
+
+[data-mon-tema="escuro"] .mon-sem-tabela,
+[data-mon-tema="escuro"] .mon-aviso-conjunto,
+[data-mon-tema="escuro"] .mon-card-rotulo {
+  color: #8a93a6;
+}
+
+/* O croqui do ativo é o mesmo desenho da planta, com outro recorte: as superfícies sem classe
+   precisam do mesmo tratamento por atributo. */
+[data-mon-tema="escuro"] .mon-asset-art {
+  background: var(--mon-fundo-quadro);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+[data-mon-tema="escuro"] .mon-asset-canvas svg [fill="#ffffff"],
+[data-mon-tema="escuro"] .mon-asset-canvas svg [fill="#fff"] { fill: #171b21; }
+[data-mon-tema="escuro"] .mon-asset-canvas svg [fill="url(#floor)"] { fill: #12161c; }
+[data-mon-tema="escuro"] .mon-asset-canvas svg [stroke="#000000"],
+[data-mon-tema="escuro"] .mon-asset-canvas svg [stroke="#000"] { stroke: #39414d; }
+[data-mon-tema="escuro"] .mon-asset-canvas svg [fill="#d9dad8"] { fill: #2a313b; }
+[data-mon-tema="escuro"] .mon-asset-canvas svg [fill="#b7b9bc"] { fill: #3a424e; }
+[data-mon-tema="escuro"] .mon-asset-canvas .zone { fill: #1a1f27; stroke: #2b3340; }
+[data-mon-tema="escuro"] .mon-asset-canvas .cell { fill: #1e242d; stroke: #2b3340; }
+[data-mon-tema="escuro"] .mon-asset-canvas .machine:not([data-state]) .body { fill: #232a33; }
+[data-mon-tema="escuro"] .mon-asset-canvas .assetlbl { fill: #e9ecef; }
+[data-mon-tema="escuro"] .mon-asset-canvas .grplbl,
+[data-mon-tema="escuro"] .mon-asset-canvas .zonelbl { fill: #6b7480; }
+
+/* ------------------------------------------- capacidade produtiva do ativo */
+
+/* O título e os dois números dividem a mesma linha: a curva já ocupa altura, e um cabeçalho
+   de duas linhas empurraria as tabelas para fora da primeira dobra. */
+.mon-cap-cabecalho {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.2rem 1rem;
+}
+
+.mon-cap-resumo {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem 0.9rem;
+  margin-bottom: 0.4rem;
+}
+
+.mon-cap-rotulo {
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: #8a93a6;
+}
+
+.mon-cap-valor {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+  color: #1f2733;
+  font-variant-numeric: tabular-nums;
+}
+
+[data-mon-tema="escuro"] .mon-cap-valor { color: #e9ecef; }
+
+[data-mon-tema="escuro"] .mon-capacidade .xtick text,
+[data-mon-tema="escuro"] .mon-capacidade .ytick text { fill: #adb5bd !important; }

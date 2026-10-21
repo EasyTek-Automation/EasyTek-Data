@@ -2,7 +2,7 @@
 """Script custo_orcado — orçado+executado por conta (ZBRCO019) → AMG_CustoResumo.
 
 Report Painter (não exporta ALV): lê por SCRAPE de rótulos. Grava Mongo direto. Auto-contido.
-Janela: 2 meses (mês corrente + anterior, até D-1) → 1 scrape por período.
+Janela: 2 meses INTEIROS (mês anterior + corrente) → 1 scrape por período.
 """
 from __future__ import annotations
 
@@ -48,4 +48,8 @@ def run(job, ctx):
         n = _carga.gravar(ctx.db, COLL, docs)
     except Exception as e:
         return Result.falha("mongo_update", e)
-    return Result.sucesso(path_xlsx=f"mongo:{COLL}", tamanho_bytes=n)
+    # espelha o custo_exec: a janela REAL usada vai no doc do job (`resultado.janela`).
+    return Result.sucesso(path_xlsx=f"mongo:{COLL}", tamanho_bytes=n,
+                          janela={"inicio": custo_collect._ddmm(ini),
+                                  "fim": custo_collect._ddmm(fim),
+                                  "periodos": [f"{a}-{m:02d}" for a, m in _periodos(ini, fim)]})

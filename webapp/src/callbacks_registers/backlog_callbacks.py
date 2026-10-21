@@ -46,6 +46,7 @@ _COLS_EXPORT = [
     {"id": "disciplina", "name": "Disciplina"},
     {"id": "centro_operacao_0010", "name": "Centro / Operação"},
     {"id": "data_inicio", "name": "Início"},
+    {"id": "data_criacao", "name": "Criação"},
     {"id": "local_pai_nome", "name": "Linha"},
     {"id": "local_descricao", "name": "Conjunto"},
     {"id": "local_instalacao_cod", "name": "Cód. conjunto"},
@@ -55,6 +56,19 @@ _COLS_EXPORT = [
 def _fmt_data(di):
     """datetime → 'DD/MM/YYYY'; vazio se não for data."""
     return di.strftime("%d/%m/%Y") if isinstance(di, datetime) else ""
+
+
+def _fmt_data_iso(di):
+    """datetime → 'YYYY-MM-DD' (ordenável cronologicamente na DataTable); vazio se não-data."""
+    return di.strftime("%Y-%m-%d") if isinstance(di, datetime) else ""
+
+
+_EIXO_LABEL = {"data_inicio": "data de início", "data_criacao": "data de criação"}
+
+
+def _norm_eixo(v):
+    """Sanitiza o valor do switch de eixo → 'data_inicio' (default) ou 'data_criacao'."""
+    return "data_criacao" if v == "data_criacao" else "data_inicio"
 
 
 def _to_aware_utc(dt):
@@ -125,7 +139,8 @@ def _linha_tabela(o):
         "categoria": o.get("categoria", ""),  # mantido p/ export (coluna removida da tabela)
         "disciplina": LABEL_DISC.get(o.get("disciplina"), "—"),
         "centro_operacao_0010": _centro_label(o.get("centro_operacao_0010")),
-        "data_inicio": _fmt_data(o.get("data_inicio")),
+        "data_inicio": _fmt_data_iso(o.get("data_inicio")),
+        "data_criacao": _fmt_data_iso(o.get("data_criacao")),
         "local_pai_nome": o.get("_linha_nome", ""),                 # coluna Linha (oficial)
         "local_instalacao": o.get("_conjunto_nome") or "—",         # coluna Conjunto (oficial)
         "local_descricao": o.get("_conjunto_nome", ""),             # export: Conjunto
@@ -229,11 +244,11 @@ def _descrever_filtros(cat, disc, sub, linhas_ids, dt_ini, dt_fim, busca, idx):
     return " · ".join(parts) if parts else "Backlog completo (sem filtros)"
 
 
-def _saida_vazia(frescor_txt):
+def _saida_vazia(frescor_txt, titulo_barras="Backlog por mês"):
     """Saída offline/sem-dado: roscas + barras vazias + insights vazio + tabela vazia."""
     vazio = _donut([], [], [], 0)
     return (vazio, vazio, _barras([], []),
-            html.Div("Sem dados.", className="text-muted small"), [], frescor_txt)
+            html.Div("Sem dados.", className="text-muted small"), [], frescor_txt, titulo_barras)
 
 
 def register_backlog_callbacks(app):
@@ -246,10 +261,12 @@ def register_backlog_callbacks(app):
         Output("bk-insights", "children"),
         Output("bk-table", "data"),
         Output("bk-frescor", "children"),
+        Output("bk-barras-titulo", "children"),
         Input("bk-interval-load", "n_intervals"),
         Input("btn-apply-backlog-filters", "n_clicks"),
         Input("btn-backlog-clear", "n_clicks"),
         Input("bk-rosca-mode", "value"),
+        Input("bk-eixo-data", "value"),
         State("bk-f-categoria", "value"),
         State("bk-f-disciplina", "value"),
         State("bk-f-subclass", "value"),
@@ -258,12 +275,16 @@ def register_backlog_callbacks(app):
         State("bk-f-periodo", "end_date"),
         State("bk-f-busca", "value"),
     )
-    def carregar(_n_int, _n_apply, _n_clear, rosca_mode, cat, disc, sub, locais_pai,
+    def carregar(_n_int, _n_apply, _n_clear, rosca_mode, eixo_val, cat, disc, sub, locais_pai,
                  dt_ini, dt_fim, busca):
+        eixo = _norm_eixo(eixo_val)
+        titulo_barras = f"Backlog por mês ({_EIXO_LABEL[eixo]})"
         snap = bd.carregar_snapshot(silent=True)
         if snap is None:
-            return _saida_vazia("⚠ Banco indisponível")
+            return _saida_vazia("⚠ Banco indisponível", titulo_barras)
         bd.enriquecer_local(snap["ordens"], bd.carregar_ativos())
+        snap["ordens"] = bd.esconder_encerradas(snap["ordens"])   # B35: fora encerradas/canceladas
+        snap["ordens"] = bd.esconder_sem_centro(snap["ordens"])   # B37: fora sem-centro (None/MAN)
 
         # 'Limpar' ignora os filtros (a redefinição visual é outro callback)
         if ctx.triggered_id == "btn-backlog-clear":
@@ -279,7 +300,7 @@ def register_backlog_callbacks(app):
                 "periodo_fim": _parse_date(dt_fim),
             }
 
-        visiveis = bd.filtrar(snap["ordens"], filtros)
+        visiveis = bd.filtrar(snap["ordens"], filtros, eixo=eixo)
 
         # Rosca 1: Categoria ou Disciplina (toggle)
         if rosca_mode == "disc":
@@ -291,14 +312,14 @@ def register_backlog_callbacks(app):
         # Rosca 2: por Linha (equipamento-pai)
         lab2, val2 = bd.dados_rosca_linha(visiveis, topn=8)
         fig_linha = _donut(lab2, val2, _COR_LINHA, sum(val2))
-        # Barras: backlog por mês/ano (data de início)
-        labm, valm = bd.dados_barras_mes(visiveis)
+        # Barras: backlog por mês/ano (eixo selecionado)
+        labm, valm = bd.dados_barras_mes(visiveis, eixo=eixo)
         fig_barras = _barras(labm, valm)
 
-        insights = _render_insights(bd.insights(visiveis))
+        insights = _render_insights(bd.insights(visiveis, eixo=eixo))
         tabela = [_linha_tabela(o) for o in visiveis]
         return (fig_cat, fig_linha, fig_barras, insights, tabela,
-                _fmt_frescor(snap.get("coletado_em")))
+                _fmt_frescor(snap.get("coletado_em")), titulo_barras)
 
     @app.callback(
         Output("bk-f-categoria", "value"),
@@ -389,21 +410,24 @@ def register_backlog_callbacks(app):
         State("bk-f-periodo", "start_date"),
         State("bk-f-periodo", "end_date"),
         State("bk-f-busca", "value"),
+        State("bk-eixo-data", "value"),
         prevent_initial_call=True,
     )
-    def exportar(n, cat, disc, sub, locais_pai, dt_ini, dt_fim, busca):
+    def exportar(n, cat, disc, sub, locais_pai, dt_ini, dt_fim, busca, eixo_val):
         if not n:
             raise PreventUpdate
         snap = bd.carregar_snapshot(silent=True)
         if snap is None:
             raise PreventUpdate
         bd.enriquecer_local(snap["ordens"], bd.carregar_ativos())
+        snap["ordens"] = bd.esconder_encerradas(snap["ordens"])   # B35: fora encerradas/canceladas
+        snap["ordens"] = bd.esconder_sem_centro(snap["ordens"])   # B37: fora sem-centro (None/MAN)
         filtros = {
             "categoria": cat or [], "disciplina": disc or [], "subclassificacao": sub or [],
             "linha": locais_pai or [], "busca": busca or "",
             "periodo_ini": _parse_date(dt_ini), "periodo_fim": _parse_date(dt_fim),
         }
-        visiveis = bd.filtrar(snap["ordens"], filtros)
+        visiveis = bd.filtrar(snap["ordens"], filtros, eixo=_norm_eixo(eixo_val))
         linhas = [_linha_tabela(o) for o in visiveis]
         df = pd.DataFrame(linhas, columns=[c["id"] for c in _COLS_EXPORT])
         df.columns = [c["name"] for c in _COLS_EXPORT]
@@ -422,9 +446,10 @@ def register_backlog_callbacks(app):
         State("bk-f-periodo", "start_date"),
         State("bk-f-periodo", "end_date"),
         State("bk-f-busca", "value"),
+        State("bk-eixo-data", "value"),
         prevent_initial_call=True,
     )
-    def exportar_pdf(n, cat, disc, sub, locais_pai, dt_ini, dt_fim, busca):
+    def exportar_pdf(n, cat, disc, sub, locais_pai, dt_ini, dt_fim, busca, eixo_val):
         if not n:
             raise PreventUpdate
         snap = bd.carregar_snapshot(silent=True)
@@ -432,13 +457,17 @@ def register_backlog_callbacks(app):
             raise PreventUpdate
         idx = bd.carregar_ativos()
         bd.enriquecer_local(snap["ordens"], idx)
+        snap["ordens"] = bd.esconder_encerradas(snap["ordens"])   # B35: fora encerradas/canceladas
+        snap["ordens"] = bd.esconder_sem_centro(snap["ordens"])   # B37: fora sem-centro (None/MAN)
+        eixo = _norm_eixo(eixo_val)
         filtros = {
             "categoria": cat or [], "disciplina": disc or [], "subclassificacao": sub or [],
             "linha": locais_pai or [], "busca": busca or "",
             "periodo_ini": _parse_date(dt_ini), "periodo_fim": _parse_date(dt_fim),
         }
-        visiveis = bd.filtrar(snap["ordens"], filtros)
+        visiveis = bd.filtrar(snap["ordens"], filtros, eixo=eixo)
         desc = _descrever_filtros(cat, disc, sub, locais_pai, dt_ini, dt_fim, busca, idx)
-        pdf_bytes = backlog_pdf.gerar_pdf(visiveis, desc, _fmt_frescor(snap.get("coletado_em")))
+        pdf_bytes = backlog_pdf.gerar_pdf(visiveis, desc, _fmt_frescor(snap.get("coletado_em")),
+                                          eixo=eixo)
         hoje = datetime.now(tz=pytz.timezone(_TZ)).strftime("%Y%m%d")
         return dcc.send_bytes(lambda b: b.write(pdf_bytes), f"backlog_BR02_{hoje}.pdf")

@@ -34,19 +34,31 @@ def derivar_categoria(tipo: str):
 _CENTRO_MECANICA = frozenset({"MEC"})
 _CENTRO_ELETRICA = frozenset()
 
+# centros com disciplina PRÓPRIA fora de Mecânica/Elétrica (B34, 2026-07-17; +Z04 no B37,
+# 2026-07-22). São destinos VÁLIDOS que o PCM atribui de propósito no SAP — não são "sem
+# classificar". Antes caíam no fallback NaoClassificado e inflavam a fila de pendentes / a rosca:
+#   Z03 = serviço de empresa terceira (coringa, atribuível nos dois quadros — B15);
+#   Z01 = gerente de manutenção (administrativa — classificada, mas não vira card do quadro);
+#   Z04 = ferramentaria/matrizes (classificada, mas não vira card do quadro — igual à Gestão).
+# Z02/MAN/sem-centro seguem NaoClassificado (Z02 = pendência real; MAN/sem-centro = fora da fila).
+_CENTRO_DISCIPLINA = {"Z03": "Terceiros", "Z01": "Gestao", "Z04": "Ferramentaria"}
+
 
 def derivar_disciplina(centro: str):
     """Disciplina pelo centro da operação 0010 — vale para TODAS as categorias
     (revisão 2026-06-27: melhoria/matrizes também recebem disciplina).
 
-    Mecanica: Z1x ou centro-texto mecânico (MEC). Eletrica: Z2x. Demais (Z02, Z01,
-    Z03, Z04, MAN, sem centro): NaoClassificado.
+    Mecanica: Z1x ou centro-texto mecânico (MEC). Eletrica: Z2x. Z03→Terceiros, Z01→Gestao
+    (B34), Z04→Ferramentaria (B37) — destinos próprios. Demais (Z02, MAN, sem centro):
+    NaoClassificado.
     """
     c = (centro or "").strip().upper()
     if c.startswith("Z1") or c in _CENTRO_MECANICA:
         return "Mecanica"
     if c.startswith("Z2") or c in _CENTRO_ELETRICA:
         return "Eletrica"
+    if c in _CENTRO_DISCIPLINA:
+        return _CENTRO_DISCIPLINA[c]
     return "NaoClassificado"
 
 
@@ -70,7 +82,7 @@ def montar_doc(ordem: dict, coleta_id: str, coletado_em) -> dict:
     """Monta o documento Mongo (DS-02) a partir de uma ordem crua da coleta SAP.
 
     `ordem` cru (do _coleta): ordem, tipo, descricao, local_instalacao, data_inicio,
-    centro_operacao_0010.
+    data_criacao, centro_operacao_0010, status_usuario.
     """
     tipo = (ordem.get("tipo") or "").strip().upper()
     centro = (ordem.get("centro_operacao_0010") or "").strip().upper()
@@ -83,10 +95,12 @@ def montar_doc(ordem: dict, coleta_id: str, coletado_em) -> dict:
         "local_instalacao": ordem.get("local_instalacao", ""),
         "local_descricao": ordem.get("local_descricao", ""),
         "local_pai": local_pai(ordem.get("local_instalacao", "")),
-        "data_inicio": ordem.get("data_inicio"),  # datetime ou None
+        "data_inicio": ordem.get("data_inicio"),    # GSTRP — início básico; datetime ou None
+        "data_criacao": ordem.get("data_criacao"),  # ERDAT — data de criação; datetime ou None
         "centro_operacao_0010": centro or None,
         "disciplina": derivar_disciplina(centro),
         "subclassificacao": derivar_subclassificacao(centro),
+        "status_usuario": ordem.get("status_usuario"),  # B30 — status do usuário (USTXT); faltava aqui
         "coleta_id": coleta_id,
         "coletado_em": coletado_em,
     }

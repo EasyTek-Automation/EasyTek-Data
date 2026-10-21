@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import logging
 import os
 import re
@@ -32,7 +33,12 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from custos.hierarquia import GRUPO_GERAL, conta_valida, grupo_da_conta  # noqa: E402
-from custos.storage import COLL_LANCAMENTOS, COLL_RESUMO, ensure_indexes  # noqa: E402
+from custos.storage import (  # noqa: E402
+    COLL_COMPONENTES,
+    COLL_LANCAMENTOS,
+    COLL_RESUMO,
+    ensure_indexes,
+)
 
 logger = logging.getLogger("custos.seed")
 
@@ -153,11 +159,47 @@ def construir_resumo(pasta: Path, mes: str, carregado_em: datetime) -> tuple[lis
     return docs, geral_orcado, geral_exec
 
 
-def construir_lancamentos(detalhe_path: Path, mes: str, carregado_em: datetime) -> list[dict]:
-    """Le o detalhe completo e retorna os lancamentos do mes (contas validas).
+# Catalogo de materiais de exemplo p/ os componentes sinteticos do seed (QA local).
+# NAO e dado real — o item real de almoxarifado vem da MB25 pelo daemon (BR-15).
+_CATALOGO_EXEMPLO = [
+    ("16888", "MOTOR CC DMP180 137KW ABB", "PC"),
+    ("1004273", "CORREIA 1180", "PC"),
+    ("200145", "FILTRO DE AR INDUSTRIAL", "PC"),
+    ("300221", "PARAFUSO ALLEN M12", "PC"),
+    ("450012", "ROLAMENTO SKF 6205", "PC"),
+    ("510098", "OLEO HIDRAULICO ISO 68", "L"),
+]
 
-    Filtra por mes da data de lancamento (BUDAT). Descritor = `texto_pedido` ->
-    senao `texto_material` (BR-06). Pula contas fora do GT340 e datas invalidas.
+
+# Requisitantes de exemplo p/ o seed (a coluna 'usuario' vem vazia no CSV da investigação).
+# No cliente, o valor real é o USNAM do lançamento (quem lançou/baixou no SAP).
+_REQUISITANTES = ["MASSIS", "JSILVA", "RCOSTA", "PALVES", "LFERREIRA"]
+
+
+def _requisitante_sintetico(ln: dict) -> str:
+    """Requisitante SINTÉTICO e determinístico p/ o seed (QA da coluna Requisitante)."""
+    base = ((ln.get("no_documento") or "") + (ln.get("centro_custo") or "")).encode()
+    return _REQUISITANTES[int(hashlib.md5(base).hexdigest()[:4], 16) % len(_REQUISITANTES)]
+
+
+def _ordem_sintetica(ln: dict) -> str:
+    """Ordem emissora SINTETICA e determinística p/ o seed (QA). O CSV da investigacao nao
+    tem ordem (`PRTAU`); geramos uma estavel (hash) no formato de ordem PM (5xxxxxx) para
+    exercitar a coluna 'Ordem' e casar com os componentes. Dado real vem do daemon SAP.
+    """
+    base = "|".join([(ln.get("no_documento") or ""), (ln.get("centro_custo") or ""),
+                     (ln.get("data_lancamento") or ""), (ln.get("valor") or "")]).encode()
+    n = int(hashlib.md5(base).hexdigest()[:6], 16) % 900000 + 5000000
+    return str(n)
+
+
+def construir_lancamentos(detalhe_path: Path, mes: str, carregado_em: datetime) -> list[dict]:
+    """Le o detalhe completo e retorna os lancamentos do mes (contas validas), enriquecidos.
+
+    Filtra por mes da data de lancamento (BUDAT). Descritor por cascata (BR-13): `texto_pedido`
+    -> `texto_material` -> (liquidacao) descricao da ordem. Deriva `familia` (BR-13) e, nas
+    linhas de liquidacao, SINTETIZA `ordem_emissora` (BR-14) — o CSV nao tem ordem; o dado real
+    vem do daemon. Campos novos `fonte='csv'` (selo "dados de exemplo").
     """
     docs: list[dict] = []
     for ln in _abrir_csv(detalhe_path):
@@ -167,7 +209,23 @@ def construir_lancamentos(detalhe_path: Path, mes: str, carregado_em: datetime) 
         data = parse_data_br(ln.get("data_lancamento"))
         if data is None or f"{data.year:04d}-{data.month:02d}" != mes:
             continue
-        descritor = (ln.get("texto_pedido") or "").strip() or (ln.get("texto_material") or "").strip()
+        pedido = (ln.get("pedido_compra") or "").strip()
+        texto_pedido = (ln.get("texto_pedido") or "").strip()
+        texto_mat = (ln.get("texto_material") or "").strip()
+        descritor = texto_pedido or texto_mat
+        # Familia (BR-13): compra tem pedido; estoque tem texto de material; o resto (sem
+        # pedido e sem material — os antigos "em branco") vira liquidacao no seed.
+        if pedido:
+            familia = "compra"
+        elif texto_mat:
+            familia = "estoque"
+        else:
+            familia = "liquidacao"
+        ordem = ""
+        if familia == "liquidacao":
+            ordem = _ordem_sintetica(ln)
+            if not descritor:
+                descritor = f"ORDEM {ordem} — SERVICO DE MANUTENCAO (exemplo)"
         docs.append(
             {
                 "mes_referencia": mes,
@@ -176,13 +234,47 @@ def construir_lancamentos(detalhe_path: Path, mes: str, carregado_em: datetime) 
                 "centro_custo": (ln.get("centro_custo") or "").strip(),
                 "valor": parse_valor_br(ln.get("valor")),
                 "descritor": descritor,
+                "familia": familia,                 # BR-13
+                "ordem_emissora": ordem,            # BR-14 (sintetica no seed)
+                "doc_ref": (ln.get("no_documento") or "").strip(),
+                "material": "",
+                "usuario": _requisitante_sintetico(ln),   # requisitante (exemplo no seed)
+                "planta": "BR02",
                 "tipo_doc": (ln.get("tipo_doc") or "").strip(),
                 "no_documento": (ln.get("no_documento") or "").strip(),
-                "pedido_compra": (ln.get("pedido_compra") or "").strip(),
+                "pedido_compra": pedido,
                 "fonte": "csv",
                 "carregado_em": carregado_em,
             }
         )
+    return docs
+
+
+def construir_componentes(lanc_docs: list[dict], mes: str, carregado_em: datetime) -> list[dict]:
+    """Componentes SINTETICOS por ordem de liquidacao (QA local do mini-modal, BR-15).
+
+    1-3 itens por ordem, do catalogo de exemplo, determinísticos pela ordem. `fonte='csv'`.
+    O dado real (item de almoxarifado baixado) vem da MB25 pelo daemon.
+    """
+    docs: list[dict] = []
+    ordens = sorted({d["ordem_emissora"] for d in lanc_docs
+                     if d.get("familia") == "liquidacao" and d.get("ordem_emissora")})
+    for ordem in ordens:
+        n_itens = int(ordem[-1]) % 3 + 1
+        for i in range(n_itens):
+            mat, desc, un = _CATALOGO_EXEMPLO[(int(ordem[-2:]) + i) % len(_CATALOGO_EXEMPLO)]
+            docs.append(
+                {
+                    "ordem": ordem,
+                    "mes_referencia": mes,
+                    "material": mat,
+                    "material_desc": desc,
+                    "quantidade": float((int(ordem[-1]) + i) % 5 + 1),
+                    "unidade": un,
+                    "fonte": "csv",
+                    "carregado_em": carregado_em,
+                }
+            )
     return docs
 
 
@@ -196,6 +288,7 @@ def seed_mes(db, base: Path, mes: str, carregado_em: datetime, dry_run: bool = F
 
     resumo_docs, geral_orcado, geral_exec = construir_resumo(pasta, mes, carregado_em)
     lanc_docs = construir_lancamentos(detalhe_path, mes, carregado_em)
+    comp_docs = construir_componentes(lanc_docs, mes, carregado_em)
 
     soma_orcado = round(sum(d["orcado"] for d in resumo_docs), 2)
     soma_exec = round(sum(d["executado"] for d in resumo_docs), 2)
@@ -205,15 +298,19 @@ def seed_mes(db, base: Path, mes: str, carregado_em: datetime, dry_run: bool = F
     if not dry_run:
         db[COLL_RESUMO].delete_many({"mes_referencia": mes})
         db[COLL_LANCAMENTOS].delete_many({"mes_referencia": mes})
+        db[COLL_COMPONENTES].delete_many({"mes_referencia": mes, "fonte": "csv"})
         if resumo_docs:
             db[COLL_RESUMO].insert_many(resumo_docs)
         if lanc_docs:
             db[COLL_LANCAMENTOS].insert_many(lanc_docs)
+        if comp_docs:
+            db[COLL_COMPONENTES].insert_many(comp_docs)
 
     return {
         "mes": mes,
         "contas": len(resumo_docs),
         "lancamentos": len(lanc_docs),
+        "componentes": len(comp_docs),
         "soma_orcado": soma_orcado,
         "geral_orcado": round(geral_orcado, 2),
         "soma_exec": soma_exec,

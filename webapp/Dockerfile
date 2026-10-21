@@ -23,11 +23,32 @@ RUN apt-get update && apt-get install -y \
     libpangocairo-1.0-0 \
     libfontconfig1 \
     fonts-liberation \
-    chromium \
     && rm -rf /var/lib/apt/lists/*
-# chromium: dependência do kaleido>=1.0 para renderização Plotly→PNG dos sunbursts do KPIReport (RV-05).
-# Substituir por chromium-headless-shell em ciclo futuro — dívida registrada em
-# .dev-docs/technical-debt/kpi-report-chromium-headless-shell.md.
+
+# ─── Chromium PINADO em 149.0.7827.155 — NÃO desfixar sem validar o render ───
+# Incidente 2026-07-07: o CI rebuildou a imagem e o apt (não-pinado) puxou o
+# chromium 150 do trixie-security. kaleido 1.3.0 é incompatível com o chrome 150
+# → falha "browser seemed to close immediately after starting" (BrowserFailedError)
+# → os PNGs dos gráficos (MTBF/MTTR/Avaria) não renderizam → o DOCX do KPIReport
+# baixa SEM gráficos. Provado: chromium 149 renderiza PNG ok; 150 falha.
+# Fix: instalar a versão exata via snapshot.debian.org (o repo corrente já não
+# serve o 149) e travar com `apt-mark hold`. chromium é dep do kaleido>=1.0 para
+# renderização Plotly→PNG dos sunbursts/barras do KPIReport (RV-05).
+# DÍVIDA (migração futura): trocar por chrome-headless-shell gerenciado pelo próprio
+# kaleido (`kaleido_get_chrome`) → desacopla do apt do Debian e imuniza contra este
+# drift. Ver .dev-docs/technical-debt/kpi-report-chromium-pin-149.md
+ARG CHROMIUM_VERSION=149.0.7827.155-1~deb13u1
+ARG CHROMIUM_SNAPSHOT=20260622T000000Z
+RUN echo "deb [check-valid-until=no] https://snapshot.debian.org/archive/debian-security/${CHROMIUM_SNAPSHOT}/ trixie-security main" \
+      > /etc/apt/sources.list.d/snapshot-chromium.list \
+    && apt-get -o Acquire::Check-Valid-Until=false update \
+    && apt-get install -y --no-install-recommends \
+       chromium=${CHROMIUM_VERSION} \
+       chromium-common=${CHROMIUM_VERSION} \
+       chromium-sandbox=${CHROMIUM_VERSION} \
+    && apt-mark hold chromium chromium-common chromium-sandbox \
+    && rm -f /etc/apt/sources.list.d/snapshot-chromium.list \
+    && rm -rf /var/lib/apt/lists/*
 
 # 4. Copiar o arquivo de dependências
 COPY requirements.txt .

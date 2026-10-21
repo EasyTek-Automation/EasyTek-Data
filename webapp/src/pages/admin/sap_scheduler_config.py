@@ -23,15 +23,14 @@ def layout_wrapper():
     return layout(current_user)
 
 
-def layout(user):
-    """Renderiza a pagina com user context propagado via `dcc.Store` (DC-05-02).
+def agendamento_section(user):
+    """Seção de agendamento (stores + interval + tabela + histórico), reutilizável.
 
-    NAO chama `check_access()` — route-level check em `index.py` bloqueia antes.
-    Callbacks fazem re-check server-side via State (defesa em profundidade —
-    DC-05-03 / SP-09 RF-09-25).
+    Usada pela página antiga (admin) E pela página consolidada de Coletas SAP no perfil
+    manutenção (/maintenance/coletas-sap). Os ids `sap-sched-*` são compartilhados; como a
+    rota antiga redireciona para a nova, só uma instância existe no DOM por vez.
     """
-    return dbc.Container(
-        [
+    return [
             # User context propagado via dcc.Store (DC-05-02)
             dcc.Store(
                 id="sap-sched-admin-user-level",
@@ -133,6 +132,10 @@ def layout(user):
                     )
                 ]
             ),
-        ],
-        fluid=True,
-    )
+        ]
+
+
+def layout(user):
+    """Página antiga (admin) — agora só envolve a seção reutilizável. A rota /config/sap-scheduler
+    redireciona para /maintenance/coletas-sap (consolidada). Mantida por compatibilidade."""
+    return dbc.Container(agendamento_section(user), fluid=True)

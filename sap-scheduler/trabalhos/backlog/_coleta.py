@@ -247,6 +247,69 @@ def _export_and_read(s, grid, wanted, target):
     return out
 
 
+def _expor_todas_colunas(s):
+    """Abre 'Modificar layout' (botão tbar[1]/btn[32]) e move TODAS as colunas ocultas p/ exibidas.
+
+    Só EXIBIÇÃO — não salva variante (read-only). Usado quando a variante /BACKLOG não expõe uma
+    coluna necessária: ARBPL no IW37 (centro da operação) e USTXT no IW39 (status do usuário — B30).
+    Comprovado no diag 2026-07-14: o /BACKLOG do IW39 traz 15 colunas SEM USTXT; com este move-all
+    o USTXT aparece populado (ABIE/ENTR/ENPA/ESAC/CERR/CANC). Devolve o grid repintado, ou None se
+    o diálogo não abriu (o chamador segue sem a coluna extra — sem regressão).
+
+    Abre o diálogo "Modificar layout (Atuais...)" por DOIS caminhos: 1º o botão da toolbar
+    `tbar[1]/btn[32]` (funciona no IW37); se não abrir, acha o item pelo MENU "Atuais..."
+    (`wnd[0]/mbar`) — mais robusto. No IW39 o `btn[32]` NÃO é o de layout (toolbar diferente do
+    IW37), então sem o menu o USTXT não vinha e o status ficava null (verificação 2026-07-14)."""
+    try:
+        aberto = False
+        try:
+            s.findById("wnd[0]/tbar[1]/btn[32]").press()
+            time.sleep(1.2)
+            aberto = s.findById("wnd[1]", False) is not None
+        except Exception:
+            aberto = False
+        if not aberto:
+            achados = []
+
+            def _walk(node):
+                try:
+                    kids = node.Children
+                    n = kids.Count
+                except Exception:
+                    return
+                for i in range(n):
+                    try:
+                        ch = kids(i)
+                    except Exception:
+                        continue
+                    if "atuais" in (getattr(ch, "Text", "") or "").lower():
+                        achados.append(getattr(ch, "Id", ""))
+                    _walk(ch)
+
+            _walk(s.findById("wnd[0]/mbar"))
+            if achados:
+                s.findById(achados[0]).select()
+                time.sleep(1.2)
+                aberto = s.findById("wnd[1]", False) is not None
+        if not aberto:
+            _log("expor colunas: diálogo de layout não abriu (btn[32] e menu 'Atuais' falharam)")
+            return None
+        base = "wnd[1]/usr/tabsG_TS_ALV/tabpALV_M_R1/ssubSUB_DYN0510:SAPLSKBH:0620/"
+        hidden = s.findById(base + "cntlCONTAINER1_LAYO/shellcont/shell")
+        nset = hidden.RowCount
+        if nset:
+            hidden.selectedRows = f"0-{nset - 1}"
+        s.findById(base + "btnAPP_WL_SING").press()
+        time.sleep(0.8)
+        s.findById("wnd[1]/tbar[0]/btn[0]").press()
+        time.sleep(1.5)
+        return _find_grid(s)
+    except Exception as ex:
+        _log(f"expor colunas falhou: {ex}")
+        _drain(s)
+        return None
+
+
 def _parse_data(v):
     v = (v or "").strip()
     if not v:
@@ -308,11 +371,24 @@ def _iw39_ordens(s):
     if g is None:
         _log("IW39: sem grid")
         return {}
+    # B30 (diag 2026-07-14): a variante /BACKLOG NÃO expõe USTXT (status do usuário) → sem move-all,
+    # status_usuario fica null em todas as ordens e o quadro mostra tudo "Pendente". Se USTXT não
+    # está no grid, expõe todas as colunas (só exibição). Opção (b) do diag — não depende de editar
+    # a variante global no SAP (que qualquer um pode re-salvar).
+    cols = [c for c in _coll(g.ColumnOrder) if c is not None]
+    if "USTXT" not in cols:
+        _log("IW39: USTXT ausente na variante -> expondo colunas via layout (B30)...")
+        g2 = _expor_todas_colunas(s)
+        if g2 is not None:
+            g = g2
     _log(f"IW39: grid {g.RowCount} linhas -> exportando xlsx")
     target = os.path.join(tempfile.gettempdir(), "backlog_iw39.xlsx")
     # PLTXT = denominação do local de instalação (texto). Best-effort: só vem se a variante
     # /BACKLOG do IW39 expuser a coluna. Confirmar o tech-name com o agente SAP (IM-17).
-    recs = _export_and_read(s, g, ["AUFNR", "AUART", "KTEXT", "TPLNR", "PLTXT", "GSTRP"], target)
+    # GSTRP = data de início básico (programada); ERDAT = data de criação/abertura da ordem.
+    # USTXT = status do usuário da ordem (B30): ex. ABIE=aberta, ENTR=em tratamento, ENPA=em pausa,
+    # ESAC=aceitação de espera, CERR=encerrada. Dá recurso ao PCM além do "pendente" binário.
+    recs = _export_and_read(s, g, ["AUFNR", "AUART", "KTEXT", "TPLNR", "PLTXT", "GSTRP", "ERDAT", "USTXT"], target)
     od = {}
     for r in recs:
         a = (r.get("AUFNR") or "").strip()
@@ -375,26 +451,10 @@ def _iw37_centro_op0010(s, ordens):
         # fallback defensivo: a variante /BACKLOG já deveria trazer ARBPL; só cai aqui
         # se a variante foi removida/alterada no SAP.
         _log("IW37: ARBPL ausente na variante -> fallback: expondo via layout...")
-        try:
-            s.findById("wnd[0]/tbar[1]/btn[32]").press()
-            time.sleep(1.2)
-            if s.findById("wnd[1]", False) is None:
-                raise RuntimeError("dialog layout nao abriu")
-            base = ("wnd[1]/usr/tabsG_TS_ALV/tabpALV_M_R1/"
-                    "ssubSUB_DYN0510:SAPLSKBH:0620/")
-            hidden = s.findById(base + "cntlCONTAINER1_LAYO/shellcont/shell")
-            nset = hidden.RowCount
-            if nset:
-                hidden.selectedRows = f"0-{nset - 1}"
-            s.findById(base + "btnAPP_WL_SING").press()
-            time.sleep(0.8)
-            s.findById("wnd[1]/tbar[0]/btn[0]").press()
-            time.sleep(1.5)
-            g = _find_grid(s)
+        g2 = _expor_todas_colunas(s)
+        if g2 is not None:
+            g = g2
             cols = [c for c in _coll(g.ColumnOrder) if c is not None]
-        except Exception as ex:
-            _log(f"IW37: expor ARBPL falhou: {ex}")
-            _drain(s)
     if "ARBPL" not in cols:
         _log("IW37: ARBPL ausente -> centros ficam None")
         return centro
@@ -433,6 +493,8 @@ def coletar_ordens(session) -> list[dict]:
             "local_instalacao": (r.get("TPLNR") or "").strip(),
             "local_descricao": (r.get("PLTXT") or "").strip(),
             "data_inicio": _parse_data(r.get("GSTRP")),
+            "data_criacao": _parse_data(r.get("ERDAT")),
+            "status_usuario": (r.get("USTXT") or "").strip() or None,   # B30
             "centro_operacao_0010": centros.get(a),
         })
     try:
@@ -450,29 +512,30 @@ def mock_ordens() -> list[dict]:
         # Corretivas (YPM1) — mecânica, elétrica, não classificado
         {"ordem": "5012522", "tipo": "YPM1", "descricao": "TROCA ROLAMENTO PRENSA 01",
          "local_instalacao": "BR02-0100-1600", "data_inicio": datetime(2026, 5, 13),
-         "centro_operacao_0010": "Z10"},
+         "data_criacao": datetime(2026, 4, 20), "centro_operacao_0010": "Z10"},
         {"ordem": "5013391", "tipo": "YPM1", "descricao": "PAINEL ELETRICO LINHA 2",
          "local_instalacao": "BR02-0100-1300", "data_inicio": datetime(2026, 4, 11),
-         "centro_operacao_0010": "Z20"},
+         "data_criacao": datetime(2026, 3, 15), "centro_operacao_0010": "Z20"},
         {"ordem": "5019639", "tipo": "YPM1", "descricao": "ORDEM NOVA SEM RECLASSIFICAR",
          "local_instalacao": "BR02-0700-0200", "data_inicio": datetime(2026, 6, 20),
-         "centro_operacao_0010": "Z02"},
+         "data_criacao": datetime(2026, 6, 18), "centro_operacao_0010": "Z02"},
         # Preventivas (YPM2) — vencida (mecânica), preditiva (mecânica), FUTURA (não exibe)
         {"ordem": "5012523", "tipo": "YPM2", "descricao": "CALIBRACAO BALANCA ROD",
          "local_instalacao": "BR02-0100-1600", "data_inicio": datetime(2026, 2, 21),
-         "centro_operacao_0010": "Z13"},
+         "data_criacao": datetime(2026, 1, 30), "centro_operacao_0010": "Z13"},
         {"ordem": "5010812", "tipo": "YPM2", "descricao": "PREVENTIVA CENTRAL EMG - ELE",
          "local_instalacao": "BR02-0700-0200", "data_inicio": datetime(2026, 5, 25),
-         "centro_operacao_0010": "Z21"},
+         "data_criacao": datetime(2026, 5, 2), "centro_operacao_0010": "Z21"},
+        # criação no passado (≤ hoje), início no futuro → segue ESCONDIDA (BR-03, ambos eixos)
         {"ordem": "5099999", "tipo": "YPM2", "descricao": "PREVENTIVA FUTURA (NAO VENCIDA)",
          "local_instalacao": "BR02-0100-0300", "data_inicio": datetime(2026, 12, 15),
-         "centro_operacao_0010": "Z10"},
+         "data_criacao": datetime(2026, 3, 10), "centro_operacao_0010": "Z10"},
         # Melhoria (YPM8) — sem disciplina
         {"ordem": "5019529", "tipo": "YPM8", "descricao": "(TEK)MELHORIA SINOPTICO IHM PRENSA",
          "local_instalacao": "BR02-0100-1600", "data_inicio": datetime(2026, 6, 1),
-         "centro_operacao_0010": "Z10"},
+         "data_criacao": datetime(2026, 5, 10), "centro_operacao_0010": "Z10"},
         # Matrizes (YPM9) — sem disciplina
         {"ordem": "5019628", "tipo": "YPM9", "descricao": "MANUT MATRIZ ESTAMPO",
          "local_instalacao": "BR02-0100-1500", "data_inicio": datetime(2026, 5, 30),
-         "centro_operacao_0010": "Z12"},
+         "data_criacao": datetime(2026, 5, 5), "centro_operacao_0010": "Z12"},
     ]

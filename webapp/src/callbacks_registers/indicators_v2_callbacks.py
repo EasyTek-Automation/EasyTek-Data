@@ -599,7 +599,7 @@ def _fetch_daily_kpi(kpi: str, equipment: str, month: int,
         # Short-circuit: equipamento do overlay tem KPI diário zerado direto.
         if internal_id in KPI_FORCE_ZERO_EQUIPMENTS:
             n_days = calendar.monthrange(year, month)[1]
-            return list(range(1, n_days + 1)), [0] * n_days
+            return list(range(1, n_days + 1)), [0] * n_days, [0] * n_days
         prod_df = fetch_zpp_production_data(start, end)
         brk_df = fetch_zpp_breakdown_data(start, end, breakdown_codes=list(codes))
         # Filtrar por equipamento
@@ -614,6 +614,7 @@ def _fetch_daily_kpi(kpi: str, equipment: str, month: int,
         n_days = calendar.monthrange(year, month)[1]
         dias = list(range(1, n_days + 1))
         values = []
+        horas_ativas = []  # IM-31: carga diária (horas trabalhadas) p/ 2ª barra
         for d in dias:
             # Filtrar por dia (campo 'date' presente no DataFrame retornado)
             if "date" in prod_eq.columns and not prod_eq.empty:
@@ -637,11 +638,12 @@ def _fetch_daily_kpi(kpi: str, equipment: str, month: int,
             else:  # breakdown rate
                 v = (breakdown_h / active_h * 100) if active_h > 0 else 0
             values.append(_to_display(kpi, v))  # MTTR: ×60 (h→min)
-        return dias, values
+            horas_ativas.append(round(active_h, 1))  # IM-31: carga do dia
+        return dias, values, horas_ativas
     except Exception as e:
         logger.warning("V2 daily %s/%s/%s falhou (%s) — retornando zeros", equipment, month, kpi, e)
         n_days = calendar.monthrange(year, month)[1]
-        return list(range(1, n_days + 1)), [0] * n_days
+        return list(range(1, n_days + 1)), [0] * n_days, [0] * n_days
 
 
 def _fetch_top_paradas_real(equipment: str, month: int, year: int = DEFAULT_YEAR,
@@ -1206,9 +1208,13 @@ def _mock_dias(kpi, equipment, month):
     # ano fixo 2026 pra POC
     n_days = calendar.monthrange(2026, month)[1]
     meta = KPI_META[kpi]
-    return list(range(1, n_days + 1)), [
+    dias = list(range(1, n_days + 1))
+    valores = [
         round(rng.uniform(meta["min"] * 0.5, meta["max"] * 1.4), 2) for _ in range(n_days)
     ]
+    # 3ª lista: carga diária mock (horas trabalhadas) — 0..~22h (IM-31)
+    horas = [round(rng.uniform(0, 22), 1) for _ in range(n_days)]
+    return dias, valores, horas
 
 
 def _mock_top_paradas_mes(equipment, month, top_n=10):
@@ -1424,7 +1430,9 @@ _OUT_COLOR = "#d6d8db"       # cinza claro — mês fora do filtro selecionado
 
 
 def _bar(x, y, title, color, unit="", target=None, show_trend=True, compact=False,
-         td=None, bar_statuses=None):
+         td=None, bar_statuses=None,
+         secondary_y=None, secondary_label=None, secondary_capacity=None,
+         click_hitbox=False):
     """Bar chart com overlay opcional de meta (linha tracejada) e tendência (poly grau 2).
 
     target: valor da linha de meta horizontal; None oculta.
@@ -1432,6 +1440,14 @@ def _bar(x, y, title, color, unit="", target=None, show_trend=True, compact=Fals
     compact: True reduz fontes/margens pra mini-cards.
     td: dict de traduções (TRANS[lang]) pra labels "Tendência"/"Meta"/"Valor"; default PT.
     bar_statuses: lista paralela a y, cada item "in"|"partial"|"out". None=tudo "in".
+    secondary_y: lista paralela a y (2ª barra num eixo Y à direita — IM-31, carga diária
+        em horas). None oculta a série secundária.
+    secondary_label: nome da série secundária na legenda/hover (ex: "Carga (h)").
+    secondary_capacity: valor da linha de teto ("cheio") ancorada no eixo secundário; None
+        oculta. IM-31 usa o maior dia do mês exibido.
+    click_hitbox: True adiciona uma barra transparente cobrindo cada categoria (IM-32),
+        tornando a coluna inteira clicável mesmo com a barra real zerada — usado no gráfico
+        de meses pra não perder acesso ao drilldown de dias quando o mês não tem avaria.
     """
     td = td or {}
     bar_color = color
@@ -1463,9 +1479,32 @@ def _bar(x, y, title, color, unit="", target=None, show_trend=True, compact=Fals
             cliponaxis=False,  # texto outside não corta no topo
             hovertemplate=f"<b>%{{x}}</b><br>%{{y}}{unit}<extra></extra>",
             name=td.get("chart_value", "Valor"),
-            showlegend=False,
+            showlegend=(secondary_y is not None) and not compact,
+            # IM-31: offsetgroup distinto p/ ficar LADO A LADO da carga mesmo em eixo Y
+            # diferente (barmode=group só offseta barras no mesmo eixo; offsetgroup força).
+            offsetgroup=("ind" if secondary_y is not None else None),
+            alignmentgroup="d",
         )
     )
+
+    # IM-31: 2ª barra "carga do equipamento" (horas trabalhadas) no eixo Y secundário.
+    # Cinza neutro, sem texto outside (evita poluir o agrupamento), hover em horas.
+    _has_secondary = secondary_y is not None
+    if _has_secondary:
+        carga_label = secondary_label or td.get("chart_carga", "Carga (h)")
+        fig.add_trace(
+            go.Bar(
+                x=x,
+                y=secondary_y,
+                marker_color="#adb5bd",
+                yaxis="y2",
+                hovertemplate="<b>%{x}</b><br>%{y}h<extra>" + carga_label + "</extra>",
+                name=carga_label,
+                showlegend=not compact,
+                offsetgroup="carga",   # IM-31: lado a lado da barra do indicador
+                alignmentgroup="d",
+            )
+        )
 
     # Tendência só sobre meses úteis: corta a cauda de meses vazios à frente (sem dados,
     # value=0 ou None) para o polyfit não ser puxado pelos meses futuros ainda sem apontamento.
@@ -1528,10 +1567,57 @@ def _bar(x, y, title, color, unit="", target=None, show_trend=True, compact=Fals
             visible=False,
             matches=None,
         ),
-        showlegend=False if compact else (show_trend and target is not None),
+        showlegend=False if compact else ((show_trend and target is not None) or _has_secondary),
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
                     font=dict(size=10)),
     )
+
+    # IM-31: eixo Y secundário (horas) + barras agrupadas + linha de teto "cheio".
+    if _has_secondary:
+        sec_vals = [h for h in secondary_y if h is not None]
+        y2_top = (max(sec_vals + ([secondary_capacity] if secondary_capacity else []))
+                  * 1.15) if sec_vals else 1
+        y2_top = y2_top or 1  # evita range [0,0] degenerar pra [-1,1] quando carga=0
+        fig.update_layout(
+            barmode="group",
+            bargap=0.25,
+            bargroupgap=0.08,
+            yaxis2=dict(overlaying="y", side="right", showgrid=False,
+                        range=[0, y2_top], title=dict(text="h", font=dict(size=10))),
+        )
+        if secondary_capacity:
+            cheio_label = td.get("chart_cheio", "Cheio")
+            fig.add_hline(
+                y=secondary_capacity, yref="y2",
+                line=dict(color="#adb5bd", width=1.5, dash="dot"),
+                annotation_text=f"{cheio_label}: {secondary_capacity}h",
+                annotation_position="top left",
+                annotation_font=dict(size=10, color="#6c757d"),
+            )
+
+    # IM-32: torna a coluna inteira de cada categoria clicável — inclusive quando a barra
+    # é zero (mês sem avaria). Barra transparente cobrindo a altura do eixo, sem tooltip,
+    # empurrada pro fundo de fig.data pra NÃO interceptar hover/click das barras reais
+    # (só pega cliques onde não há barra). O clique emite plotly_click com x = categoria.
+    if click_hitbox and x:
+        yr = fig.layout.yaxis.range
+        top = (yr[1] if yr and yr[1] else (max([v for v in y if v] or [0]))) or 1
+        fig.add_trace(
+            go.Bar(
+                x=list(x),
+                y=[top] * len(x),
+                width=0.85,
+                # invisível a olho, mas clicável. CRÍTICO: hoverinfo="none" (NÃO "skip") —
+                # "skip" remove a trace do hit-testing e o plotly_click nunca dispara;
+                # "none" só esconde o tooltip e mantém o clique. Cor com alpha ínfimo.
+                marker=dict(color="rgba(0,0,0,0.01)"),
+                hoverinfo="none",
+                showlegend=False,
+                name="",
+            )
+        )
+        # move a hitbox (última adicionada) pro fundo
+        fig.data = (fig.data[-1],) + tuple(fig.data[:-1])
     return fig
 
 
@@ -1884,6 +1970,9 @@ def register_indicators_v2_callbacks(app):
         ]
         value = [eq.get("internal") or eq["id"] for eq in eq_list]
         return options, value
+
+    # (Deep-link de aba ?tab=custo é resolvido na montagem do layout via index.py,
+    #  evitando o flash de troca de aba pós-render.)
 
     # IM-11 — Apply filters → escreve store-v2-filters
     @app.callback(
@@ -2755,7 +2844,7 @@ def register_indicators_v2_callbacks(app):
             main_fig = _bar(labels_m, values, f"{equipment} — {td.get('mdl_meses','12 meses')}",
                             meta["color"], meta["unit"],
                             target=eq_target, show_trend=True, td=td,
-                            bar_statuses=statuses_m)
+                            bar_statuses=statuses_m, click_hitbox=True)
             main_fig.update_layout(height=380)
 
             # mini-cards por mês (clicáveis) abaixo do gráfico grande.
@@ -2902,9 +2991,12 @@ def register_indicators_v2_callbacks(app):
 
         # NÍVEL 4: dias — IM-04
         if level == "dias" and equipment and month:
-            dias, valores = _fetch_daily_kpi(
+            dias, valores, horas_ativas = _fetch_daily_kpi(
                 kpi, equipment, month, year=d_year, codes=f_codes
             )
+            # IM-31: teto "cheio" = maior dia de produção do mês exibido (None se tudo 0)
+            _max_h = max(horas_ativas) if horas_ativas else 0
+            eq_capacity = round(_max_h, 1) if _max_h > 0 else None
             eq_target = _resolve_target(kpi, equipment)
             main_fig = _bar(
                 [f"{d:02d}" for d in dias],
@@ -2915,6 +3007,9 @@ def register_indicators_v2_callbacks(app):
                 target=eq_target,
                 show_trend=True,
                 td=td,
+                secondary_y=horas_ativas,
+                secondary_label=td.get("chart_carga", "Carga (h)"),
+                secondary_capacity=eq_capacity,
             )
             main_fig.update_layout(height=380)
 

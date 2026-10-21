@@ -58,7 +58,12 @@ def _window_metrics(start, end):
 
     Reusa o pipeline canônico V1: fetch_zpp_production_data (ffinnotif ∈ janela,
     BR-05 'fim') + fetch_zpp_breakdown_data (fim_execucao ∈ janela, BREAKDOWN_CODES).
-    Exclui DECAP001 (KPI_FORCE_ZERO). KPIs por BR-01/02/03 sobre os totais brutos (BR-11).
+    KPIs por BR-01/02/03 sobre os totais brutos da planta (BR-11).
+
+    **Paridade com a Indicators-V2 (canônica):** NÃO aplica filter_force_zero_production —
+    as horas dos equipamentos KPI_FORCE_ZERO (ex.: DECAP001) PERMANECEM no denominador da
+    planta, exatamente como calculate_general_avg_by_month (V2/slide). Sem isto, Horas de
+    Atividade / MTBF / Taxa de Avaria do telão divergiam da V2.
 
     Retorna: {activity, stops, downtime, mtbf, mttr, breakdown, durations}.
     Robusto a Mongo offline / janela vazia → zeros (nunca lança).
@@ -72,10 +77,9 @@ def _window_metrics(start, end):
            "mtbf": 0.0, "mttr": 0.0, "breakdown": 0.0, "durations": []}
     try:
         from src.utils.zpp_kpi_calculator import (
-            fetch_zpp_production_data, fetch_zpp_breakdown_data,
-            filter_force_zero_production, BREAKDOWN_CODES,
+            fetch_zpp_production_data, fetch_zpp_breakdown_data, BREAKDOWN_CODES,
         )
-        prod = filter_force_zero_production(fetch_zpp_production_data(start, end))
+        prod = fetch_zpp_production_data(start, end)  # planta inteira (inclui KPI_FORCE_ZERO)
         bd = fetch_zpp_breakdown_data(start, end, BREAKDOWN_CODES)  # já exclui DECAP001
         active_h = float(prod["horasact"].sum()) if prod is not None and not prod.empty else 0.0
         if bd is not None and not bd.empty:
@@ -150,9 +154,9 @@ def _collect(period, lang):
 C_SHORT = "#005687"  # azul AMG — paradas curtas
 C_LONG = "#E96D38"   # laranja AMG — paradas longas
 
-# Cores de marca AMG (logo) no confronto: lado MELHOR = laranja ArcelorMittal, PIOR = azul Gonvarri
-C_GOOD = "#E96D38"  # laranja AMG — lado melhor
-C_BAD = "#005687"   # azul AMG — lado pior
+# Cores de marca AMG no confronto: lado MELHOR = azul Gonvarri, PIOR = laranja ArcelorMittal
+C_GOOD = "#005687"  # azul AMG — lado melhor
+C_BAD = "#E96D38"   # laranja AMG — lado pior
 C_FLAT = "#6c757d"
 
 # Operacionais — barras grandes
@@ -1125,16 +1129,18 @@ def render_costs_slide(lang):
     lang = lang or "pt"
     try:
         from src.callbacks_registers.custo_callbacks import (
-            _fig_rosca, _fig_barras, _filtra_por_contas)
+            _fig_rosca, _fig_barras, _filtra_por_contas, _contas_efetivas)
         from src.custos import leitura as L
         from src.utils.kpi_report_config import _now_in_report_timezone
         now = _now_in_report_timezone()
         ano, mm = now.year, now.month
         mes = f"{ano}-{mm:02d}"  # BR-14: mês do relógio; executado já cortado em ≤ D-1 na coleta
-        rosca = _fig_rosca(L.fetch_por_equipamento(ano, None, mes=mes))  # rosca = todas (igual à aba)
+        # Rosca e barras herdam as contas fixadas na aba via "Fixar no telão" (vazio = todas);
+        # GERAL e rosca somam só esse recorte (BR-17).
+        contas = _contas_efetivas(L.ler_slide_contas() or None, ano)  # telão nunca fica vazio
+        rosca = _fig_rosca(L.fetch_por_equipamento(ano, None, mes=mes, contas=contas))
         rosca.update_layout(title_text=t("costs_rosca", lang))  # figura diz "(ano)"; aqui é mês
-        # Barras herdam as contas fixadas na aba via "Fixar no telão" (vazio = todas).
-        rows = _filtra_por_contas(L.fetch_contas_geral(ano, mes=mes), L.ler_slide_contas() or None)
+        rows = _filtra_por_contas(L.fetch_contas_geral(ano, mes=mes), contas)
         barras = _fig_barras(rows, True, t("costs_bars", lang), h=460, modo="pct")
         cfg = {"displayModeBar": False, "staticPlot": True, "responsive": True}
         row = dbc.Row(
@@ -1229,8 +1235,415 @@ def _lang_switcher():
     )
 
 
+# ============================================================
+# DISPATCH DA HOME POR PERFIL + NÍVEL (DS-13 / BR-15)
+# A rota '/' é única; o conteúdo varia conforme current_user.perfil/.level.
+# Blocos internos obedecem perfil + nível via registry (home_blocks — BR-16).
+# ============================================================
+from src.pages.dashboards.home_blocks import HomeBlock, render_blocos  # noqa: E402
+
+
+def _home_card(icon, title, desc, href, btn_label, color="primary", btn_id=None):
+    """Card-atalho padrão de uma home por perfil."""
+    return dbc.Col(
+        dbc.Card(
+            dbc.CardBody([
+                html.Div(
+                    [html.I(className=f"bi {icon} me-2",
+                            style={"fontSize": "1.4rem", "color": "#0d6efd"}),
+                     html.H5(title, className="d-inline align-middle mb-0")],
+                    className="mb-2 d-flex align-items-center",
+                ),
+                html.P(desc, className="text-muted",
+                       style={"fontSize": "0.85rem", "minHeight": "2.4rem"}),
+                dbc.Button(
+                    [html.I(className="bi bi-arrow-right-circle me-2"), btn_label],
+                    href=href, color=color, size="sm",
+                    **({"id": btn_id} if btn_id else {}),
+                ),
+            ]),
+            className="shadow-sm h-100",
+        ),
+        xs=12, md=6, lg=4, className="mb-3",
+    )
+
+
+def _home_shell(titulo, icone, subtitulo, corpo):
+    """Casca comum das homes por perfil: header + container fluido."""
+    return dbc.Container(
+        [
+            dbc.Row(dbc.Col(html.Div([
+                html.H2(
+                    [html.I(className=f"bi {icone} me-3", style={"color": "#0d6efd"}),
+                     html.Span(titulo)],
+                    className="mb-1 d-flex align-items-center",
+                ),
+                html.P(subtitulo, className="text-muted mb-0", style={"fontSize": "0.9rem"}),
+            ])), className="mb-3"),
+            corpo,
+        ],
+        fluid=True, className="p-3",
+    )
+
+
+# ============================================================
+# HOME DE MANUTENÇÃO (Etapa 2 — IM-13): boas-vindas + cards de insight
+# Visual herdado do design system da Indicators-V2 (indicator-v2-card, contador
+# animado v2_animated_counter.js, spotlight). Dados reais: veredito semanal (reuso
+# do confronto da própria home) + backlog SAP (utils/backlog_data).
+# ============================================================
+_MESES_PT = ["janeiro", "fevereiro", "março", "abril", "maio", "junho",
+             "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"]
+_KPI_LABELS = {"mtbf": "MTBF", "mttr": "MTTR", "breakdown": "Taxa de Avaria"}
+
+
+def _week_verdict():
+    """Veredito da semana: dos 3 KPIs (MTBF/MTTR/Avaria), quantos pioraram vs a semana
+    anterior. Reusa o confronto da home (_collect/_duel) — sem query nova. None se falhar."""
+    try:
+        data, _meta = _collect("week", "pt")
+    except Exception:
+        return None
+    keys = ["mtbf", "mttr", "breakdown"]
+    worse = better = flat = 0
+    worst = None  # (key, perf_pct) — o mais negativo
+    for k in keys:
+        _cur, _prev, perf_pct, state, _c, _w = _duel(data[k])
+        if state == "bad":
+            worse += 1
+        elif state == "good":
+            better += 1
+        else:
+            flat += 1
+        if worst is None or perf_pct < worst[1]:
+            worst = (k, perf_pct)
+    return {"worse": worse, "better": better, "flat": flat,
+            "total": len(keys), "worst": worst}
+
+
+def _backlog_summary():
+    """Resumo do backlog SAP p/ o card da home: total de ordens visíveis + dias da mais
+    antiga. Degrada para None se o módulo/coleção não existir (RNF graceful)."""
+    try:
+        from src.utils import backlog_data as bd
+        snap = bd.carregar_snapshot(silent=True)
+        if not snap:
+            return None
+        bd.enriquecer_local(snap["ordens"], bd.carregar_ativos())
+        visiveis = bd.filtrar(snap["ordens"], {})
+        ins = bd.insights(visiveis)
+        return {"total": ins.get("total", 0),
+                "mais_antiga_dias": ins.get("mais_antiga_dias")}
+    except Exception:
+        return None
+
+
+def _anim_number(value, unit="", decimals=0):
+    """Número grande com contador animado (v2_animated_counter.js anima [data-v2-anim])."""
+    return html.Span(
+        "—",
+        **{"data-v2-anim": str(value), "data-v2-unit": unit,
+           "data-v2-decimals": str(decimals)},
+        className="home-mtn-headline",
+    )
+
+
+def _pill(text, variant):
+    """Chip de tendência. variant: 'down' (pior/vermelho), 'up' (melhor/verde), 'flat'."""
+    return html.Span(text, className=f"home-mtn-pill home-mtn-pill-{variant}")
+
+
+def _fmt_brl(v):
+    """R$ compacto: 1.234.567 → '1,2 mi'; 12.345 → '12 mil'; senão inteiro."""
+    try:
+        v = float(v)
+    except (TypeError, ValueError):
+        return "—"
+    a = abs(v)
+    if a >= 1_000_000:
+        return f"{v / 1_000_000:.1f} mi".replace(".", ",")
+    if a >= 1_000:
+        return f"{v / 1_000:.0f} mil"
+    return f"{v:.0f}"
+
+
+def _insight_card(chip_icon, accent, eyebrow, headline, support, btn_label, href,
+                  btn_id, pill=None):
+    """Card de insight sofisticado da home de manutenção (estilo indicator-v2-card)."""
+    return dbc.Col(
+        html.Div(
+            dbc.Card(
+                dbc.CardBody(
+                    [
+                        html.Div(
+                            [
+                                html.Div(html.I(className=f"bi {chip_icon}"),
+                                         className="home-mtn-chip",
+                                         style={"background": accent}),
+                                pill if pill is not None else html.Span(),
+                            ],
+                            className="d-flex justify-content-between align-items-start mb-2",
+                        ),
+                        html.Div(eyebrow, className="home-mtn-eyebrow"),
+                        html.Div(headline, className="home-mtn-headline-wrap"),
+                        html.Div(support, className="home-mtn-support"),
+                        dbc.Button(
+                            [html.Span(btn_label), html.I(className="bi bi-arrow-right ms-1")],
+                            href=href, id=btn_id, size="sm", color="link",
+                            className="home-mtn-btn-link mt-auto",
+                            style={"color": accent},
+                        ),
+                    ],
+                    className="d-flex flex-column h-100",
+                ),
+                className="shadow-sm h-100 indicator-v2-card home-mtn-card",
+                style={"borderTop": f"4px solid {accent}"},
+            ),
+            className="home-mtn-card-wrap h-100",
+        ),
+        xs=12, sm=6, xl=True, className="mb-3 d-flex",
+    )
+
+
+def _blk_indicadores(lang):
+    """Card de Indicadores — veredito semana×semana dos 3 KPIs (BR-16/SP-F16)."""
+    v = _week_verdict()
+    accent = "#0d6efd"
+    if not v:
+        head, support, pill = html.Span("—", className="home-mtn-headline"), \
+            "Sem dados desta semana.", None
+    else:
+        if v["worse"] > v["better"]:
+            head = html.Span([_anim_number(v["worse"]),
+                              html.Span(f" de {v['total']}", className="home-mtn-head-sub")])
+            verbo, pill = "pioraram", _pill("piora", "down")
+        elif v["better"] > v["worse"]:
+            head = html.Span([_anim_number(v["better"]),
+                              html.Span(f" de {v['total']}", className="home-mtn-head-sub")])
+            verbo, pill = "melhoraram", _pill("melhora", "up")
+        else:
+            head = html.Span("estável", className="home-mtn-headline")
+            verbo, pill = "sem mudança", _pill("estável", "flat")
+        wk, wp = v["worst"]
+        support = html.Span([f"indicadores {verbo} esta semana · destaque: ",
+                             html.Strong(_KPI_LABELS.get(wk, wk)),
+                             f" ({wp:+.0f}%)"])
+    return _insight_card("bi-graph-up-arrow", accent, "Indicadores da semana",
+                         head, support, "Ver Indicadores",
+                         "/maintenance/indicators-v2", "btn-home-mtn-indicadores", pill)
+
+
+def _blk_backlog(lang):
+    """Card de Backlog SAP — total de ordens + mais antiga (SP-F16)."""
+    b = _backlog_summary()
+    accent = "#08137C"  # navy do backlog
+    if not b:
+        head = html.Span("—", className="home-mtn-headline")
+        support, pill = "Backlog indisponível no momento.", None
+    else:
+        head = html.Span([_anim_number(b["total"]),
+                          html.Span(" ordens", className="home-mtn-head-sub")])
+        dias = b.get("mais_antiga_dias")
+        if dias is not None:
+            support = html.Span(["mais antiga há ", html.Strong(f"{dias} dias")])
+            pill = _pill(f"{dias}d", "down" if dias > 90 else "flat")
+        else:
+            support, pill = "ordens em aberto no backlog.", None
+    return _insight_card("bi-card-checklist", accent, "Backlog de manutenção",
+                         head, support, "Abrir Backlog",
+                         "/maintenance/backlog", "btn-home-mtn-backlog", pill)
+
+
+def _blk_visao_geral(lang):
+    """Atalho para a Visão Geral da Manutenção (home rica migrada — BR-17)."""
+    return _insight_card(
+        "bi-speedometer2", "#E96D38", "Dashboard Manutenção",
+        html.Span("Visão Geral", className="home-mtn-headline-text"),
+        "Evolução da saúde de ativos",
+        "Abrir Visão Geral", "/maintenance/overview?present=1", "btn-home-mtn-overview")
+
+
+def _blk_custos(lang):
+    """Card de Custos — executado × planejado (orçado) do mês corrente (gated nível ≥2).
+
+    Mostra o % do orçado já executado no mês e sinaliza estouro (acima do plano). Reusa a
+    leitura de custos ([[project-costsmanagement-sdd]]); degrada se a coleção não existir."""
+    accent = "#1a8754"
+    orc = exe = pct = None
+    estouro = False
+    try:
+        from src.utils.kpi_report_config import _now_in_report_timezone
+        from src.custos import leitura as L
+        now = _now_in_report_timezone()
+        geral = L.fetch_contas_geral(now.year, mes=f"{now.year}-{now.month:02d}")[0]
+        orc, exe, pct, estouro = (geral["orcado"], geral["executado"],
+                                  geral.get("pct"), geral.get("estouro"))
+    except Exception:
+        pass
+
+    if pct is None:
+        head = html.Span("—", className="home-mtn-headline")
+        support, pill = "Sem orçamento lançado neste mês.", None
+    else:
+        head = html.Span(_anim_number(pct, unit="%", decimals=0))
+        support = html.Span([f"R$ {_fmt_brl(exe)} de ",
+                             html.Strong(f"R$ {_fmt_brl(orc)}"), " orçado · este mês"])
+        pill = _pill("acima do plano", "down") if estouro else _pill("dentro do plano", "up")
+    return _insight_card(
+        "bi-cash-coin", accent, "Custos do mês · nível avançado",
+        head, support, "Análise de Custos",
+        "/maintenance/indicators-v2?tab=custo", "btn-home-mtn-custos", pill)
+
+
+def _blk_analise_falhas(lang):
+    """Atalho para a Análise de Falhas (gated nível ≥2). Nasce como esqueleto visual."""
+    return _insight_card(
+        "bi-exclamation-triangle", "#c0392b", "Confiabilidade · nível avançado",
+        html.Span("Análise de Falhas", className="home-mtn-headline-text"),
+        "Padrões e ofensores de parada",
+        "Abrir Análise", "/maintenance/analise-de-falhas", "btn-home-mtn-falhas")
+
+
+MANUTENCAO_BLOCKS = [
+    HomeBlock("indicadores", _blk_indicadores, perfis=["manutencao"], min_level=1),
+    HomeBlock("backlog", _blk_backlog, perfis=["manutencao"], min_level=1),
+    HomeBlock("visao-geral", _blk_visao_geral, perfis=["manutencao"], min_level=1),
+    HomeBlock("custos", _blk_custos, perfis=["manutencao"], min_level=2),
+    HomeBlock("analise-falhas", _blk_analise_falhas, perfis=["manutencao"], min_level=2),
+]
+
+
+def _clock_chip(cidade, span_id, valor_inicial):
+    """Chip de relógio (cidade + hora). O valor é atualizado client-side (home_clocks.js)."""
+    return html.Span(
+        [
+            html.I(className="bi bi-clock me-1"),
+            html.Span(f"{cidade} ", className="home-mtn-clock-city"),
+            html.Span(valor_inicial, id=span_id, className="home-mtn-clock-time"),
+        ],
+        className="home-mtn-clock",
+    )
+
+
+def _home_mtn_hero(nome, level):
+    """Cabeçalho leve de boas-vindas (estilo header da Indicators-V2) com o logo do
+    cliente (AMG) à direita — sem banner colorido, alinhado às demais páginas."""
+    from zoneinfo import ZoneInfo
+    now = datetime.datetime.now()
+    data_txt = f"{now.day} de {_MESES_PT[now.month - 1]} de {now.year}"
+    hora = now.hour
+    saud = "Bom dia" if hora < 12 else ("Boa tarde" if hora < 18 else "Boa noite")
+    # valores iniciais (server-side) p/ não piscar; o JS mantém atualizado sem custo de servidor
+    brt = datetime.datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%H:%M")
+    mad = datetime.datetime.now(ZoneInfo("Europe/Madrid")).strftime("%H:%M")
+    return html.Div(
+        [
+        dbc.Row(
+            [
+                dbc.Col(
+                    html.Div(
+                        [
+                            html.H2(
+                                [
+                                    html.Span(f"{saud}, ", className="home-mtn-hero-greet"),
+                                    html.Span(f"{nome}", className="home-mtn-hero-name"),
+                                ],
+                                className="mb-1 d-flex align-items-baseline flex-wrap",
+                            ),
+                            html.P(f"EasyTek-Data · {data_txt}",
+                                   className="text-muted mb-0", style={"fontSize": "0.9rem"}),
+                            html.Div(
+                                [
+                                    _clock_chip("Brasília", "clock-brt", brt),
+                                    _clock_chip("Madrid", "clock-mad", mad),
+                                ],
+                                className="home-mtn-clocks mt-2",
+                            ),
+                        ]
+                    ),
+                    xs=8, md=9,
+                ),
+                dbc.Col(
+                    html.Img(src="/assets/LogoAMG.png", className="home-mtn-hero-logo",
+                             alt="AMG"),
+                    xs=4, md=3, className="text-end",
+                ),
+            ],
+            className="align-items-center g-0",
+        ),
+        # Linha divisória + "Powered by" (esquerda, abaixo)
+        html.Hr(className="home-mtn-hero-divider"),
+        html.Div(
+            [
+                html.Span("Powered by", className="home-mtn-powered-text"),
+                html.A(
+                    html.Img(src="/assets/logo.png", className="home-mtn-powered-logo",
+                             alt="Tekmont"),
+                    href="https://www.tekmont.com.br", target="_blank",
+                    rel="noopener noreferrer", title="Tekmont",
+                ),
+            ],
+            className="home-mtn-powered",
+        ),
+    ],
+        className="home-mtn-hero",
+    )
+
+
+def _home_mtn_bg():
+    """Camadas de fundo full-bleed (largura total da viewport), atrás dos cards
+    (z-index < conteúdo): fábrica no topo + bobinas no rodapé, bem esmaecidas."""
+    return html.Div(
+        [
+            html.Img(src="/assets/home-abstract.svg",
+                     className="home-mtn-bg-img home-mtn-bg-top", alt=""),
+            html.Img(src="/assets/home-abstract.svg",
+                     className="home-mtn-bg-img home-mtn-bg-bottom", alt=""),
+        ],
+        className="home-mtn-bg", **{"aria-hidden": "true"},
+    )
+
+
+def _home_scene(level, cards=None):
+    """Cena de boas-vindas UNIVERSAL (todos os perfis): fundo da planta + hero
+    (logo, nome, saudação, relógios). `cards` (opcional) são blocos específicos do
+    perfil — hoje só a manutenção tem; demais perfis veem apenas a cena."""
+    nome = (getattr(current_user, "username", None) or "Equipe").strip().title()
+    filhos = [_home_mtn_bg(), _home_mtn_hero(nome, level)]
+    if cards:
+        filhos.append(dbc.Row(cards, className="home-mtn-cards"))
+    return dbc.Container(filhos, fluid=True, className="p-3 p-md-4 home-mtn")
+
+
+def render_home_manutencao(perfil, level):
+    """Home da Manutenção: cena universal + cards de insight com gating de nível
+    (Custos só nível ≥2) via registry (BR-15/16, SP-F16)."""
+    return _home_scene(level, cards=render_blocos(MANUTENCAO_BLOCKS, current_user, "pt"))
+
+
+def render_home_default(perfil, level):
+    """Demais perfis: a MESMA cena de boas-vindas, sem os cards de manutenção."""
+    return _home_scene(level)
+
+
 def layout():
-    """Visão Geral da Manutenção — header + toggle de granularidade + arena de confronto."""
+    """Dispatch da home (BR-15/DS-13). URL '/' única e compartilhada: TODOS os perfis
+    veem a mesma cena de boas-vindas; a manutenção adiciona seus cards de insight.
+    Chamado dentro do request — current_user sempre presente (roteador trata login antes)."""
+    perfil = getattr(current_user, "perfil", None)
+    level = getattr(current_user, "level", 1) or 1
+    if perfil == "manutencao":
+        return render_home_manutencao(perfil, level)
+    return render_home_default(perfil, level)
+
+
+def overview_layout():
+    """Visão Geral da Manutenção (rota /maintenance/overview, ex-home / — BR-17/DS-15).
+
+    Conteúdo inalterado da home anterior: confronto de períodos + KPIs + paradas +
+    modo apresentação. Migrada de `/` para página secundária de manutenção; os IDs são
+    preservados para que os callbacks de `home_callbacks.py` continuem ligando por ID.
+    """
     return dbc.Container(
         [
             dcc.Store(id="store-home-lang", storage_type="local", data="pt"),
@@ -1242,6 +1655,8 @@ def layout():
             dcc.Store(id="store-home-rendered", storage_type="memory", data=0),
             dcc.Store(id="store-rendered-graph", storage_type="memory", data=0),
             dcc.Store(id="store-rendered-cuts", storage_type="memory", data=0),
+            # DDS no telão — overlay de imagem aberto pelo botão "DDS" ou pela tecla F9
+            dcc.Store(id="store-home-dds", storage_type="memory", data=False),
             # Rotação automática dos cortes no modo apresentação (8s) — desabilitado fora dele
             dcc.Interval(id="interval-home-present", interval=15000, n_intervals=0, disabled=True),
 
@@ -1280,59 +1695,47 @@ def layout():
                 className="mb-2 align-items-center",
             ),
 
-            # Toggle de granularidade
+            # Controles do carrossel: Anterior/Próximo navegam TODOS os slides (3 cortes +
+            # KPIs + Custos) em qualquer modo. Pausar/Retomar só no modo apresentação.
+            # Os botões de período (mês/semana/faixa) foram removidos — viram slides.
             dbc.Row(
                 dbc.Col(html.Div(
                     [
                         dbc.ButtonGroup(
                             [
-                                dbc.Button([html.I(className="bi bi-calendar-month me-2"),
-                                            html.Span("Mês a mês", id="home-i18n-btn-month")],
-                                           id="btn-home-period-month", color="primary", size="sm",
-                                           outline=False, n_clicks=0),
-                                dbc.Button([html.I(className="bi bi-calendar-week me-2"),
-                                            html.Span("Semana a semana", id="home-i18n-btn-week")],
-                                           id="btn-home-period-week", color="primary", size="sm",
-                                           outline=True, n_clicks=0),
-                                dbc.Button([html.I(className="bi bi-calendar3-range me-2"),
-                                            html.Span("Faixa de dias", id="home-i18n-btn-band")],
-                                           id="btn-home-period-band", color="primary", size="sm",
-                                           outline=True, n_clicks=0),
+                                dbc.Button([html.I(className="bi bi-chevron-left me-1"),
+                                            html.Span("Anterior", id="home-i18n-btn-prev")],
+                                           id="btn-home-present-prev", color="dark",
+                                           outline=True, size="sm", n_clicks=0, title="Anterior"),
+                                dbc.Button([html.Span("Próximo", id="home-i18n-btn-next"),
+                                            html.I(className="bi bi-chevron-right ms-1")],
+                                           id="btn-home-present-next", color="dark",
+                                           outline=True, size="sm", n_clicks=0, title="Próximo"),
                             ],
-                            className="shadow-sm home-period-group",
+                            className="shadow-sm me-2",
                         ),
-                        html.Small("Mês até hoje vs mesmo dia do mês passado",
-                                   id="home-i18n-period-sub", className="text-muted ms-3"),
-                        # Controles à direita — wrapper sempre visível (ms-auto fixo)
-                        html.Div(
-                            [
-                                # Navegação manual + pausar — só no present mode
-                                dbc.ButtonGroup(
-                                    [
-                                        dbc.Button(html.I(className="bi bi-chevron-left"),
-                                                   id="btn-home-present-prev", color="dark",
-                                                   outline=True, size="sm", n_clicks=0,
-                                                   title="Anterior"),
-                                        dbc.Button(
-                                            [html.I(className="bi bi-pause-fill me-1", id="icon-home-pause"),
-                                             html.Span("Pausar", id="home-i18n-btn-pause")],
-                                            id="btn-home-present-pause", color="dark",
-                                            outline=True, size="sm", n_clicks=0),
-                                        dbc.Button(html.I(className="bi bi-chevron-right"),
-                                                   id="btn-home-present-next", color="dark",
-                                                   outline=True, size="sm", n_clicks=0,
-                                                   title="Próximo"),
-                                    ],
-                                    className="home-present-only shadow-sm me-2",
-                                ),
-                                dbc.Button(
-                                    [html.I(className="bi bi-display me-2"),
-                                     html.Span("Apresentação", id="home-i18n-btn-present")],
-                                    id="btn-home-present", color="dark", outline=True, size="sm",
-                                    n_clicks=0),
-                            ],
-                            className="ms-auto d-flex align-items-center",
-                        ),
+                        # Pausar/Retomar — só no modo apresentação
+                        dbc.Button(
+                            [html.I(className="bi bi-pause-fill me-1", id="icon-home-pause"),
+                             html.Span("Pausar", id="home-i18n-btn-pause")],
+                            id="btn-home-present-pause", color="dark", outline=True,
+                            size="sm", n_clicks=0, className="home-present-only me-2"),
+                        # DDS — abre o guia do Diálogo Diário de Segurança em tela cheia
+                        # e congela o carrossel enquanto estiver aberto (atalho: F9).
+                        # Sem callback próprio: o clique é tratado em `home_dds.js`,
+                        # que aciona o gatilho global do overlay (`btn-dds-trigger`).
+                        dbc.Button(
+                            [html.I(className="bi bi-shield-check me-1"),
+                             html.Span("DDS", id="home-i18n-btn-dds")],
+                            id="btn-home-dds", color="warning", outline=True,
+                            size="sm", n_clicks=0, className="me-2",
+                            title="Exibir o DDS em tela cheia (F9)"),
+                        # Apresentação (auto-rotação + fullscreen) — à direita
+                        dbc.Button(
+                            [html.I(className="bi bi-display me-2"),
+                             html.Span("Apresentação", id="home-i18n-btn-present")],
+                            id="btn-home-present", color="dark", outline=True, size="sm",
+                            n_clicks=0, className="ms-auto"),
                     ],
                     className="d-flex align-items-center flex-wrap gap-2",
                 )),
@@ -1409,8 +1812,9 @@ def layout():
             ),
             dcc.Store(id="store-home-transition"),
 
+
             build_rodape(),
-            build_rerun_controls(current_user),
+            # "Rodar agora" movido para /maintenance/coletas-sap (página consolidada)
         ],
         fluid=True,
         className="p-3",

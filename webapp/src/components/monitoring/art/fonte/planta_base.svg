@@ -1,0 +1,52 @@
+<svg id="root" viewBox="0 0 1789 1068" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <filter id="shadow" x="-15%" y="-15%" width="130%" height="140%">
+          <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.20"/>
+        </filter>
+        <linearGradient id="floor" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#fbfbfa"/><stop offset="1" stop-color="#ecece8"/>
+        </linearGradient>
+        <radialGradient id="steel" cx="38%" cy="34%" r="72%">
+          <stop offset="0" stop-color="#f4f5f6"/><stop offset="0.55" stop-color="#c9cbce"/><stop offset="1" stop-color="#94969a"/>
+        </radialGradient>
+        <pattern id="pit" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect width="6" height="6" fill="#d9dad8"/><line x1="0" y1="0" x2="0" y2="6" stroke="#a9aaa7" stroke-width="1.1"/>
+        </pattern>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+          <path d="M1 1 L9 5 L1 9" fill="none" stroke="#9aa0a6" stroke-width="1.6" stroke-linecap="round"/>
+        </marker>
+      </defs>
+
+      <!-- ===== PAREDES (planta baixa da fábrica, à risca) ===== -->
+      <!-- coords extraídas do PLANTA.drawio.svg (espaço 1789x1068) -->
+      <g id="walls" fill="#ffffff" stroke="#000000" stroke-width="2">
+        <rect x="461"  y="1"   width="1320" height="189"/><!-- R1 Decapado -->
+        <rect x="461"  y="190" width="1320" height="172"/><!-- R2 pátios -->
+        <rect x="921"  y="362" width="860"  height="120"/><!-- R3 faixa ALMOX -->
+        <rect x="461"  y="362" width="460"  height="648"/><!-- R4 trio prensa (fundo alinhado c/ R6) -->
+        <rect x="1232" y="482" width="550"  height="400"/><!-- R5 corte -->
+        <rect x="1"    y="541" width="460"  height="469"/><!-- R6 LWB (ampliada, fundo alinhado c/ R4) -->
+      </g>
+
+      <!-- Decapado (futuro) -->
+      <text class="zonelbl" x="1121" y="85"  text-anchor="middle">Decapado</text>
+      <text class="zonelbl" x="1121" y="121" text-anchor="middle">(futuro)</text>
+
+      <!-- Pátios de bobina (R2) -->
+      <g id="yards"></g>
+
+      <!-- Faixa Almoxarifado / TOP / OF (R3) — coladas na parede de cima -->
+      <rect class="blue" x="936"  y="370" width="210" height="36" rx="6"/><text class="bluelbl" x="1041" y="394" text-anchor="middle">ALMOXARIFADO</text>
+      <rect class="blue" x="1206" y="370" width="70"  height="36" rx="6"/><text class="bluelbl" x="1241" y="394" text-anchor="middle">TOP</text>
+      <rect class="blue" x="1386" y="370" width="70"  height="36" rx="6"/><text class="bluelbl" x="1421" y="394" text-anchor="middle">OF.</text>
+
+      <!-- Faixas verticais (corredor entre R4 e R5) — coords exatas do drawio -->
+      <rect fill="#ffffff" stroke="#000000" stroke-width="2" x="1001" y="482" width="60" height="229"/><text class="vlbl" x="1031" y="596" text-anchor="middle" transform="rotate(-90 1031 596)">COMPRESSORES</text>
+      <rect fill="#fad7ac" stroke="#b46504" stroke-width="2" x="1121" y="482" width="51" height="400"/><text class="vlbl" x="1146" y="682" text-anchor="middle" transform="rotate(-90 1146 682)">ESCRITÓRIOS</text>
+      <rect fill="#ffffff" stroke="#000000" stroke-width="2" x="1172" y="482" width="60" height="400"/><text class="vlbl" x="1202" y="682" text-anchor="middle" transform="rotate(-90 1202 682)">PRAÇA</text>
+
+      <!-- ===== LINHAS REAIS (SVG exato de cada página, aninhado nas rooms) ===== -->
+      <svg id="svgLwb" x="10" y="590" width="442" height="410" viewBox="180 -150 320 665" preserveAspectRatio="xMinYMin meet"></svg>
+      <svg id="svgPress" x="469" y="400" width="444" height="276" viewBox="-200 -110 1340 640" preserveAspectRatio="none"></svg>
+      <svg id="svgCut" x="1240" y="512" width="534" height="270" viewBox="0 -124 1720 815" preserveAspectRatio="xMidYMin meet"></svg>
+    </svg>

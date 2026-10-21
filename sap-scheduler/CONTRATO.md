@@ -91,15 +91,26 @@ Webapp lê (`webapp/src/custos/leitura.py`) por `mes_referencia` + opcional `cen
 ## 5. Drifts conhecidos (auditados em 2026-06-15 na importação da fonte)
 
 Pré-existentes; documentados para não viram surpresa. Nenhum quebra produção hoje.
+**1 e 2 foram resolvidos em 2026-09-25** — mantidos aqui, riscados, como histórico.
 
-1. **`parametros.janela` é ignorado pelo daemon.** O webapp grava
-   `parametros.janela.{inicio,fim,meses}` no job, mas `custo_exec.run`/`custo_orcado.run`
-   **recalculam** a janela via `custo_collect.janela_dois_meses(agora)`. Benigno: as duas
-   implementações são algebricamente idênticas (mês corrente + anterior até D-1, BR-09).
+1. ~~**`parametros.janela` é ignorado pelo daemon.**~~ **RESOLVIDO em 2026-09-25.** O webapp
+   gravava `parametros.janela.{inicio,fim,meses}` no job, mas `custo_exec.run`/`custo_orcado.run`
+   **recalculam** a janela via `custo_collect.janela_dois_meses(agora)` — campo sem leitor. O
+   webapp parou de gravar o campo; em troca, os dois scripts passaram a devolver a janela
+   REALMENTE usada em **`resultado.janela`** (`custo_orcado` inclui também `periodos`). Quem
+   precisa saber o que foi coletado lê o resultado, não o parâmetro.
 
-2. **Regra da janela (BR-09) duplicada** em dois lugares: `webapp/src/custos/sap_jobs.py`
-   (`janela_dois_meses`) e `sap-scheduler/trabalhos/custos_manut/custo_collect.py`
-   (`janela_dois_meses`). Mudar a regra exige editar os dois. Consolidar é o alvo futuro.
+2. ~~**Regra da janela (BR-09) duplicada.**~~ **RESOLVIDO em 2026-09-25.** A regra vivia em
+   `webapp/src/custos/sap_jobs.py` e em `sap-scheduler/trabalhos/custos_manut/custo_collect.py`,
+   e as cópias divergiram no mesmo dia em que o daemon trocou **D-1** por **meses INTEIROS**
+   (fim = último dia do mês corrente). Motivo da troca: o corte em D-1 escondia do detalhe
+   (KSB1, por BUDAT) a liquidação KO88, que o SAP lança com data no último dia do mês,
+   enquanto o resumo (ZBRCO019, por **período**) já a enxergava — a janela anterior escondia lançamentos de liquidação no fim do mês.
+   calcular a janela: **dono único = o daemon**. Cobertura em `tests/test_custos_janela.py`
+   (8 casos, inclusive o que barra a volta do D-1).
+
+   > Contrapartida assumida: o executado do mês corrente passa a incluir provisão/liquidação
+   > com data futura — era exatamente o que o D-1 evitava. Decisão do cliente em 25/09/2026.
 
 3. **A leitura do webapp NÃO filtra `fonte`.** `webapp/src/custos/leitura.py` agrega por
    `mes_referencia` sem distinguir `fonte`. Como a idempotência do daemon só apaga

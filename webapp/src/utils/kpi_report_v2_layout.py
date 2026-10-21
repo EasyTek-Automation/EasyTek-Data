@@ -17,6 +17,7 @@ from dash import dash_table, dcc, html
 from src.pages.maintenance.kpi_report_v2 import TRANS
 from src.utils.kpi_report_config import fmt_numero
 from src.utils.kpi_report_v2_bars import build_bar_figure
+from src.utils.zpp_paradas_pendentes import LEGENDA as LEGENDA_PENDENTE, SELO as SELO_PENDENTE
 
 
 # ============================================================================
@@ -329,12 +330,17 @@ def _build_paradas_table(paradas: list[dict], lang: str,
             row_props["n_clicks"] = 0
             row_props["style"] = {"cursor": "pointer"}
             row_props["className"] = "kpi-v2-row-clickable"
+        # BR-14: parada ainda não consolidada na NT0001 — selo + fundo (SP-27)
+        selo = []
+        if p.get("pendente"):
+            row_props["className"] = (row_props["className"] + " kpi-v2-row-pendente").strip()
+            selo = [html.Span(SELO_PENDENTE, className="kpi-v2-selo-pendente me-1")]
         rows.append(
             html.Tr(
                 [
                     html.Td(p.get("posicao", "")),
                     html.Td(p.get("equipamento", "")),
-                    html.Td([
+                    html.Td(selo + [
                         html.Span(p.get("causa", ""), className="me-1 fw-semibold"),
                         html.Small(p.get("descricao", ""), className="text-muted"),
                     ]),
@@ -349,6 +355,16 @@ def _build_paradas_table(paradas: list[dict], lang: str,
         [header, html.Tbody(rows)],
         className="table table-sm table-hover mb-0 kpi-v2-paradas-table",
     )
+
+
+def _rodape_pendentes(paradas: list[dict], aviso: str = "") -> list:
+    """Legenda do selo (só se houver pendente) + aviso de checagem indisponível (BR-14 / SP-27/28)."""
+    out = []
+    if any(p.get("pendente") for p in paradas or []):
+        out.append(html.Div(LEGENDA_PENDENTE, className="kpi-v2-legenda-pendente mt-2"))
+    if aviso:
+        out.append(html.Div(aviso, className="kpi-v2-aviso-checagem mt-2"))
+    return out
 
 
 def build_bloco2_html(dados: dict, lang: str) -> dbc.Card:
@@ -376,7 +392,8 @@ def build_bloco2_html(dados: dict, lang: str) -> dbc.Card:
                     className="d-flex justify-content-between align-items-center",
                 ),
             ),
-            dbc.CardBody(_build_paradas_table(paradas, lang, row_clickable=False)),
+            dbc.CardBody([_build_paradas_table(paradas, lang, row_clickable=False)]
+                         + _rodape_pendentes(paradas, dados.get("aviso_checagem", ""))),
         ],
         id="kpi-v2-card-block-2",
         className="h-100 kpi-v2-block-card",
@@ -393,7 +410,8 @@ def build_bloco5_html(dados: dict, lang: str) -> dbc.Card:
     return dbc.Card(
         [
             dbc.CardHeader(html.H5(title, className="mb-0")),
-            dbc.CardBody(_build_paradas_table(paradas, lang, row_clickable=True)),
+            dbc.CardBody([_build_paradas_table(paradas, lang, row_clickable=True)]
+                         + _rodape_pendentes(paradas, dados.get("aviso_checagem", ""))),
         ],
         id="kpi-v2-card-block-5",
         className="h-100 kpi-v2-block-card",
@@ -504,7 +522,8 @@ def build_drilldown_modal_body(block: int, paradas: list[dict],
 
     if block == 2:
         # Top 10 paradas — tabela completa
-        return html.Div(_build_paradas_table(paradas, lang, row_clickable=False))
+        return html.Div([_build_paradas_table(paradas, lang, row_clickable=False)]
+                        + _rodape_pendentes(paradas))
 
     # Block 5 — esperado 1 evento (paradas[0]) com todos os campos
     evt = paradas[0] if isinstance(paradas, list) else paradas
@@ -526,8 +545,15 @@ def build_drilldown_modal_body(block: int, paradas: list[dict],
             ])
         )
 
-    return html.Div(html.Table(html.Tbody(field_rows),
-                                className="table table-sm mb-0"))
+    rodape = []
+    if evt.get("pendente"):
+        field_rows.insert(0, html.Tr([
+            html.Th(html.Span(SELO_PENDENTE, className="kpi-v2-selo-pendente"), style={"width": "28%"}),
+            html.Td("ainda não consolidada na NT0001"),
+        ], className="kpi-v2-row-pendente"))
+        rodape = _rodape_pendentes([evt])
+    return html.Div([html.Table(html.Tbody(field_rows),
+                                className="table table-sm mb-0")] + rodape)
 
 
 # ============================================================================

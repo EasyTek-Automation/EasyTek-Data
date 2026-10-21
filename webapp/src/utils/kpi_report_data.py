@@ -220,14 +220,45 @@ def _build_top5_paradas(
     fim: datetime,
     names: dict[str, str],
     top_n: Optional[int] = 5,
+    incluir_pendentes: bool = True,
+    agora: Optional[datetime] = None,
 ) -> dict[str, Any]:
     """Helper compartilhado Blocos 2 e 5 — chama `fetch_top_breakdowns_all`,
     resolve nome via `names`, devolve `{"paradas": [...], "vazio": bool}` (SP-08).
 
     `top_n=None` lista todas as paradas (Bloco 5 — BR-03 itens 5/7 revistos em 2026-05-13).
     `top_n=5` mantém limite Top 5 (Bloco 2).
+
+    BR-14 / DS-19: com `incluir_pendentes`, mistura as paradas ainda não consolidadas na NT0001
+    (retrato da ZPPPARADAS), que disputam posição pela duração e saem com `pendente=True`. O corte
+    em `top_n` passa a ser feito depois da mistura. Sem pendente, o caminho é o de sempre.
+    Também devolve `tem_pendente` e `aviso_checagem` (texto quando o retrato não é de hoje).
     """
-    paradas_raw = fetch_top_breakdowns_all(inicio, fim, top_n=top_n)
+    pendentes, aviso = [], ""
+    if incluir_pendentes:
+        try:
+            from src.utils import zpp_paradas_pendentes as zpend
+            ok, coletado_em = zpend.retrato_valido(agora or datetime.now())
+            if ok:
+                pendentes = zpend.buscar_pendentes(inicio, fim)
+            else:
+                aviso = zpend.aviso_checagem(coletado_em)
+        except Exception as exc:
+            logger.warning("Falha ao checar paradas pendentes: %s", type(exc).__name__)
+            pendentes = []
+
+    if pendentes:
+        oficiais = fetch_top_breakdowns_all(inicio, fim, top_n=None)
+        paradas_raw = sorted(
+            oficiais + pendentes,
+            key=lambda p: (p.get("duration_min", 0) or 0, p["inicio_execucao"]),
+            reverse=True,
+        )
+        if top_n is not None:
+            paradas_raw = paradas_raw[:top_n]
+    else:
+        paradas_raw = fetch_top_breakdowns_all(inicio, fim, top_n=top_n)
+
     paradas = []
     for idx, p in enumerate(paradas_raw):
         eq_id = p.get("equipamento", "")
@@ -239,8 +270,14 @@ def _build_top5_paradas(
             "duracao_min": f"{int(round(dur_min))} min",
             "causa":       p.get("causa_do_desvio", ""),
             "descricao":   p.get("descricao", ""),
+            "pendente":    bool(p.get("pendente", False)),
         })
-    return {"paradas": paradas, "vazio": len(paradas) == 0}
+    return {
+        "paradas": paradas,
+        "vazio": len(paradas) == 0,
+        "tem_pendente": any(x["pendente"] for x in paradas),
+        "aviso_checagem": aviso,
+    }
 
 
 def build_detalhamento_table(
@@ -291,7 +328,8 @@ def build_detalhamento_table(
 # Orquestrador — coletar_dados_relatorio (SP-04 item 6)
 # =========================================================================
 
-def coletar_dados_relatorio(stored_data: dict, agora: datetime, as_png: bool = True) -> dict:
+def coletar_dados_relatorio(stored_data: dict, agora: datetime, as_png: bool = True,
+                            incluir_pendentes: bool = True) -> dict:
     """Orquestra coleta completa — devolve dict consolidado para o template.
 
     Estrutura em SP-04 item 6 + DS-03 (chaves `periodo`, `bloco1..5`, `planta_vazia`).
@@ -299,6 +337,8 @@ def coletar_dados_relatorio(stored_data: dict, agora: datetime, as_png: bool = T
 
     `as_png`: True (default — DOCX) gera sunbursts em PNG via kaleido. False (tela,
     IM-08) devolve `plotly.graph_objects.Figure` nativos para renderização interativa.
+
+    `incluir_pendentes` (BR-14): False na tela V1, que não sabe desenhar o selo de pendente.
     """
     eq_ids = _aplicar_escopo(stored_data)
     names = stored_data.get("names", {}) or {}
@@ -341,7 +381,8 @@ def coletar_dados_relatorio(stored_data: dict, agora: datetime, as_png: bool = T
 
     def _safe_top5(ini, fim, names_arg, top_n=5):
         try:
-            return _build_top5_paradas(ini, fim, names_arg, top_n=top_n)
+            return _build_top5_paradas(ini, fim, names_arg, top_n=top_n,
+                                       incluir_pendentes=incluir_pendentes, agora=agora)
         except Exception as exc:
             logger.warning("Falha ao buscar top5 paradas (%s, %s): %s",
                             ini, fim, type(exc).__name__)

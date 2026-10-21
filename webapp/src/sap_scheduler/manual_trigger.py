@@ -36,7 +36,9 @@ TOAST_ID = "toast-rerun-sap"
 _RERUN_BTN_PREFIX = "btn-rerun-"
 
 # Rótulo amigável por tipo (operador não conhece os nomes técnicos do SAP).
-_LABEL_TIPO = {"zppprd": "Produção", "zpp_nt0001": "Paradas"}
+_LABEL_TIPO = {"zppprd": "Produção", "zpp_nt0001": "Paradas",
+               "hh_planejado": "HH Planejado", "hh_realizado": "HH Realizado",
+               "hh_entregas": "HH Entregas"}
 
 # Mensagem + cor do toast por status retornado por `inserir_job_manual`.
 _MSG = {

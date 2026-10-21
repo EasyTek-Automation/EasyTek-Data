@@ -1,0 +1,996 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Overview
+
+AMG_Data is an industrial IoT data platform built with Dash/Plotly for real-time monitoring and analytics. The system consists of:
+
+- **webapp**: Main Dash web application with multi-page architecture
+- **event-gateway**: MQTT gateway service for publishing commands to industrial equipment
+- **node-red**: Node-RED flows for data ingestion and processing
+- **nginx**: Reverse proxy configuration
+
+The platform provides dashboards for production monitoring (OEE), energy consumption, maintenance alarms, supervisory control, and utility management.
+
+## Docstrings
+
+Durante qualquer trabalho nos arquivos Python, ao encontrar funções ou métodos sem docstring, adicioná-la imediatamente — mesmo que a função não esteja sendo modificada no contexto atual.
+
+A docstring deve ser concisa (1–2 linhas), descrevendo **o que** a função faz e, quando não óbvio, **por que** existe ou qual o comportamento esperado em casos especiais (retrocompat, edge cases, etc.).
+
+## Testes
+
+Antes de alterar qualquer função existente:
+1. Verificar se já existe teste cobrindo ela em `webapp/tests/`
+2. Se não existir, escrever o teste primeiro (captura o comportamento atual)
+3. Rodar `pytest webapp/tests/` para confirmar verde
+4. Só então fazer a alteração
+5. Rodar pytest novamente para confirmar que continua verde
+
+Não é necessário criar testes para código que não será alterado.
+
+## Common Commands
+
+### Subir Stack Local (única forma suportada)
+
+Todo desenvolvimento e teste local roda via **stack Docker completo** orquestrado por `AMG_Infra/scripts/up.sh`. Não existe mais modo `run_local` standalone — o webapp depende de MongoDB, ZPP-Processor e event-gateway estarem de pé.
+
+**Pré-requisitos:**
+- Docker Desktop rodando no Windows (WSL2 integration habilitada)
+- Comandos `docker` precisam ser executados **fora do ai-jail** (jail bloqueia o socket)
+- Arquivo `AMG_Infra/environments/local/.env` existente (criar a partir de `.env.common` se ausente)
+
+**Comando:**
+```bash
+# Sair do ai-jail se estiver dentro (digite "exit" no terminal)
+cd ~/projects/AMG/AMG_Infra
+./scripts/up.sh local
+# Webapp → http://localhost:8050
+# Mongo  → localhost:27017
+# ZPP    → localhost:5002
+# NodeRed→ localhost:1880
+```
+
+`up.sh local` faz `docker compose build` automaticamente — qualquer alteração em `AMG_Data/webapp/src/` recompila a imagem. O override do ambiente local também monta `../AMG_Data/webapp/src:/app/src:ro` para hot reload de Python sem rebuild.
+
+**Parar:**
+```bash
+cd ~/projects/AMG/AMG_Infra
+./scripts/down.sh local
+```
+
+**Rodar a partir de um worktree do AMG_Data:**
+
+`docker-compose.override.yml` usa `build: ../AMG_Data/webapp` (relativo a AMG_Infra). Para construir a partir de um worktree em `.claude/worktrees/<name>/webapp`, ou (a) faça merge do worktree no main do AMG_Data antes de subir, ou (b) edite o `context:` do override apontando para o caminho do worktree.
+
+### Environment Setup
+
+Variáveis vivem em **`AMG_Infra/environments/local/.env`** (consumido por `up.sh local`). Template de referência em `AMG_Infra/.env.common`.
+
+Variáveis-chave (lidas pelos containers via `env_file`):
+```
+MONGO_URI=mongodb+srv://...        # ou mongodb://database:27017 para Mongo do override local
+DB_NAME=Cluster-EasyTek
+SECRET_KEY=<token_hex_32>
+MQTT_BROKER_ADDRESS=...
+MQTT_BROKER_PORT=8883
+MQTT_USERNAME=...
+MQTT_PASSWORD=...
+GATEWAY_URL=http://event-gateway:5001
+ZPP_PROCESSOR_URL=http://zpp-processor:5002
+ZPP_INTERNAL_SECRET=<token>
+LOG_LEVEL=INFO
+TZ=America/Sao_Paulo
+```
+
+### Offline Mode
+
+A aplicação está configurada para funcionar **completamente offline**, sem dependências de CDNs externos. Todos os recursos (Bootstrap themes, Font Awesome) são servidos localmente.
+
+#### Recursos Localizados
+
+- **Bootstrap Themes**: Minty (tema claro) e Darkly (tema escuro) do Bootswatch 5.3.6
+- **Font Awesome**: Versão 5.10.2 (CSS + webfonts)
+- **Localização**: `webapp/src/assets/vendor/`
+
+#### Scripts de Gerenciamento
+
+```bash
+# Download de recursos externos (primeira configuração ou atualização)
+cd webapp
+python scripts/download_offline_resources.py
+
+# Validação de configuração offline
+python scripts/validate_offline.py
+```
+
+**Download de Recursos**: Baixa automaticamente Bootstrap e Font Awesome dos CDNs e ajusta URLs internas do CSS para caminhos relativos locais.
+
+**Validação**: Verifica que:
+- Todos os 6 arquivos de recursos estão presentes
+- Nenhuma referência a CDNs no código
+- Configurações corretas em `app.py` e `theme_config.py`
+
+#### Estrutura de Assets
+
+```
+webapp/src/assets/
+├── vendor/                    # Recursos de terceiros
+│   ├── bootstrap/
+│   │   ├── minty/
+│   │   │   └── bootstrap.min.css
+│   │   └── darkly/
+│   │       └── bootstrap.min.css
+│   └── fontawesome/
+│       ├── css/
+│       │   └── all.min.css
+│       └── webfonts/
+│           ├── fa-brands-400.woff2
+│           ├── fa-regular-400.woff2
+│           └── fa-solid-900.woff2
+├── [CSS customizados...]
+└── favicon.ico
+```
+
+#### Atualizando Versões
+
+Para atualizar Bootstrap ou Font Awesome:
+
+1. Editar URLs em `webapp/scripts/download_offline_resources.py`
+2. Executar: `python scripts/download_offline_resources.py`
+3. Testar aplicação
+4. Validar: `python scripts/validate_offline.py`
+
+**Documentação completa**: Ver `webapp/scripts/README.md`
+
+#### Teste Offline
+
+Para verificar que a aplicação funciona sem internet:
+
+1. Desconectar Wi-Fi/Ethernet
+2. Iniciar aplicação: `python webapp/src/run.py`
+3. Abrir navegador: `http://localhost:8050`
+4. Verificar DevTools → Network tab (nenhuma requisição externa deve falhar)
+5. Testar comutação de temas e navegação entre páginas
+
+## Architecture
+
+### Application Structure
+
+```
+webapp/src/
+├── app.py              # Flask server & Dash app initialization (includes favicon config)
+├── run.py              # Application entry point
+├── index.py            # Main routing and layout orchestration
+├── header.py           # Top navigation bar with mega menus
+├── sidebar.py          # Collapsible sidebar with dynamic content
+├── callbacks.py        # Central callback registration
+├── callbacks_registers/  # Callback modules (one per feature)
+│   ├── main_layout_callbacks.py
+│   ├── sidebar_content_callback.py
+│   ├── sidebar_filters_callback.py
+│   ├── sidebar_toggle_callback.py
+│   ├── sidebar_default_dates_callback.py
+│   ├── oeegraph_callback.py
+│   ├── kpicards_callback.py
+│   ├── energygraph_callback.py
+│   ├── hourlyconsumption_callback.py
+│   ├── states_callbacks.py
+│   ├── alarms_callbacks.py
+│   ├── maintenance_kpi_callbacks.py  # Maintenance KPI indicators
+│   ├── procedures_collapse_callbacks.py
+│   ├── energy_config_callbacks.py
+│   ├── create_user_callbacks.py
+│   ├── manage_users_callbacks.py
+│   ├── change_password_callbacks.py
+│   ├── input_bridge_callbacks.py  # Bridge between header filters and sidebar
+│   └── ... (30+ specialized callback modules)
+├── components/         # Reusable UI components
+│   ├── icons.py        # SVG icon components
+│   ├── stores.py       # Application dcc.Store components
+│   ├── dropdown_footer.py  # Reusable dropdown footer
+│   ├── demo_badge.py   # Demo data badge component
+│   ├── maintenance_kpi_graphs.py  # KPI graphs (bar, sunburst, line, radar, heatmap, gauges)
+│   ├── maintenance_kpi_cards.py   # KPI summary cards
+│   ├── headers/        # Page-specific header filter modules
+│   │   ├── energy_filters.py
+│   │   ├── states_filters.py
+│   │   └── default_filters.py
+│   ├── sidebars/       # Page-specific sidebar content modules
+│   │   ├── __init__.py
+│   │   ├── dashboard_sidebar.py
+│   │   ├── states_sidebar.py
+│   │   ├── superv_sidebar.py
+│   │   ├── energy_sidebar.py  # Includes SE03 cost calculations
+│   │   ├── procedures_sidebar.py  # Procedures documentation navigation
+│   │   └── default_sidebar.py
+│   └── ... (graph and card components)
+├── config/             # Configuration modules
+│   ├── access_control.py   # Route & menu permissions matrix
+│   ├── theme_config.py     # Dash Bootstrap theme configuration
+│   ├── user_loader.py      # Flask-Login user loader
+│   ├── docs_config.py      # Documentation/procedures system configuration
+│   └── demo_data_config.py # Demo data badges configuration
+├── database/
+│   └── connection.py   # MongoDB connection & User model
+├── pages/              # Page layouts organized by domain
+│   ├── admin/          # User management (create_user, manage_users)
+│   ├── auth/           # Login, registration, change password
+│   ├── dashboards/     # Home, production OEE
+│   ├── energy/         # Energy monitoring pages (overview, config)
+│   ├── production/     # Production state tracking
+│   ├── maintenance/    # Maintenance module
+│   │   ├── alarms.py        # Alarm monitoring and history
+│   │   ├── indicators.py    # KPI dashboard (MTBF, MTTR, Breakdown Rate)
+│   │   ├── config.py        # KPI target configuration (admin only)
+│   │   └── procedures.py    # Markdown-based documentation
+│   ├── supervision/    # Supervisory control (SCADA-like)
+│   ├── reports/        # Reporting pages
+│   └── common/         # Shared pages (access_denied, under_development)
+├── assets/             # Static files (CSS, images)
+│   ├── dropdown_menus.css  # Mega menu styling
+│   ├── markdown.css        # Markdown rendering styles
+│   └── ... (other CSS and images)
+└── utils/
+    ├── permissions.py  # Access control logic
+    ├── helpers.py      # Utility functions
+    ├── empty_state.py  # Empty state components
+    ├── demo_helpers.py # Demo data helpers
+    ├── zpp_kpi_calculator.py        # ZPP data integration and KPI calculations
+    └── maintenance_demo_data.py     # Demo data generation and targets for maintenance KPIs
+```
+
+### Key Architectural Patterns
+
+#### 1. Routing System (`index.py`)
+
+- Central `ROUTES` dictionary maps pathnames to page layout functions
+- Route aliases provide backward compatibility (`ROUTE_ALIASES`)
+- Access control integrated into routing via `check_access()`
+- Main layout builder (`_build_main_layout()`) combines header, sidebar, and page content
+
+**Route Aliases** (defined in `index.py`):
+```python
+ROUTE_ALIASES = {
+    '/dashboard': '/production/oee',
+    '/states': '/production/states',
+    '/superv': '/supervision',
+    '/production/alarms': '/maintenance/alarms',
+    '/alarms': '/maintenance/alarms',
+}
+```
+
+**Maintenance Routes Structure**:
+- `/maintenance/alarms`: Alarm monitoring and history
+- `/maintenance/indicators`: KPI dashboard (MTBF, MTTR, Breakdown Rate) — V1, canônico
+- `/maintenance/indicators-v2`: KPI dashboard V2 — layout drilldown + timeline reusada + switch foco manutenção (mesma BR/cálculo da V1; SDD em `.dev-docs/projects/indicators-v2/`)
+- `/maintenance/config`: KPI target configuration (admin only, level 3)
+- `/maintenance/procedures`: Markdown-based documentation system
+- `/workflow/dashboard`: Workflow management - Pending tasks dashboard (integrated in Maintenance menu)
+  - **Terminologia**: **Demanda** = tarefa/pendência (collection `Maintenance_workflow`); **Atividade** = subtarefa (record_type='subtarefa' em `MaintenanceHistory_workflow`)
+  - Campo `prioridade` nas Atividades: `'urgente'` | `'alta'` | `'normal'` | `'baixa'` (retrocompat: sem campo → `'normal'`)
+  - Filtros: responsável, status, busca, aceite, datas, horas úteis, prioridade das atividades, sem data planejada, atividades atrasadas
+  - Campo `status_validacao_gestor` nas Atividades: `'pendente'` | `'aprovado'` | `'devolvido'` — quando `'aprovado'`, atividade é **imutável** (compliance lock)
+  - **Ver seção "11. Workflow Module Architecture"** para contratos de stores, padrões de KPI e audit trail
+- `/maintenance/work-orders`: Work orders management (in development)
+- `/maintenance/schedule`: Maintenance planning (in development)
+- `/maintenance/history`: Intervention history (in development)
+
+**Utilities Routes Structure**:
+- `/utilities/energy`: Energy overview (alias: `/energy`)
+- `/utilities/energy/config`: Energy tariff configuration (admin only)
+- `/utilities/energy/se01-se04`: Individual substations (in development)
+- `/utilities/water`: Water consumption monitoring (in development)
+- `/utilities/gas`: Natural gas monitoring (in development)
+- `/utilities/compressed-air`: Compressed air system (in development)
+- `/utilities/dashboard`: Integrated utilities dashboard (in development)
+
+#### 2. Access Control System
+
+**Two-dimensional permission model** (defined in `config/access_control.py`):
+
+- **Vertical (level)**: 1 = basic, 2 = advanced, 3 = admin
+- **Horizontal (perfil)**:
+  - `manutencao` - Maintenance team
+  - `qualidade` - Quality control team
+  - `producao` - Production team
+  - `utilidades` - Utilities team (energy, water, gas, air)
+  - `admin` - System administrators
+  - `meio_ambiente` - Environmental team
+  - `seguranca` - Safety team
+  - `engenharias` - Engineering team
+
+Routes can be:
+- **Shared** (`shared=True`): All profiles can access if level requirement met
+- **Profile-specific** (`shared=False`): Requires specific profile(s) AND level
+
+Permission checking flow:
+1. Route config lookup in `ROUTE_ACCESS`
+2. Level check: `user.level >= min_level`
+3. Profile check (if not shared): `user.perfil in perfis`
+4. On denial: Show access denied page with reason
+
+#### 3. User Authentication (`database/connection.py`)
+
+- Flask-Login integration with `User` class
+- MongoDB `usuarios` collection stores user documents
+- User model fields: `username`, `email`, `password` (hashed), `level`, `perfil`
+- Global connection singleton pattern for MongoDB client
+
+#### 4. Callback Registration Pattern
+
+All callbacks registered in `callbacks.py` via modular functions:
+
+```python
+def register_callbacks(app):
+    collection_graph = get_mongo_connection('DecapadoPerformance')
+    register_oeegraph_callbacks(app, collection_graph)
+    register_kpicards_callbacks(app, collection_graph)
+    # ... more registrations
+```
+
+Each callback module in `callbacks_registers/` exports a `register_*_callbacks(app, ...)` function.
+
+#### 5. Header System (`header.py`)
+
+Top navigation bar located at `src/header.py` with:
+
+- **Mega Menu Navigation**: Multi-column dropdown menus for Utilities section
+  - Energia Elétrica (with substation options SE01-SE04)
+  - Água, Gás Natural, Ar Comprimido
+- **Dynamic Page Filters**: `get_filters_for_page(pathname)` loads filters from `components/headers/`
+- **Theme Switcher**: `ThemeSwitchAIO` component for light/dark mode
+- **Hamburger Menu**: Toggle for sidebar collapse/expand
+- **User Profile Dropdown**: Avatar, profile info, level badge, logout
+- **Permission-based Menus**: Uses `can_see_menu()` to show/hide items
+
+**Page-Specific Filters** (in `components/headers/`):
+- `energy_filters.py`: Equipment dropdowns and date/time pickers
+- `states_filters.py`: Filters for production state monitoring
+- `default_filters.py`: Generic filter layout
+
+#### 6. Sidebar System (`sidebar.py`)
+
+Collapsible sidebar located at `src/sidebar.py` with:
+
+- **Company Logo**: Displayed at top
+- **Dynamic Content**: `get_sidebar_content_for_page(pathname)` loads content per route
+- **State Management**: Expanded/collapsed state stored in `dcc.Store`
+- **CSS Transitions**: Smooth collapse/expand animations
+
+**Page-Specific Sidebar Content** (in `components/sidebars/`):
+- `dashboard_sidebar.py`: Dashboard/OEE navigation
+- `states_sidebar.py`: Production states navigation
+- `superv_sidebar.py`: Supervision controls
+- `energy_sidebar.py`: Energy page with dynamic cost calculations
+  - `create_se03_cost_sidebar_with_groups()`: Cost breakdown by equipment groups (Transversais/Longitudinais)
+  - `create_se03_cost_sidebar_content()`: Detailed step-by-step cost calculation (debug version)
+  - `create_energy_sidebar_no_config()`: Alert when tariff config is missing
+  - `create_default_energy_sidebar_content()`: Default for non-SE03 tabs
+- `procedures_sidebar.py`: Documentation navigation tree (hierarchical structure from docs.yml)
+- `default_sidebar.py`: Generic fallback content
+
+**Important**: Sidebar content is determined AFTER route alias resolution.
+
+**Date Filter Synchronization**:
+- Sidebar date pickers are synchronized with header date pickers via `input_bridge_callbacks.py`
+- Default dates are set by `sidebar_default_dates_callback.py` (last 7 days)
+- Changes in either header or sidebar filters update both locations
+- Stored in `dcc.Store` components for persistence during navigation
+
+#### 7. MongoDB Collections
+
+Key collections referenced in codebase:
+- `usuarios`: User accounts
+- `DecapadoPerformance`: OEE and production metrics
+- `DecapadoFalhas`: Failure/alarm messages
+- `DecapadoTemp`: Temperature sensor data
+- `AMG_EnergyData`: Energy consumption data
+- `AMG_Consumo`: Hourly consumption aggregates
+- `ZPP_Producao`: Production data from ZPP system (activity hours by equipment) — nome fixo, não muda com o ano
+- `ZPP_Paradas`: Breakdown/stop data from ZPP system (failure events with duration and cause) — nome fixo, não muda com o ano
+- `maintenance_kpi_targets`: Maintenance KPI targets (MTBF, MTTR, breakdown rate) per equipment
+
+#### 8. Documentation System (`config/docs_config.py`)
+
+**Procedures Documentation System** for maintenance procedures:
+
+- **External Volume Support**: Documents stored in external volume via `DOCS_PROCEDURES_PATH` env var
+- **YAML Configuration**: `docs.yml` file defines navigation structure with sections/subsections
+- **Hot-Reload**: Automatic reload when `docs.yml` changes (modification time tracking)
+- **Fallback Mode**: Auto-scans directory if `docs.yml` doesn't exist
+- **Title Extraction**: Automatically extracts H1 titles from markdown files
+- **Security**: Path traversal protection to prevent access outside volume
+
+**Configuration Structure** (`docs.yml`):
+```yaml
+title: "Procedimentos"
+icon: "bi-book"
+index: "index.md"  # Optional homepage
+sections:
+  - name: "preventive"
+    label: "Manutenção Preventiva"
+    icon: "bi-calendar-check"
+    expanded: true
+    files:
+      - path: "preventive/procedure1.md"
+        title: "Auto-extracted or custom title"
+```
+
+**Key Functions**:
+- `get_docs_path()`: Returns volume path (env var or fallback)
+- `load_docs_structure()`: Loads and caches navigation structure
+- `get_markdown_title(filepath)`: Extracts title from markdown H1
+- `check_file_exists(relative_path)`: Validates file with security checks
+
+#### 9. Demo Data System (`config/demo_data_config.py`)
+
+**Demo Badge System** for indicating non-production data:
+
+- **Global Toggle**: `ENABLE_DEMO_BADGES` enables/disables all badges
+- **Per-Page Control**: `DEMO_PAGES` dict controls badges by route
+- **Per-Component Control**: `DEMO_COMPONENTS` dict controls by component type
+- **Helper Functions**: `should_show_demo_badge()`, `get_demo_pages()`
+
+**Usage Pattern**:
+```python
+from src.config.demo_data_config import should_show_demo_badge
+from src.components.demo_badge import create_demo_badge
+
+# In page layout
+if should_show_demo_badge(page_path="/production/oee"):
+    badge = create_demo_badge()
+```
+
+**Badge Display Logic**:
+1. Check global `ENABLE_DEMO_BADGES` flag
+2. Check page-specific or component-specific setting
+3. Render badge if both conditions are true
+
+#### 10. Maintenance KPI System (`pages/maintenance/indicators.py`)
+
+**Comprehensive maintenance indicators system** for tracking equipment reliability:
+
+- **Route**: `/maintenance/indicators`
+- **Permission**: Maintenance profile, level 1+
+- **Admin Configuration**: `/maintenance/config` (level 3 only)
+
+**Key Performance Indicators** (based on PRO017 standard):
+- **M01 - MTBF** (Mean Time Between Failures): `(∑Active Hours - ∑Breakdown Hours) / Number of Failures`
+- **M02 - MTTR** (Mean Time To Repair): `Total Breakdown Minutes / Number of Breakdowns` (converted to hours)
+- **M03 - Breakdown Rate**: `(Breakdown Hours / Active Hours) × 100%`
+
+**Data Integration** (`utils/zpp_kpi_calculator.py`):
+- Integrates with ZPP system collections (`ZPP_Producao_YYYY`, `ZPP_Paradas_YYYY`)
+- Automatic equipment categorization (Longitudinais, Prensas, Transversais)
+- Month-boundary filtering with configurable rules (início vs fim)
+- Custom equipment naming support
+- Breakdown codes filtering (201, S201, 202, S202, 203, S203, 204, S204, 205, S205, 110, S110)
+
+**Target Management** (`utils/maintenance_demo_data.py`):
+- Individual targets per equipment stored in MongoDB (`maintenance_kpi_targets`)
+- General plant target (GENERAL) as fallback
+- Configurable alert range (default ±3%)
+- Three-color system: Green (meets target), Yellow (within margin), Red (fails target)
+
+**Visualization Components** (`components/maintenance_kpi_graphs.py`):
+- **Bar charts** with polynomial trend lines and individual targets
+- **Sunburst charts** (hierarchical view by equipment category with performance colors)
+- **Line charts** (monthly evolution with target reference lines)
+- **Radar chart** (multi-dimensional performance comparison normalized to 0-100%)
+- **Gauges** (speedometer-style indicators with target markers)
+- **Calendar heatmap** (daily breakdown patterns with weekday statistics)
+- **Top breakdowns chart** (horizontal bars showing longest stops)
+
+**Page Features**:
+- **Tab 1 - General**: Plant-wide view with all equipment
+  - 4 summary cards (MTBF, MTTR, Breakdown Rate, Equipment Count)
+  - Sunburst hierarchies by category (MTBF, MTTR, Breakdown Rate)
+  - Monthly evolution charts for the plant
+  - Bar charts comparing all equipment
+  - Summary table with pass/fail indicators
+- **Tab 2 - Individual**: Single equipment analysis
+  - Equipment selector dropdown with target badges
+  - Top 5 longest breakdowns (with aggregation by date+cause)
+  - 3 gauges showing current performance vs targets
+  - Monthly evolution charts (equipment vs plant average)
+  - Calendar heatmap with comprehensive statistics:
+    * Best/worst weekdays (by average failures)
+    * Critical days count (2+ failures)
+    * Trend analysis (first half vs second half)
+    * Weekday ranking
+  - Performance radar comparing equipment, plant average, and target
+
+**Filter System**:
+- **Period Types**: Year, Last 12 months, Custom date range
+- **Auto-load**: Data loads automatically on page entry via `dcc.Interval`
+- **Refresh button**: Manual reload of data and targets from MongoDB
+- **Export button**: Download indicators to Excel
+
+**Data Caching** (`callbacks_registers/maintenance_kpi_callbacks.py`):
+- Monthly aggregates cached in `dcc.Store` to prevent redundant MongoDB queries
+- Separate caching for production days vs breakdown data
+- Optimized calendar heatmap using single aggregation pipeline instead of daily loops
+
+**Error Handling**:
+- Graceful database offline state detection
+- Empty state graphics when no data available
+- Differentiation between "no connection" vs "no data" states
+- User-friendly error messages with suggestions
+
+**Configuration Page** (`/maintenance/config`):
+- Admin-only access (level 3)
+- Set targets per equipment or use general plant target
+- Alert range configuration (tolerance percentage)
+- Real-time preview of color coding impact
+
+#### 10b. Indicators V2 (`/maintenance/indicators-v2`)
+
+Página alternativa de Indicadores de Manutenção com layout drilldown progressivo. **Mesma BR/cálculo da V1** (`zpp_kpi_calculator`); diferença é UX.
+
+**Componentes-chave:**
+- 3 cards KPI clicáveis no topo (MTBF, MTTR, Avaria) — barras mensais agregadas da planta
+- Modal drilldown 4 níveis: equipamentos → meses → (mes-top OU dias) → tabela
+- Click no card de mês → "mes-top" (top paradas barras horizontais + tabela top 10)
+- Click numa barra do gráfico de meses → "dias" (KPI diário do equipamento)
+- Click numa barra de dia → "tabela" (eventos paradas do dia)
+- Timeline evocon reusada da home com switch "Só avaria" (BR-15: filtra na query ZPP)
+- Spotlight CSS no hover dos cards (`:has()` — Chromium ≥105)
+- Filtros V2 collapse-able (period type, year, range, equipment, codes — paridade V1)
+- Excel export V2
+
+**Rota/permissão:** `/maintenance/indicators-v2` — perfil `manutencao` level 1+ (idêntico V1).
+
+**Módulos novos:**
+- `webapp/src/pages/maintenance/indicators_v2.py` — layout
+- `webapp/src/callbacks_registers/indicators_v2_callbacks.py` — callbacks drilldown + fetch real
+- `webapp/src/utils/zpp_timeline_loader.py` — `fetch_timeline_events()` + `_classify_status()`
+
+**Stores compartilhados com home:** `store-evocon-{granularity,offset,mtto-only}`, `interval-evocon-now`. Switch `switch-v2-mtto-only` só existe na V2 (sync via `sync_mtto_only` + `hydrate_switch`).
+
+**Testes:** `webapp/tests/maintenance/test_zpp_status_classifier.py` (29 casos) + `test_indicators_v2_parity.py` (7 casos contrato V1↔V2). Total 36/36 verde.
+
+**Documentação SDD:** `.dev-docs/projects/indicators-v2/` (8 docs, fases 01..06 completas).
+
+**Convenção crítica BR-12:** caller passa `end_date = datetime(y, m+1, 1)` (primeiro instante mês seguinte). Janela `[start, end)` estrita pós-fix `f102f3f`.
+
+#### 11. Workflow Module Architecture (`/workflow/dashboard`)
+
+**Stores e seus contratos — leia antes de tocar em qualquer callback do workflow:**
+
+| Store | Conteúdo | Quem escreve |
+|-------|----------|-------------|
+| `store-pendencias` | **View atual** — apenas as demandas visíveis (filtradas ou todas) | CB2 (aplicar filtros), CB3 (refresh), CB10/CB11 (aceitar/rejeitar), subtask CBs |
+| `store-historico` | **Sempre completo** — todo o histórico do MongoDB | CB3 (refresh), CB7 (concluir), CB2 (aplicar filtros) |
+| `store-filtros-ativos` | Dict com filtros aplicados atualmente | CB2, CB3, CB12 (limpar filtros) |
+
+**Regra crítica — `_kpi_filtrado` vs `criar_cards_kpi`:**
+
+Nunca chamar `criar_cards_kpi(df_pend, df_historico, username)` diretamente em callbacks que têm contexto de filtro. Usar sempre `_kpi_filtrado(df_pend, df_historico, username)` porque:
+- `store-historico` é sempre completo (full scan do MongoDB)
+- `_kpi_filtrado` restringe o histórico aos IDs presentes em `df_pend` (que já é a view filtrada)
+- Chamar `criar_cards_kpi` com historico completo mostra KPIs inflados ignorando os filtros
+
+```python
+# ERRADO — usa historico completo, ignora filtro ativo
+return criar_cards_kpi(df_pendencias, df_historico, username)
+
+# CORRETO — escopa historico pelos IDs de df_pendencias (já filtrado)
+return _kpi_filtrado(df_pendencias, df_historico, username)
+```
+
+**Problema clássico com `allow_duplicate=True` — callback reativo sobrescrevendo:**
+
+CB5 (`atualizar_cards_kpi`) reage a `Input("store-pendencias")` e `Input("store-historico")`. Qualquer callback que escreva nesses stores dispara CB5 em seguida. Se CB5 usar lógica errada, **sobrescreve** os valores corretos que o callback anterior calculou. Sintoma: "atualiza e volta ao estado sem filtro".
+
+Diagnóstico: buscar todos os `Output("container-xyz")` no codebase. Se CB_A escreve o valor correto e CB_B (reativo a um store que CB_A também escreveu) escreve um valor errado, CB_B vai sobrescrever.
+
+**Compliance lock — atividades validadas pelo gestor:**
+
+Atividades com `status_validacao_gestor='aprovado'` são **imutáveis**. Toda função de escrita em `workflow_db.py` que afete atividades deve fazer `find_one` antes de `update_one`/`delete_one`:
+
+```python
+doc = collection_hist.find_one({'_id': ObjectId(hist_id)})
+if doc and doc.get('status_validacao_gestor') == 'aprovado':
+    return False  # bloqueado
+```
+
+Funções que implementam o guard: `editar_subtarefa`, `deletar_subtarefa`, `adicionar_log`, `editar_log`.
+
+Na UI: quando `status_validacao_gestor == 'aprovado'`, botões editar/deletar são ocultados e elementos interativos (ex: badge de prioridade `dbc.DropdownMenu`) são substituídos por `html.Span` estático. **Calcular `_validada` ANTES de construir qualquer componente que dependa dele.**
+
+**Audit trail — linha do tempo do sistema:**
+
+Helper `_criar_evento_timeline(collection_hist, pend_id, descricao, tipo_evento, editado_por, ...)` em `workflow_db.py` insere um documento `record_type='criacao'` em `MaintenanceHistory_workflow`. Esses documentos aparecem automaticamente na seção "Linha do tempo do sistema" sem código adicional na UI.
+
+Chamar o helper após cada operação bem-sucedida de: criar subtarefa, editar subtarefa, concluir, validar, devolver, deletar, adicionar log, editar log.
+
+**Testes com `insert_one` chamado múltiplas vezes:**
+
+Quando uma função chama `insert_one` mais de uma vez (ex: `criar_subtarefa` insere o doc da atividade e depois o evento de timeline), usar `call_args_list[0][0][0]` (primeira chamada) em vez de `call_args[0][0]` (última chamada):
+
+```python
+# ERRADO se insert_one é chamado 2x — pega a última chamada (evento timeline)
+doc = mock_hist.insert_one.call_args[0][0]
+
+# CORRETO — pega a primeira chamada (doc da atividade)
+doc = mock_hist.insert_one.call_args_list[0][0][0]
+```
+
+#### 12. ZPP Processor Service (`zpp-processor/`)
+
+Serviço independente que processa planilhas Excel exportadas do SAP e carrega no MongoDB.
+
+**Arquivos principais:**
+- `processor.py` — `ZPPProcessor`: detecta tipo, limpa, faz upload (delete+reinsert) e arquiva
+- `scheduler.py` — `ZPPScheduler`: executa processamento automático por intervalo configurável
+- `api.py` — API REST Flask para trigger manual e consulta de histórico
+- `models/processing_log.py` — schemas dos documentos de log no MongoDB
+- `cleaner.py` — limpeza e detecção de tipo das planilhas (`zppprd` ou `zppparadas`)
+
+**Status de processamento (por arquivo e por job):**
+- `success` — todos os registros inseridos sem problemas
+- `partial` — inserção concluída mas com duplicatas ignoradas (`skipped_rows > 0`)
+- `failed` — nenhum registro inserido
+
+**Índice único `idx_parada_unique` (collection `ZPP_Paradas`):**
+
+Campos: `(centro_de_trabalho, inicio_execucao, inicio_real_hora, ordem, causa_do_desvio)`
+
+Inclui `causa_do_desvio` porque o SAP gera **dupla codificação** — mesmo equipamento/ordem/hora com causas diferentes (ex: `301` e `S201` simultâneos). Sem esse campo, o segundo registro seria rejeitado como duplicata, potencialmente descartando um código de avaria válido.
+
+**Warnings persistidos no MongoDB:**
+
+Duplicatas ignoradas ficam gravadas em `files_processed[].warnings` (lista de strings) no documento do job. Campo `skipped_rows` indica a contagem total. Não interrompem o processamento — arquivo é arquivado normalmente.
+
+**API de histórico paginada:**
+
+`GET /api/zpp/history?page=1&per_page=20`
+
+Retorna: `total`, `page`, `per_page`, `total_pages`, `has_next`, `has_prev`, `logs`
+
+### Application Initialization Flow
+
+1. **app.py**: Initialize Flask server, Dash app, Flask-Login
+2. **run.py**: Load theme template, import index module (triggers callback registration)
+3. **index.py**: Define app layout, import all page modules, register route callbacks
+4. **callbacks.py**: Register all feature-specific callbacks
+
+When user navigates:
+1. `url` location change triggers routing callback
+2. Check authentication status
+3. Resolve route aliases
+4. **Check permissions** via `check_access()`
+5. Load page layout or show access denied
+6. Build main layout with header, sidebar, content
+7. Load dynamic sidebar content based on resolved route
+
+## Registrar Dívida Técnica
+
+Quando o usuário disser **"Crie essa dívida técnica"** (ou variações como "registra essa dívida", "documenta como dívida técnica"), execute os seguintes passos:
+
+1. **Criar arquivo detalhado** em `E:\Projetos Python\AMG\.dev-docs\technical-debt\` seguindo o padrão dos arquivos existentes:
+   - Nome descritivo em kebab-case (ex: `callbacks-client-side.md`)
+   - Cabeçalho com Data, Prioridade, Impacto, Módulo, Status
+   - Para cada item: O que faz, Problema, Solução, Arquivos afetados, Estimativa, Frequência/Impacto
+   - Seção "Como implementar" com exemplos de código quando aplicável
+   - Tabela de ordem de execução recomendada
+
+2. **Atualizar `E:\Projetos Python\AMG\.dev-docs\technical-debt\README.md`**:
+   - Adicionar linha na tabela de Status Geral (atualizar contadores)
+   - Adicionar itens na seção de prioridade correta (🔴 Alta / 🟡 Média / 🟢 Baixa)
+   - Adicionar link na seção "📚 Arquivos Detalhados"
+
+3. **Prioridades**:
+   - 🔴 Alta: impacto em segurança, robustez ou bugs em produção
+   - 🟡 Média: performance, manutenibilidade, código duplicado
+   - 🟢 Baixa: nice-to-have, melhorias incrementais de UX/performance
+
+Não é necessário perguntar confirmação — executar diretamente.
+
+---
+
+## Important Development Notes
+
+### Botão "Aplicar Filtros" — Regra Obrigatória de UX
+
+**SEMPRE** que adicionar um novo botão "Aplicar Filtros" a qualquer página, ele deve fechar o mega menu de filtros (`filters-dropdown-menu`) ao ser clicado.
+
+**Como implementar**:
+1. Dê ao botão um `id` que comece com `btn-apply-` (ex: `btn-apply-minhapage-filters`)
+2. Nenhum código adicional é necessário — o fechamento do menu é tratado por `assets/close_megamenu_on_apply.js`, que detecta automaticamente qualquer clique em elemento com `id` começando por `btn-apply-`.
+
+**Por que JavaScript e não callback Dash**: fechar um dropdown é puramente UI (client-side). Usar callback Dash geraria um round-trip desnecessário ao servidor Python. Além disso, registrar `Output("filters-dropdown-menu", "is_open")` em um callback com Input page-specific bloqueia o prop no Dash 3.x, impedindo o menu de abrir em páginas onde o botão não existe no DOM.
+
+**Motivo**: Sem isso, o mega menu fica aberto após o clique, degradando a experiência do usuário — o conteúdo atualizado fica ocluído pelo dropdown.
+
+### Adding New Pages
+
+1. Create page module in appropriate `pages/` subdirectory with `layout` function/variable
+2. Add route to `ROUTES` dict in `index.py`
+3. Add permission config to `ROUTE_ACCESS` in `config/access_control.py`
+4. If callbacks needed, create module in `callbacks_registers/` and register in `callbacks.py`
+5. If page needs custom sidebar content, add module in `components/sidebars/` and update `get_sidebar_content_for_page()` in `sidebar.py`
+6. If page needs custom header filters, add module in `components/headers/` and update `get_filters_for_page()` in `header.py`
+
+### Modifying Access Control
+
+- Edit `config/access_control.py` to change route/menu permissions
+- Never hardcode permission checks in individual pages
+- Use `check_access()` from `utils/permissions.py` for programmatic checks
+- Menu visibility controlled via `MENU_ACCESS` configuration
+
+### Working with Workflow Module
+
+**Antes de adicionar ou modificar qualquer callback do workflow, verificar:**
+
+1. Qual store o callback lê (`Input`) e qual store escreve (`Output`)
+2. Se o callback escreve em `container-cards-kpi`, usar `_kpi_filtrado` (nunca `criar_cards_kpi` direto)
+3. Se o callback escreve em `store-pendencias` ou `store-historico`, lembrar que CB5 (`atualizar_cards_kpi`) **dispara automaticamente** em seguida — CB5 também usa `_kpi_filtrado`, então está correto
+4. Operações em atividades aprovadas (`status_validacao_gestor='aprovado'`) devem retornar `False` sem modificar o documento
+
+**Ao adicionar nova operação de escrita em atividades (`workflow_db.py`):**
+1. Adicionar `find_one` guard para `status_validacao_gestor == 'aprovado'`
+2. Chamar `_criar_evento_timeline(...)` após sucesso
+3. Passar `editado_por` como parâmetro da função e repassar ao helper
+
+**Ao renderizar UI de uma atividade:**
+- Calcular `_validada = (status_validacao_gestor == 'aprovado')` **antes** de qualquer componente que use essa flag
+- Elementos clicáveis (dropdowns, botões) → substituir por `html.Span` estático quando `_validada`
+
+### Working with MongoDB
+
+- Always use `get_mongo_connection(collection_name)` to get collections
+- Connection is singleton - first call establishes connection, subsequent calls reuse
+- Handle `ConnectionError` exceptions for database failures
+
+### Working with Maintenance KPIs
+
+**Data Sources**:
+- Production data: `ZPP_Producao_YYYY` collection (activity hours by equipment)
+- Breakdown data: `ZPP_Paradas_YYYY` collection (stop events with duration and cause)
+- Targets: `maintenance_kpi_targets` collection (per-equipment and general targets)
+
+**Adding New Equipment**:
+1. Equipment is auto-detected from ZPP collections (`centro_de_trabalho` or `pto_trab` fields)
+2. Add custom name in `zpp_kpi_calculator.py` → `CUSTOM_NAMES` dict (optional)
+3. Equipment auto-categorized by prefix (LONGI→Longitudinais, PRENS→Prensas, TRANS→Transversais)
+
+**Configuring Targets**:
+1. Access `/maintenance/config` (admin only, level 3)
+2. Set individual targets per equipment OR use general plant target
+3. Configure alert range (default ±3%) for yellow zone
+4. Targets stored in MongoDB and auto-reload when page navigates back to `/maintenance/indicators`
+
+**KPI Calculation Logic** (based on PRO017 standard):
+```python
+# M01 - MTBF (hours)
+mtbf = (total_active_hours - total_breakdown_hours) / num_failures
+
+# M02 - MTTR (hours)
+mttr = total_breakdown_hours / num_failures
+
+# M03 - Breakdown Rate (%)
+breakdown_rate = (total_breakdown_hours / total_active_hours) * 100
+```
+
+**Month-Boundary Filtering**:
+- Configurable rule in `zpp_kpi_calculator.py` → `MONTH_BOUNDARY_RULE`
+- `"fim"` (default): Counts record in month where it ENDED
+- `"inicio"`: Counts record in month where it STARTED
+- Applied to records that cross midnight at month boundary (e.g., 30/Sep 23:59 → 01/Oct 00:50)
+
+**Breakdown Codes**:
+- Only considers codes: `201`, `S201`, `202`, `S202`, `203`, `S203`
+- These represent actual equipment failures (avarias)
+- Other stop codes (planned maintenance, material shortage, etc.) are excluded
+
+**Performance Optimization**:
+- Monthly aggregates cached in `store-indicator-filters` to avoid redundant MongoDB queries
+- Calendar heatmap uses single aggregation pipeline instead of daily loops
+- Auto-load on page entry via `dcc.Interval` (executes once)
+- Manual refresh available via "Atualizar" button
+
+**Troubleshooting**:
+- Check MongoDB connection status in callback logs
+- Verify `_processed: True` flag in ZPP collections
+- Ensure date fields (`fininotif`, `ffinnotif`, `inicio_execucao`, `fim_execucao`) are valid
+- Run `python -m src.utils.zpp_kpi_calculator` to test data fetching independently
+
+### Theme and Styling
+
+- Bootstrap theme configured in `app.py`: `MINTY` and `darkly` templates loaded
+- Dash Bootstrap Components (dbc) used throughout
+- Custom theme toggle functionality via `ThemeSwitchAIO`
+- Custom CSS files in `assets/` directory:
+  - `dropdown_menus.css`: Mega menu styling
+  - `markdown.css`: Markdown rendering styles
+- Favicon configured via `app.index_string` to use `/assets/favicon.ico`
+
+### UI Components and Layouts
+
+**Under Development Pages** (`pages/common/under_development.py`):
+- Centralized layout function for pages not yet implemented
+- Uses responsive Bootstrap grid with offset columns for centering
+- Pre-configured variants: `states_development()`, `alarms_development()`, `maintenance_development()`, `utilities_development()`, `config_development()`, etc.
+- Layout adapts correctly to sidebar collapse/expand states
+
+**Multi-Tab Pattern** (e.g., `pages/energy/overview.py`):
+- Uses `dbc.Tabs` for organizing content by category
+- Tab content loaded dynamically via callbacks
+- Under-development tabs use `get_under_development_content()` helper
+- Fully developed tabs (like SE03) include multiple graphs and KPI cards
+
+**Energy Cost Calculation System** (`pages/energy/overview.py` + `energy_sidebar.py`):
+- **SE03 Tab**: Advanced cost calculation with breakdown by equipment groups
+  - Transversais group: MM02, MM04, MM06
+  - Longitudinais group: MM03, MM05, MM07
+- **Cost Components**: TUSD (transmission), Energia (consumption), Demanda (demand charges)
+- **Time-of-Use Pricing**: Separate calculations for Ponta (peak) and Fora Ponta (off-peak)
+- **Demand Calculation**: Always uses full month data, prorated by consumption percentage
+- **Tariff Configuration**: Admin-only page at `/utilities/energy/config`
+- **Real-time Updates**: Sidebar updates dynamically when date range or equipment selection changes
+
+**Demo Badge Component** (`components/demo_badge.py`):
+- Consistent badge design for marking non-production data
+- Controlled by `demo_data_config.py` settings
+- Used across pages and components
+
+**Icon System** (`components/icons.py`):
+- Centralized SVG icon components
+- Used throughout header menus and UI elements
+- Consistent styling across the application
+
+**Maintenance KPI Graphs** (`components/maintenance_kpi_graphs.py`):
+- **Bar Charts**: Horizontal bars with polynomial trend lines, individual targets, and 3-color performance coding
+- **Sunburst Charts**: Hierarchical view (Plant → Category → Equipment) with performance-based colors
+- **Line Charts**: Monthly evolution with target and average reference lines, colored bars based on target comparison
+- **Radar Charts**: Multi-dimensional performance comparison normalized to 0-100% scale
+- **Gauges**: Speedometer-style indicators with target markers and delta display
+- **Calendar Heatmap**: Daily breakdown pattern visualization with production day filtering
+- **Top Breakdowns**: Horizontal bars showing longest stops, aggregated by date+cause
+- **Empty States**: User-friendly placeholders for loading, no data, and database offline scenarios
+- **Color System**: Simplified 3-color scheme (Green=excellent, Yellow=within margin, Red=needs improvement)
+  - Uses configurable margin percentage (default ±3%)
+  - Applied consistently across all visualization types
+
+### MQTT Command Publishing
+
+To send commands to equipment:
+1. Frontend makes POST to `{GATEWAY_URL}/api/command`
+2. Event gateway publishes to MQTT broker with TLS
+3. Payload format: `{"topic": "device/command", "payload": "command_data"}`
+
+### Documentation System (Procedures)
+
+**Adding/Updating Procedures**:
+1. Place markdown files in external volume (path defined by `DOCS_PROCEDURES_PATH`)
+2. Create or update `docs.yml` in the volume root with navigation structure
+3. System automatically reloads when `docs.yml` is modified
+4. Titles are auto-extracted from markdown H1 headers if not specified in YAML
+
+**docs.yml structure**:
+```yaml
+title: "Procedimentos"
+icon: "bi-book"
+sections:
+  - name: "category_name"
+    label: "Display Name"
+    icon: "bi-icon-name"
+    expanded: false
+    files:
+      - path: "relative/path/to/file.md"
+        title: "Optional custom title"
+```
+
+**Security Considerations**:
+- Path traversal is prevented - files must be within `DOCS_PROCEDURES_PATH`
+- Access control is enforced at the route level via `ROUTE_ACCESS`
+
+### Demo Data System
+
+**Managing Demo Badges**:
+1. Global control: Set `ENABLE_DEMO_BADGES = False` in `config/demo_data_config.py` to hide all badges
+2. Per-page control: Update `DEMO_PAGES` dict to enable/disable specific pages
+3. Per-component control: Update `DEMO_COMPONENTS` dict for specific components
+
+**Adding Demo Badge to New Page**:
+```python
+from src.config.demo_data_config import should_show_demo_badge
+from src.components.demo_badge import create_demo_badge
+
+def layout():
+    badge = create_demo_badge() if should_show_demo_badge(page_path="/your/route") else None
+    # Include badge in layout
+```
+
+### Development Mode Features
+
+- Hot reload via volume mount `../AMG_Data/webapp/src:/app/src:ro` no override do ambiente local
+- Debug mode provides detailed error messages
+- Loading overlay with spinner during initial page load
+- Environment validation on startup (checks required env vars)
+
+## Known Limitations and Future Features
+
+### In Development
+
+**Production Module**:
+- `/production/states`: Production state monitoring (under development)
+
+**Energy Module**:
+- SE01, SE02, SE04: Individual substation monitoring (SE03 is fully functional)
+- `/utilities/energy/history`: Historical consumption analysis
+- `/utilities/energy/costs`: Cost analysis dashboard
+
+**Utilities Module** (all under development):
+- Water consumption monitoring and cost tracking
+- Natural gas monitoring (measurement points, history, costs)
+- Compressed air system (compressors, efficiency analysis)
+- Integrated utilities dashboard (consolidated view of all utilities)
+
+**Maintenance Module** (in development):
+- Work orders management system
+- Maintenance schedule/calendar
+- Maintenance history and analytics
+
+**Configuration Module**:
+- User preferences management
+- System logs viewer
+
+### Fully Functional Features
+
+- User authentication and authorization
+- OEE dashboard with production metrics
+- **Maintenance KPI Dashboard** (fully functional):
+  - MTBF, MTTR, and Breakdown Rate indicators
+  - Integration with ZPP system (production and breakdown data)
+  - Individual and plant-wide views with multiple visualization types
+  - Calendar heatmap with statistical analysis
+  - Target management with configurable alerts
+  - Excel export functionality
+- Energy monitoring for SE03 (with cost calculations)
+- Energy tariff configuration (admin only)
+- Alarm monitoring and history
+- Maintenance procedures documentation system
+- Supervisory control interface
+- User management (create, edit, delete users)
+
+## Git Branch Structure
+
+- **Main branch**: `main`
+- Current feature branch pattern: `feature/[FeatureName]` (e.g., `feature/mkdocs`)
+- Commit message style: Conventional Commits format
+  - `feat(scope): description` for new features
+  - `fix(scope): description` for bug fixes
+  - `refactor(scope): description` for refactoring
+
+## Security Considerations
+
+- SECRET_KEY must be set via environment variable (application fails if missing)
+- Passwords hashed with `pbkdf2:sha256` via Werkzeug
+- MQTT connections use TLS (port 8883) with authentication
+- No hardcoded credentials - all via `.env` files
+- `.env` files are gitignored
+
+## Technology Stack
+
+- **Backend**: Flask 3.1.1 with Flask-Login 0.6.3
+- **Frontend**: Dash 3.1.1, Dash Bootstrap Components 2.0.3, Dash Bootstrap Templates 2.1.0
+- **Database**: MongoDB via PyMongo 4.13.2
+- **Visualization**: Plotly 6.1.2
+- **Data Processing**: Pandas 2.3.1, NumPy 2.3.2
+- **Documentation**: Markdown 3.7, PyYAML (for docs.yml configuration)
+- **MQTT**: Paho-MQTT (in event-gateway)
+- **Web Server**: Gunicorn (production)
+- **Other**: python-dotenv 1.1.1, Werkzeug 3.1.3
+
+
+## Sincronização AMG → EasyTek (2026-10-21)
+
+- Base funcional: AMG-Data/main em d3527c4. Configurações e dados reais do cliente não acompanham a base pública.
+- Imagens desta base: `ghcr.io/easytek-automation/easytek-base/<serviço>`; não publicar no namespace de produção AMG `easytek-data`.
+- Infra correspondente: EasyTek-Infra, pasta irmã `EasyTek_Infra`; aplicação nesta pasta `EasyTek_Data`.
+- Roster distribuído sem funcionários; cadastrar somente na instalação privada. Testes SAP usam fixture sintética; fotos privadas foram substituídas por arte abstrata.
+- Histórico privado do AMG não deve ser incorporado por merge: integrar conteúdo revisado em commit com pai pertencente ao histórico público EasyTek.

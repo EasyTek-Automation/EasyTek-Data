@@ -10,18 +10,21 @@ Layout (DS-08): header (título + Atualizar + Exportar + selo de frescor) → fi
 from dash import html, dcc, dash_table
 import dash_bootstrap_components as dbc
 
-# rótulos de exibição dos valores internos
+# rótulos de exibição dos valores internos (Terceiros/Gestão adicionados no B34)
 LABEL_DISCIPLINA = {"Mecanica": "Mecânica", "Eletrica": "Elétrica",
+                    "Terceiros": "Serviço de terceiros", "Gestao": "Gestão",
                     "NaoClassificado": "Não classificado"}
 LABEL_SUBCLASS = {"Corretiva": "Corretiva", "PDCA": "PDCA",
                   "CorretivaProgramada": "Corretiva Programada", "Preditiva": "Preditiva"}
 
+# datas em ISO (aaaa-mm-dd) + type datetime → ordenação cronológica correta na DataTable
 TABLE_COLUMNS = [
     {"name": "Ordem", "id": "ordem"},
     {"name": "Descrição", "id": "descricao"},
     {"name": "Disciplina", "id": "disciplina"},
     {"name": "Centro / Operação", "id": "centro_operacao_0010"},
-    {"name": "Início", "id": "data_inicio"},
+    {"name": "Início", "id": "data_inicio", "type": "datetime"},
+    {"name": "Criação", "id": "data_criacao", "type": "datetime"},
     {"name": "Linha", "id": "local_pai_nome"},
     {"name": "Conjunto", "id": "local_instalacao"},
 ]
@@ -70,13 +73,31 @@ def _viz_row():
 
 def _barras_row():
     return dbc.Row(dbc.Col(html.Div([
-        html.Div("Backlog por mês (data de início)", className="small fw-bold bk-field-label mb-1"),
+        html.Div("Backlog por mês (data de início)", id="bk-barras-titulo",
+                 className="small fw-bold bk-field-label mb-1"),
         dcc.Loading(dcc.Graph(id="bk-barras-mes", config={"displayModeBar": False},
                               style={"height": "250px"})),
     ], className="bk-field p-2 rounded bg-white"), width=12), className="mb-3")
 
 
 NAVY = "#08137C"  # azul escuro do logo Tekmont
+
+
+def _eixo_switch():
+    """Controle isolado (fora dos grupos validados): escolhe a data-base (eixo) aplicada
+    ao filtro de período, aos insights e ao gráfico mensal. Não afeta o corte de vencidas
+    da preventiva (sempre por data de início — BR-03)."""
+    return dbc.Row(dbc.Col(html.Div([
+        html.Span("Eixo de data:", className="small text-muted me-2 fw-semibold"),
+        dbc.RadioItems(
+            # default = Criação (ERDAT): mesma base de idade do quadro de Hora-Homem, p/ as
+            # "ordens mais antigas" baterem entre backlog e HH. Switch permite voltar a Início.
+            id="bk-eixo-data", value="data_criacao", inline=True, className="small d-inline-flex",
+            options=[{"label": "Início", "value": "data_inicio"},
+                     {"label": "Criação", "value": "data_criacao"}],
+        ),
+    ], className="d-flex align-items-center justify-content-end"),
+        width="auto", className="ms-auto"), className="mb-2")
 
 # estilos dos checkboxes (contraste em fundo claro) e do campo
 _CHK_INPUT = {"width": "1.05rem", "height": "1.05rem", "border": f"1px solid {NAVY}",
@@ -120,7 +141,7 @@ def _filtros():
                    dcc.Dropdown(id="bk-f-local-pai", multi=True, options=[],
                                 placeholder="Todas as linhas", className="bk-dropdown"),
                    md=4),
-            _campo("Período (data de início)",
+            _campo("Período (conforme eixo de data)",
                    html.Div(
                        dcc.DatePickerRange(
                            id="bk-f-periodo", display_format="DD/MM/YYYY",
@@ -164,10 +185,17 @@ def _header():
     ], className="align-items-center mb-3 g-2")
 
 
-def layout():
-    return dbc.Container([
+def _tab_backlog_content():
+    """Conteúdo original da página de backlog (preservado integralmente — todos os ids bk-*).
+
+    Extraído para dentro de uma aba sem alterar nada da aparência/comportamento já entregue
+    (premissa de preservação de UI). Os ids bk-* permanecem montados no DOM (dbc.Tab renderiza
+    o conteúdo das duas abas), então os callbacks do backlog seguem funcionando.
+    """
+    return html.Div([
         _header(),
         _filtros(),
+        _eixo_switch(),
         _viz_row(),
         _barras_row(),
         dbc.Row(
@@ -205,4 +233,18 @@ def layout():
         dcc.Interval(id="bk-interval-load", interval=400, max_intervals=1),
         dcc.Interval(id="bk-cooldown", interval=15000),  # re-habilita o botão após o cooldown
         html.Div(id="bk-refresh-status", className="small text-muted mt-2"),
+    ])
+
+
+def layout():
+    """Página de backlog com três abas: Backlog (intacto) + Planejamento semanal (HH) +
+    Histórico Semanal (adição pura — SDD hh-historico, BR-14)."""
+    from src.pages.maintenance import hh_quadro, hh_historico
+    return dbc.Container([
+        dbc.Tabs([
+            dbc.Tab(_tab_backlog_content(), label="Backlog", tab_id="tab-backlog"),
+            dbc.Tab(hh_quadro.board_content(), label="Planejamento semanal", tab_id="tab-hh"),
+            hh_historico.hist_tab(),
+        ], id="backlog-tabs", active_tab="tab-backlog",
+           persistence=True, persistence_type="session", persisted_props=["active_tab"]),
     ], fluid=True, className="py-3")

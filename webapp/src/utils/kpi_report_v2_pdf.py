@@ -32,6 +32,7 @@ from reportlab.platypus import (
 
 from src.pages.maintenance.kpi_report_v2 import TRANS
 from src.utils.kpi_report_config import fmt_numero
+from src.utils.zpp_paradas_pendentes import LEGENDA as LEGENDA_PENDENTE, SELO as SELO_PENDENTE
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,53 @@ def _fmt(v: Optional[float], casas: int = 1) -> str:
 # ============================================================================
 # Builders por bloco
 # ============================================================================
+
+def _bloco_mao_de_obra_flowables(styles: dict, dados: dict) -> list:
+    """Bloco "Mão de obra da semana" (BR-11/12, SP-18/20) — PT (SP-23 revisado). Último bloco
+    de dados do PDF. Defensivo: HH indisponível / falha → lista vazia (não derruba o export)."""
+    try:
+        from datetime import timedelta
+
+        from src.utils import kpi_report_config as _cfg
+        from src.utils import kpi_report_maodeobra as _mdo
+        from src.utils.hh_data import semana_mao_de_obra
+        from src.utils.kpi_report_figures import renderizar_sunburst_png
+
+        # dia avaliado = o mesmo do relatório (DatePicker, default ontem), injetado pelo callback.
+        ref = (dados or {}).get("_mao_de_obra_ref")
+        if ref is None:
+            agora = _cfg._now_in_report_timezone() if hasattr(_cfg, "_now_in_report_timezone") else datetime.now()
+            ref = agora - timedelta(days=1)
+        sem = semana_mao_de_obra(ref)
+        out = [Paragraph("Mão de obra da semana", styles["block_title"])]
+        if not sem or sem.get("sem_dados") or not sem.get("dias"):
+            out.append(Paragraph("Sem dados de mão de obra no período.", styles["kpi_line"]))
+            return out
+        out.append(Paragraph(_mdo.rotulo_semana(sem), styles["subtitle"]))
+        dias = sem["dias"]
+        png = renderizar_sunburst_png(_mdo.fig_mao_de_obra(dias),
+                                      kpi_label="mao_de_obra", width=1400, height=420, scale=2)
+        out.append(Image(io.BytesIO(bytes(png)), width=24 * cm, height=7.2 * cm))
+        out.append(Spacer(1, 4))
+        linhas = _mdo.linhas_tabela(dias)
+        rows = [list(_mdo.CABECALHOS)]
+        for l in linhas:
+            rows.append([l["dia"], l["disponivel"], l["planejado"], l["pct"],
+                         l["executado"], l["aderencia"]])
+        tbl = Table(rows, colWidths=[3 * cm, 3.5 * cm, 3.5 * cm, 3 * cm, 3.5 * cm, 3 * cm])
+        tbl.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e9ecef")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTSIZE", (0, 0), (-1, -1), 9),
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#adb5bd")),
+            ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+        ]))
+        out.append(tbl)
+        return out
+    except Exception:
+        logger.exception("PDF: falha no bloco de mão de obra; omitido")
+        return []
+
 
 def _bloco_planta_flowables(block_id: int, dados: Optional[dict], lang: str,
                               titulo_key: str, styles: dict,
@@ -212,14 +260,27 @@ def _bloco_planta_flowables(block_id: int, dados: Optional[dict], lang: str,
     return out
 
 
+# BR-14 / SP-27: a fonte padrão do reportlab não tem o "⏳" → no PDF o selo é só texto em negrito
+_SELO_PDF = SELO_PENDENTE.replace("⏳", "").strip()
+_LEGENDA_PDF = LEGENDA_PENDENTE.replace("⏳", "").strip()
+
+
+def _esc(txt: str) -> str:
+    """Escapa &, < e > para o mini-HTML do Paragraph do reportlab."""
+    return str(txt).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+
 def _bloco_paradas_flowables(block_id: int, dados: Optional[dict], lang: str,
                                titulo_key: str, styles: dict, top_n: Optional[int],
                                title_suffix: str = "") -> list:
     """Bloco 2 ou 5 — Top paradas. `title_suffix` BR-02b: ' — DD/MM/YYYY'."""
     full_title = _t(lang, titulo_key) + (title_suffix or "")
     out: list = [Paragraph(full_title, styles["block_title"])]
+    aviso = (dados or {}).get("aviso_checagem") or ""
     if not dados or dados.get("vazio") or not dados.get("paradas"):
         out.append(Paragraph(_t(lang, "no_data"), styles["kpi_line"]))
+        if aviso:
+            out.append(Paragraph(f"<i>{_esc(aviso)}</i>", styles["small"]))
         return out
 
     paradas = dados["paradas"]
@@ -238,7 +299,8 @@ def _bloco_paradas_flowables(block_id: int, dados: Optional[dict], lang: str,
         rows.append([
             Paragraph(str(p.get("posicao", "")), styles["small"]),
             Paragraph(str(p.get("equipamento", "")), styles["small"]),
-            Paragraph(f"{p.get('causa', '')} — {p.get('descricao', '')}",
+            Paragraph((f"<b>{_SELO_PDF}</b> · " if p.get("pendente") else "")
+                      + f"{p.get('causa', '')} — {p.get('descricao', '')}",
                       styles["small"]),
             Paragraph(str(p.get("data_hora", "")), styles["small"]),
             Paragraph(str(p.get("duracao_min", "")), styles["small"]),
@@ -258,8 +320,17 @@ def _bloco_paradas_flowables(block_id: int, dados: Optional[dict], lang: str,
         ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
         ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#dee2e6")),
         ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#adb5bd")),
+    ] + [  # BR-14: linha pendente com fundo cinza-claro (o selo em texto garante leitura P&B)
+        ("BACKGROUND", (0, i), (-1, i), colors.HexColor("#E6E6E6"))
+        for i, p in enumerate(paradas, start=1) if p.get("pendente")
     ]))
     out.append(tbl)
+    if any(p.get("pendente") for p in paradas):
+        out.append(Spacer(1, 1.5 * mm))
+        out.append(Paragraph(_esc(_LEGENDA_PDF), styles["small"]))
+    if aviso:
+        out.append(Spacer(1, 1.5 * mm))
+        out.append(Paragraph(f"<i>{_esc(aviso)}</i>", styles["small"]))
     out.append(Spacer(1, 6 * mm))
     return out
 
@@ -409,6 +480,9 @@ def gerar_pdf(dados: dict, blocos_ativos: set[int] | list[int],
             5, dados.get("bloco5"), lang, "block_5_title", styles, top_n=None,
             title_suffix=suffix_24h,
         ))
+
+    # último bloco de dados — mão de obra da semana (SP-18); antes das seções de reunião
+    story.extend(_bloco_mao_de_obra_flowables(styles, dados))
 
     doc.build(story, onFirstPage=_on_page, onLaterPages=_on_page)
     return buf.getvalue()

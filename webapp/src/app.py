@@ -123,6 +123,30 @@ try:
 except Exception:
     logging.getLogger("backlog").exception("backlog: seed no boot falhou (webapp continua)")
 
+# De/para de executores (PERNR persona → nome real) — SDD hh-management SP-06.6/BR-14.
+# Idempotente (upsert por código a partir de roster_executores.json). O modal de detalhe
+# da ordem traduz o código cru do IW47 para o nome via `hh_executores`.
+try:
+    from src.utils.hh_executores import seed_executores as _seed_executores
+    _seed_executores()
+except Exception:
+    logging.getLogger("hh_executores").exception("hh_executores: seed no boot falhou (webapp continua)")
+
+# --- Análise de Falhas: garante índices da collection FailureAnalysis no boot ---
+# Faz o papel de "migration" — o projeto não tem framework de migração, e a
+# convenção é ensure_indexes idempotente no boot. O índice único em
+# `parada_chave` é o que garante no máximo uma análise por parada.
+try:
+    from src.utils.failure_analysis_db import ensure_indexes as _fa_ensure_indexes
+    if not _fa_ensure_indexes():
+        logging.getLogger("failure_analysis").warning(
+            "análise de falhas: Mongo offline no boot — índices no próximo restart"
+        )
+except Exception:
+    logging.getLogger("failure_analysis").exception(
+        "análise de falhas: criação de índices falhou (webapp continua)"
+    )
+
 # --- Custo de Manutenção: garante schema (coleções + índices) no boot (DS-03) ---
 # Idempotente. Cria AMG_CustoResumo/AMG_CustoLancamentos vazias + índices, para a
 # coleta SAP (Bloco D) gravar direto sem depender de seed/CSV. Webapp continua se falhar.
@@ -141,6 +165,34 @@ try:
         )
 except Exception:
     logging.getLogger("custos").exception("custos: erro ao garantir schema no boot (webapp continua)")
+
+# --- Paradas pendentes (KPIReport-v2 BR-14): agenda da coleta ZPPPARADAS ---
+# Isolada do sap-scheduler (como custos): só enfileira em sap_jobs às 06:30 e 10:00
+# (env ZPP_PARADAS_PENDENTES_HORAS); o daemon do cliente executa. Webapp continua se falhar.
+try:
+    from src.utils.zpp_paradas_scheduler import init_scheduler as _zpend_init_scheduler
+    from src.sap_scheduler.mongo_helpers import get_db as _zpend_get_db
+    _zpend_init_scheduler(_zpend_get_db(), os.getenv("TZ", "America/Sao_Paulo"))
+except Exception:
+    logging.getLogger("zpp_paradas").exception("zpp_paradas: agenda não iniciou (webapp continua)")
+
+# --- Captura Fase 2 do Histórico Semanal (SDD hh-historico, Bloco E) ---
+# Job semanal no webapp: grava hh_historico_semanal (SCD2 do estado do backlog) + hh_historico_fora.
+# Só Mongo, não toca o daemon. Webapp continua se falhar.
+try:
+    from src.utils.hh_historico_data import ensure_indexes_historico as _hist_ensure_indexes
+    from src.utils.hh_historico_scheduler import init_historico_scheduler as _hist_init_scheduler
+    from src.sap_scheduler.mongo_helpers import get_db as _hist_get_db
+    _hist_db = _hist_get_db()
+    if _hist_db is not None:
+        _hist_ensure_indexes()
+        _hist_init_scheduler(_hist_db, os.getenv("TZ", "America/Sao_Paulo"))
+    else:
+        logging.getLogger("hh_historico").warning(
+            "histórico: Mongo offline no boot — captura semanal inicia no próximo restart")
+except Exception:
+    logging.getLogger("hh_historico").exception(
+        "histórico: erro ao iniciar captura semanal no boot (webapp continua)")
 
 # --- Configuração do Favicon Customizado ---
 app.index_string = '''

@@ -22,8 +22,48 @@ _BRT = pytz.timezone("America/Sao_Paulo")
 
 CATEGORIAS = ["Preventiva", "Corretiva", "Melhoria", "Matrizes"]
 CATEGORIAS_COM_DISCIPLINA = ("Preventiva", "Corretiva")
-DISCIPLINAS = ["Mecanica", "Eletrica", "NaoClassificado"]
+# B34 (2026-07-17): Terceiros (Z03) e Gestão (Z01) ganham fatia própria — antes caíam em
+# NaoClassificado e inflavam a pendência. Ordem = ordem de exibição da rosca.
+DISCIPLINAS = ["Mecanica", "Eletrica", "Terceiros", "Gestao", "Ferramentaria", "NaoClassificado"]
+LABEL_DISCIPLINA = {"Mecanica": "Mecânica", "Eletrica": "Elétrica",
+                    "Terceiros": "Serviço de terceiros", "Gestao": "Gestão",
+                    "Ferramentaria": "Ferramentaria",  # B37: Z04 (matrizes) — classificada, fora do quadro
+                    "NaoClassificado": "Não classificado"}
 SUBCLASSIFICACOES = ["Corretiva", "PDCA", "CorretivaProgramada", "Preditiva"]
+
+# Status do usuário (USTXT) que tira a ordem do trabalho pendente: encerrada / cancelada (B35).
+_STATUS_MORTOS = frozenset({"CERR", "CANC"})
+
+
+def esta_encerrada(o: dict) -> bool:
+    """True se a ordem está Encerrada (CERR) ou Cancelada (CANC) pelo status do usuário (B35).
+
+    Combos como 'CERR PRIO' contam pela 1ª palavra. Ordem sem status → não encerrada.
+    """
+    su = (o.get("status_usuario") or "").strip().upper()
+    return bool(su) and su.split()[0] in _STATUS_MORTOS
+
+
+def esconder_encerradas(ordens: list) -> list:
+    """Remove as ordens Encerradas/Canceladas de uma lista (fila e aba backlog — B35)."""
+    return [o for o in ordens if not esta_encerrada(o)]
+
+
+# Centros que NÃO são classificáveis pelo PCM nesta tela: genérico (MAN) e sem centro na
+# operação 0010 (None/vazio). Não inflam a fila "pendente de classificação" nem a aba backlog (B37).
+_CENTROS_NAO_CLASSIFICAVEIS = frozenset({"MAN"})
+
+
+def sem_centro_classificavel(o: dict) -> bool:
+    """True se a ordem não tem centro classificável na operação 0010: sem centro (None/vazio)
+    ou centro genérico MAN. Essas nunca serão classificadas nesta tela → fora da fila/backlog (B37)."""
+    c = (o.get("centro_operacao_0010") or "").strip().upper()
+    return (not c) or (c in _CENTROS_NAO_CLASSIFICAVEIS)
+
+
+def esconder_sem_centro(ordens: list) -> list:
+    """Remove ordens sem centro classificável (None/MAN) de uma lista (fila e aba backlog — B37)."""
+    return [o for o in ordens if not sem_centro_classificavel(o)]
 
 
 def hoje_brt() -> datetime:
@@ -78,8 +118,23 @@ def _vencida_ou_nao_preventiva(o: dict, hoje: datetime) -> bool:
     return True
 
 
-def _passa_filtros(o: dict, f: dict) -> bool:
-    """Aplica os 6 filtros (SP-07): E entre dimensões, OU dentro da dimensão."""
+def _data_eixo(o: dict, eixo: str):
+    """Data-base do `eixo` escolhido, com fallback. No eixo 'data_criacao' (ERDAT), se a
+    ordem não tiver criação (ex: backlog sintetizado da IW37, que não traz ERDAT), cai de
+    volta para 'data_inicio' (GSTRP). Mesma regra de idade que o quadro de Hora-Homem usa
+    (`base = data_criacao or data_inicio`), p/ as duas telas baterem. Retorna datetime ou None."""
+    d = o.get(eixo)
+    if not isinstance(d, datetime) and eixo == "data_criacao":
+        d = o.get("data_inicio")
+    return d if isinstance(d, datetime) else None
+
+
+def _passa_filtros(o: dict, f: dict, eixo: str = "data_inicio") -> bool:
+    """Aplica os 6 filtros (SP-07): E entre dimensões, OU dentro da dimensão.
+
+    `eixo` define qual data o filtro de período usa: 'data_inicio' (GSTRP, default) ou
+    'data_criacao' (ERDAT). Não afeta o corte de vencidas (BR-03), que é sempre GSTRP.
+    """
     if not f:
         return True
     cat = f.get("categoria")
@@ -102,8 +157,8 @@ def _passa_filtros(o: dict, f: dict) -> bool:
     ini = f.get("periodo_ini")
     fim = f.get("periodo_fim")
     if ini or fim:
-        di = o.get("data_inicio")
-        if not isinstance(di, datetime):
+        di = _data_eixo(o, eixo)
+        if di is None:
             return False
         if ini and di < ini:
             return False
@@ -112,13 +167,18 @@ def _passa_filtros(o: dict, f: dict) -> bool:
     return True
 
 
-def filtrar(ordens: list, filtros: dict, hoje: datetime | None = None) -> list:
-    """Aplica recorte de vencidas + filtros, devolve as ordens visíveis."""
+def filtrar(ordens: list, filtros: dict, hoje: datetime | None = None,
+            eixo: str = "data_inicio") -> list:
+    """Aplica recorte de vencidas + filtros, devolve as ordens visíveis.
+
+    `eixo` ('data_inicio'|'data_criacao') é repassado só ao filtro de período. O recorte de
+    vencidas (`_vencida_ou_nao_preventiva`) é sempre por GSTRP (BR-03), independente do eixo.
+    """
     if hoje is None:
         hoje = hoje_brt()
     return [
         o for o in ordens
-        if _vencida_ou_nao_preventiva(o, hoje) and _passa_filtros(o, filtros)
+        if _vencida_ou_nao_preventiva(o, hoje) and _passa_filtros(o, filtros, eixo)
     ]
 
 
@@ -156,6 +216,19 @@ def _resolver(tplnr: str, idx: dict):
         cur = idx.get(cur.get("pai"))
         visita += 1
     return linha, conj
+
+
+def resolver_linha(tplnr: str, idx: dict | None = None) -> dict | None:
+    """Nó Linha da hierarquia oficial a partir de um TPLNR (local de instalação), subindo a árvore.
+
+    Público (usado por `hh_data` para re-resolver a Linha de cards congelados que guardaram o
+    TPLNR mas não a `linha_nome`). `idx=None` usa a árvore cacheada (`carregar_ativos`). Devolve o
+    nó Linha (`{id, descricao, ...}`) ou `None` se o TPLNR não estiver na árvore / sem Linha acima.
+    """
+    if not (tplnr or "").strip():
+        return None
+    linha, _conj = _resolver(tplnr, idx if idx is not None else carregar_ativos())
+    return linha
 
 
 def enriquecer_local(ordens: list, idx: dict) -> list:
@@ -201,14 +274,18 @@ def dados_rosca_categoria(ordens: list):
 
 
 def dados_rosca_disciplina(ordens: list):
-    """(labels, valores) por disciplina: Mecânica/Elétrica/Não classificado."""
+    """(labels, valores) por disciplina: Mecânica/Elétrica/Terceiros/Gestão/Não classificado (B34).
+
+    Fatias com contagem 0 saem do gráfico (plotly ignora), então Terceiros/Gestão só aparecem
+    quando houver ordens desses centros (Z03/Z01).
+    """
     cont = {d: 0 for d in DISCIPLINAS}
     for o in ordens:
         d = o.get("disciplina")
         if d in cont:
             cont[d] += 1
-    labels = ["Mecânica", "Elétrica", "Não classificado"]
-    return labels, [cont["Mecanica"], cont["Eletrica"], cont["NaoClassificado"]]
+    labels = [LABEL_DISCIPLINA[d] for d in DISCIPLINAS]
+    return labels, [cont[d] for d in DISCIPLINAS]
 
 
 def dados_rosca_linha(ordens: list, topn: int = 8):
@@ -229,28 +306,33 @@ def dados_rosca_linha(ordens: list, topn: int = 8):
     return labels, vals
 
 
-def dados_barras_mes(ordens: list):
-    """(labels 'MM/AAAA', valores) por mês/ano da data de início, em ordem cronológica."""
+def dados_barras_mes(ordens: list, eixo: str = "data_inicio"):
+    """(labels 'MM/AAAA', valores) por mês/ano da data do `eixo` escolhido (início ou
+    criação), em ordem cronológica."""
     cont = {}
     for o in ordens:
-        di = o.get("data_inicio")
-        if isinstance(di, datetime):
+        di = _data_eixo(o, eixo)
+        if di is not None:
             cont[(di.year, di.month)] = cont.get((di.year, di.month), 0) + 1
     chaves = sorted(cont.keys())
     labels = [f"{m:02d}/{y}" for (y, m) in chaves]
     return labels, [cont[k] for k in chaves]
 
 
-def insights(ordens: list, hoje: datetime | None = None) -> dict:
-    """Métricas de texto do painel (respeitam o recorte filtrado)."""
+def insights(ordens: list, hoje: datetime | None = None,
+             eixo: str = "data_inicio") -> dict:
+    """Métricas de texto do painel (respeitam o recorte filtrado).
+
+    `eixo` define a data-base da idade/inflow: 'data_inicio' (GSTRP) ou 'data_criacao' (ERDAT).
+    """
     if hoje is None:
         hoje = hoje_brt()
     total = len(ordens)
     res = {"total": total}
     idades = []
     for o in ordens:
-        di = o.get("data_inicio")
-        if isinstance(di, datetime):
+        di = _data_eixo(o, eixo)
+        if di is not None:
             d = (hoje - di).days
             if d >= 0:
                 idades.append((d, o))

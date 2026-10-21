@@ -58,7 +58,7 @@ from src.components.headers import (
 from src.components.dropdown_footer import create_dropdown_footer
 
 # Sistema de Permissões
-from src.utils.permissions import can_see_menu
+from src.utils.permissions import can_see_menu, can_access_route
 
 
 def get_filters_for_page(pathname):
@@ -102,10 +102,15 @@ def create_header(pathname, user):
             item_style["opacity"] = "0.5"
         return dbc.DropdownMenuItem(
             html.Div([
-                html.Span(icon, style={"marginRight": "8px", "display": "inline-flex"}),
-                label
+                html.Span(icon, style={"marginRight": "8px", "display": "inline-flex",
+                                       "flexShrink": "0"}),
+                html.Span(label),
             ], className="d-flex align-items-center"),
-            href=href, active=active, disabled=disabled, style=item_style
+            href=href, active=active, disabled=disabled, style=item_style,
+            # O nome longo precisa quebrar em vez de vazar a coluna: o item do Bootstrap nasce
+            # com `white-space: nowrap`, e "Monitoramento de Ativos (DEMO)" saía da caixa. A
+            # classe é o gancho da regra em `assets/dropdown_menus.css`.
+            class_name="mtn-mega-item",
         )
 
     def _mtn_section_header(icon, title, color):
@@ -130,7 +135,9 @@ def create_header(pathname, user):
                             _mtn_item(alarm_icon(), "Alarmes", "/maintenance/alarms", active=(pathname == "/maintenance/alarms")),
                             _mtn_item(clipboard_icon(), "Procedimentos", "/maintenance/procedures", active=(pathname == "/maintenance/procedures")),
                             _mtn_item(workflow_icon(), "AMG WorkFlow", "/workflow/dashboard", active=(pathname == "/workflow/dashboard")),
-                            _mtn_item(checklist_icon(), "Backlog de Manutenção", "/maintenance/backlog", active=(pathname == "/maintenance/backlog")),
+                            _mtn_item(checklist_icon(), "Coletas SAP", "/maintenance/coletas-sap", active=(pathname == "/maintenance/coletas-sap")),
+                            _mtn_item(maintenance_icon(), "Monitoramento de Ativos", "/maintenance/monitoramento-ativos",
+                                      active=(pathname or "").startswith("/maintenance/monitoramento-ativos")),
                         ], style={"minHeight": "190px"})
                     ], width=4, className="border-end"),
 
@@ -138,6 +145,7 @@ def create_header(pathname, user):
                     dbc.Col([
                         html.Div([
                             _mtn_section_header(graph_icon(), "Indicadores", "#0dcaf0"),
+                            _mtn_item(speedometer_icon(), "Visão Geral", "/maintenance/overview", active=(pathname == "/maintenance/overview")),
                             _mtn_item(speedometer_icon(), "Dashboard", "/maintenance/indicators-v2", active=(pathname == "/maintenance/indicators-v2")),
                             _mtn_item(sliders_icon(), "Configurar Metas", "/maintenance/config", active=(pathname == "/maintenance/config")),
                             _mtn_item(html.I(className="bi bi-file-earmark-spreadsheet"), "Processamento ZPP", "/maintenance/zpp-processor", active=(pathname == "/maintenance/zpp-processor")),
@@ -146,19 +154,34 @@ def create_header(pathname, user):
 
                     # COLUNA 3: PLANEJAMENTO
                     dbc.Col([
-                        html.Div([
-                            _mtn_section_header(calendar_icon(), "Planejamento", "#fd7e14"),
-                            _mtn_item(calendar_icon(), "Planejamento Gantt", "/maintenance/gantt", active=(pathname == "/maintenance/gantt")),
-                            _mtn_item(calendar_icon(), "Plano de Manutenção", "/maintenance/schedule", disabled=True),
-                            _mtn_item(clipboard_icon(), "Ordens de Serviço", "/maintenance/work-orders", disabled=True),
-                            _mtn_item(history_icon(), "Histórico de Intervenções", "/maintenance/history", disabled=True),
-                        ], style={"minHeight": "190px"})
+                        html.Div(
+                            [
+                                _mtn_section_header(calendar_icon(), "Planejamento", "#fd7e14"),
+                                _mtn_item(calendar_icon(), "Planejamento Gantt", "/maintenance/gantt", active=(pathname == "/maintenance/gantt")),
+                                _mtn_item(checklist_icon(), "Backlog de Manutenção", "/maintenance/backlog", active=(pathname == "/maintenance/backlog")),
+                            ]
+                            + (
+                                [_mtn_item(graph_icon(), "Análise de Falhas", "/maintenance/analise-de-falhas",
+                                           active=(pathname == "/maintenance/analise-de-falhas"))]
+                                if can_access_route(user, "/maintenance/analise-de-falhas") else []
+                            )
+                            + [
+                                _mtn_item(calendar_icon(), "Plano de Manutenção", "/maintenance/schedule", disabled=True),
+                                _mtn_item(clipboard_icon(), "Ordens de Serviço", "/maintenance/work-orders", disabled=True),
+                                _mtn_item(history_icon(), "Histórico de Intervenções", "/maintenance/history", disabled=True),
+                            ],
+                            style={"minHeight": "190px"},
+                        )
                     ], width=4),
                 ], className="g-0"),
 
                 # Footer "Powered By"
                 create_dropdown_footer()
-            ], style={"padding": "15px", "minWidth": "640px"})
+            # 740px em vez de 640: com a quebra de linha ligada nos itens (ver
+            # `assets/dropdown_menus.css`), a largura antiga faria quebrar também os rótulos
+            # que sempre couberam em uma linha — "Backlog de Manutenção", "Histórico de
+            # Intervenções". Assim só quebra o que realmente não cabe.
+            ], style={"padding": "15px", "minWidth": "740px"})
         ],
         nav=True, in_navbar=True,
         toggle_style={"display": "inline-flex", "alignItems": "center", "gap": "4px", "fontWeight": "600"},
@@ -404,6 +427,14 @@ def create_header(pathname, user):
                     ], className="d-flex align-items-center"),
                     href="/config/sap-scheduler",
                     active=(pathname == "/config/sap-scheduler")
+                ),
+                dbc.DropdownMenuItem(
+                    html.Div([
+                        html.I(className="bi bi-megaphone", style={"marginRight": "8px"}),
+                        "DDS — Segurança e ritmo"
+                    ], className="d-flex align-items-center"),
+                    href="/config/dds",
+                    active=(pathname == "/config/dds")
                 ),
                 dbc.DropdownMenuItem(divider=True),
                 dbc.DropdownMenuItem(

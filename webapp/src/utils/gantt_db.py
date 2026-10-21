@@ -558,7 +558,15 @@ def get_employee_by_id(employee_id):
 def create_employee(data):
     """
     Insere novo funcionário. Retorna o ID gerado como string.
-    data: {"nome", "turno_padrao"}
+    data: {"nome", "turno_padrao"} + campos opcionais do hh-management:
+      - "siglas_sap" (list[str]): de/para sigla SAP↔nome (default []); BR-14
+      - "jornada_min" (int|None): override da jornada do turno (default None); BR-08/DS-05
+      - "temporario" (bool): mão de obra temporária (BR-25); só gravado quando True, junto com
+        `periodos_quadro=[]` (fora do quadro semanal até inclusão manual)
+      - "semana_cadastro" (str 'YYYY-Www'|None): semana atual informada por quem cadastra; fixo
+        novo grava `periodos_quadro=[{de: semana_cadastro, ate: None}]` (BR-26: conta no quadro só
+        a partir da semana do cadastro). Ausente = sem período (comportamento anterior).
+    Extensão ADITIVA (BR-11.1): campos novos têm default, não quebram o GanttManagement.
     """
     col = _col("gantt_employees")
     if col is None:
@@ -567,19 +575,32 @@ def create_employee(data):
         "nome":          data["nome"],
         "turno_padrao":  data["turno_padrao"],
         "ativo":         True,
+        "siglas_sap":    list(data.get("siglas_sap") or []),
+        "jornada_min":   data.get("jornada_min"),
         "criado_em":     _now(),
         "atualizado_em": _now(),
     }
+    if data.get("temporario"):
+        doc["temporario"] = True
+        doc["periodos_quadro"] = []
+    elif data.get("semana_cadastro"):
+        doc["periodos_quadro"] = [{"de": data["semana_cadastro"], "ate": None}]   # BR-26
     result = col.insert_one(doc)
     return str(result.inserted_id)
 
 
 def update_employee(employee_id, data):
-    """Atualiza nome e/ou turno_padrao do funcionário. Retorna True se modificou."""
+    """Atualiza campos do funcionário (whitelist). Retorna True se modificou.
+
+    Whitelist ampliada (B4/BR-14): além de nome/turno_padrao, aceita siglas_sap e jornada_min
+    do hh-management, e temporario/periodos_quadro da mão de obra temporária (BR-25). Campos
+    fora da whitelist continuam descartados (segurança preservada).
+    """
     col = _col("gantt_employees")
     if col is None:
         return False
-    allowed = ("nome", "turno_padrao")
+    allowed = ("nome", "turno_padrao", "siglas_sap", "jornada_min", "disciplinas",
+               "temporario", "periodos_quadro")
     update_fields = {k: v for k, v in data.items() if k in allowed}
     update_fields["atualizado_em"] = _now()
     result = col.update_one({"_id": ObjectId(employee_id)}, {"$set": update_fields})
@@ -648,6 +669,23 @@ def has_employee_photo(employee_id):
         {"_id": 1},
     )
     return doc is not None
+
+
+def get_employee_photo(employee_id):
+    """Foto do funcionário como (bytes, mime) ou (None, None). Usado por relatórios PDF.
+
+    Read-only; tolerante a id inválido / sem foto (fallback = sem imagem).
+    """
+    col = _col("gantt_employees")
+    if col is None:
+        return None, None
+    try:
+        doc = col.find_one({"_id": ObjectId(employee_id)}, {"foto_bytes": 1, "foto_mime": 1})
+    except Exception:
+        return None, None
+    if not doc or "foto_bytes" not in doc:
+        return None, None
+    return doc.get("foto_bytes"), doc.get("foto_mime")
 
 
 # ---------------------------------------------------------------------------

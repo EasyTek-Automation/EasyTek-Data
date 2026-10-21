@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>fa-diagrama (Excalidraw)</title>
+<script>window.EXCALIDRAW_ASSET_PATH = "/vendor/excalidraw/";</script>
+<link rel="stylesheet" href="/vendor/excalidraw/index.css" />
+<style>html, body, #root { margin: 0; height: 100%; width: 100%; }</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="module">
+// ===========================================================================
+//  iframe = SUPERFÍCIE do diagrama causa-efeito. store-fa-nos manda; regras/tempo
+//  ficam no Dash (Python). Excalidraw 0.18 (ESM) — seta cotovelo (elbowed 90°).
+//    pai -> iframe : {cmd:'render', nos:[...]} | {cmd:'exportar', req}
+//    iframe -> pai : {type:'ready'} | {type:'select', faId} | {type:'edit', nos}
+//                    | {type:'exportado', req, svg, png} (png = base64)
+// ===========================================================================
+// Tudo vem do bundle local (React 18.2 + Excalidraw 0.18 num arquivo só): a fábrica
+// não tem internet, e do CDN a página abriria em branco. Ver src/vendor/excalidraw/README.md.
+// `?v=` = data em que o bundle foi gerado. A rota /vendor manda guardar por 1 ano; os
+// pedaços têm hash no nome, mas o entry.js não — sem trocar o `v` ao regerar o bundle,
+// quem tem o entry velho em cache pede pedaços que não existem mais (quadro em branco).
+import { React, createRoot, Excalidraw, convertToExcalidrawElements, exportToSvg, exportToBlob }
+  from "/vendor/excalidraw/entry.js?v=20261015";
+
+const TIPO = { ROOT: "ROOT", STEP: "STEP", CAUSE: "CAUSE" };
+const RECT_W = 210, RECT_H = 96;
+const h = React.createElement;
+
+let api = null;
+let posById = {};
+let applyingUntil = 0;
+let emitTimer = null;
+let pendingNos = null;
+let lastSel = null;
+let jaRenderou = false;   // trava anti-race: só emite edit DEPOIS do 1º render com dados
+let arrastando = false;   // enquanto arrasta/interage: silencia todo tráfego pro Dash
+let fontesOk = false;     // Excalifont carregada? (a quebra de linha depende dela)
+let esperandoFontes = false;
+
+// FONTE ANTES DO 1º DESENHO. O `convertToExcalidrawElements` calcula a quebra de linha
+// medindo o texto com a fonte do momento; se a Excalifont ainda não carregou, mede com
+// uma fonte mais estreita e o texto sai CORTADO dos dois lados quando a manuscrita chega
+// (medido: "Queima do motor da cisalha" calculado 180 px, desenhado 210 px num balão de
+// 210). Os textos vão junto no `load` para baixar também os trechos com acento/★/Σ.
+// Se a fonte não vier em 3 s, desenha assim mesmo — melhor cortado do que em branco.
+function esperarFontes(nos) {
+  if (esperandoFontes) return;
+  esperandoFontes = true;
+  const amostra = nos.map(n => rotulo(n, 1)).join(" ");
+  const carga = document.fonts.load("16px Excalifont", amostra).catch(() => {});
+  const limite = new Promise(r => setTimeout(r, 3000));
+  Promise.race([carga, limite]).then(() => {
+    fontesOk = true;
+    console.log("[fa] fontes prontas");
+    const p = pendingNos; pendingNos = null;
+    if (p) render(p);
+  });
+}
+
+function estilo(no) {
+  if (no.is_root_cause) return { s: "#b7950b", b: "#fef9e7" };
+  if (no.tipo === TIPO.ROOT) return { s: "#c0392b", b: "#f9dcd6" };
+  if (no.tipo === TIPO.STEP) return { s: "#2471a3", b: "#d6eaf8" };
+  return { s: "#616a6b", b: "#eaecee" };
+}
+
+function fmtDur(m) {
+  if (m == null) return "";
+  const t = Math.round(m);
+  if (t <= 0) return "0 min";
+  const hh = Math.floor(t / 60), mm = t % 60;
+  if (hh && mm) return hh + " h " + mm + " min";
+  if (hh) return hh + " h";
+  return mm + " min";
+}
+
+// Altura REAL de cada balão com o rótulo já quebrado: o Excalidraw estica o retângulo
+// quando o texto não cabe nos 96 px. Converte só os retângulos (fora da tela, descartados)
+// para ler a altura — usada pelo arranjo automático não empilhar balão alto em cima do
+// vizinho. Só roda se houver balão sem posição (análise antiga ou balão novo).
+function alturasReais(nos, totalRoot) {
+  const alt = {};
+  if (nos.every(n => posById[n.id] || (n.position_x != null && n.position_y != null))) return alt;
+  const els = convertToExcalidrawElements(nos.map(n => ({
+    type: "rectangle", x: 0, y: 0, width: RECT_W, height: RECT_H,
+    customData: { faId: n.id }, label: { text: rotulo(n, totalRoot), fontSize: 16 },
+  })));
+  for (const e of els) if (e.type === "rectangle") alt[e.customData.faId] = e.height;
+  return alt;
+}
+
+function garantirPosicoes(nos, alturas = {}) {
+  const filhos = new Map(nos.map(n => [n.id, []]));
+  let raiz = null;
+  for (const n of nos) {
+    if (n.parent_id && filhos.has(n.parent_id)) filhos.get(n.parent_id).push(n.id);
+    if (!n.parent_id) raiz = n.id;
+  }
+  const depth = new Map(), row = new Map();
+  let linha = 0;
+  (function dfs(id, d) {
+    if (id == null) return;
+    depth.set(id, d);
+    const kids = filhos.get(id) || [];
+    if (!kids.length) { row.set(id, linha++); return; }
+    kids.forEach(k => dfs(k, d + 1));
+    row.set(id, kids.map(k => row.get(k)).reduce((a, b) => a + b, 0) / kids.length);
+  })(raiz, 0);
+  const auto = [];
+  for (const n of nos) {
+    if (posById[n.id]) continue;
+    // posição SALVA tem prioridade (persiste o arranjo do usuário entre reloads)
+    if (n.position_x != null && n.position_y != null) {
+      posById[n.id] = { x: n.position_x, y: n.position_y };
+      continue;
+    }
+    // Centro da linha no mesmo lugar de sempre; balão mais alto cresce pra cima e pra
+    // baixo a partir dele (balão de altura normal fica exatamente onde ficava).
+    const hh = alturas[n.id] || RECT_H;
+    const cy = 60 + RECT_H / 2 + (row.get(n.id) || 0) * 135;
+    posById[n.id] = { x: 60 + (depth.get(n.id) || 0) * 300, y: cy - hh / 2 };
+    auto.push(n.id);
+  }
+  // Na mesma coluna, empurra pra baixo quem encostar no de cima (vão mínimo de 39 px,
+  // o mesmo do arranjo padrão: 135 − 96). Só mexe nos balões arranjados agora.
+  const colunas = new Map();
+  for (const id of auto) {
+    const x = posById[id].x;
+    if (!colunas.has(x)) colunas.set(x, []);
+    colunas.get(x).push(id);
+  }
+  for (const ids of colunas.values()) {
+    ids.sort((a, b) => posById[a].y - posById[b].y);
+    for (let i = 1; i < ids.length; i++) {
+      const ant = ids[i - 1], piso = posById[ant].y + (alturas[ant] || RECT_H) + 39;
+      if (posById[ids[i]].y < piso) posById[ids[i]].y = piso;
+    }
+  }
+}
+
+function rotulo(n, totalRoot) {
+  // Divisão de tempo DESABILITADA: só o 1º balão (ROOT) leva tempo (= parada).
+  // Sem placeholder "(causa)": balão vazio fica vazio (não força texto).
+  let base = (n.is_root_cause ? "★ " : "") + (n.titulo || "");
+  if (n.tipo === TIPO.ROOT && totalRoot > 0) base += "\nΣ " + fmtDur(totalRoot);
+  return base;
+}
+
+let fullById = {};   // nós COMPLETOS (com duration_min etc) do último render
+let ferramentaNoToque = null;  // ferramenta ativa no pointerdown (balão novo = "rectangle")
+let renderAdiado = null;       // render que chegou enquanto um texto era editado
+let editandoTexto = false;
+
+// Rota da seta pai->filho escolhendo o lado pela posição relativa dos balões.
+// Eixo primário = maior distância entre centros; cotovelo no meio desse eixo.
+function rotaSeta(p, c) {
+  const pcx = p.x + RECT_W / 2, pcy = p.y + RECT_H / 2;
+  const ccx = c.x + RECT_W / 2, ccy = c.y + RECT_H / 2;
+  const ddx = ccx - pcx, ddy = ccy - pcy;
+  let x1, y1, x2, y2, points;
+  if (Math.abs(ddx) >= Math.abs(ddy)) {
+    // horizontal: sai pela direita/esquerda do pai, entra no lado oposto do filho
+    if (ddx >= 0) { x1 = p.x + RECT_W; x2 = c.x; }
+    else          { x1 = p.x;          x2 = c.x + RECT_W; }
+    y1 = pcy; y2 = ccy;
+    const dx = x2 - x1, dy = y2 - y1, mx = dx / 2;
+    points = [[0, 0], [mx, 0], [mx, dy], [dx, dy]];
+    return { x1, y1, dx, dy, points };
+  } else {
+    // vertical: sai pela base/topo do pai, entra no lado oposto do filho
+    if (ddy >= 0) { y1 = p.y + RECT_H; y2 = c.y; }
+    else          { y1 = p.y;          y2 = c.y + RECT_H; }
+    x1 = pcx; x2 = ccx;
+    const dx = x2 - x1, dy = y2 - y1, my = dy / 2;
+    points = [[0, 0], [0, my], [dx, my], [dx, dy]];
+    return { x1, y1, dx, dy, points };
+  }
+}
+
+// Descobre de qual BALÃO um elemento faz parte.
+// O texto escrito dentro do balão é um elemento próprio, filho do retângulo
+// (`containerId`), e não carrega o id do balão. Sem resolver o pai, clicar no texto
+// — que é o que a pessoa naturalmente faz — seria "nenhum balão selecionado", e o
+// botão de causa raiz ficaria apagado com o balão visivelmente selecionado.
+function faIdDoElemento(el, elements) {
+  if (!el) return null;
+  if (el.customData && el.customData.faId) return el.customData.faId;
+  if (el.containerId) {
+    const pai = (elements || []).find(x => x.id === el.containerId);
+    if (pai && pai.customData && pai.customData.faId) return pai.customData.faId;
+  }
+  return null;
+}
+
+function render(nos) {
+  // Redesenhar troca todos os elementos e FECHA o editor de texto aberto — o que a
+  // pessoa estava digitando no balão some. Guarda e decide quando a edição acabar.
+  // Idem no meio de um arrasto/desenho: o retângulo sendo desenhado seria trocado.
+  if (arrastando || (api && emEdicaoDeTexto(api.getAppState()))) { renderAdiado = nos; return; }
+  if (!nos) { console.log("[fa] render(null) ignorado"); return; }
+  if (!api) { pendingNos = nos; console.log("[fa] render adiado (sem api)", nos.length); return; }
+  if (!fontesOk && nos.length) { pendingNos = nos; esperarFontes(nos); return; }
+  // TRAVA CENTRAL: um push VAZIO nunca apaga uma árvore que já existe (race de load/echo).
+  if (nos.length === 0 && Object.keys(fullById).length > 0) {
+    console.log("[fa] render VAZIO ignorado — mantém", Object.keys(fullById).length, "nós");
+    return;
+  }
+  // ECHO-KILL: se o que chegou já é o que está na tela, NÃO redesenha (mata o
+  // re-render após cada drag/edição — a origem foi o próprio canvas).
+  if (jaRenderou && sigOf(nos) === lastSig) {
+    console.log("[fa] render redundante ignorado (cena já atual)");
+    return;
+  }
+  console.log("[fa] render", nos.length, "nós");
+  fullById = {};
+  for (const n of nos) fullById[n.id] = n;
+  if (nos.length) jaRenderou = true;   // libera emissão de edits (depois de ter dados)
+  // total do ROOT = soma das STEP (= duração da parada)
+  const totalRoot = nos.filter(n => n.tipo === TIPO.STEP).reduce((a, n) => a + (n.duration_min || 0), 0);
+  garantirPosicoes(nos, alturasReais(nos, totalRoot));   // define posById ANTES da assinatura
+  // Baseline com as posições atuais (não marca sujo). O "|[]" casa com o formato da
+  // assinatura do emitEdit, que carrega junto a lista de conflitos — sem isso, o
+  // primeiro desenho pareceria diferente do que acabou de ser desenhado e a análise
+  // nasceria com "alterações não salvas".
+  lastSig = sigOf(nos) + "|[]";
+  const skel = [];
+  for (const n of nos) {
+    const c = posById[n.id], st = estilo(n);
+    skel.push({
+      type: "rectangle", id: "rect_" + n.id,
+      x: c.x, y: c.y, width: RECT_W, height: RECT_H,
+      strokeColor: st.s, backgroundColor: st.b, strokeWidth: 2, roughness: 1,
+      roundness: { type: 3 },
+      customData: { faId: n.id, tipo: n.tipo, is_root_cause: !!n.is_root_cause },
+      label: { text: rotulo(n, totalRoot), fontSize: 16 },
+    });
+  }
+  for (const n of nos) {
+    if (!n.parent_id || !posById[n.parent_id]) continue;
+    const p = posById[n.parent_id], c = posById[n.id];
+    // Lado de saída/entrada conforme posição relativa dos balões: evita o S-shape
+    // fixo (filho-à-direita) cruzar balões quando o layout não é linear.
+    const rt = rotaSeta(p, c);
+    skel.push({
+      type: "arrow", x: rt.x1, y: rt.y1, width: rt.dx, height: rt.dy,
+      points: rt.points,
+      strokeColor: "#34495e", strokeWidth: 2, roughness: 0,
+      elbowed: true,
+      start: { id: "rect_" + n.parent_id }, end: { id: "rect_" + n.id },
+      customData: { faEdge: true },
+    });
+  }
+  const els = convertToExcalidrawElements(skel);
+  applyingUntil = Date.now() + 500;
+  // PRESERVA A SELEÇÃO, PELO BALÃO (não pelo id do elemento).
+  // Redesenhar limpa o que estava selecionado — o balão "solta" da mão do usuário no
+  // meio da operação (marcar causa raiz deixava o botão de volta em "selecione um
+  // balão"). E não adianta guardar o id do elemento: `convertToExcalidrawElements`
+  // gera ids NOVOS a cada desenho, então o id velho vira um elemento que não existe
+  // mais. O que sobrevive ao redesenho é o id do balão, guardado em customData.
+  const antes = api.getAppState().selectedElementIds || {};
+  const cenaAntiga = api.getSceneElements();
+  const faIdsSelecionados = Object.keys(antes)
+    .filter(k => antes[k])
+    .map(id => faIdDoElemento(cenaAntiga.find(e => e.id === id), cenaAntiga))
+    .filter(Boolean);
+  const selDepois = {};
+  for (const el of els) {
+    const fa = el.customData && el.customData.faId;
+    if (fa && faIdsSelecionados.includes(fa)) selDepois[el.id] = true;
+  }
+  api.updateScene(
+    Object.keys(selDepois).length
+      ? { elements: els, appState: { selectedElementIds: selDepois } }
+      : { elements: els }
+  );
+  if (!render._centrou) { render._centrou = true; setTimeout(() => api.scrollToContent(els, { fitToContent: true }), 60); }
+}
+
+// BALÃO NOVO JÁ ABRE PARA ESCREVER (como o "estilo PowerPoint" da v2).
+// O Excalidraw, sozinho, termina o retângulo SEM editor de texto: o que a pessoa
+// digita vira ATALHO de ferramenta ("a" = seta, "o" = elipse...) e nada é escrito.
+// Ao soltar o mouse depois de desenhar um retângulo, ele recebe o duplo clique que
+// abre o editor — na hora, sem esperar a ida e volta ao Dash.
+function abrirEdicaoDoNovo() {
+  if (!api) return;
+  const st0 = api.getAppState();
+  const ids = Object.keys(st0.selectedElementIds || {}).filter(k => st0.selectedElementIds[k]);
+  const el = ids.length === 1 && api.getSceneElements().find(e => e.id === ids[0] && !e.isDeleted);
+  const canvas = document.querySelector("canvas.excalidraw__canvas.interactive");
+  if (!el || el.type !== "rectangle" || (el.customData && el.customData.faId) || !canvas) return;
+  if ((el.boundElements || []).some(b => b.type === "text")) return;
+  const st = api.getAppState();
+  const z = st.zoom.value;
+  const clientX = (el.x + el.width / 2 + st.scrollX) * z + st.offsetLeft;
+  const clientY = (el.y + el.height / 2 + st.scrollY) * z + st.offsetTop;
+  canvas.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true, view: window, clientX, clientY }));
+}
+
+function reconstruir() {
+  const els = api.getSceneElements();
+  // TODO retângulo é um balão. Os que não têm faId foram DESENHADOS pelo usuário
+  // (modo livre) -> ganham um id novo e entram na árvore.
+  const rects = els.filter(e => e.type === "rectangle" && !e.isDeleted);
+  const elId2fa = new Map();
+  const novos = new Set();
+  for (const r of rects) {
+    let fa = r.customData && r.customData.faId;
+    if (!fa) { fa = "novo_" + r.id; novos.add(fa); }   // balão desenhado agora
+    elId2fa.set(r.id, fa);
+  }
+  const txt = new Map();
+  // originalText = texto SEM a quebra automática do Excalidraw (evita \n espúrio no título)
+  for (const e of els) if (e.type === "text" && e.containerId && !e.isDeleted) txt.set(e.containerId, e.originalText || e.text);
+
+  const nos = new Map();
+  for (const r of rects) {
+    const fa = elId2fa.get(r.id);
+    posById[fa] = { x: r.x, y: r.y };
+    // MESCLA no nó COMPLETO original: preserva duration_min, sort_order, analysis_id...
+    const base = fullById[fa] || { id: fa };
+    nos.set(fa, {
+      ...base,
+      id: fa,
+      parent_id: null,
+      tipo: (r.customData && r.customData.tipo) || TIPO.CAUSE,   // novo começa CAUSE
+      titulo: (txt.get(r.id) || "").replace(/^★\s*/, "").replace(/\n[Σ⏱].*$/s, "").trim(),
+      is_root_cause: !!(r.customData && r.customData.is_root_cause),
+      position_x: r.x, position_y: r.y,
+      _novo: novos.has(fa) || undefined,
+    });
+  }
+  // parent pelas SETAS (source=pai, target=filho)
+  // Um balão tem UM pai. Se chegarem duas setas no mesmo balão, a segunda apenas
+  // sobrescrevia a primeira — em silêncio, e o banco nunca via problema nenhum
+  // (no modelo só existe um parent_id). Agora a primeira vale e a segunda vira
+  // CONFLITO, que o Salvar mostra ao usuário em vez de gravar torto.
+  const setasPorFilho = new Map();
+  for (const e of els) {
+    if (e.type !== "arrow" || e.isDeleted) continue;
+    const pai = e.startBinding && elId2fa.get(e.startBinding.elementId);
+    const filho = e.endBinding && elId2fa.get(e.endBinding.elementId);
+    if (!pai || !filho || !nos.has(filho)) continue;
+    const jaTem = setasPorFilho.get(filho) || [];
+    jaTem.push(pai);
+    setasPorFilho.set(filho, jaTem);
+    if (jaTem.length === 1) nos.get(filho).parent_id = pai;
+  }
+  const conflitos = [];
+  for (const [filho, pais] of setasPorFilho.entries()) {
+    if (pais.length > 1) {
+      const n = nos.get(filho);
+      conflitos.push({ id: filho, titulo: (n && n.titulo) || "", setas: pais.length });
+    }
+  }
+  // tipo do nó novo pela profundidade: filho do ROOT = STEP, senão CAUSE
+  for (const n of nos.values()) {
+    if (!n._novo) continue;
+    const pai = n.parent_id && nos.get(n.parent_id);
+    n.tipo = (pai && pai.tipo === TIPO.ROOT) ? TIPO.STEP : TIPO.CAUSE;
+    delete n._novo;
+  }
+  return { nos: [...nos.values()], conflitos };
+}
+
+// assinatura da árvore INCLUINDO posição (posById = fonte da posição).
+// Assim o drag emite (salva posição); o baseline no render usa as mesmas
+// posições recém-desenhadas, então NÃO marca sujo no load.
+function sigOf(nos) {
+  return JSON.stringify(
+    nos.map(n => {
+      const p = posById[n.id] || {};
+      return [n.id, n.parent_id || "", (n.titulo || "").trim(), n.tipo,
+              !!n.is_root_cause, Math.round(p.x || 0), Math.round(p.y || 0)];
+    }).sort((a, b) => (a[0] < b[0] ? -1 : 1))
+  );
+}
+let lastSig = null;
+
+function emitEdit() {
+  if (arrastando) return;        // no meio do arrasto: o pointerup emite ao soltar
+  const { nos, conflitos } = reconstruir();
+  if (!nos.length) return;       // nunca empurra árvore vazia (evita wipe acidental)
+  const sig = sigOf(nos) + "|" + JSON.stringify(conflitos.map(c => c.id).sort());
+  if (sig === lastSig) return;   // nada relevante mudou -> não suja a análise
+  lastSig = sig;
+  console.log("[fa] emitEdit ->", nos.length, "nós,", conflitos.length, "conflito(s)");
+  parent.postMessage({ type: "edit", nos, conflitos }, "*");
+}
+function emEdicaoDeTexto(st) {
+  return !!(st && (st.editingTextElement || (st.editingElement && st.editingElement.type === "text")));
+}
+
+// Fim de uma edição de texto ou de um arrasto: manda o que mudou. Se nada mudou
+// (balão deixado em branco, clique sem mover), aplica o render que ficou guardado —
+// ele traz o que o servidor completou.
+function fimDaEdicao() {
+  const adiado = renderAdiado; renderAdiado = null;
+  const antes = lastSig;
+  emitEdit();
+  if (lastSig === antes && adiado) render(adiado);
+}
+
+function ready() { parent.postMessage({ type: "ready" }, "*"); }
+
+function App() {
+  const onApi = React.useCallback((a) => {
+    api = a; window.__api = a; ready();
+    if (pendingNos) { const p = pendingNos; pendingNos = null; render(p); }
+  }, []);
+  const onChange = React.useCallback((elements, appState) => {
+    // DURANTE O ARRASTO: nenhum postMessage (nem select nem edit). O Excalidraw
+    // desenha nativo, liso; o Dash não recebe nada até soltar. Mata o flood de
+    // "Updating" e o re-render por movimento.
+    if (arrastando) return;
+    if (appState) {
+      const ids = Object.keys(appState.selectedElementIds || {}).filter(k => appState.selectedElementIds[k]);
+      let faId = null;
+      if (ids.length === 1) {
+        faId = faIdDoElemento((elements || []).find(x => x.id === ids[0]), elements);
+      }
+      if (faId !== lastSel) { lastSel = faId; parent.postMessage({ type: "select", faId }, "*"); }
+    }
+    if (!jaRenderou) return;               // anti-race: ignora onChange antes do 1º render
+    const editando = emEdicaoDeTexto(appState);
+    if (editando) { editandoTexto = true; clearTimeout(emitTimer); return; }   // emite ao terminar
+    if (editandoTexto) { editandoTexto = false; clearTimeout(emitTimer); setTimeout(fimDaEdicao, 0); return; }
+    if (Date.now() < applyingUntil) return;
+    clearTimeout(emitTimer);
+    emitTimer = setTimeout(emitEdit, 300);
+  }, []);
+  return h(Excalidraw, {
+    excalidrawAPI: onApi,
+    onChange: onChange,
+    UIOptions: { canvasActions: { loadScene: false, saveToActiveFile: false } },
+    initialData: { appState: { viewBackgroundColor: "#ffffff", currentItemFontFamily: 2 } },
+  });
+}
+
+createRoot(document.getElementById("root")).render(h(App));
+
+window.addEventListener("message", (e) => {
+  const d = e.data || {};
+  if (d.cmd === "render") render(d.nos);
+  else if (d.cmd === "exportar") exportar(d.req);
+});
+
+// IMAGEM DO DIAGRAMA PARA O SLIDE (IM-AF3-08): o desenho do quadro como ele é —
+// SVG (vetor, não serrilha no zoom) + PNG 2× de reserva para quem não lê SVG.
+// Não exporta no meio de uma edição: a imagem tem de ser a da árvore salva.
+async function exportar(req) {
+  const responder = (extra) => parent.postMessage({ type: "exportado", req, ...extra }, "*");
+  try {
+    if (!api || !jaRenderou || arrastando || renderAdiado || emEdicaoDeTexto(api.getAppState())) {
+      return responder({ erro: "ocupado" });
+    }
+    const elements = api.getSceneElements().filter(x => !x.isDeleted);
+    if (!elements.length) return responder({ erro: "vazio" });
+    const appState = { exportBackground: true, viewBackgroundColor: "#ffffff", exportWithDarkMode: false };
+    const files = api.getFiles();
+    const svg = await exportToSvg({ elements, appState, files, exportPadding: 16 });
+    const blob = await exportToBlob({
+      elements, appState, files, mimeType: "image/png", exportPadding: 16,
+      getDimensions: (w, h) => ({ width: w * 2, height: h * 2, scale: 2 }),
+    });
+    const png = await new Promise((ok) => {
+      const fr = new FileReader();
+      fr.onload = () => ok(String(fr.result).split(",")[1]);
+      fr.readAsDataURL(blob);
+    });
+    responder({ svg: svg.outerHTML, png });
+  } catch (err) {
+    responder({ erro: String(err) });
+  }
+}
+
+// Troca de versão do diagrama (v2.0/v3.0): a página esconde este iframe com
+// display:none, e o quadro escondido fica com tamanho zero — o que for desenhado
+// nesse meio-tempo cai fora da área visível. Ao voltar a aparecer, enquadra tudo.
+let _oculto = window.innerWidth === 0 || window.innerHeight === 0;
+window.addEventListener("resize", () => {
+  const oculto = window.innerWidth === 0 || window.innerHeight === 0;
+  if (_oculto && !oculto && api) {
+    setTimeout(() => {
+      const els = api.getSceneElements().filter((x) => !x.isDeleted);
+      if (els.length) api.scrollToContent(els, { fitToContent: true });
+    }, 80);
+  }
+  _oculto = oculto;
+});
+
+// Guarda de ARRASTO: pointerdown liga o silêncio; pointerup desliga e emite UMA vez.
+// Assim, mover balão = zero callbacks Dash durante o movimento; 1 escrita ao soltar.
+document.addEventListener("pointerdown", () => {
+  arrastando = true; window.__arr = true;
+  ferramentaNoToque = api ? api.getAppState().activeTool.type : null;
+  console.log("[fa] DOWN (silêncio)");
+}, true);
+document.addEventListener("pointerup", () => {
+  window.__arr = false;
+  console.log("[fa] UP (libera)");
+  if (!arrastando) return;
+  arrastando = false;
+  if (!jaRenderou) return;
+  clearTimeout(emitTimer);
+  emitTimer = setTimeout(fimDaEdicao, 60);   // uma emissão após soltar
+  if (ferramentaNoToque === "rectangle") setTimeout(abrirEdicaoDoNovo, 30);
+  ferramentaNoToque = null;
+  // reavalia seleção uma vez (o onChange do arrasto foi silenciado)
+  if (api) {
+    const st = api.getAppState();
+    const ids = Object.keys(st.selectedElementIds || {}).filter(k => st.selectedElementIds[k]);
+    let faId = null;
+    if (ids.length === 1) {
+      const todos = api.getSceneElements();
+      faId = faIdDoElemento(todos.find(x => x.id === ids[0]), todos);
+    }
+    if (faId !== lastSel) { lastSel = faId; parent.postMessage({ type: "select", faId }, "*"); }
+  }
+}, true);
+
+// Handshake ROBUSTO: repete 'ready' até receber dados. Evita perder o 'ready'
+// quando o listener do pai ainda não anexou (reload com fila de callbacks lenta).
+const _readyTimer = setInterval(() => {
+  if (jaRenderou) { clearInterval(_readyTimer); return; }
+  parent.postMessage({ type: "ready" }, "*");
+}, 500);
+
+// TRAVA DE SCROLL: wheel simples ROLA A PÁGINA (não o canvas). Excalidraw só
+// captura a roda com Shift/Ctrl (zoom/pan). iframe same-origin -> chama parent direto.
+window.addEventListener("wheel", (e) => {
+  if (e.shiftKey || e.ctrlKey || e.metaKey) return;   // modificador -> deixa o Excalidraw
+  e.preventDefault();                                  // impede o pan do canvas
+  e.stopPropagation();
+  try {
+    // o AMG rola um DIV interno (#content-column), não a window
+    const pd = window.parent.document;
+    const sc = pd.getElementById("content-column") || pd.scrollingElement || pd.documentElement;
+    sc.scrollTop += e.deltaY;
+    sc.scrollLeft += e.deltaX;
+  } catch (_) {}
+}, { capture: true, passive: false });
+</script>
+</body>
+</html>

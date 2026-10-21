@@ -1,0 +1,593 @@
+{
+  "planta": {
+    "view_box": [
+      0,
+      0,
+      1789,
+      1068
+    ]
+  },
+  "ativos": [
+    {
+      "ativo": "LCP01",
+      "caixa": {
+        "x": 630.64,
+        "y": 406.39,
+        "largura": 127.02,
+        "altura": 271.85
+      },
+      "croqui": {
+        "desenho": "linha_prensa.svg",
+        "view_box": [
+          294.0,
+          -96.0,
+          371.0,
+          632.0
+        ]
+      },
+      "conjuntos": [
+        {
+          "chave": "LCP01.DESBOBINADOR",
+          "conjunto": "DESBOBINADOR",
+          "nome": "Desbobinador"
+        },
+        {
+          "chave": "LCP01.PINCH_ROLL",
+          "conjunto": "PINCH_ROLL",
+          "nome": "Pinch roll"
+        },
+        {
+          "chave": "LCP01.APLANADORA",
+          "conjunto": "APLANADORA",
+          "nome": "Aplainadora"
+        },
+        {
+          "chave": "LCP01.FOSSO_DE_LACO",
+          "conjunto": "FOSSO_DE_LACO",
+          "nome": "Fosso de laço"
+        },
+        {
+          "chave": "LCP01.ALIMENTADOR",
+          "conjunto": "ALIMENTADOR",
+          "nome": "Alimentador"
+        },
+        {
+          "chave": "LCP01.PRENSA_FAGOR",
+          "conjunto": "PRENSA_FAGOR",
+          "nome": "Prensa Fagor"
+        },
+        {
+          "chave": "LCP01.ESTEIRA_DE_SAIDA",
+          "conjunto": "ESTEIRA_DE_SAIDA",
+          "nome": "Esteira de saída"
+        },
+        {
+          "chave": "LCP01.EMPILHADOR_1",
+          "conjunto": "EMPILHADOR_1",
+          "nome": "Empilhador 1"
+        },
+        {
+          "chave": "LCP01.EMPILHADOR_2",
+          "conjunto": "EMPILHADOR_2",
+          "nome": "Empilhador 2"
+        },
+        {
+          "chave": "LCP01.CARGA_DE_BOBINAS",
+          "conjunto": "CARGA_DE_BOBINAS",
+          "nome": "Carga de bobinas"
+        }
+      ]
+    },
+    {
+      "ativo": "LCP02",
+      "caixa": {
+        "x": 478.55,
+        "y": 406.39,
+        "largura": 127.02,
+        "altura": 271.85
+      },
+      "croqui": {
+        "desenho": "linha_prensa.svg",
+        "view_box": [
+          -165.0,
+          -96.0,
+          371.0,
+          632.0
+        ]
+      },
+      "conjuntos": [
+        {
+          "chave": "LCP02.DESBOBINADOR",
+          "conjunto": "DESBOBINADOR",
+          "nome": "Desbobinador"
+        },
+        {
+          "chave": "LCP02.PINCH_ROLL",
+          "conjunto": "PINCH_ROLL",
+          "nome": "Pinch roll"
+        },
+        {
+          "chave": "LCP02.APLANADORA",
+          "conjunto": "APLANADORA",
+          "nome": "Aplainadora"
+        },
+        {
+          "chave": "LCP02.FOSSO_DE_LACO",
+          "conjunto": "FOSSO_DE_LACO",
+          "nome": "Fosso de laço"
+        },
+        {
+          "chave": "LCP02.ALIMENTADOR",
+          "conjunto": "ALIMENTADOR",
+          "nome": "Alimentador"
+        },
+        {
+          "chave": "LCP02.PRENSA_FAGOR",
+          "conjunto": "PRENSA_FAGOR",
+          "nome": "Prensa Fagor"
+        },
+        {
+          "chave": "LCP02.ESTEIRA_DE_SAIDA",
+          "conjunto": "ESTEIRA_DE_SAIDA",
+          "nome": "Esteira de saída"
+        },
+        {
+          "chave": "LCP02.EMPILHADOR_1",
+          "conjunto": "EMPILHADOR_1",
+          "nome": "Empilhador 1"
+        },
+        {
+          "chave": "LCP02.EMPILHADOR_2",
+          "conjunto": "EMPILHADOR_2",
+          "nome": "Empilhador 2"
+        },
+        {
+          "chave": "LCP02.CARGA_DE_BOBINAS",
+          "conjunto": "CARGA_DE_BOBINAS",
+          "nome": "Carga de bobinas"
+        }
+      ]
+    },
+    {
+      "ativo": "LCT2,5",
+      "caixa": {
+        "x": 811.88,
+        "y": 408.37,
+        "largura": 84.94,
+        "altura": 241.41
+      },
+      "croqui": {
+        "desenho": "linha_prensa.svg",
+        "view_box": [
+          683.0,
+          -96.0,
+          402.0,
+          566.0
+        ]
+      },
+      "conjuntos": [
+        {
+          "chave": "LCT2,5.DESBOBINADOR",
+          "conjunto": "DESBOBINADOR",
+          "nome": "Desbobinador"
+        },
+        {
+          "chave": "LCT2,5.ENDIREITADEIRA",
+          "conjunto": "ENDIREITADEIRA",
+          "nome": "Endireitadeira"
+        },
+        {
+          "chave": "LCT2,5.APLANADORA",
+          "conjunto": "APLANADORA",
+          "nome": "Aplanadora"
+        },
+        {
+          "chave": "LCT2,5.MESA_DE_ROLETES",
+          "conjunto": "MESA_DE_ROLETES",
+          "nome": "Mesa de roletes"
+        },
+        {
+          "chave": "LCT2,5.CISALHA_ROTATIVA",
+          "conjunto": "CISALHA_ROTATIVA",
+          "nome": "Cisalha rotativa"
+        },
+        {
+          "chave": "LCT2,5.ESTEIRA_DE_SAIDA",
+          "conjunto": "ESTEIRA_DE_SAIDA",
+          "nome": "Esteira de saída"
+        },
+        {
+          "chave": "LCT2,5.ESTEIRA_TRANSVERSAL",
+          "conjunto": "ESTEIRA_TRANSVERSAL",
+          "nome": "Esteira transversal"
+        },
+        {
+          "chave": "LCT2,5.EMPILHADOR_1",
+          "conjunto": "EMPILHADOR_1",
+          "nome": "Empilhador 1"
+        },
+        {
+          "chave": "LCT2,5.EMPILHADOR_2",
+          "conjunto": "EMPILHADOR_2",
+          "nome": "Empilhador 2"
+        },
+        {
+          "chave": "LCT2,5.CARRO_DE_BOBINAS",
+          "conjunto": "CARRO_DE_BOBINAS",
+          "nome": "Carro de bobinas"
+        }
+      ]
+    },
+    {
+      "ativo": "LCT16",
+      "caixa": {
+        "x": 1279.05,
+        "y": 511.93,
+        "largura": 69.68,
+        "altura": 251.61
+      },
+      "croqui": {
+        "desenho": "linhas_corte.svg",
+        "view_box": [
+          134.0,
+          -116.0,
+          208.0,
+          794.0
+        ]
+      },
+      "conjuntos": [
+        {
+          "chave": "LCT16.CARRO_DE_BOBINAS",
+          "conjunto": "CARRO_DE_BOBINAS",
+          "nome": "Carro de bobinas"
+        },
+        {
+          "chave": "LCT16.DESBOBINADOR",
+          "conjunto": "DESBOBINADOR",
+          "nome": "Desbobinador"
+        },
+        {
+          "chave": "LCT16.ENDIREITADEIRA",
+          "conjunto": "ENDIREITADEIRA",
+          "nome": "Endireitadeira"
+        },
+        {
+          "chave": "LCT16.APLANADORA",
+          "conjunto": "APLANADORA",
+          "nome": "Aplanadora"
+        },
+        {
+          "chave": "LCT16.MESA_DE_ROLETES",
+          "conjunto": "MESA_DE_ROLETES",
+          "nome": "Mesa de roletes"
+        },
+        {
+          "chave": "LCT16.TRACIONADOR_MEDICAO",
+          "conjunto": "TRACIONADOR_MEDICAO",
+          "nome": "Tracionador / medição"
+        },
+        {
+          "chave": "LCT16.TESOURA_VOADORA",
+          "conjunto": "TESOURA_VOADORA",
+          "nome": "Tesoura voadora"
+        },
+        {
+          "chave": "LCT16.ESTEIRA_DE_SAIDA",
+          "conjunto": "ESTEIRA_DE_SAIDA",
+          "nome": "Esteira de saída"
+        },
+        {
+          "chave": "LCT16.EMPILHADOR_1",
+          "conjunto": "EMPILHADOR_1",
+          "nome": "Empilhador 1"
+        },
+        {
+          "chave": "LCT16.EMPILHADOR_2",
+          "conjunto": "EMPILHADOR_2",
+          "nome": "Empilhador 2"
+        }
+      ]
+    },
+    {
+      "ativo": "LCT08",
+      "caixa": {
+        "x": 1407.28,
+        "y": 511.93,
+        "largura": 70.29,
+        "altura": 241.68
+      },
+      "croqui": {
+        "desenho": "linhas_corte.svg",
+        "view_box": [
+          547.0,
+          -116.0,
+          210.0,
+          762.0
+        ]
+      },
+      "conjuntos": [
+        {
+          "chave": "LCT08.CARRO_DE_BOBINAS",
+          "conjunto": "CARRO_DE_BOBINAS",
+          "nome": "Carro de bobinas"
+        },
+        {
+          "chave": "LCT08.DESBOBINADOR",
+          "conjunto": "DESBOBINADOR",
+          "nome": "Desbobinador"
+        },
+        {
+          "chave": "LCT08.ENDIREITADEIRA",
+          "conjunto": "ENDIREITADEIRA",
+          "nome": "Endireitadeira"
+        },
+        {
+          "chave": "LCT08.FACA_DE_DESPONTE",
+          "conjunto": "FACA_DE_DESPONTE",
+          "nome": "Faca de desponte"
+        },
+        {
+          "chave": "LCT08.APLANADORA_1",
+          "conjunto": "APLANADORA_1",
+          "nome": "Aplanadora 1"
+        },
+        {
+          "chave": "LCT08.APLANADORA_2",
+          "conjunto": "APLANADORA_2",
+          "nome": "Aplanadora 2"
+        },
+        {
+          "chave": "LCT08.MESA_DE_ROLETES",
+          "conjunto": "MESA_DE_ROLETES",
+          "nome": "Mesa de roletes"
+        },
+        {
+          "chave": "LCT08.TRACIONADOR_MEDICAO",
+          "conjunto": "TRACIONADOR_MEDICAO",
+          "nome": "Tracionador / medição"
+        },
+        {
+          "chave": "LCT08.TESOURA_ROTATIVA",
+          "conjunto": "TESOURA_ROTATIVA",
+          "nome": "Tesoura rotativa"
+        },
+        {
+          "chave": "LCT08.ESTEIRA_DE_SAIDA",
+          "conjunto": "ESTEIRA_DE_SAIDA",
+          "nome": "Esteira de saída"
+        },
+        {
+          "chave": "LCT08.EMPILHADOR_1",
+          "conjunto": "EMPILHADOR_1",
+          "nome": "Empilhador 1"
+        },
+        {
+          "chave": "LCT08.EMPILHADOR_2",
+          "conjunto": "EMPILHADOR_2",
+          "nome": "Empilhador 2"
+        }
+      ]
+    },
+    {
+      "ativo": "LCL4,5",
+      "caixa": {
+        "x": 1531.46,
+        "y": 511.93,
+        "largura": 81.47,
+        "altura": 203.18
+      },
+      "croqui": {
+        "desenho": "linhas_corte.svg",
+        "view_box": [
+          947.0,
+          -116.0,
+          246.0,
+          638.0
+        ]
+      },
+      "conjuntos": [
+        {
+          "chave": "LCL4,5.CARRO_DE_BOBINAS",
+          "conjunto": "CARRO_DE_BOBINAS",
+          "nome": "Carro de bobinas"
+        },
+        {
+          "chave": "LCL4,5.DESBOBINADOR",
+          "conjunto": "DESBOBINADOR",
+          "nome": "Desbobinador"
+        },
+        {
+          "chave": "LCL4,5.MESA_DE_INTRODUCAO",
+          "conjunto": "MESA_DE_INTRODUCAO",
+          "nome": "Mesa de introdução"
+        },
+        {
+          "chave": "LCL4,5.CABECOTE_DE_CORTE",
+          "conjunto": "CABECOTE_DE_CORTE",
+          "nome": "Cabeçote de corte"
+        },
+        {
+          "chave": "LCL4,5.ENROLADOR_DE_APARAS",
+          "conjunto": "ENROLADOR_DE_APARAS",
+          "nome": "Enrolador de aparas"
+        },
+        {
+          "chave": "LCL4,5.FOSSO_DE_LACO",
+          "conjunto": "FOSSO_DE_LACO",
+          "nome": "Fosso de laço"
+        },
+        {
+          "chave": "LCL4,5.CARRO_DE_ENFIAMENTO",
+          "conjunto": "CARRO_DE_ENFIAMENTO",
+          "nome": "Carro de enfiamento"
+        },
+        {
+          "chave": "LCL4,5.SEPARADOR_TENSAO",
+          "conjunto": "SEPARADOR_TENSAO",
+          "nome": "Separador / tensão"
+        },
+        {
+          "chave": "LCL4,5.ENROLADOR",
+          "conjunto": "ENROLADOR",
+          "nome": "Enrolador"
+        },
+        {
+          "chave": "LCL4,5.CARRO_DE_SAIDA",
+          "conjunto": "CARRO_DE_SAIDA",
+          "nome": "Carro de saída"
+        }
+      ]
+    },
+    {
+      "ativo": "LCL08",
+      "caixa": {
+        "x": 1661.86,
+        "y": 511.93,
+        "largura": 81.47,
+        "altura": 203.18
+      },
+      "croqui": {
+        "desenho": "linhas_corte.svg",
+        "view_box": [
+          1367.0,
+          -116.0,
+          246.0,
+          638.0
+        ]
+      },
+      "conjuntos": [
+        {
+          "chave": "LCL08.CARRO_DE_BOBINAS",
+          "conjunto": "CARRO_DE_BOBINAS",
+          "nome": "Carro de bobinas"
+        },
+        {
+          "chave": "LCL08.DESBOBINADOR",
+          "conjunto": "DESBOBINADOR",
+          "nome": "Desbobinador"
+        },
+        {
+          "chave": "LCL08.MESA_DE_INTRODUCAO",
+          "conjunto": "MESA_DE_INTRODUCAO",
+          "nome": "Mesa de introdução"
+        },
+        {
+          "chave": "LCL08.CABECOTE_DE_CORTE",
+          "conjunto": "CABECOTE_DE_CORTE",
+          "nome": "Cabeçote de corte"
+        },
+        {
+          "chave": "LCL08.ENROLADOR_DE_APARAS",
+          "conjunto": "ENROLADOR_DE_APARAS",
+          "nome": "Enrolador de aparas"
+        },
+        {
+          "chave": "LCL08.FOSSO_DE_LACO",
+          "conjunto": "FOSSO_DE_LACO",
+          "nome": "Fosso de laço"
+        },
+        {
+          "chave": "LCL08.CARRO_DE_ENFIAMENTO",
+          "conjunto": "CARRO_DE_ENFIAMENTO",
+          "nome": "Carro de enfiamento"
+        },
+        {
+          "chave": "LCL08.SEPARADOR_TENSAO",
+          "conjunto": "SEPARADOR_TENSAO",
+          "nome": "Separador / tensão"
+        },
+        {
+          "chave": "LCL08.ENROLADOR",
+          "conjunto": "ENROLADOR",
+          "nome": "Enrolador"
+        },
+        {
+          "chave": "LCL08.CARRO_DE_SAIDA",
+          "conjunto": "CARRO_DE_SAIDA",
+          "nome": "Carro de saída"
+        }
+      ]
+    },
+    {
+      "ativo": "LWB",
+      "caixa": {
+        "x": 10.48,
+        "y": 605.28,
+        "largura": 196.33,
+        "altura": 389.92
+      },
+      "croqui": {
+        "desenho": "linha_lwb.svg",
+        "view_box": [
+          183.0,
+          -97.0,
+          304.0,
+          596.0
+        ]
+      },
+      "conjuntos": [
+        {
+          "chave": "LWB.DUNI1_DESTACKING",
+          "conjunto": "DUNI1_DESTACKING",
+          "nome": "DUni1 — Destacking"
+        },
+        {
+          "chave": "LWB.DUNI2_DESTACKING",
+          "conjunto": "DUNI2_DESTACKING",
+          "nome": "DUni2 — Destacking"
+        },
+        {
+          "chave": "LWB.CONCONDL1_2",
+          "conjunto": "CONCONDL1_2",
+          "nome": "ConConDL1&2"
+        },
+        {
+          "chave": "LWB.DBCON_DBPLA",
+          "conjunto": "DBCON_DBPLA",
+          "nome": "DBCon / DBPla"
+        },
+        {
+          "chave": "LWB.RYDI_DIMPLING",
+          "conjunto": "RYDI_DIMPLING",
+          "nome": "RyDi — Dimpling"
+        },
+        {
+          "chave": "LWB.SSPEED_FIWI_SOLDA",
+          "conjunto": "SSPEED_FIWI_SOLDA",
+          "nome": "SSpeed + FiWi — Solda"
+        },
+        {
+          "chave": "LWB.TUNICON",
+          "conjunto": "TUNICON",
+          "nome": "TUniCon"
+        },
+        {
+          "chave": "LWB.BTOVER_STOVER_VIRADOR",
+          "conjunto": "BTOVER_STOVER_VIRADOR",
+          "nome": "BTover / STover — Virador"
+        },
+        {
+          "chave": "LWB.MARK_MARCACAO",
+          "conjunto": "MARK_MARCACAO",
+          "nome": "Mark — Marcação"
+        },
+        {
+          "chave": "LWB.ITAB",
+          "conjunto": "ITAB",
+          "nome": "ITab"
+        },
+        {
+          "chave": "LWB.NOKCON_NOKPLA_REJEITO",
+          "conjunto": "NOKCON_NOKPLA_REJEITO",
+          "nome": "NOKCon / NOKPla — Rejeito"
+        },
+        {
+          "chave": "LWB.SUNI_STACKING",
+          "conjunto": "SUNI_STACKING",
+          "nome": "SUni — Stacking"
+        }
+      ]
+    }
+  ],
+  "total_maquinas": 84
+}

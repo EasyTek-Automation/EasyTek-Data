@@ -204,6 +204,15 @@ def _modal_employee_management():
                             value="B",
                             className="mt-1 mb-3",
                         ),
+                        # campos do hh-management (cadastro único — BR-14). Opcionais; não
+                        # afetam o GanttManagement (retrocompat — só alimentam o quadro semanal).
+                        dbc.Label("Sigla(s) no SAP (separe por vírgula)"),
+                        dbc.Input(id="input-employee-siglas", type="text",
+                                  placeholder="ex.: CDAMASIO, C.DAMASIO",
+                                  className="mb-3"),
+                        dbc.Label("Jornada (min/dia — opcional; vazio = usa o turno)"),
+                        dbc.Input(id="input-employee-jornada", type="number", min=0, step=30,
+                                  placeholder="ex.: 480", className="mb-3"),
                         dbc.Label("Foto (JPG ou PNG, opcional)"),
                         html.Div([
                             html.Div(id="div-employee-photo-preview", className="mb-2"),
@@ -231,6 +240,10 @@ def _modal_employee_management():
                             ),
                         ], className="mb-4"),
                         dcc.Store(id="store-employee-photo-staged"),
+                        # mão de obra temporária (BR-25): conta no Gantt, fora do quadro semanal
+                        # salvo inclusão manual pelo quadro
+                        dbc.Checkbox(id="check-employee-temporario", value=False,
+                                     label="Mão de obra temporária", className="mb-3"),
                         dbc.Button("Salvar",   id="btn-save-employee",   color="primary"),
                         dbc.Button("Cancelar", id="btn-cancel-employee", color="secondary",
                                    outline=True, className="ms-2"),

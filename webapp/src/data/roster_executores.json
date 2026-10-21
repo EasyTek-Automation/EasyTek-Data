@@ -1,0 +1,13 @@
+{
+  "_meta": {
+    "descricao": "Base pública sem dados de funcionários; configurar por instalação.",
+    "total_tecnicos": 0,
+    "total_terceiros": 0
+  },
+  "executores": {
+    "89990000": {
+      "nome": null,
+      "tipo": "sem_executor"
+    }
+  }
+}

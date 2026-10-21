@@ -1,0 +1,329 @@
+/* Análise de Falhas — estilos da página do diagrama Ishikawa/A3. */
+
+/* Quadriculado discreto no fundo do diagrama (cara de engenharia / papel
+   milimetrado). O canvas do cytoscape é transparente, então o grid aparece
+   atrás dos balões. Linhas cinza semi-transparentes → funcionam no tema claro
+   e no escuro sem precisar detectar o tema. Grid fino de 22px + linhas de
+   destaque a cada 110px. */
+#fa-diagrama {
+  background-image:
+    linear-gradient(rgba(120, 130, 140, 0.16) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 130, 140, 0.16) 1px, transparent 1px),
+    linear-gradient(rgba(120, 130, 140, 0.09) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(120, 130, 140, 0.09) 1px, transparent 1px);
+  background-size: 36.67px 36.67px, 36.67px 36.67px, 7.33px 7.33px, 7.33px 7.33px;
+}
+
+/* Blink discreto no botão "Salvar alterações" quando há mudanças não salvas:
+   um leve pulso de brilho ao redor (não pisca opacidade — fica mais elegante). */
+@keyframes fa-dirty-blink {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(13, 110, 253, 0.0); }
+  50%      { box-shadow: 0 0 0 4px rgba(13, 110, 253, 0.35); }
+}
+.fa-dirty-blink {
+  animation: fa-dirty-blink 1.4s ease-in-out infinite;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Accordions das seções A3 (classe `fa-a3-accordion`). Objetivo: deixar claro
+   que cada linha é um cabeçalho EXPANSÍVEL (antes, colapsado, tudo se misturava)
+   e usar as cores do logo do cliente (marca/marca) — azul #005090 e
+   laranja #E96D38 — as mesmas da home. Substitui o verde do tema Minty.
+   Cores de fundo em rgba (tint) para funcionar no tema claro e no escuro; o
+   texto do título usa a cor do corpo (legível nos dois temas). A identidade da
+   marca vem da barra azul + do badge laranja, não de forçar cor no texto. */
+
+/* Cada item vira um cartão separado, com respiro entre eles.
+   Os date pickers (Prazo na Seção 4, Data na Seção 6) usam `with_portal=True`:
+   o calendário abre como modal centralizado no body, então NÃO é cortado por
+   este `overflow: hidden` nem pela borda da tela na última linha. */
+.fa-a3-accordion .accordion-item {
+  border: 1px solid rgba(0, 80, 144, 0.20);
+  border-radius: 10px;
+  margin-bottom: 0.6rem;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.07);
+}
+
+/* Cabeçalho clicável: barra azul da marca à esquerda + fundo com tint azul +
+   chevron azul (substitui o chevron verde do tema). */
+.fa-a3-accordion .accordion-button {
+  background: rgba(0, 80, 144, 0.05);
+  border-left: 5px solid #005090;
+  font-weight: 600;
+  color: var(--bs-body-color);
+  padding: 0.8rem 1rem;
+  transition: background 0.15s ease;
+  --bs-accordion-btn-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23005090' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.2'%3e%3cpath d='M3 5l5 6 5-6'/%3e%3c/svg%3e");
+  --bs-accordion-btn-active-icon: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23005090' stroke-linecap='round' stroke-linejoin='round' stroke-width='2.2'%3e%3cpath d='M3 5l5 6 5-6'/%3e%3c/svg%3e");
+}
+.fa-a3-accordion .accordion-button:hover {
+  background: rgba(0, 80, 144, 0.10);
+}
+.fa-a3-accordion .accordion-button:not(.collapsed) {
+  background: rgba(0, 80, 144, 0.10);
+  color: var(--bs-body-color);
+  box-shadow: inset 0 -1px 0 rgba(0, 80, 144, 0.20);
+}
+.fa-a3-accordion .accordion-button:focus {
+  box-shadow: 0 0 0 0.2rem rgba(0, 80, 144, 0.20);
+}
+/* Chevron um pouco maior, mais evidente. */
+.fa-a3-accordion .accordion-button::after {
+  width: 1.1rem;
+  height: 1.1rem;
+  background-size: 1.1rem;
+}
+
+/* Título com badge numerado (círculo laranja da marca) + texto. */
+.fa-sec-titulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+.fa-sec-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  flex: 0 0 1.6rem;
+  background: #E96D38;
+  color: #fff;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
+}
+.fa-sec-txt {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Seção 6 (Encerramento): a assinatura (dcc.Dropdown, ~36px) fica na MESMA altura
+   do date picker da Data (~46px), para a linha ficar alinhada. */
+#fa-sec-enc-resp .Select-control {
+  height: 46px;
+}
+#fa-sec-enc-resp .Select-placeholder,
+#fa-sec-enc-resp .Select-value {
+  line-height: 44px;
+}
+#fa-sec-enc-resp .Select-input {
+  height: 44px;
+}
+
+/* Seção 4 (Plano de Ação): a linha tem Ação (Textarea), Responsável (Dropdown),
+   Prazo (DatePickerSingle) e Status (Dropdown). Por padrão o input do DatePicker é
+   mais alto/maior que os dropdowns e desalinha a linha. Iguala todos os controles
+   à mesma altura (38px) para a linha ficar reta. Escopo em #fa-acoes-container
+   porque os ids das linhas são pattern-matching (não dá para mirar por id fixo). */
+#fa-acoes-container .Select-control {
+  min-height: 38px;
+  height: 38px;
+}
+#fa-acoes-container .Select-placeholder,
+#fa-acoes-container .Select-value {
+  line-height: 36px;
+}
+#fa-acoes-container .Select-input {
+  height: 36px;
+}
+#fa-acoes-container .SingleDatePickerInput,
+#fa-acoes-container .DateInput {
+  width: 100%;
+}
+#fa-acoes-container .DateInput_input {
+  height: 38px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Galeria de fotos (SDD analise-falhas-fotos): grade de miniaturas estilo
+   rede social. As imagens são servidas pela rota Flask (streaming do file
+   server), nunca do disco do app. */
+.fa-fotos-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.fa-foto-card {
+  position: relative;
+  width: 150px;
+}
+.fa-foto-thumb {
+  width: 150px;
+  height: 110px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 80, 144, 0.20);
+  background: rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  display: block;
+  transition: filter 0.15s;
+}
+.fa-foto-thumb:hover {
+  filter: brightness(0.92);
+}
+.fa-foto-legenda {
+  font-size: 0.72rem;
+  color: var(--bs-secondary-color, #6c757d);
+  margin-top: 2px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fa-foto-del {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  width: 26px;
+  height: 26px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.fa-foto-card:hover .fa-foto-del {
+  opacity: 1;
+}
+/* Miniatura quebrada (file server fora / arquivo ausente) — placeholder (BR-09). */
+.fa-foto-quebrada {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #adb5bd;
+  font-size: 1.7rem;
+}
+
+/* Lightbox (visualizador cheio) — overlay dirigido pelo JS (display flex/none). */
+.fa-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1080;
+  background: rgba(0, 0, 0, 0.85);
+  align-items: center;
+  justify-content: center;
+}
+/* A moldura é a tela inteira do overlay, não o tamanho da foto: antes ela encolhia
+   até a imagem (92vw/88vh) e cortava a foto ampliada — arrastar não chegava aos
+   cantos. A imagem continua limitada em 1×; ampliar cresce dentro da moldura.
+   `pointer-events: none` deixa o clique no fundo escuro chegar ao overlay (que fecha
+   o visualizador, como antes); só a imagem recebe mouse — arrastar segue igual. */
+.fa-lb-stage {
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.fa-lb-img {
+  max-width: 92vw;
+  max-height: 88vh;
+  object-fit: contain;
+  border-radius: 4px;
+  transition: transform 0.05s linear;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: auto;
+}
+.fa-lb-stage { cursor: grab; }
+.fa-lb-stage:active { cursor: grabbing; }
+/* Barra de manipulação (girar / reset / salvar) no rodapé do lightbox. */
+.fa-lb-toolbar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 2;
+}
+.fa-lb-btn {
+  background: rgba(255, 255, 255, 0.14);
+  border: none;
+  color: #fff;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 1.05rem;
+  cursor: pointer;
+  line-height: 1;
+}
+.fa-lb-btn:hover { background: rgba(255, 255, 255, 0.28); }
+.fa-lb-salvar { background: rgba(25, 135, 84, 0.75); }
+.fa-lb-salvar:hover { background: rgba(25, 135, 84, 0.95); }
+.fa-lb-close {
+  position: absolute;
+  z-index: 2;
+  top: 14px;
+  right: 20px;
+  background: none;
+  border: none;
+  color: #fff;
+  font-size: 2.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+.fa-lb-nav {
+  position: absolute;
+  z-index: 2;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  color: #fff;
+  font-size: 2.4rem;
+  width: 52px;
+  height: 72px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+.fa-lb-prev { left: 18px; }
+.fa-lb-next { right: 18px; }
+.fa-lb-nav:hover { background: rgba(255, 255, 255, 0.25); }
+.fa-lb-legenda {
+  position: absolute;
+  bottom: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 6px 14px;
+  border-radius: 6px;
+  max-width: 80vw;
+  font-size: 0.9rem;
+}
+
+/* Dropdowns (dcc.Dropdown / react-select) dentro dos accordions das seções A3 —
+   o menu aberto era cortado pelo `overflow: hidden` do `.accordion-item` (posto para
+   arredondar os cantos) e sumia atrás do título da seção/campo de baixo. Só o menu do
+   dropdown é `position:absolute` descendente do item, então o `overflow: hidden` o
+   clipa independentemente do z-index. Solução: liberar o overflow do item APENAS
+   enquanto há um dropdown aberto dentro dele (`:has(.Select.is-open)`); fechado, o
+   overflow volta e os cantos seguem arredondados. `:has` já é usado no projeto
+   (Chromium ≥105). O `.Select.is-open` ganha z-index para o menu flutuar acima do
+   accordion irmão seguinte. Escopo em `.fa-page` para não mexer em outras telas. */
+.fa-page .fa-a3-accordion .accordion-item:has(.Select.is-open) {
+  overflow: visible;
+}
+.fa-page .dash-dropdown .Select.is-open {
+  position: relative;
+  z-index: 1200;
+}
+
+/* Gestão das Análises — linha clicável (tabela por responsável e lista de atenção).
+   Linha que abre alguma coisa precisa PARECER clicável; sem isto, a pessoa não
+   descobre que dá para clicar (SP-08). */
+.g-clicavel { cursor: pointer; transition: background-color .12s ease; }
+.g-clicavel:hover { background-color: rgba(192, 57, 43, 0.06); }

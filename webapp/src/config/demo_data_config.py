@@ -53,6 +53,10 @@ DEMO_PAGES = {
     "/maintenance/plan": True,          # Plano de Manutenção
     "/maintenance/history": True,       # Histórico
     "/maintenance/indicators": True,    # Indicadores
+    # Protótipo: a tela inteira é mockada, e parece supervisório de verdade —
+    # o selo é o que impede que seja lida como sistema em produção.
+    "/maintenance/monitoramento-ativos": True,
+    "/maintenance/monitoramento-ativos/ativo": True,
 
     # Relatórios
     "/reports": True,                   # Relatórios

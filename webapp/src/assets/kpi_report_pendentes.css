@@ -1,0 +1,42 @@
+/* KPIReport-v2 BR-14 / SP-27 — parada lançada na ZPP Paradas, ainda não consolidada na NT0001.
+   Aditivo: só pinta linhas com a classe nova; linhas oficiais não mudam. */
+/* box-shadow inset: vence o zebrado/hover do Bootstrap 5.3 (que pinta via box-shadow) */
+tr.kpi-v2-row-pendente > th,
+tr.kpi-v2-row-pendente > td {
+    background-color: #FFF4E0;
+    box-shadow: inset 0 0 0 9999px #FFF4E0 !important;
+}
+tr.kpi-v2-row-pendente > td:first-child {
+    box-shadow: inset 4px 0 0 #E96D38, inset 0 0 0 9999px #FFF4E0 !important;
+}
+.kpi-v2-selo-pendente {
+    display: inline-block;
+    padding: 0 6px;
+    border: 1px solid #E96D38;
+    border-radius: 4px;
+    color: #B4471A;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    background: #FFFFFF;
+}
+.kpi-v2-legenda-pendente {
+    font-size: 0.78rem;
+    color: #8A4B14;
+}
+.kpi-v2-aviso-checagem {
+    font-size: 0.75rem;
+    color: #6c757d;
+    font-style: italic;
+}
+[data-bs-theme="dark"] tr.kpi-v2-row-pendente > td,
+[data-bs-theme="dark"] tr.kpi-v2-row-pendente > th {
+    background-color: rgba(233, 109, 56, 0.18);
+    box-shadow: inset 0 0 0 9999px rgba(233, 109, 56, 0.18) !important;
+}
+[data-bs-theme="dark"] tr.kpi-v2-row-pendente > td:first-child {
+    box-shadow: inset 4px 0 0 #E96D38, inset 0 0 0 9999px rgba(233, 109, 56, 0.18) !important;
+}
+[data-bs-theme="dark"] .kpi-v2-selo-pendente { background: transparent; color: #F2A27E; }
+[data-bs-theme="dark"] .kpi-v2-legenda-pendente { color: #F2A27E; }

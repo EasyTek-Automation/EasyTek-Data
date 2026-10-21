@@ -168,3 +168,24 @@
         /* Hide footer in print */
     }
 }
+/* Itens do mega-menu de Manutenção: nome longo quebra em vez de vazar a coluna.
+   O `.dropdown-item` do Bootstrap nasce com `white-space: nowrap` — bom para rótulo curto,
+   ruim para "Monitoramento de Ativos (DEMO)", que saía da caixa. A quebra vale só nos itens
+   marcados, para não mexer nos outros menus do sistema. */
+/* A dupla classe é necessária: o Bootstrap é carregado depois deste arquivo (o Dash serve
+   `assets/` em ordem alfabética e `vendor/` vem por último), então `.dropdown-item` sozinho
+   empataria e venceria pela ordem. */
+.dropdown-item.mtn-mega-item {
+  white-space: normal;
+}
+
+/* Com duas linhas, o ícone sobe para acompanhar a primeira — centralizado, ele flutuaria no
+   meio do bloco de texto. */
+.dropdown-item.mtn-mega-item > .d-flex {
+  align-items: flex-start !important;
+}
+
+.dropdown-item.mtn-mega-item > .d-flex > span:first-child {
+  /* Alinha o ícone com a linha de base do texto, já que não está mais centralizado. */
+  margin-top: 1px;
+}

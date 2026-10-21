@@ -86,6 +86,7 @@ def seed_sap_backlog():
         for d in payload.get("docs", []):
             d = dict(d)
             d["data_inicio"] = _iso(d.get("data_inicio"))
+            d["data_criacao"] = _iso(d.get("data_criacao"))
             d["coletado_em"] = _iso(d.get("coletado_em"))
             docs.append(d)
         if not docs:
@@ -95,7 +96,8 @@ def seed_sap_backlog():
             "coleta_id_atual": payload.get("coleta_id"),
             "coletado_em": _iso(payload.get("coletado_em")),
             "total": len(docs)}}, upsert=True)
-        for f in ("coleta_id", "categoria", "disciplina", "subclassificacao", "data_inicio", "ordem"):
+        for f in ("coleta_id", "categoria", "disciplina", "subclassificacao",
+                  "data_inicio", "data_criacao", "ordem"):
             coll.create_index([(f, 1)])
         logger.info("seed sap_backlog: %d ordens (bootstrap)", len(docs))
     except (PyMongoError, OSError, ValueError) as e:

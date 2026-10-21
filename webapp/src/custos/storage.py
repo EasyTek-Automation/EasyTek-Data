@@ -22,9 +22,12 @@ COLL_LANCAMENTOS = "AMG_CustoLancamentos"
 # Config leve da feature (doc unico por chave) — ex: contas fixadas no slide da home.
 COLL_CONFIG = "AMG_CustoConfig"
 # De/para codigo->nome (1 doc por codigo, _id=codigo), populado pelo daemon a partir do
-# OBJ_TXT/CEL_LTXT da KSB1. Fonte do nome de centro/conta na tela (sem dict manual).
+# OBJ_TXT/CEL_KTXT da KSB1. Fonte do nome de centro/conta na tela (sem dict manual).
 COLL_CENTROS = "AMG_CustoCentros"
 COLL_CONTAS = "AMG_CustoContas"
+# Itens do almoxarifado por ordem (BR-15): 1 doc por ordem x material baixado, coletado da
+# MB25. Alimenta o mini-modal da linha de liquidacao (busca por `ordem`).
+COLL_COMPONENTES = "AMG_CustoOrdemComponentes"
 
 
 def ensure_indexes(db) -> None:
@@ -53,6 +56,10 @@ def ensure_indexes(db) -> None:
     db[COLL_LANCAMENTOS].create_index(
         [("centro_custo", 1)],
         name="idx_lanc_centro",
+    )
+    db[COLL_COMPONENTES].create_index(
+        [("ordem", 1)],
+        name="idx_comp_ordem",
     )
     logger.info(
         "custos: indices garantidos (%s.idx_resumo_conta_mes unique; "

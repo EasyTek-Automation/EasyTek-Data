@@ -159,13 +159,22 @@ CENTRO_ARBPL: dict[str, str] = {
 EQUIP_OUTROS = "Outros"          # cauda de fatias pequenas (não usado quando há ponte completa)
 EQUIP_APOIO = "Apoio/Admin"      # centros sem linha (predial, ferramentaria, serviços, TI…)
 
+# Centros SEM KPI de manutenção próprio (sem MTBF/MTTR, logo fora da ponte KPI acima), mas cujo
+# custo deve aparecer como FATIA PRÓPRIA na rosca — sem ser engolido pelo cinza "Apoio/Admin".
+# Nome de exibição direto (não passa por EQUIPAMENTO_NOMES). Ver SDD CostsManagement.
+CENTRO_EQUIP_EXTRA: dict[str, str] = {
+    "201300": "Decapado",       # LINHA DECAPADO — linha de decapagem
+    "201000": "Solda Laser",    # LINHA SOLDA LASER
+}
+
 
 def nome_equipamento(centro: str) -> str:
     """Nome do equipamento de um centro de custo: ponte KOSTL→ARBPL → `EQUIPAMENTO_NOMES`
-    (fonte única dos KPIs). Centro sem linha mapeada → 'Apoio/Admin'."""
+    (fonte única dos KPIs). Centro sem linha KPI cai em `CENTRO_EQUIP_EXTRA` (linha de produção
+    com fatia própria, ex: Decapado) ou, por fim, em 'Apoio/Admin'."""
     arbpl = CENTRO_ARBPL.get(centro)
     if not arbpl:
-        return EQUIP_APOIO
+        return CENTRO_EQUIP_EXTRA.get(centro, EQUIP_APOIO)
     try:
         from src.utils.zpp_kpi_calculator import EQUIPAMENTO_NOMES
     except ImportError:  # pragma: no cover

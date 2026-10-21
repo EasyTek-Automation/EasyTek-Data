@@ -13,16 +13,21 @@ from src.callbacks_registers.sap_scheduler_config_callbacks import (
     _construir_texto_ultima_alteracao,
     _formatar_em,
 )
+from src.sap_scheduler.validators import TIPOS_VALIDOS
 
 
 class TestConstruirTabela:
-    """Tabela sempre mostra todos os TIPOS_VALIDOS — defaults pra ausentes."""
+    """Tabela sempre mostra todos os TIPOS_VALIDOS — defaults pra ausentes.
 
-    def test_renderiza_2_linhas_em_lista_vazia(self):
+    Nº de linhas é dinâmico (= len(TIPOS_VALIDOS)) — cresce conforme novos tipos
+    (backlog, hh_planejado, hh_realizado) entram na whitelist.
+    """
+
+    def test_renderiza_uma_linha_por_tipo_em_lista_vazia(self):
         tabela = _construir_tabela([])
         # dbc.Table -> children = [thead, tbody]
         tbody = tabela.children[1]
-        assert len(tbody.children) == 2  # zppprd + zpp_nt0001
+        assert len(tbody.children) == len(TIPOS_VALIDOS)
 
     def test_renderiza_linha_por_tipo_existente(self):
         agendamentos = [
@@ -30,8 +35,8 @@ class TestConstruirTabela:
         ]
         tabela = _construir_tabela(agendamentos)
         tbody = tabela.children[1]
-        # 2 linhas: zppprd (encontrado) + zpp_nt0001 (default inativo)
-        assert len(tbody.children) == 2
+        # 1 linha por tipo da whitelist (zppprd encontrado + os demais como default inativo)
+        assert len(tbody.children) == len(TIPOS_VALIDOS)
 
     def test_renderiza_pattern_matching_ids(self):
         tabela = _construir_tabela([])
@@ -43,7 +48,7 @@ class TestConstruirTabela:
         # Dash pattern-matching id
         assert isinstance(input_widget.id, dict)
         assert input_widget.id["type"] == "sap-sched-input-hora"
-        assert input_widget.id["tipo"] in {"zppprd", "zpp_nt0001"}
+        assert input_widget.id["tipo"] in TIPOS_VALIDOS
 
 
 class TestFormatarEm:

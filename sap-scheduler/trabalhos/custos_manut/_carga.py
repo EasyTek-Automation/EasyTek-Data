@@ -11,6 +11,19 @@ def gravar(db, coll: str, docs: list) -> int:
     return len(docs)
 
 
+def gravar_componentes(db, coll: str, docs: list, ordens: list) -> int:
+    """Carga idempotente dos componentes de ordem (BR-15). Idempotente **por ordem** (não por
+    mês): apaga os componentes das ordens do lote (`fonte='sap'`) e reinsere. O mini-modal busca
+    por ordem, e uma ordem tem o mesmo conjunto de itens baixados independente do mês da coleta.
+    """
+    ordens = sorted({(o or "").strip() for o in (ordens or []) if (o or "").strip()})
+    if ordens:
+        db[coll].delete_many({"ordem": {"$in": ordens}, "fonte": "sap"})
+    if docs:
+        db[coll].insert_many(docs)
+    return len(docs)
+
+
 def upsert_depara(db, coll: str, mapping: dict) -> int:
     """Upsert do de/para código→nome (1 doc por código, `_id`=código). Idempotente.
 

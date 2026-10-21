@@ -985,3 +985,12 @@ def layout():
 - **MQTT**: Paho-MQTT (in event-gateway)
 - **Web Server**: Gunicorn (production)
 - **Other**: python-dotenv 1.1.1, Werkzeug 3.1.3
+
+
+## Sincronização AMG → EasyTek (2026-10-21)
+
+- Base funcional: AMG-Data/main em d3527c4. Configurações e dados reais do cliente não acompanham a base pública.
+- Imagens desta base: `ghcr.io/easytek-automation/easytek-base/<serviço>`; não publicar no namespace de produção AMG `easytek-data`.
+- Infra correspondente: EasyTek-Infra, pasta irmã `EasyTek_Infra`; aplicação nesta pasta `EasyTek_Data`.
+- Roster distribuído sem funcionários; cadastrar somente na instalação privada. Testes SAP usam fixture sintética; fotos privadas foram substituídas por arte abstrata.
+- Histórico privado do AMG não deve ser incorporado por merge: integrar conteúdo revisado em commit com pai pertencente ao histórico público EasyTek.

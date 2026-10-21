@@ -1,0 +1,60 @@
+  :root{
+    --parado:#d7d7d2; --parcial:#f6c026; --cheio:#28c76f; --vermelho:#e74c3c;
+    --stroke:#3a3a37; --bg:#eef0ee; --panel:#fff;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font:14px/1.4 'Segoe UI',Arial,sans-serif;background:var(--bg);color:#2a2a28}
+  header{padding:14px 20px;background:#fff;border-bottom:1px solid #e3e3df}
+  header h1{margin:0;font-size:18px}
+  header p{margin:4px 0 0;color:#777;font-size:12px}
+  .wrap{padding:20px}
+  .stage{background:var(--panel);border:1px solid #e3e3df;border-radius:10px;padding:12px;overflow:auto}
+  svg{display:block}
+  #root{width:100%;height:auto}
+  .nav{display:flex;gap:6px;padding:8px 20px;background:#fff;border-bottom:1px solid #e3e3df}
+  .nav a{padding:6px 14px;border-radius:8px;text-decoration:none;color:#555;font-size:13px;font-weight:600;border:1px solid transparent}
+  .nav a:hover{background:#f2f2ef}
+  .nav a.active{background:#eef7f2;color:#0f6e56;border-color:#cfe9dd}
+
+  /* --- máquinas (compartilhado por todas as linhas embutidas) --- */
+  .machine{cursor:pointer;filter:url(#shadow)}
+  .machine .body{fill:#fff;stroke:var(--stroke);stroke-width:1.4;transition:fill .3s}
+  .machine .detail{fill:none;stroke:var(--stroke);stroke-width:.9;stroke-linecap:round}
+  .machine .fill-detail{fill:var(--stroke);opacity:.10;stroke:none}
+  .machine .bevel{fill:none;stroke:#fff;stroke-width:1.1;opacity:.5}
+  .machine[data-state="parado"]  .body{fill:var(--parado)}
+  .machine[data-state="parcial"] .body{fill:var(--parcial)}
+  .machine[data-state="cheio"]   .body{fill:var(--cheio)}
+  .machine[data-state="vermelho"] .body{fill:var(--vermelho)}
+  .machine:hover .body{stroke-width:2.2}
+  .badge{display:none}
+  .flow{fill:none;stroke:#9aa0a6;stroke-width:1.4;stroke-dasharray:2 6;stroke-linecap:round;opacity:.5}
+  .coil{fill:url(#steel);stroke:var(--stroke);stroke-width:1.1}
+  .ring{fill:none;stroke:#8b8d90;stroke-width:.9;opacity:.65}
+  .hub{fill:#b7b9bc;stroke:var(--stroke);stroke-width:1}
+  .weld{fill:none;stroke:#c0451f;stroke-width:2.6;stroke-linecap:round}
+  .stack{fill:#f6e6dc;stroke:#a24b28;stroke-width:1}
+  .pallet{fill:#ecebe5;stroke:#83817a;stroke-width:1}
+  .pmat{fill:#8f8d86;opacity:.5}
+  .grp{fill:none;stroke:#9aa0a6;stroke-width:1.1;stroke-dasharray:8 5;opacity:.6}
+  .grplbl{fill:#6a6a64;font:600 11px 'Segoe UI',Arial}
+  .linelbl{fill:#3a3a37;font:700 18px 'Segoe UI',Arial;letter-spacing:.5px}
+  #root .linelbl{display:none}                 /* nomes embutidos escondidos — page4 gera os seus */
+  .assetlbl{fill:#2a2a28;font:800 26px 'Segoe UI',Arial;letter-spacing:.5px}
+
+  /* zonas da planta */
+  .zone{fill:#f6f6f4;stroke:#d9d9d3;stroke-width:1.4}
+  .zonelbl{fill:#9a9a92;font:700 26px 'Segoe UI',Arial;letter-spacing:.5px}
+  .zonelbl.sm{font-size:15px}
+  .blue{fill:#1f6fe0}
+  .bluelbl{fill:#fff;font:700 15px 'Segoe UI',Arial;letter-spacing:.5px}
+  .vlbl{fill:#5a5a54;font:700 15px 'Segoe UI',Arial;letter-spacing:1px}
+  .yard{fill:#fafaf8;stroke:#dcdcd6;stroke-width:1}
+  .cell{fill:#eeeee9;stroke:#cfcfc8;stroke-width:.8}
+  .yardlbl{fill:#9a9a92;font:600 10px 'Segoe UI',Arial}
+  .aisle{fill:#f3ead9;stroke:#e2d3b6;stroke-width:1}
+  /* grades de material sob os stacks */
+  .mchapa{fill:#e9e7e1;stroke:#b3afa4;stroke-width:.8}
+  .mblank{fill:#d3eddd;stroke:#63b98f;stroke-width:.8}
+  .mline{stroke:#b0aca1;stroke-width:.7}
+  .mdot{fill:#d3d3cc;stroke:#adada6;stroke-width:.5}

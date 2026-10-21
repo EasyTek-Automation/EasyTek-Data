@@ -253,10 +253,10 @@ def register_sap_scheduler_config_callbacks(app) -> None:
         # Alinhado com precedente /config/users/create (shared=True, qualquer lvl 3).
         # Perfil nao e mais filtrado server-side — route-level check ja restringiu.
         _ = user_perfil  # mantido como State pra eventual filtragem futura
-        if (user_level or 0) < 3:
+        if (user_level or 0) < 2:
             msg = [
                 html.I(className="bi bi-exclamation-triangle me-2"),
-                "Permissao negada — requer level 3.",
+                "Permissao negada — requer nivel 2+ (perfil manutencao).",
             ]
             return msg, "danger", True, no_update, no_update, no_update, no_update
 

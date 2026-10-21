@@ -33,6 +33,8 @@ from src.utils.kpi_report_data import (
     _build_top5_paradas,
     coletar_dados_relatorio,
 )
+from src.utils import kpi_report_maodeobra as mdo
+from src.utils.hh_data import semana_mao_de_obra
 from src.utils.kpi_report_v2_bars import build_bar_figure
 from src.utils.kpi_report_v2_series import (
     build_daily_series_last_n,
@@ -86,6 +88,51 @@ def _row_3_bars(series: dict | None, metas: dict | None) -> dbc.Row:
             )
         )
     return dbc.Row(cols)
+
+
+def _tabela_mao_de_obra(dias: list) -> dbc.Table:
+    """Tabela Dia · Disponível · Planejado · % plan. · Executado · Aderência. '—' nos vazios."""
+    header = html.Thead(html.Tr([html.Th(c) for c in mdo.CABECALHOS]))
+    corpo = []
+    for d in dias:
+        corpo.append(html.Tr([
+            html.Td(mdo.dia_label(d)),
+            html.Td(mdo.fmt_h(d["disponivel_h"])),
+            html.Td(mdo.fmt_h(d["planejado_h"])),
+            html.Td(mdo.fmt_pct(d["pct_plan"])),
+            html.Td(mdo.fmt_h(d["executado_h"])),
+            html.Td(mdo.fmt_pct(d["aderencia"])),
+        ]))
+    return dbc.Table([header, html.Tbody(corpo)],
+                     bordered=True, hover=True, striped=True, size="sm", className="mb-0")
+
+
+def _bloco_mao_de_obra(ref_day: datetime):
+    """Monta o bloco 'Mão de obra da semana' (BR-11/12, SP-18/20). Fábrica-toda, PT.
+
+    `ref_day` = dia avaliado do relatório (DatePicker das últimas 24h; default ontem). A semana de
+    referência é a que o contém — mesma âncora dos blocos 24h. Fail-soft: qualquer erro/HH
+    indisponível → nota, nunca derruba o relatório (SP-19)."""
+    try:
+        dados = semana_mao_de_obra(ref_day)
+    except Exception:
+        logger.exception("KPI v2 tab: falha em semana_mao_de_obra")
+        dados = None
+    if not dados or dados.get("sem_dados") or not dados.get("dias"):
+        return _section(
+            "Mão de obra da semana",
+            dbc.Alert("Sem dados de mão de obra no período.",
+                      color="info", className="mb-0"),
+        )
+    dias = dados["dias"]
+    return _section(
+        "Mão de obra da semana",
+        html.Small(mdo.rotulo_semana(dados), className="text-muted d-block mb-2"),
+        dcc.Graph(figure=mdo.fig_mao_de_obra(dias),
+                  config={"displayModeBar": False, "responsive": True},
+                  style={"height": "320px"}),
+        _tabela_mao_de_obra(dias),
+    )
 
 
 def _recompute_blocos_24h(
@@ -257,6 +304,7 @@ def register_kpi_report_v2_tab_callback(app: dash.Dash) -> None:
                 _tabela_top_paradas(
                     b2.get("paradas", []), b2.get("vazio", True),
                     "Sem paradas registradas no mês corrente.",
+                    aviso=b2.get("aviso_checagem", ""),
                 ),
             ),
             _section(
@@ -276,10 +324,14 @@ def register_kpi_report_v2_tab_callback(app: dash.Dash) -> None:
                     _tabela_top_paradas(
                         b5.get("paradas", []), b5.get("vazio", True),
                         "Sem paradas no dia selecionado.",
+                        aviso=b5.get("aviso_checagem", ""),
                     ),
                     style={"maxHeight": "500px", "overflowY": "auto"},
                 ),
             ),
+            # último bloco de dados, antes das seções de reunião (no DOCX) — SP-18.
+            # data_dia = dia avaliado do relatório (DatePicker, default ontem) — mesma âncora 24h.
+            _bloco_mao_de_obra(data_dia),
         ])
 
         # store-kpi-v2-data: marca disponível pra habilitar export (C11 desabilita

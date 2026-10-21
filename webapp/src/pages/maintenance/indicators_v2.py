@@ -132,6 +132,8 @@ TRANS = {
         "chart_trend":   "Tendência",
         "chart_target":  "Meta",
         "chart_value":   "Valor",
+        "chart_carga":   "Carga (h)",
+        "chart_cheio":   "Cheio",
         "chart_status":  "Status",
         "chart_delta":   "Δ",
         "chart_top_n_paradas": "Top {n} Paradas",
@@ -242,6 +244,8 @@ TRANS = {
         "chart_trend":   "Tendencia",
         "chart_target":  "Meta",
         "chart_value":   "Valor",
+        "chart_carga":   "Carga (h)",
+        "chart_cheio":   "Lleno",
         "chart_status":  "Estado",
         "chart_delta":   "Δ",
         "chart_top_n_paradas": "Top {n} Paradas",
@@ -349,6 +353,8 @@ TRANS = {
         "chart_trend":   "Trend",
         "chart_target":  "Target",
         "chart_value":   "Value",
+        "chart_carga":   "Load (h)",
+        "chart_cheio":   "Full",
         "chart_status":  "Status",
         "chart_delta":   "Δ",
         "chart_top_n_paradas": "Top {n} Breakdowns",
@@ -579,7 +585,9 @@ def _toolbar_field(label, control, width="auto", label_id=None):
     )
 
 
-def layout():
+def layout(active_tab="tab-v2-general"):
+    """active_tab permite deep-link de aba (ex.: home → ?tab=custo abre Custo direto,
+    sem renderizar a Geral antes — evita o flash de troca pós-render)."""
     return dbc.Container(
         [
             # Store de idioma — persiste entre sessões via localStorage
@@ -1087,7 +1095,7 @@ def layout():
                             ],
                         ),
                     ),
-                    _build_custo_tab(),
+                    _build_custo_tab(prerender=(active_tab == "tab-v2-custo")),
                     dbc.Tab(
                         label="📅 Relatório",
                         id="tab-v2-report-component",
@@ -1235,7 +1243,7 @@ def layout():
                     ),
                 ],
                 id="tabs-indicators-v2",
-                active_tab="tab-v2-general",
+                active_tab=active_tab,
             ),
 
             # Stores drilldown

@@ -13,21 +13,26 @@ ao Div (mesmo truque do v2).
 """
 from __future__ import annotations
 
+import io
 import logging
 import math
+from datetime import date as _date
 
 import dash
 import dash_bootstrap_components as dbc
+import pandas as pd
 import plotly.graph_objects as go
 from dash import ALL, Input, Output, State, ctx, dash_table, dcc, html, no_update
 from dash.dash_table.Format import Format, Group, Scheme, Symbol
 
+from src.custos import periodo as P
+
 try:
     from src.custos import leitura as L
-    from src.custos.hierarquia import nome_centro, nome_conta
+    from src.custos.hierarquia import nome_centro, nome_conta, nome_equipamento
 except ImportError:
     from custos import leitura as L  # type: ignore
-    from custos.hierarquia import nome_centro, nome_conta  # type: ignore
+    from custos.hierarquia import nome_centro, nome_conta, nome_equipamento  # type: ignore
 
 logger = logging.getLogger("custos.callbacks")
 
@@ -137,16 +142,72 @@ def _filtra_por_exec(rows, faixa):
             if r["code"] == "__GERAL__" or lo <= (r["executado"] or 0) <= hi]
 
 
+GERAL_FILTRADO = "GERAL (filtrado)"
+MSG_NENHUMA_CONTA = "Nenhuma conta marcada — marque ao menos uma no filtro Contas"
+
+
 def _filtra_por_contas(rows, sel):
-    """Mantém GERAL sempre; mantém só as contas cujo código está em `sel`. sel None → tudo.
+    """Mantém só as contas cujo código está em `sel` e recalcula o GERAL do recorte (BR-17).
 
     É o filtro das BARRAS (contas/classes de custo) — não confundir com centro de custo
-    (onde o gasto ocorreu). GERAL é o total e nunca some.
+    (onde o gasto ocorreu). A barra GERAL nunca some, mas passa a somar SÓ as contas
+    marcadas (orçado, executado, % e saldo via BR-05) e muda o rótulo p/ "GERAL (filtrado)".
+    `sel` None → `rows` intacto (GERAL oficial); `[]` (nenhuma marcada) → só o GERAL zerado.
+    Quem chama passa a seleção já
+    normalizada por `_contas_efetivas` ('todas marcadas' vira None) — assim o rótulo segue o
+    filtro global, mesmo num nível (ex: contas do dia) onde a conta desmarcada nem aparece.
     """
     if sel is None:
         return rows
     alvo = set(sel)
-    return [r for r in rows if r["code"] == "__GERAL__" or r["code"] in alvo]
+    mantidas = [r for r in rows if r["code"] != "__GERAL__" and r["code"] in alvo]
+    geral = next((r for r in rows if r["code"] == "__GERAL__"), None)
+    if geral is None:
+        return mantidas
+    tot_o = sum(r.get("orcado") or 0.0 for r in mantidas)
+    tot_e = sum(r.get("executado") or 0.0 for r in mantidas)
+    geral = {**geral, **L.calcular_metricas(tot_o, tot_e), "label": GERAL_FILTRADO}
+    return [geral] + mantidas
+
+
+def _jan(janela):
+    """Janela de leitura a partir do `store-custo-janela` (BR-18): `int` do ano (Ano inteiro —
+    caminho e cache de sempre) ou tupla de meses 'YYYY-MM' do período. Aceita o `int` legado."""
+    if isinstance(janela, dict):
+        meses = janela.get("meses")
+        return tuple(meses) if meses else int(janela.get("ano") or 2026)
+    if isinstance(janela, (tuple, list)):
+        return tuple(janela)
+    return int(janela or 2026)
+
+
+def _rotulo(janela) -> str:
+    """Texto do período p/ títulos/breadcrumb/arquivo: '2026' ou 'jan–mar/2026' (BR-18)."""
+    if isinstance(janela, dict):
+        return janela.get("rotulo") or str(janela.get("ano") or 2026)
+    return str(janela or 2026)
+
+
+def _eh_periodo(janela) -> bool:
+    """True quando o período NÃO é o ano inteiro (textos trocam 'ano' pelo período)."""
+    return isinstance(janela, dict) and bool(janela.get("meses"))
+
+
+def _contas_efetivas(sel, ano):
+    """Contas a aplicar na rosca/modal (BR-17), ou None (= sem filtro → número oficial).
+
+    None (sem escolha ainda) ou 'todas marcadas' == None. Lista VAZIA = o usuário desmarcou
+    tudo → `[]` (gráfico e rosca mostram o aviso `MSG_NENHUMA_CONTA`, não "todas").
+    """
+    if sel is None:
+        return None
+    if len(sel) == 0:
+        return []
+    todas = {r["code"] for r in L.fetch_contas_geral(_jan(ano), None, None)
+             if r["code"] != "__GERAL__"}
+    if todas and set(sel) >= todas:
+        return None
+    return list(sel)
 
 
 def _centro_label(c: str) -> str:
@@ -164,7 +225,7 @@ def _centros_efetivos(selected, ano):
     """
     if not selected:
         return None
-    todos = set(L.fetch_centros_disponiveis(int(ano or 2026)))
+    todos = set(L.fetch_centros_disponiveis(_jan(ano)))
     if todos and set(selected) >= todos:
         return None
     return selected
@@ -352,19 +413,19 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
             # mini (200px): um rótulo só por barra — % quando há, senão R$ abreviado
             t = txt_pct or (_brl_abrev(ex) if ex else "")
             if t:
-                anots.append(dict(x=x, y=topo, yref=yr, text=t, showarrow=False, yshift=5,
-                                  font={"size": 7, "color": (cor_pct if txt_pct else cor_ex)}))
+                anots.append(dict(x=x, y=topo, yref=yr, text=t, showarrow=False, yshift=7,
+                                  font={"size": 12, "color": (cor_pct if txt_pct else cor_ex)}))
             continue
         # gráficos grandes: pilha Executado (R$) / Orçado (R$) / % acima da barra
         if ex:
             anots.append(dict(x=x, y=topo, yref=yr, text=_brl_abrev(ex), showarrow=False,
-                              yshift=9, font={"size": 9, "color": cor_ex, "weight": "bold"}))
+                              yshift=12, font={"size": 14, "color": cor_ex, "weight": "bold"}))
         if orc > 0:
             anots.append(dict(x=x, y=topo, yref=yr, text=_brl_abrev(orc), showarrow=False,
-                              yshift=20, font={"size": 8, "color": _CINZA}))
+                              yshift=26, font={"size": 13, "color": _CINZA}))
         if txt_pct:
-            anots.append(dict(x=x, y=topo, yref=yr, text=txt_pct, showarrow=False, yshift=31,
-                              font={"size": 9, "color": cor_pct, "weight": "bold"}))
+            anots.append(dict(x=x, y=topo, yref=yr, text=txt_pct, showarrow=False, yshift=40,
+                              font={"size": 14, "color": cor_pct, "weight": "bold"}))
 
     def _pct_ticks(ate, topo):
         rs = [t for t in (0, 50, 100) if t <= ate + 1]
@@ -405,11 +466,14 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
     # A própria mudança de tom divide o GERAL das contas (sem precisar de linha).
     shapes = []
     if geral_destaque:
-        x_fim = xs[-1] + 0.3
+        _div = 0.42                                    # divisa GERAL | contas (fixa)
+        _esq = _div - (_div - (-0.32)) * 1.15          # faixa escura ~15% mais larga p/ fora
+        _dir = _div + ((xs[-1] + 0.3) - _div) * 1.15   # faixa clara ~15% mais larga p/ fora
+        _y0, _y1 = -0.05, 1.08                         # faixas mais altas (passam do plot)
         shapes = [
-            dict(type="rect", xref="x", yref="paper", x0=-0.32, x1=0.42, y0=0, y1=1,
+            dict(type="rect", xref="x", yref="paper", x0=_esq, x1=_div, y0=_y0, y1=_y1,
                  fillcolor="rgba(0,86,135,0.15)", line={"width": 0}, layer="below"),
-            dict(type="rect", xref="x", yref="paper", x0=0.42, x1=x_fim, y0=0, y1=1,
+            dict(type="rect", xref="x", yref="paper", x0=_div, x1=_dir, y0=_y0, y1=_y1,
                  fillcolor="rgba(0,86,135,0.07)", line={"width": 0}, layer="below"),
         ]
 
@@ -426,7 +490,7 @@ def _fig_barras(rows, com_orcado, titulo, h=380, mini=False, modo="valor"):
         legend={"orientation": "h", "y": 1.1, "x": 1, "xanchor": "right", "font": {"size": 11}},
         bargap=0.35, annotations=anots,
         xaxis={"tickmode": "array", "tickvals": xs, "ticktext": ticks,
-               "showgrid": False, "zeroline": False, "tickfont": {"size": 10},
+               "showgrid": False, "zeroline": False, "tickfont": {"size": 13},
                "tickangle": -35, "showticklabels": not mini},
         yaxis=yaxis,
         **({"yaxis2": yaxis2} if yaxis2 else {}),
@@ -440,7 +504,7 @@ _ROSCA_SEQ = ["#005687", "#1f6aa5", "#2f8fc0", "#5b8def", "#7bb0e8", "#9ec5fe",
               "#b9d4f2", "#c9a227", "#e0b84e", "#6c8ea4"]
 
 
-def _fig_rosca(dados, h=460):
+def _fig_rosca(dados, h=460, periodo="ano"):
     """Rosca: distribuição do executado do ano por EQUIPAMENTO (centro de custo).
 
     Cada fatia = um equipamento (nome via de/para `CENTRO_EQUIP`, fallback = código); a
@@ -464,7 +528,7 @@ def _fig_rosca(dados, h=460):
         hovertemplate="<b>%{label}</b><br>%{customdata} · %{percent}<extra></extra>"))
     fig.update_layout(
         height=h, margin={"l": 8, "r": 8, "t": 34, "b": 8},
-        title={"text": "Custo por equipamento (ano)", "x": 0, "xanchor": "left", "y": 0.98,
+        title={"text": f"Custo por equipamento ({periodo})", "x": 0, "xanchor": "left", "y": 0.98,
                "font": {"size": 13, "color": "#343a40"}},
         paper_bgcolor="rgba(0,0,0,0)",
         showlegend=True,
@@ -540,20 +604,22 @@ _SORT_DOC_KEY = {
     "centro": lambda d: d.get("centro_custo") or "",
     "valor": lambda d: d.get("valor") or 0,
     "descritor": lambda d: (d.get("descritor") or "").lower(),
-    "tipo": lambda d: d.get("tipo_doc") or "",
-    "documento": lambda d: d.get("no_documento") or "",
+    "ordem": lambda d: d.get("ordem_emissora") or "",   # BR-14: chave de rastreio (substitui documento)
+    "pedido": lambda d: d.get("pedido_compra") or "",
+    "requisitante": lambda d: (d.get("usuario") or "").lower(),
 }
 
 
-def _tabela_lancamentos(docs, table_id=None, sort_by=None):
-    """Tabela de lançamentos. Com `table_id` usa sort **custom** (server-side): os docs são
-    ordenados aqui e os `tooltip_data` são montados na MESMA ordem — senão o tooltip (que é
-    posicional) cola na linha errada ao ordenar (sort nativo reordena só o cliente). Sem
-    `table_id` mantém o sort nativo (uso onde não há tooltip crítico)."""
+def _tabela_lancamentos(docs, table_id=None, sort_by=None, custom_sort=False):
+    """Tabela de lançamentos. `table_id` dá id à tabela (habilita clique via `active_cell` p/
+    o mini-modal de itens — IM-33). `custom_sort=True` usa sort **server-side** (docs ordenados
+    aqui + `tooltip_data` na MESMA ordem, senão o tooltip posicional cola na linha errada);
+    caso contrário, sort nativo. Colunas: Data·Conta·Centro·Valor·Descrição·Ordem·Pedido·
+    Requisitante (Tipo removido — inútil ao gestor)."""
     if not docs:
         return html.Small("Nenhum lançamento neste recorte.", className="text-muted")
     # sort custom: reordena os docs ANTES de montar linhas+tooltips (alinhamento garantido)
-    if table_id and sort_by:
+    if custom_sort and sort_by:
         sb = sort_by[0]
         keyfn = _SORT_DOC_KEY.get(sb.get("column_id"))
         if keyfn:
@@ -572,7 +638,10 @@ def _tabela_lancamentos(docs, table_id=None, sort_by=None):
             "conta": conta, "centro": centro,
             "valor": round(d.get("valor") or 0, 2),   # número cru → sort numérico
             "descritor": d.get("descritor", "") or "(sem descrição)",
-            "tipo": d.get("tipo_doc", ""), "documento": d.get("no_documento", ""),
+            "ordem": d.get("ordem_emissora", "") or "",       # BR-14: rastreio no SAP (substitui documento)
+            "pedido": d.get("pedido_compra", "") or "",       # rastreio da compra
+            "requisitante": d.get("usuario", "") or "",       # quem lançou/baixou no SAP
+            "familia": d.get("familia", "") or "",            # oculto — destaque + clique (IM-33)
         })
         tip = {}
         nc = nome_conta(conta)
@@ -603,27 +672,219 @@ def _tabela_lancamentos(docs, table_id=None, sort_by=None):
         columns=[{"name": "Data", "id": "data"}, {"name": "Conta", "id": "conta"},
                  {"name": "Centro", "id": "centro"},
                  {"name": "Valor", "id": "valor", "type": "numeric", "format": _fmt_brl},
-                 {"name": "Descrição", "id": "descritor"}, {"name": "Tipo", "id": "tipo"},
-                 {"name": "Documento", "id": "documento"}],
+                 {"name": "Descrição", "id": "descritor"}, {"name": "Ordem", "id": "ordem"},
+                 {"name": "Pedido", "id": "pedido"}, {"name": "Requisitante", "id": "requisitante"}],
         page_size=12, style_as_list_view=True,
-        style_cell={"fontSize": "0.82rem", "padding": "8px 10px", "textAlign": "left",
+        style_cell={"fontSize": "1.14rem", "padding": "8px 10px", "textAlign": "left",
                     "border": "none", "borderBottom": "1px solid #eef0f3"},
-        style_header={"fontWeight": "700", "textTransform": "uppercase", "fontSize": "0.7rem",
+        style_header={"fontWeight": "700", "textTransform": "uppercase", "fontSize": "1.14rem",
                       "letterSpacing": "0.4px", "color": "#6c757d",
                       "backgroundColor": "#fafbfc", "borderBottom": "2px solid #e9ecef"},
         style_data_conditional=[
             {"if": {"row_index": "odd"}, "backgroundColor": "rgba(248,250,252,0.6)"},
             {"if": {"column_id": "valor"}, "textAlign": "right", "fontWeight": "600"},
-            {"if": {"column_id": "descritor"}, "color": "#495057"}] + _italico,
+            {"if": {"column_id": "descritor"}, "color": "#495057"},
+            # BR-15: linha de LIQUIDAÇÃO (almoxarifado) destacada — tom âmbar + faixa à esquerda
+            {"if": {"filter_query": '{familia} = "liquidacao"'},
+             "backgroundColor": "rgba(255,193,7,0.10)", "borderLeft": "3px solid #ffc107"},
+            # a célula Ordem da liquidação vira "link" (azul + sublinhado + cursor) → abre o mini-modal
+            {"if": {"filter_query": '{familia} = "liquidacao"', "column_id": "ordem"},
+             "color": "#0d6efd", "textDecoration": "underline", "cursor": "pointer",
+             "fontWeight": "600"}] + _italico,
         style_table={"overflowX": "auto"},
     )
     if table_id:
+        kwargs["id"] = table_id                    # habilita active_cell (clique → mini-modal)
+    if custom_sort:
         # sort custom (server-side) → tooltip alinhado mesmo ordenando
-        kwargs.update(id=table_id, sort_action="custom", sort_mode="single",
-                      sort_by=sort_by or [])
+        kwargs.update(sort_action="custom", sort_mode="single", sort_by=sort_by or [])
     else:
         kwargs["sort_action"] = "native"
     return dash_table.DataTable(**kwargs)
+
+
+# --------------------------------------------------------------------------- #
+# Export Excel (IM-40) — formato "base de dados" (flat, 1 registro por linha)
+# --------------------------------------------------------------------------- #
+_EXPORT_COLS_LANC = [
+    "Data", "Conta", "Nome da conta", "Centro", "Nome do centro", "Valor (R$)",
+    "Descrição", "Ordem", "Pedido", "Requisitante",
+    "Item", "Material", "Descrição do material", "Quantidade", "Unidade",
+]
+_EXPORT_COLS_COMP = [
+    "Ordem", "Valor total da ordem (R$)", "Item",
+    "Material", "Descrição do material", "Quantidade", "Unidade",
+]
+
+
+def _lanc_base(d: dict) -> dict:
+    """Campos de identidade de um lançamento p/ o export flat (sem os campos de item)."""
+    dt = d.get("data_lancamento")
+    conta = (d.get("conta") or "").strip()
+    centro = (d.get("centro_custo") or "").strip()
+    return {
+        "Data": dt.strftime("%d/%m/%Y") if dt else "",
+        "Conta": conta,
+        "Nome da conta": nome_conta(conta),
+        "Centro": centro,
+        "Nome do centro": nome_centro(centro),
+        "Valor (R$)": round(d.get("valor") or 0, 2),
+        "Descrição": (d.get("descritor") or "").strip() or "(sem descrição)",
+        "Ordem": (d.get("ordem_emissora") or "").strip(),
+        "Pedido": (d.get("pedido_compra") or "").strip(),
+        "Requisitante": (d.get("usuario") or "").strip(),
+        "Item": None, "Material": None, "Descrição do material": None,
+        "Quantidade": None, "Unidade": None,
+    }
+
+
+def _export_rows(docs, fetch_comps=None) -> list[dict]:
+    """Lançamentos → linhas flat p/ Excel (Opção A + grupo explícito, IM-40).
+
+    Linha de LIQUIDAÇÃO (`familia == "liquidacao"`) com N itens de almox → N linhas, uma por
+    item, repetindo TODA a identidade do lançamento (grupo visualmente contíguo; `Ordem` = chave
+    do grupo). `Valor (R$)` grava só na 1ª linha do grupo (demais em branco) → coluna somável sem
+    superconta. `Item` = ordinal 1..N do grupo. Linha normal (ou liquidação sem componentes) → 1
+    linha, campos de item vazios. `fetch_comps` injetável p/ teste (default `L.fetch_componentes`).
+    """
+    fc = fetch_comps or L.fetch_componentes
+    out: list[dict] = []
+    for d in docs:
+        base = _lanc_base(d)
+        ordem = base["Ordem"]
+        eh_liquidacao = (d.get("familia") or "") == "liquidacao"
+        comps = fc(ordem) if (eh_liquidacao and ordem) else []
+        if not comps:
+            out.append(base)          # normal OU liquidação sem componentes (fallback)
+            continue
+        for i, c in enumerate(comps):
+            row = dict(base)
+            if i > 0:
+                row["Valor (R$)"] = None      # Valor só na 1ª linha do grupo (Opção A)
+            row["Item"] = i + 1
+            row["Material"] = (c.get("material") or "").strip()
+            row["Descrição do material"] = (c.get("material_desc") or "").strip()
+            row["Quantidade"] = c.get("quantidade")
+            row["Unidade"] = (c.get("unidade") or "").strip()
+            out.append(row)
+    return out
+
+
+def _export_comp_rows(ordem, valor, fetch_comps=None) -> list[dict]:
+    """Itens de almox de UMA ordem p/ o export do mini-modal — 1 linha por item. `Valor total da
+    ordem` repetido (é o total da ordem, não por item — BR-15). Sem componentes → 1 linha só com
+    Ordem+Valor."""
+    fc = fetch_comps or L.fetch_componentes
+    comps = fc(ordem) if ordem else []
+    total = round(valor or 0, 2)
+    if not comps:
+        return [{"Ordem": ordem, "Valor total da ordem (R$)": total, "Item": None,
+                 "Material": None, "Descrição do material": None,
+                 "Quantidade": None, "Unidade": None}]
+    return [{
+        "Ordem": ordem, "Valor total da ordem (R$)": total, "Item": i + 1,
+        "Material": (c.get("material") or "").strip(),
+        "Descrição do material": (c.get("material_desc") or "").strip(),
+        "Quantidade": c.get("quantidade"),
+        "Unidade": (c.get("unidade") or "").strip(),
+    } for i, c in enumerate(comps)]
+
+
+def _resumo_export_rows(resumo, total, code_header) -> list[dict]:
+    """Resumo (por conta / por centro) p/ aba do Excel: código, nome, R$ e % da fatia."""
+    rows = []
+    for r in resumo or []:
+        v = r.get("executado") or 0
+        code = r.get("code") or ""
+        rows.append({
+            code_header: code,
+            "Nome": r.get("nome") or code,
+            "Valor (R$)": round(v, 2),
+            "% da fatia": round(100 * v / total, 1) if total else 0,
+        })
+    return rows
+
+
+def _sanitize_fname(nome: str, max_len: int = 120) -> str:
+    """Nome de arquivo seguro (sem barras/dois-pontos) e curto o bastante p/ o download.
+
+    Trunca o miolo preservando a extensão `.xlsx` — o caminho completo do Windows estoura em
+    ~255 chars e alguns leitores param bem antes (207). Ver IM-43: a rosca de 'Apoio/Admin'
+    (29 centros) gerava um nome gigante que não abria.
+    """
+    for ch in '/\\:*?"<>|':
+        nome = nome.replace(ch, "-")
+    nome = nome.replace("–", "-")  # rótulo de período 'jan–mar/2026' (BR-18) → ASCII
+    if len(nome) <= max_len:
+        return nome
+    base, dot, ext = nome.rpartition(".")
+    if dot and len(ext) <= 5:
+        return base[:max_len - len(ext) - 1] + "." + ext
+    return nome[:max_len]
+
+
+def _rosca_fname(centros, ano) -> str:
+    """Nome do arquivo do export da rosca pelo NOME do equipamento da fatia — NÃO a lista de
+    centros. 'Apoio/Admin' agrega 29 centros; `'-'.join(centros)` estourava 207 chars e o
+    Windows não abria o .xlsx (IM-43). Todos os centros de uma fatia mapeiam ao mesmo nome, então
+    `centros[0]` resolve o rótulo da fatia."""
+    equip = nome_equipamento(centros[0]) if centros else "fatia"
+    return _sanitize_fname(f"custo_rosca_{equip}_{ano}.xlsx")
+
+
+def _row_de_active(ac, data):
+    """Linha (dict) clicada numa tabela de lançamentos: `active_cell` + `derived_viewport_data`
+    (índice já pós-sort/página/filtro). None se clique inválido."""
+    if not ac or not data:
+        return None
+    i = ac.get("row")
+    if i is None or i < 0 or i >= len(data):
+        return None
+    return data[i]
+
+
+def _mini_modal_payload(row):
+    """(is_open, título, corpo, store) do mini-modal do almoxarifado p/ a linha clicada. `store` =
+    `{ordem, valor}` alimenta o export (IM-40). Só linha de LIQUIDAÇÃO com ordem abre; senão
+    `(no_update,)*4` — clique inócuo em compra/estoque."""
+    if not row or (row.get("familia") or "") != "liquidacao":
+        return no_update, no_update, no_update, no_update
+    ordem = (row.get("ordem") or "").strip()
+    if not ordem:
+        return no_update, no_update, no_update, no_update
+    comps = L.fetch_componentes(ordem)
+    titulo = [html.I(className="bi bi-box-seam me-2"),
+              f"Ordem {ordem} — {_brl(row.get('valor') or 0)}"]
+
+    def _q(x):
+        x = x or 0
+        s = f"{x:.0f}" if float(x).is_integer() else f"{x:.3f}".rstrip("0").rstrip(".")
+        return s.replace(".", ",")
+
+    if not comps:
+        corpo = dbc.Alert("Sem itens de almoxarifado registrados para esta ordem (reserva não "
+                          "baixada, ou coleta ainda não rodou).", color="secondary", className="mb-0")
+    else:
+        def _item_label(c):
+            # ENRICH-D: mostra código + descrição (MAKTX) do item juntos, nessa ordem
+            # (código primeiro em negrito, descrição em cinza). Antes só um dos dois aparecia
+            # (material_desc engolia material). Sem descrição → cai só no código.
+            cod = (c.get("material") or "").strip()
+            desc = (c.get("material_desc") or "").strip()
+            if cod and desc:
+                return [html.Strong(cod), html.Span(f"  ·  {desc}", className="text-muted")]
+            return [html.Strong(cod or desc or "?")]
+
+        itens = [html.Li(_item_label(c) + [
+            html.Span(f"  ·  {_q(c.get('quantidade'))} {c.get('unidade', '') or ''}".rstrip(),
+                      className="text-muted")]) for c in comps]
+        corpo = html.Div([
+            html.Small(f"{len(comps)} item(ns) — quantidade baixada (o SAP não fornece R$ por "
+                       "item; o valor total da linha está no título)",
+                       className="text-muted d-block mb-2"),
+            html.Ul(itens, className="mb-0", style={"lineHeight": "1.9"}),
+        ])
+    return True, titulo, corpo, {"ordem": ordem, "valor": row.get("valor") or 0}
 
 
 def _tabela_resumo(resumo, total_fatia, header):
@@ -664,22 +925,32 @@ def _tabela_resumo(resumo, total_fatia, header):
 def _build_rosca_tabela(ano, centros, fconta, fcentro, busca, faixa, sort_by):
     """Monta o bloco da tabela de lançamentos da fatia (cabeçalho + tabela). `sort_by` vazio
     = ordem padrão (data). Reusado pelo render por filtro e pelo callback de sort custom."""
-    docs = L.fetch_lancamentos(int(ano or 2026), centros=centros, limit=5000)
+    docs = L.fetch_lancamentos(_jan(ano), centros=centros, limit=5000)
     docs = _filtra_lancamentos(docs, fconta, fcentro, busca, faixa)
     return html.Div([
         html.H6([html.I(className="bi bi-list-ul me-2"),
                  f"Lançamentos ({len(docs)})"], className="fw-bold mb-2"),
-        _tabela_lancamentos(docs, table_id="rosca-lanc-table", sort_by=sort_by),
+        _tabela_lancamentos(docs, table_id="rosca-lanc-table", sort_by=sort_by, custom_sort=True),
     ])
 
 
-def _rosca_slice_info(ano, equip):
+def _rosca_slice_info(ano, equip, contas=None):
     """Acha a fatia clicada na rosca. Retorna `(alvo, total_ano)` ou `(None, total)`.
-    `alvo` = dict `{equip, executado, centros}` da fatia; `total_ano` = soma de todas."""
-    dados = L.fetch_por_equipamento(ano, None)
+    `alvo` = dict `{equip, executado, centros}` da fatia; `total_ano` = soma de todas.
+    `contas` = recorte do filtro de conta (BR-17) — o mesmo que a rosca exibida usou."""
+    dados = L.fetch_por_equipamento(ano, None, contas=contas)
     total = sum((d.get("executado") or 0) for d in dados) or 1
     alvo = next((d for d in dados if d.get("equip") == equip), None)
     return alvo, total
+
+
+def _fconta_inicial(opt_conta, contas):
+    """Valor inicial do dropdown "Conta" do modal da rosca (BR-17): as contas do filtro que
+    existem na fatia. Sem filtro (`contas` None) → [] (= todas, como antes)."""
+    if not contas:
+        return []
+    alvo = set(contas)
+    return [o["value"] for o in opt_conta if o["value"] in alvo]
 
 
 def _opt_codigo(code, nome):
@@ -689,8 +960,16 @@ def _opt_codigo(code, nome):
 
 
 def _opcoes_filtro(docs):
-    """Opções (conta, centro) e teto de valor a partir dos lançamentos da fatia."""
-    contas, centros, vmax = {}, {}, 0.0
+    """Opções (conta, centro) e piso/teto de valor a partir dos lançamentos da fatia.
+
+    `vmin`/`vmax` = menor/maior valor de linha. `vmin` PODE ser negativo (estorno / crédito
+    RE) — o slider tem que abrir incluindo os negativos, senão o default os droparia e a
+    tabela/export inflariam vs. o donut (que soma positivos + negativos). Ver IM-41.
+    """
+    contas, centros = {}, {}
+    valores = [float(d.get("valor") or 0) for d in docs]
+    vmin = min(valores) if valores else 0.0
+    vmax = max(valores) if valores else 0.0
     for d in docs:
         c = (d.get("conta") or "").strip()
         ce = (d.get("centro_custo") or "").strip()
@@ -698,10 +977,9 @@ def _opcoes_filtro(docs):
             contas[c] = nome_conta(c)
         if ce:
             centros[ce] = nome_centro(ce)
-        vmax = max(vmax, float(d.get("valor") or 0))
     opt_conta = sorted((_opt_codigo(k, v) for k, v in contas.items()), key=lambda o: o["label"])
     opt_centro = sorted((_opt_codigo(k, v) for k, v in centros.items()), key=lambda o: o["label"])
-    return opt_conta, opt_centro, vmax
+    return opt_conta, opt_centro, vmin, vmax
 
 
 def _filtra_lancamentos(docs, contas, centros, busca, faixa):
@@ -742,18 +1020,39 @@ def _crumb(*partes):
 def register_custo_callbacks(app):
     """Registra todos os callbacks da aba de custo."""
 
+    # Popula o filtro de ANO a partir dos anos realmente presentes no Mongo.
+    # Sem isto o dropdown fica fixo em 2026 e ignora dados de outros anos coletados.
+    @app.callback(
+        Output("custo-ano-select", "options"),
+        Output("custo-ano-select", "value"),
+        Input("custo-init", "n_intervals"),
+        State("store-custo-ano", "data"),
+    )
+    def _popular_anos(_n, ano_salvo):
+        anos = L.fetch_anos_disponiveis() or [2026]
+        options = [{"label": str(a), "value": a} for a in anos]
+        # Abre sempre no ano atual (BR-18.6: nada é lembrado entre recargas); sem dado do ano
+        # atual, o mais recente.
+        atual = _date.today().year
+        value = atual if atual in anos else anos[0]
+        return options, value
+
     # Popula o filtro de CONTAS (as barras). Repopula ao trocar o ano.
     @app.callback(
         Output("custo-conta-filter", "options"),
         Output("custo-conta-filter", "value"),
         Input("custo-init", "n_intervals"),
-        Input("store-custo-ano", "data"),
+        Input("store-custo-janela", "data"),
         State("store-custo-contas-sel", "data"),
     )
     def _popular_contas(_n, ano, salvos):
-        rows = L.fetch_contas_geral(int(ano or 2026), None, None)
+        rows = L.fetch_contas_geral(_jan(ano), None, None)
         contas = [r for r in rows if r["code"] != "__GERAL__"]
-        options = [{"label": f'{r["code"]} — {r["label"]}', "value": r["code"]} for r in contas]
+        # Lista simples em ordem alfabética pelo nome (código no tooltip da linha).
+        options = sorted(({"label": html.Span(r["label"], title=r["code"]), "value": r["code"],
+                           "_nome": r["label"]} for r in contas), key=lambda o: o["_nome"])
+        for o in options:
+            o.pop("_nome")
         codes = [r["code"] for r in contas]
         # Padrão: todas marcadas. Respeita seleção salva na sessão se ainda válida.
         value = [c for c in (salvos or []) if c in codes] or codes
@@ -761,11 +1060,32 @@ def register_custo_callbacks(app):
 
     @app.callback(
         Output("store-custo-contas-sel", "data"),
-        Input("custo-conta-filter", "value"),
+        Input("custo-contas-collapse", "is_open"),
+        State("custo-conta-filter", "value"),
+        State("store-custo-contas-sel", "data"),
         prevent_initial_call=True,
     )
-    def _set_contas(value):
-        return value or []
+    def _set_contas(aberto, value, atual):
+        # As caixinhas são RASCUNHO: marcar/desmarcar não recalcula nada (antes cada clique
+        # re-renderizava gráfico + rosca e a tela piscava). Aplica UMA vez, ao fechar o painel
+        # (botão "Aplicar" ou o próprio botão das contas).
+        if aberto:
+            return no_update
+        novo = value or []  # [] explícito = nenhuma marcada (≠ None = ainda não escolhido)
+        return no_update if novo == atual else novo
+
+    # "Marcar todas" / "Limpar" no topo do painel de contas.
+    @app.callback(
+        Output("custo-conta-filter", "value", allow_duplicate=True),
+        Input("custo-contas-todas", "n_clicks"),
+        Input("custo-contas-limpar", "n_clicks"),
+        State("custo-conta-filter", "options"),
+        prevent_initial_call=True,
+    )
+    def _contas_todas_limpar(_t, _l, options):
+        if ctx.triggered_id == "custo-contas-limpar":
+            return []
+        return [o["value"] for o in (options or [])]
 
     # "Fixar no telão": persiste a seleção atual de contas no Mongo para o slide de
     # Custos do modo apresentação da home herdar (não altera nada mais na aba).
@@ -794,14 +1114,90 @@ def register_custo_callbacks(app):
     def _set_ano(value):
         return value
 
+    # ---- Período (BR-18) -------------------------------------------------------------
+    # Nada é lembrado (BR-18.6), então a abertura NÃO restaura o seletor: só carrega as opções
+    # do "De/Até". Nenhuma saída daqui alimenta a janela → os gráficos não esperam esta corrente.
+    @app.callback(
+        Output("custo-periodo-de", "options"),
+        Output("custo-periodo-ate", "options"),
+        Input("custo-init", "n_intervals"),
+    )
+    def _popular_periodo(_n):
+        opts = [{"label": P.rotulo_mes(m), "value": m} for m in L.fetch_meses_disponiveis()]
+        return opts, opts
+
+    # "De/Até" só aparecem no Personalizado; nele o "Ano" não manda (fica desabilitado). Ao
+    # entrar no Personalizado pela 1ª vez, pré-preenche do 1º ao último mês com dado.
+    @app.callback(
+        Output("custo-periodo-custom", "style"),
+        Output("custo-ano-select", "disabled"),
+        Output("custo-periodo-de", "value"),
+        Output("custo-periodo-ate", "value"),
+        Input("custo-periodo-select", "value"),
+        State("custo-periodo-de", "options"),
+        State("custo-periodo-de", "value"),
+        State("custo-periodo-ate", "value"),
+        prevent_initial_call=True,
+    )
+    def _ui_periodo(tipo, opts, de, ate):
+        custom = tipo == P.PERSONALIZADO
+        estilo = {"display": "flex"} if custom else {"display": "none"}
+        meses = [o["value"] for o in (opts or [])]
+        if custom and meses and not (de and ate):
+            return estilo, True, meses[0], meses[-1]
+        return estilo, custom, no_update, no_update
+
+    @app.callback(
+        Output("store-custo-periodo", "data"),
+        Input("custo-periodo-select", "value"),
+        Input("custo-periodo-de", "value"),
+        Input("custo-periodo-ate", "value"),
+        prevent_initial_call=True,
+    )
+    def _set_periodo(tipo, de, ate):
+        tipo = tipo or P.ANO_INTEIRO
+        # De/Até só importam no Personalizado — fora dele, mexer neles não recalcula nada.
+        if tipo != P.PERSONALIZADO and ctx.triggered_id != "custo-periodo-select":
+            return no_update
+        return {"tipo": tipo, "de": de, "ate": ate}
+
+    # Janela que os callbacks de dado leem: ano (Ano inteiro) ou lista de meses do período.
+    # Lê o dropdown do Ano direto (não o store) p/ ter a mesma profundidade de corrente da
+    # main; devolve no_update se a janela não mudou (evita re-render em cascata).
+    @app.callback(
+        Output("store-custo-janela", "data"),
+        Input("custo-ano-select", "value"),
+        Input("store-custo-periodo", "data"),
+        State("store-custo-janela", "data"),
+    )
+    def _set_janela(ano, periodo, atual):
+        ano = int(ano or 2026)
+        periodo = periodo or {}
+        meses = P.resolver_meses(ano, periodo.get("tipo"), periodo.get("de"), periodo.get("ate"))
+        nova = {"ano": ano, "meses": meses, "rotulo": P.rotulo(ano, meses)}
+        return no_update if nova == atual else nova
+
+    # Título do card do gráfico de entrada cita o período ("ano" no Ano inteiro, como antes).
+    @app.callback(
+        Output("custo-entry-titulo", "children"),
+        Input("store-custo-janela", "data"),
+    )
+    def _titulo_entrada(janela):
+        from src.pages.maintenance._v2_tabs.custo_tab import TITULO_ENTRADA
+        return TITULO_ENTRADA.format(periodo=_rotulo(janela) if _eh_periodo(janela) else "ano")
+
+
     # Colapsar/expandir a lista de contas (paredão de chips fica escondido)
     @app.callback(
         Output("custo-contas-collapse", "is_open"),
         Input("custo-contas-toggle", "n_clicks"),
+        Input("custo-contas-aplicar", "n_clicks"),
         State("custo-contas-collapse", "is_open"),
         prevent_initial_call=True,
     )
-    def _toggle_contas(_n, aberto):
+    def _toggle_contas(_n, _aplicar, aberto):
+        if ctx.triggered_id == "custo-contas-aplicar":
+            return False  # "Aplicar" fecha o painel → _set_contas grava a seleção
         return not aberto
 
     # Rótulo do botão: quantas contas selecionadas + chevron (sobe/desce)
@@ -831,21 +1227,27 @@ def register_custo_callbacks(app):
         Output("custo-slider-geral", "value"),
         Output("custo-slider-geral", "marks"),
         Output("custo-slider-geral", "step"),
-        Input("store-custo-ano", "data"),
+        Input("store-custo-janela", "data"),
         Input("custo-init", "n_intervals"),
     )
     def _slider_geral_range(ano, _n):
         # escala do slider baseada em TODAS as contas (não no recorte do filtro) — estável
-        return _slider_cfg(L.fetch_contas_geral(int(ano or 2026), None, None))
+        return _slider_cfg(L.fetch_contas_geral(_jan(ano), None, None))
 
-    # Rosca: distribuição do executado por equipamento (independe do filtro de conta)
+    # Rosca: distribuição do executado por equipamento — segue o filtro de conta (BR-17)
     @app.callback(
         Output("custo-graph-rosca", "figure"),
-        Input("store-custo-ano", "data"),
+        Input("store-custo-janela", "data"),
         Input("custo-init", "n_intervals"),
+        Input("store-custo-contas-sel", "data"),
     )
-    def _render_rosca(ano, _n):
-        return _fig_rosca(L.fetch_por_equipamento(int(ano or 2026), None))
+    def _render_rosca(janela, _n, contas_sel):
+        ano = _jan(janela)
+        sufixo = _rotulo(janela) if _eh_periodo(janela) else "ano"  # BR-18: título cita o período
+        contas = _contas_efetivas(contas_sel, ano)
+        if contas == []:  # coluna estreita: aviso em 2 linhas
+            return _fig_vazia(MSG_NENHUMA_CONTA.replace(" — ", "<br>"), h=460)
+        return _fig_rosca(L.fetch_por_equipamento(ano, None, contas=contas), periodo=sufixo)
 
     # Clique numa fatia da rosca → abre o modal "o que compõe esta fatia": guarda os
     # centros da fatia no store, pinta os resumos colapsáveis e prepara os filtros. A
@@ -873,10 +1275,11 @@ def register_custo_callbacks(app):
         Output("chev-rosca-centro", "className", allow_duplicate=True),
         Input("custo-graph-rosca", "clickData"),
         Input("btn-rosca-close", "n_clicks"),
-        State("store-custo-ano", "data"),
+        State("store-custo-janela", "data"),
+        State("store-custo-contas-sel", "data"),
         prevent_initial_call=True,
     )
-    def _modal_rosca(click, _close, ano):
+    def _modal_rosca(click, _close, janela, contas_sel):
         n = 18
         if ctx.triggered_id == "btn-rosca-close":
             return (False,) + (no_update,) * (n - 1)
@@ -884,28 +1287,36 @@ def register_custo_callbacks(app):
         equip = pts[0].get("label") if pts else None
         if not equip:
             return (no_update,) * n
-        ano = int(ano or 2026)
-        alvo, total = _rosca_slice_info(ano, equip)
+        ano = _jan(janela)
+        contas = _contas_efetivas(contas_sel, ano)  # BR-17: mesmo recorte da rosca exibida
+        alvo, total = _rosca_slice_info(ano, equip, contas)
         if alvo is None:
             return (True, equip, None, None, None, [], [], [], [], "",
                     0, 1, [0, 1], {}, False, False, _CHEV_DOWN, _CHEV_DOWN)
         valor = alvo.get("executado") or 0
-        title = f"{equip} — {_brl(valor)} ({valor / total:.0%} do ano)"
+        escopo = "do período" if _eh_periodo(janela) else "do ano"  # BR-18
+        title = f"{equip} — {_brl(valor)} ({valor / total:.0%} {escopo})"
         centros = alvo.get("centros") or []
         if not centros:
             # 'Não atribuído' (BR-10): provisões/itens sem centro — sem detalhe por centro.
             return (True, title, [], None, None, [], [], [], [], "",
                     0, 1, [0, 1], {}, False, False, _CHEV_DOWN, _CHEV_DOWN)
-        resumo_conta = _tabela_resumo(L.fetch_contas_resumo(ano, centros), valor, "Conta")
-        resumo_centro = _tabela_resumo(L.fetch_centros_resumo(ano, centros), valor,
-                                       "Centro de custo")
+        resumo_conta = _tabela_resumo(L.fetch_contas_resumo(ano, centros, contas=contas),
+                                      valor, "Conta")
+        resumo_centro = _tabela_resumo(L.fetch_centros_resumo(ano, centros, contas=contas),
+                                       valor, "Centro de custo")
         docs = L.fetch_lancamentos(ano, centros=centros, limit=5000)
-        opt_conta, opt_centro, vmax = _opcoes_filtro(docs)
-        mx = max(round(vmax), 1)
-        marks = {0: "R$ 0", mx: _brl_abrev(mx)}
+        opt_conta, opt_centro, vmin, vmax = _opcoes_filtro(docs)
+        # Faixa CHEIA no default: o piso inclui os negativos (estornos / créditos RE) — senão
+        # o antigo [0, mx] os dropava e a tabela/export não batiam com o donut (IM-41).
+        lo = min(math.floor(vmin), 0)
+        hi = max(math.ceil(vmax), 1)
+        marks = {lo: _brl_abrev(lo), hi: _brl_abrev(hi)}
+        # Dropdown "Conta" já vem com o recorte do filtro (BR-17) → tabela/export = fatia.
+        fconta = _fconta_inicial(opt_conta, contas)
         return (True, title, centros, resumo_conta, resumo_centro,
-                opt_conta, [], opt_centro, [], "",
-                0, mx, [0, mx], marks, False, False, _CHEV_DOWN, _CHEV_DOWN)
+                opt_conta, fconta, opt_centro, [], "",
+                lo, hi, [lo, hi], marks, False, False, _CHEV_DOWN, _CHEV_DOWN)
 
     # Reabrir a MESMA fatia: o Plotly só re-dispara clickData quando o ponto MUDA. Ao fechar
     # o modal, zeramos o clickData (callback separado — fora do que tem clickData como Input)
@@ -928,7 +1339,7 @@ def register_custo_callbacks(app):
         Input("rosca-f-centro", "value"),
         Input("rosca-f-busca", "value"),
         Input("rosca-f-valor", "value"),
-        State("store-custo-ano", "data"),
+        State("store-custo-janela", "data"),
         prevent_initial_call=True,
     )
     def _rosca_tabela(centros, fconta, fcentro, busca, faixa, ano):
@@ -953,13 +1364,130 @@ def register_custo_callbacks(app):
         State("rosca-f-centro", "value"),
         State("rosca-f-busca", "value"),
         State("rosca-f-valor", "value"),
-        State("store-custo-ano", "data"),
+        State("store-custo-janela", "data"),
         prevent_initial_call=True,
     )
     def _rosca_sort(sort_by, centros, fconta, fcentro, busca, faixa, ano):
         if not centros:
             return no_update
         return _build_rosca_tabela(ano, centros, fconta, fcentro, busca, faixa, sort_by)
+
+    # Mini-modal do almoxarifado (BR-15/IM-33): clique numa linha de LIQUIDAÇÃO → itens da
+    # ordem + R$ total no cabeçalho. Duas tabelas (rosca e drill) existem em momentos
+    # DIFERENTES no DOM → um callback por tabela (um só, com Input das duas, não dispara
+    # quando a outra não existe). Ambos reusam `_mini_modal_payload`.
+    @app.callback(
+        Output("modal-comp", "is_open"),
+        Output("modal-comp-title", "children"),
+        Output("modal-comp-body", "children"),
+        Output("store-comp-ordem", "data"),
+        Input("rosca-lanc-table", "active_cell"),
+        State("rosca-lanc-table", "derived_viewport_data"),
+        prevent_initial_call=True,
+    )
+    def _mini_modal_rosca(ac, data):
+        return _mini_modal_payload(_row_de_active(ac, data))
+
+    @app.callback(
+        Output("modal-comp", "is_open", allow_duplicate=True),
+        Output("modal-comp-title", "children", allow_duplicate=True),
+        Output("modal-comp-body", "children", allow_duplicate=True),
+        Output("store-comp-ordem", "data", allow_duplicate=True),
+        Input("drill-lanc-table", "active_cell"),
+        State("drill-lanc-table", "derived_viewport_data"),
+        prevent_initial_call=True,
+    )
+    def _mini_modal_drill(ac, data):
+        return _mini_modal_payload(_row_de_active(ac, data))
+
+    # ----------------------------------------------------------------- #
+    # Export Excel dos modais (IM-40)
+    # ----------------------------------------------------------------- #
+    # O botão de export do drill só aparece no nível de lançamentos (único com tabela).
+    @app.callback(
+        Output("btn-custo-drill-export", "style"),
+        Input("store-custo-level", "data"),
+        prevent_initial_call=True,
+    )
+    def _toggle_drill_export(level):
+        return {"display": "inline-block"} if level == "lancamentos" else {"display": "none"}
+
+    # Export do drill (nível lançamentos): reconstrói os mesmos docs do `_render_modal`.
+    @app.callback(
+        Output("download-custo-drill", "data"),
+        Input("btn-custo-drill-export", "n_clicks"),
+        State("store-custo-level", "data"),
+        State("store-custo-mes", "data"),
+        State("store-custo-dia", "data"),
+        State("store-custo-conta", "data"),
+        State("store-custo-janela", "data"),
+        prevent_initial_call=True,
+    )
+    def _export_drill(n, level, mes, dia, conta, janela):
+        if not n or level != "lancamentos" or not conta:
+            return no_update
+        ano = _jan(janela)
+        if dia:
+            docs = L.fetch_lancamentos_no_dia(ano, dia, conta=conta, centros=None)
+            escopo = dia
+        else:
+            docs = L.fetch_lancamentos(ano, conta=conta, mes=mes, centros=None)
+            escopo = mes or _rotulo(janela)
+        df = pd.DataFrame(_export_rows(docs), columns=_EXPORT_COLS_LANC)
+        fname = _sanitize_fname(f"custo_{conta}_{escopo}.xlsx")
+        return dcc.send_data_frame(df.to_excel, fname, index=False, sheet_name="Lançamentos")
+
+    # Export da rosca: 1 arquivo, 3 abas (Lançamentos + Por conta + Por centro).
+    @app.callback(
+        Output("download-custo-rosca", "data"),
+        Input("btn-rosca-export", "n_clicks"),
+        State("store-rosca-centros", "data"),
+        State("rosca-f-conta", "value"),
+        State("rosca-f-centro", "value"),
+        State("rosca-f-busca", "value"),
+        State("rosca-f-valor", "value"),
+        State("store-custo-janela", "data"),
+        prevent_initial_call=True,
+    )
+    def _export_rosca(n, centros, fconta, fcentro, busca, faixa, janela):
+        if not n or not centros:
+            return no_update
+        ano = _jan(janela)
+        docs = L.fetch_lancamentos(ano, centros=centros, limit=5000)
+        docs = _filtra_lancamentos(docs, fconta, fcentro, busca, faixa)
+        resumo_conta = L.fetch_contas_resumo(ano, centros)
+        resumo_centro = L.fetch_centros_resumo(ano, centros)
+        total = sum((r.get("executado") or 0) for r in resumo_conta)
+        df_lanc = pd.DataFrame(_export_rows(docs), columns=_EXPORT_COLS_LANC)
+        df_conta = pd.DataFrame(_resumo_export_rows(resumo_conta, total, "Conta"),
+                                columns=["Conta", "Nome", "Valor (R$)", "% da fatia"])
+        df_centro = pd.DataFrame(_resumo_export_rows(resumo_centro, total, "Centro"),
+                                 columns=["Centro", "Nome", "Valor (R$)", "% da fatia"])
+
+        def _write(buf):
+            with pd.ExcelWriter(buf, engine="openpyxl") as w:
+                df_lanc.to_excel(w, sheet_name="Lançamentos", index=False)
+                df_conta.to_excel(w, sheet_name="Por conta", index=False)
+                df_centro.to_excel(w, sheet_name="Por centro", index=False)
+
+        fname = _rosca_fname(centros, _rotulo(janela))
+        return dcc.send_bytes(_write, fname)
+
+    # Export do mini-modal do almoxarifado: itens da ordem (1 linha por item).
+    @app.callback(
+        Output("download-custo-comp", "data"),
+        Input("btn-comp-export", "n_clicks"),
+        State("store-comp-ordem", "data"),
+        prevent_initial_call=True,
+    )
+    def _export_comp(n, info):
+        if not n or not info:
+            return no_update
+        ordem = info.get("ordem")
+        rows = _export_comp_rows(ordem, info.get("valor"))
+        df = pd.DataFrame(rows, columns=_EXPORT_COLS_COMP)
+        fname = _sanitize_fname(f"custo_itens_ordem_{ordem}.xlsx")
+        return dcc.send_data_frame(df.to_excel, fname, index=False, sheet_name="Itens")
 
     # Toggles dos resumos colapsáveis (chevron acompanha o estado)
     @app.callback(
@@ -989,21 +1517,23 @@ def register_custo_callbacks(app):
         Output("custo-seed-selo", "children"),
         Output("custo-reconc-banner", "children"),
         Input("store-custo-contas-sel", "data"),
-        Input("store-custo-ano", "data"),
+        Input("store-custo-janela", "data"),
         Input("custo-init", "n_intervals"),
         Input("custo-slider-geral", "value"),
     )
     def _render_entry(contas_sel, ano, _n, faixa):
-        ano = int(ano or 2026)
+        ano = _jan(ano)
         # Só o arrasto do slider aplica o filtro de valor; outras mudanças renderizam cheio.
         if ctx.triggered_id != "custo-slider-geral":
             faixa = None
+        contas = _contas_efetivas(contas_sel, ano)
         rows = L.fetch_contas_geral(ano, None, None)   # todos os centros (sem escopo de centro)
-        rows = _filtra_por_contas(rows, contas_sel or None)   # filtro das BARRAS (contas)
+        rows = _filtra_por_contas(rows, contas)  # contas + GERAL do recorte
         rows = _filtra_por_exec(rows, _faixa_rs(faixa))
         # Anual usa a vista por % realizado (altura = executado÷orçado) — evita barras
         # minúsculas de contas de baixo R$. Modal segue em R$ (modo padrão).
-        fig = _fig_barras(rows, True, "", h=460, modo="pct")
+        fig = (_fig_vazia(MSG_NENHUMA_CONTA, h=460) if contas == []
+               else _fig_barras(rows, True, "", h=460, modo="pct"))
         rc = L.reconciliacao(ano)
         banner = None
         if rc.get("por_mes") and not rc["bate"]:
@@ -1107,11 +1637,11 @@ def register_custo_callbacks(app):
         Input("store-custo-level", "data"),
         Input("store-custo-mes", "data"),
         Input("store-custo-dia", "data"),
-        State("store-custo-ano", "data"),
+        State("store-custo-janela", "data"),
         prevent_initial_call=True,
     )
     def _slider_modal_range(level, mes, dia, ano):
-        ano = int(ano or 2026)
+        ano = _jan(ano)
         oculto = {"display": "none"}
         if level == "meses":
             # teto = maior conta entre todos os meses (mesmo limiar aplicado a cada mini)
@@ -1140,15 +1670,15 @@ def register_custo_callbacks(app):
         Input("store-custo-conta", "data"),
         Input("custo-slider-modal", "value"),
         State("store-custo-contas-sel", "data"),
-        State("store-custo-ano", "data"),
+        State("store-custo-janela", "data"),
         prevent_initial_call=True,
     )
-    def _render_modal(level, mes, dia, conta, faixa, contas_sel, ano):
+    def _render_modal(level, mes, dia, conta, faixa, contas_sel, janela):
         if not level or level == "planta":
             return None, "", None, {"display": "none"}
-        ano = int(ano or 2026)
-        sel = contas_sel or None
-        ano_lbl = f"{ano}"
+        ano = _jan(janela)
+        sel = _contas_efetivas(contas_sel, ano)  # BR-17: None = sem filtro (GERAL oficial)
+        ano_lbl = _rotulo(janela)  # BR-18: breadcrumb começa pelo período
         # Só o arrasto do slider aplica filtro; navegação de nível renderiza cheio (o reset
         # do slider re-renderiza com a faixa nova) — evita filtrar com faixa de outro nível.
         if ctx.triggered_id != "custo-slider-modal":
@@ -1219,7 +1749,7 @@ def register_custo_callbacks(app):
             content = html.Div([
                 html.H6(f"Lançamentos — {nome} ({conta}), {escopo}",
                         className="v2-section-h6 text-muted"),
-                _tabela_lancamentos(docs),
+                _tabela_lancamentos(docs, table_id="drill-lanc-table"),
             ])
             return content, f"Custo — {nome} — {escopo}", crumb, {}
 

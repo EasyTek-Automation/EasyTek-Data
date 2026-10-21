@@ -758,6 +758,7 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
         data_dia = _resolve_data_24h(date_24h, agora)
         try:
             dados_png, end_day_override = _build_export_dados(stored, agora, data_dia)
+            dados_png["_mao_de_obra_ref"] = data_dia  # dia avaliado p/ o bloco de mão de obra
             dia_label = (data_dia.strftime("%d/%m/%Y")
                           if end_day_override is not None else "")
             pdf_bytes = gerar_pdf(dados_png, active, lang,
@@ -796,6 +797,7 @@ def register_kpi_report_v2_callbacks(app: dash.Dash) -> None:
             # renderizar (template v1 fica intocado). Aplica em cópia para não
             # mutar o dict cacheado (next export usa state intacto).
             dados_png = _replace_sunbursts_with_bars(dict(dados_png))
+            dados_png["_mao_de_obra_ref"] = data_dia  # dia avaliado p/ o bloco de mão de obra
             docx_bytes = montar_docx(dados_png)
         except (TemplateLoadError, Exception):
             logger.exception("KPI v2 export_docx: falha")

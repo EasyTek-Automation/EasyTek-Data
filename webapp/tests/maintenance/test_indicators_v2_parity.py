@@ -467,10 +467,12 @@ def test_daily_kpi_mtbf_zero_when_no_failures():
                return_value=brk_empty), \
          patch("src.callbacks_registers.indicators_v2_callbacks.get_zpp_equipment_names",
                return_value={"LONGI001": "LCL-08"}):
-        dias, values = _fetch_daily_kpi("mtbf", "LCL-08", month=6, year=2026)
+        dias, values, horas = _fetch_daily_kpi("mtbf", "LCL-08", month=6, year=2026)
 
     assert dias[0] == 1
     assert values[0] == 0, "MTBF dia 01 sem falhas deve ser 0 (paridade ZBRPP029), não 4.47h"
+    # IM-31: 3ª lista = carga diária (horasact do dia); dia 01 = 4.47h → 4.5
+    assert horas[0] == 4.5, "carga do dia 01 deve refletir horasact somado (IM-31)"
 
 
 def test_zpp_calculator_mtbf_zero_when_no_failures_plant_wide():

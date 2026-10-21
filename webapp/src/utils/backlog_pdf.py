@@ -62,9 +62,9 @@ def _fig_rosca(labels, vals, cores, titulo):
     return fig
 
 
-def _fig_barras(labels, vals):
+def _fig_barras(labels, vals, titulo="Backlog por mês (data de início)"):
     fig = go.Figure(go.Bar(x=labels, y=vals, marker_color="#08137C"))
-    fig.update_layout(title=dict(text="Backlog por mês (data de início)", x=0.5,
+    fig.update_layout(title=dict(text=titulo, x=0.5,
                                  font=dict(size=13, color="#08137C")),
                       margin=dict(t=34, b=50, l=10, r=10), plot_bgcolor="white",
                       xaxis=dict(tickangle=-45, tickfont=dict(size=9)),
@@ -120,10 +120,21 @@ def _rodape(c, doc):
     c.restoreState()
 
 
-def gerar_pdf(ordens: list, filtros_desc: str, frescor: str, hoje: datetime | None = None) -> bytes:
-    """Monta o PDF do recorte (lista de ordens já filtrada/enriquecida). Devolve bytes."""
+_EIXO_LABEL_PDF = {"data_inicio": "data de início", "data_criacao": "data de criação"}
+_EIXO_COL_PDF = {"data_inicio": "Início", "data_criacao": "Criação"}
+
+
+def gerar_pdf(ordens: list, filtros_desc: str, frescor: str, hoje: datetime | None = None,
+              eixo: str = "data_inicio") -> bytes:
+    """Monta o PDF do recorte (lista de ordens já filtrada/enriquecida). Devolve bytes.
+
+    `eixo` ('data_inicio'|'data_criacao') define a data-base de idade/mensal/coluna, espelhando
+    o switch da tela. Não afeta o corte de vencidas (já aplicado em `ordens`).
+    """
     if hoje is None:
         hoje = bd.hoje_brt()
+    if eixo not in _EIXO_LABEL_PDF:
+        eixo = "data_inicio"
     s = _styles()
     el = []
 
@@ -140,7 +151,7 @@ def gerar_pdf(ordens: list, filtros_desc: str, frescor: str, hoje: datetime | No
     el += [tc, Spacer(1, 4), Paragraph(f"<b>Recorte:</b> {filtros_desc}", s["BkSub"]), Spacer(1, 8)]
 
     # 2. KPIs
-    ins = bd.insights(ordens, hoje)
+    ins = bd.insights(ordens, hoje, eixo=eixo)
     lab_c, val_c = bd.dados_rosca_categoria(ordens)
     lab_d, val_d = bd.dados_rosca_disciplina(ordens)
     kpis = [
@@ -166,25 +177,26 @@ def gerar_pdf(ordens: list, filtros_desc: str, frescor: str, hoje: datetime | No
     lab_l, val_l = bd.dados_rosca_linha(ordens, topn=8)
     rl = _img(_png(_fig_rosca(lab_l, val_l, _COR_LINHA, "Por linha (equipamento-pai)"), 700, 380),
               8.2 * cm, 5.3 * cm)
-    labm, valm = bd.dados_barras_mes(ordens)
-    bar = _img(_png(_fig_barras(labm, valm), 700, 360), 8.2 * cm, 5.3 * cm)
+    labm, valm = bd.dados_barras_mes(ordens, eixo=eixo)
+    bar = _img(_png(_fig_barras(labm, valm, f"Backlog por mês ({_EIXO_LABEL_PDF[eixo]})"),
+                    700, 360), 8.2 * cm, 5.3 * cm)
     gtab = Table([[rc, rd], [rl, bar]], colWidths=[8.5 * cm, 8.5 * cm])
     gtab.setStyle(TableStyle([("ALIGN", (0, 0), (-1, -1), "CENTER")]))
     el += [Paragraph("Gráficos", s["BkH2"]), gtab, Spacer(1, 8)]
 
-    # 4. Top 10 mais antigas
+    # 4. Top 10 mais antigas (idade pela data do eixo selecionado)
     idades = []
     for o in ordens:
-        di = o.get("data_inicio")
+        di = o.get(eixo)
         if isinstance(di, datetime):
             d = (hoje - di).days
             if d >= 0:
                 idades.append((d, o))
     idades.sort(key=lambda x: x[0], reverse=True)
-    cab_top = ["Dias", "OS", "Descrição", "Categoria", "Linha", "Início"]
+    cab_top = ["Dias", "OS", "Descrição", "Categoria", "Linha", _EIXO_COL_PDF[eixo]]
     rows_top = [cab_top]
     for d, o in idades[:10]:
-        di = o.get("data_inicio")
+        di = o.get(eixo)
         rows_top.append([
             str(d), o.get("ordem", ""),
             Paragraph((o.get("descricao", "") or "")[:48], s["BkCell"]),

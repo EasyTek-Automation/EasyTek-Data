@@ -122,17 +122,11 @@ EQUIPMENT_CATEGORY_PREFIXES = {
 # Nomes amigáveis dos equipamentos por ARBPL (posto de trabalho) — FONTE ÚNICA do projeto.
 # Reusado pela rosca de custo (via ponte KOSTL→ARBPL em custos.hierarquia). Renomear aqui
 # propaga p/ KPIs e custo.
-EQUIPAMENTO_NOMES = {
-    "LONGI001": "LCL-08",
-    "LONGI002": "LCL-4,5",
-    "PRENS001": "PRENSA-01",
-    "PRENS002": "PRENSA-02",
-    "TRANS001": "LCT-08",
-    "TRANS002": "LCT-16",
-    "TRANS003": "LCT-2,5",
-    "DECAP001": "Decapado",
-    "SOLDA001": "LWB",
-}
+# Reexportado de `utils/equipment_names`, que não depende de pandas — assim quem
+# só precisa traduzir código→nome (ex.: o cadastro de gatilhos) não arrasta este
+# módulo inteiro. Continua importável daqui: `from ...zpp_kpi_calculator import
+# EQUIPAMENTO_NOMES` segue valendo.
+from src.utils.equipment_names import EQUIPAMENTO_NOMES  # noqa: F401
 
 # ==================== FILTRO DE VIRADA DE MÊS ====================
 # IMPORTANTE: Define como tratar registros que cruzam a virada do mês
